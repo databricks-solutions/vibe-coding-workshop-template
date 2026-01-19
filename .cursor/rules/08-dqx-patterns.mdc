@@ -1,0 +1,1659 @@
+---
+description: Databricks DQX framework patterns for advanced data quality validation with detailed failure insights and flexible quarantine strategies
+---
+# DQX Data Quality Framework Patterns
+
+## Pattern Recognition
+
+DQX is a Python-based data quality framework from Databricks Labs that validates PySpark DataFrames with richer diagnostics than standard DLT expectations. This rule provides patterns for integrating DQX into medallion architecture pipelines.
+
+## When to Use DQX
+
+### ✅ Use DQX When:
+- Need detailed diagnostic information on why data quality checks fail
+- Want auto-profiling to suggest quality rules based on data patterns
+- Need flexible quarantine strategies (drop, mark, flag)
+- Require pre-write validation before saving data
+- Want centralized quality dashboards across all layers
+- Need to store quality check history in Delta tables
+
+### ❌ Continue with Standard DLT Expectations When:
+- Current DLT expectations + Lakehouse Monitoring are sufficient
+- Don't need granular failure diagnostics
+- Want to minimize external dependencies
+- Simple pass/fail validation is adequate
+
+## Installation Patterns
+
+### As Library Dependency (Recommended for Pipelines)
+
+**⚠️ CRITICAL: Serverless Compute Library Configuration**
+
+**For serverless compute, ALWAYS specify libraries at environment level, NOT task level.**
+
+**❌ WRONG - Task-level libraries:**
+```yaml
+# This will FAIL on serverless compute
+resources:
+  jobs:
+    my_job:
+      tasks:
+        - task_key: my_task
+          notebook_task:
+            notebook_path: ../src/script.py
+          libraries:  # ❌ NOT supported for serverless
+            - pypi:
+                package: databricks-labs-dqx==0.8.0
+```
+
+**Error:** `Libraries field is not supported for serverless task, please specify libraries in environment.`
+
+**✅ CORRECT - Environment-level libraries:**
+```yaml
+# resources/<layer>_job.yml
+resources:
+  jobs:
+    silver_dq_job:
+      name: "[${bundle.target}] Silver DQ with DQX"
+      
+      # ✅ Define dependencies at environment level
+      environments:
+        - environment_key: default
+          spec:
+            dependencies:
+              - "databricks-labs-dqx==0.8.0"
+      
+      tasks:
+        - task_key: apply_dqx_checks
+          environment_key: default  # ✅ Reference environment
+          notebook_task:
+            notebook_path: ../src/<layer>/apply_dqx_checks.py
+```
+
+**Notebook Installation:**
+
+```python
+# Install in notebook (if not using bundle)
+%pip install databricks-labs-dqx==0.8.0
+dbutils.library.restartPython()
+```
+
+### As Workspace Tool (For Advanced Features)
+
+**CLI Installation (Optional - provides workflows and dashboards):**
+
+```bash
+# Install DQX tool in workspace
+databricks labs install dqx
+
+# Installs:
+# - Profiling workflow (auto-generate rule candidates)
+# - Quality checking workflow (apply rules)
+# - Quality dashboard (visualization)
+# - Configuration management
+
+# Open dashboards
+databricks labs dqx open-dashboards
+```
+
+## ⚠️ DQX API Reference (Production-Critical)
+
+### Correct DQX Function Names
+
+**ALWAYS use the exact function names from the [official DQX API](https://databrickslabs.github.io/dqx/docs/reference/api/check_funcs/).**
+
+#### Row-Level Check Functions
+
+| Use Case | ✅ Correct Function | ❌ WRONG (Don't Use) | Parameters | Example |
+|----------|---------------------|----------------------|------------|---------|
+| Column >= value | `is_not_less_than` | `has_min`, `is_greater_than_or_equal_to` | `column, limit` | `is_not_less_than("revenue", 0)` |
+| Column <= value | `is_not_greater_than` | `has_max`, `is_less_than_or_equal_to` | `column, limit` | `is_not_greater_than("discount", 100)` |
+| Min <= col <= max | `is_in_range` | `is_between` | `column, min_limit, max_limit` | `is_in_range("pct", 0, 100)` |
+| Column in list | `is_in_list` | `is_in`, `is_in_values` | `column, allowed` | `is_in_list("status", ["A","B"])` |
+| Column > value | `is_greater_than` | ✅ Correct | `column, limit` | `is_greater_than("qty", 0)` |
+| Column < value | `is_less_than` | ✅ Correct | `column, limit` | `is_less_than("returns", 10)` |
+| Not null | `is_not_null` | ✅ Correct | `column` | `is_not_null("id")` |
+| Unique values | `is_unique` | `has_unique_key`, `has_no_duplicates` | `columns` (list) | `is_unique(["id"])` |
+
+#### Dataset-Level Check Functions
+
+| Use Case | ✅ Correct Function | Parameters | Example |
+|----------|---------------------|------------|---------|
+| No duplicate values | `has_no_duplicate_values` | `column` | `has_no_duplicate_values("transaction_id")` |
+| Minimum row count | `has_min_row_count` | `min_count` | `has_min_row_count(1000)` |
+| Maximum row count | `has_max_row_count` | `max_count` | `has_max_row_count(1000000)` |
+
+**Reference:** [DQX Check Functions API Documentation](https://databrickslabs.github.io/dqx/docs/reference/api/check_funcs/)
+
+### Correct Parameter Names
+
+**DQX is STRICT about parameter names. Using wrong names causes immediate errors.**
+
+#### ❌ Common Parameter Name Mistakes
+
+```python
+# ❌ WRONG - Using 'value' instead of 'limit'
+{
+    "function": "is_not_less_than",
+    "arguments": {
+        "column": "revenue",
+        "value": 0  # ❌ ERROR: Unexpected argument 'value'
+    }
+}
+
+# ❌ WRONG - Using 'values' instead of 'allowed'
+{
+    "function": "is_in_list",
+    "arguments": {
+        "column": "status",
+        "values": ["A", "B", "C"]  # ❌ ERROR: Unexpected argument 'values'
+    }
+}
+
+# ❌ WRONG - Using 'min_value'/'max_value' instead of 'min_limit'/'max_limit'
+{
+    "function": "is_in_range",
+    "arguments": {
+        "column": "percentage",
+        "min_value": 0,   # ❌ ERROR: Unexpected argument 'min_value'
+        "max_value": 100  # ❌ ERROR: Unexpected argument 'max_value'
+    }
+}
+```
+
+#### ✅ Correct Parameter Names
+
+```python
+# ✅ CORRECT - Using 'limit' for comparison functions
+{
+    "function": "is_not_less_than",
+    "arguments": {
+        "column": "revenue",
+        "limit": 0  # ✅ Correct parameter name
+    }
+}
+
+# ✅ CORRECT - Using 'allowed' for list membership
+{
+    "function": "is_in_list",
+    "arguments": {
+        "column": "status",
+        "allowed": ["A", "B", "C"]  # ✅ Correct parameter name
+    }
+}
+
+# ✅ CORRECT - Using 'min_limit'/'max_limit' for range checks
+{
+    "function": "is_in_range",
+    "arguments": {
+        "column": "percentage",
+        "min_limit": 0,    # ✅ Correct parameter name
+        "max_limit": 100   # ✅ Correct parameter name
+    }
+}
+```
+
+### Data Type Requirements
+
+**DQX requires INTEGER types for limits, NOT floats.**
+
+#### ❌ WRONG - Using float values
+```python
+{
+    "function": "is_not_greater_than",
+    "arguments": {
+        "column": "return_rate_pct",
+        "limit": 50.0  # ❌ ERROR: Argument 'limit' should be of type 'int'
+    }
+}
+
+{
+    "function": "is_in_range",
+    "arguments": {
+        "column": "discount_pct",
+        "min_limit": 0.0,    # ❌ ERROR: Should be int
+        "max_limit": 100.0   # ❌ ERROR: Should be int
+    }
+}
+```
+
+**Error Message:**
+> `Argument 'limit' should be of type 'int | datetime.date | datetime.datetime | str | pyspark.sql.column.Column | None', not float`
+
+#### ✅ CORRECT - Using integer values
+```python
+{
+    "function": "is_not_greater_than",
+    "arguments": {
+        "column": "return_rate_pct",
+        "limit": 50  # ✅ Integer
+    }
+}
+
+{
+    "function": "is_in_range",
+    "arguments": {
+        "column": "discount_pct",
+        "min_limit": 0,    # ✅ Integer
+        "max_limit": 100   # ✅ Integer
+    }
+}
+```
+
+### DQX API Method Selection
+
+**CRITICAL: Choose the correct API method based on how checks are defined.**
+
+#### Metadata-Based API (For Dict/YAML Checks)
+
+**Use when checks are defined as dictionaries or loaded from YAML:**
+
+```python
+from databricks.labs.dqx.engine import DQEngine
+from databricks.sdk import WorkspaceClient
+
+dq_engine = DQEngine(WorkspaceClient())
+
+# Checks defined as dicts (from YAML or Python)
+checks = [
+    {
+        "name": "revenue_non_negative",
+        "criticality": "error",
+        "check": {
+            "function": "is_not_less_than",
+            "arguments": {"column": "revenue", "limit": 0}
+        }
+    }
+]
+
+# ✅ CORRECT - Use metadata-based API
+valid_df, invalid_df = dq_engine.apply_checks_by_metadata_and_split(df, checks)
+
+# OR for validation without splitting
+validated_df = dq_engine.apply_checks_by_metadata(df, checks)
+```
+
+**❌ WRONG - Using code-based API for dict checks:**
+```python
+# ❌ This will FAIL with dict checks
+valid_df, invalid_df = dq_engine.apply_checks_and_split(df, checks)
+```
+
+**Error Message:**
+> `Use 'apply_checks_by_metadata_and_split' to pass checks as list of dicts instead.`
+
+#### Code-Based API (For DQRowRule/DQDatasetRule Objects)
+
+**Use when checks are defined as DQX rule objects:**
+
+```python
+from databricks.labs.dqx.rule import DQRowRule
+from databricks.labs.dqx import check_funcs
+
+# Checks defined as DQX rule objects
+checks = [
+    DQRowRule(
+        name="revenue_non_negative",
+        criticality="error",
+        check_func=check_funcs.is_not_less_than,
+        column="revenue",
+        limit=0
+    )
+]
+
+# ✅ CORRECT - Use code-based API
+valid_df, invalid_df = dq_engine.apply_checks_and_split(df, checks)
+```
+
+### Spark Connect Compatibility
+
+**CRITICAL: Serverless compute uses Spark Connect, which doesn't support JVM-dependent APIs.**
+
+#### ❌ WRONG - Using sparkContext (not Spark Connect compatible)
+```python
+# ❌ This FAILS on serverless compute
+current_user = spark.sparkContext.sparkUser()
+```
+
+**Error Message:**
+> `[JVM_ATTRIBUTE_NOT_SUPPORTED] Attribute sparkContext is not supported in Spark Connect as it depends on the JVM.`
+
+#### ✅ CORRECT - Spark Connect compatible alternatives
+```python
+# ✅ Get current user via SQL
+try:
+    current_user = spark.sql("SELECT current_user() as user").collect()[0]["user"]
+except:
+    current_user = "unknown"
+
+# ✅ Get session ID
+session_id = spark.sparkSession.sessionId
+
+# ✅ Get Spark version
+spark_version = spark.version
+```
+
+**Rule:** Always use SQL queries or DataFrame APIs instead of `sparkContext` when deploying to serverless.
+
+## Quality Checks Definition Patterns
+
+### Pattern 1: YAML Configuration (Declarative)
+
+**Best for:** Version-controlled, reusable check definitions
+
+**File: `src/<layer>/dqx_checks.yml`**
+
+```yaml
+# DQX Quality Checks for Silver Transactions
+# Criticality: error (drops records) | warn (logs but passes)
+
+# NOT NULL checks
+- name: transaction_id_not_null
+  criticality: error
+  check:
+    function: is_not_null_and_not_empty
+    arguments:
+      column: transaction_id
+  metadata:
+    check_type: completeness
+    layer: silver
+    entity: transactions
+    business_owner: Revenue Analytics
+
+- name: store_number_not_null
+  criticality: error
+  check:
+    function: is_not_null
+    arguments:
+      column: store_number
+  metadata:
+    check_type: referential_integrity
+    layer: silver
+
+# Range checks
+- name: positive_price
+  criticality: error
+  check:
+    function: is_greater_than
+    arguments:
+      column: final_sales_price
+      value: 0
+  metadata:
+    check_type: validity
+    business_rule: "Prices must be positive"
+
+- name: reasonable_quantity
+  criticality: warn  # Warning only (doesn't drop)
+  check:
+    function: is_between
+    arguments:
+      column: quantity_sold
+      min_value: -50
+      max_value: 100
+  metadata:
+    check_type: reasonableness
+    business_rule: "Quantities outside range are unusual"
+
+# Date checks
+- name: valid_transaction_date
+  criticality: error
+  check:
+    function: is_greater_than_or_equal_to
+    arguments:
+      column: transaction_date
+      value: "2020-01-01"
+  metadata:
+    check_type: temporal_validity
+
+# Custom SQL expression
+- name: discount_not_exceeds_price
+  criticality: error
+  check:
+    function: sql_expr
+    arguments:
+      column: transaction_id  # Reference column
+      sql_expr: "(multi_unit_discount + coupon_discount + loyalty_discount) <= final_sales_price"
+  metadata:
+    check_type: business_logic
+    business_rule: "Total discounts cannot exceed sale price"
+```
+
+### Pattern 2: Python Programmatic Definition
+
+**Best for:** Dynamic rule generation, conditional logic
+
+```python
+# src/<layer>/dqx_checks_generator.py
+from databricks.labs.dqx import check_funcs
+from databricks.labs.dqx.rule import DQRowRule, DQDatasetRule, DQForEachColRule
+
+def get_silver_transaction_checks():
+    """Generate DQX checks for silver_transactions programmatically."""
+    
+    checks = []
+    
+    # Row-level checks (applied to each row)
+    checks.extend([
+        DQRowRule(
+            name="transaction_id_not_null",
+            criticality="error",
+            check_func=check_funcs.is_not_null_and_not_empty,
+            column="transaction_id",
+            user_metadata={
+                "check_type": "completeness",
+                "layer": "silver",
+                "entity": "transactions"
+            }
+        ),
+        DQRowRule(
+            name="positive_price",
+            criticality="error",
+            check_func=check_funcs.is_greater_than,
+            column="final_sales_price",
+            value=0,
+            user_metadata={
+                "check_type": "validity",
+                "business_rule": "Prices must be positive"
+            }
+        ),
+        DQRowRule(
+            name="reasonable_quantity",
+            criticality="warn",  # Warning only
+            check_func=check_funcs.is_between,
+            column="quantity_sold",
+            min_value=-50,
+            max_value=100,
+            user_metadata={
+                "check_type": "reasonableness"
+            }
+        ),
+    ])
+    
+    # Dataset-level checks (applied to entire DataFrame)
+    checks.extend([
+        DQDatasetRule(
+            name="no_duplicate_transaction_ids",
+            criticality="error",
+            check_func=check_funcs.has_no_duplicate_values,
+            column="transaction_id",
+            user_metadata={
+                "check_type": "uniqueness"
+            }
+        ),
+        DQDatasetRule(
+            name="min_record_count",
+            criticality="warn",
+            check_func=check_funcs.has_min_row_count,
+            min_count=1000,
+            user_metadata={
+                "check_type": "volume",
+                "business_rule": "Expect at least 1000 daily transactions"
+            }
+        ),
+    ])
+    
+    # For-each-column checks (applied to multiple columns)
+    required_columns = ["store_number", "upc_code", "transaction_date"]
+    
+    for col in required_columns:
+        checks.append(
+            DQRowRule(
+                name=f"{col}_not_null",
+                criticality="error",
+                check_func=check_funcs.is_not_null,
+                column=col,
+                user_metadata={
+                    "check_type": "completeness",
+                    "generated": "for_each_column"
+                }
+            )
+        )
+    
+    return checks
+
+def get_dimension_checks(dim_name: str, key_column: str):
+    """Reusable dimension check generator."""
+    return [
+        DQRowRule(
+            name=f"{key_column}_not_null",
+            criticality="error",
+            check_func=check_funcs.is_not_null_and_not_empty,
+            column=key_column,
+            user_metadata={
+                "dimension": dim_name,
+                "check_type": "completeness"
+            }
+        ),
+        DQDatasetRule(
+            name=f"no_duplicate_{key_column}",
+            criticality="error",
+            check_func=check_funcs.has_no_duplicate_values,
+            column=key_column,
+            user_metadata={
+                "dimension": dim_name,
+                "check_type": "uniqueness"
+            }
+        ),
+    ]
+```
+
+### Pattern 3: Delta Table Storage (Production Pattern)
+
+**Best for:** Large-scale environments, centralized governance
+
+```python
+# src/<layer>/dqx_checks_manager.py
+from databricks.labs.dqx.engine import DQEngine
+from databricks.labs.dqx.config import TableChecksStorageConfig
+from databricks.sdk import WorkspaceClient
+from pyspark.sql import SparkSession
+import yaml
+
+def load_checks_from_yaml(yaml_path: str):
+    """Load checks from YAML file."""
+    with open(yaml_path, 'r') as f:
+        return yaml.safe_load(f)
+
+def save_checks_to_delta(
+    spark: SparkSession,
+    checks: list,
+    catalog: str,
+    schema: str,
+    table_name: str = "dqx_quality_checks"
+):
+    """
+    Save quality checks to Delta table for governance and history.
+    
+    Table Schema:
+    - check_id: string (unique identifier)
+    - check_name: string
+    - criticality: string (error|warn)
+    - check_function: string
+    - target_column: string
+    - arguments: string (JSON)
+    - metadata: string (JSON)
+    - created_timestamp: timestamp
+    - created_by: string
+    - entity: string (table name)
+    - layer: string (bronze|silver|gold)
+    - version: int
+    """
+    from datetime import datetime
+    import json
+    
+    dq_engine = DQEngine(WorkspaceClient())
+    
+    # Create fully qualified table name
+    checks_table = f"{catalog}.{schema}.{table_name}"
+    
+    # Convert checks to Delta-friendly format
+    check_records = []
+    for check in checks:
+        record = {
+            "check_id": check.get("name", ""),
+            "check_name": check.get("name", ""),
+            "criticality": check.get("criticality", "warn"),
+            "check_function": check["check"]["function"],
+            "target_column": check["check"]["arguments"].get("column", ""),
+            "arguments": json.dumps(check["check"]["arguments"]),
+            "metadata": json.dumps(check.get("metadata", {})),
+            "created_timestamp": datetime.now(),
+            "created_by": spark.sparkContext.sparkUser(),
+            "entity": check.get("metadata", {}).get("entity", ""),
+            "layer": check.get("metadata", {}).get("layer", ""),
+            "version": 1
+        }
+        check_records.append(record)
+    
+    # Create DataFrame and save to Delta
+    checks_df = spark.createDataFrame(check_records)
+    
+    # ⚠️ CRITICAL: Delete old checks before inserting new ones
+    # This ensures obsolete checks are removed from Delta table
+    if spark.catalog.tableExists(checks_table):
+        from delta.tables import DeltaTable
+        
+        delta_table = DeltaTable.forName(spark, checks_table)
+        
+        # ✅ DELETE all existing checks for this entity
+        # This removes obsolete checks that no longer exist in code
+        entity_name = check_records[0].get("entity", "")
+        if entity_name:
+            delta_table.delete(f"entity = '{entity_name}'")
+            print(f"  Deleted old checks for entity: {entity_name}")
+        
+        # Then INSERT all current checks
+        checks_df.write.format("delta") \
+            .mode("append") \
+            .saveAsTable(checks_table)
+        
+        print(f"✓ Updated {len(check_records)} checks in {checks_table}")
+    else:
+        checks_df.write.format("delta").mode("overwrite").saveAsTable(checks_table)
+        print(f"✓ Created checks table {checks_table}")
+    
+    return checks_table
+
+def load_checks_from_delta(
+    spark: SparkSession,
+    catalog: str,
+    schema: str,
+    entity: str = None,
+    table_name: str = "dqx_quality_checks"
+):
+    """Load checks from Delta table."""
+    import json
+    
+    checks_table = f"{catalog}.{schema}.{table_name}"
+    
+    # Query checks
+    query = f"SELECT * FROM {checks_table} WHERE 1=1"
+    if entity:
+        query += f" AND entity = '{entity}'"
+    
+    checks_df = spark.sql(query)
+    
+    # Convert back to DQX format
+    checks = []
+    for row in checks_df.collect():
+        check = {
+            "name": row.check_name,
+            "criticality": row.criticality,
+            "check": {
+                "function": row.check_function,
+                "arguments": json.loads(row.arguments)
+            },
+            "metadata": json.loads(row.metadata)
+        }
+        checks.append(check)
+    
+    return checks
+```
+
+## Quality Checks Storage Patterns
+
+### Pattern: YAML → Delta Workflow
+
+**Integrated with Gold Table Setup Job:**
+
+```yaml
+# resources/gold_table_setup_job.yml
+resources:
+  jobs:
+    gold_table_setup_job:
+      name: "[${bundle.target}] Gold Table Setup with DQX"
+      
+      tasks:
+        # Existing table creation task
+        - task_key: create_gold_tables
+          python_task:
+            python_file: ../src/altria_gold/create_gold_tables.py
+        
+        # NEW: Store DQX checks in Delta
+        - task_key: store_dqx_checks
+          depends_on:
+            - task_key: create_gold_tables
+          python_task:
+            python_file: ../src/altria_gold/store_dqx_checks.py
+            parameters:
+              - "--catalog=${catalog}"
+              - "--schema=${gold_schema}"
+          libraries:
+            - pypi:
+                package: databricks-labs-dqx==0.8.0
+```
+
+**Implementation:**
+
+```python
+# src/altria_gold/store_dqx_checks.py
+"""
+Store DQX quality checks from YAML into Delta table.
+Run as part of gold_table_setup_job.
+"""
+
+from pyspark.sql import SparkSession
+import argparse
+import os
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--catalog", required=True)
+    parser.add_argument("--schema", required=True)
+    args = parser.parse_args()
+    
+    spark = SparkSession.builder.appName("Store DQX Checks").getOrCreate()
+    
+    # Import helper (ensure it's in the same directory or importable)
+    from dqx_checks_manager import load_checks_from_yaml, save_checks_to_delta
+    
+    try:
+        # Path to YAML checks file (in bundle)
+        checks_yaml_path = "../src/altria_silver/dqx_checks.yml"
+        
+        # Load checks from YAML
+        print(f"Loading checks from {checks_yaml_path}...")
+        checks = load_checks_from_yaml(checks_yaml_path)
+        print(f"✓ Loaded {len(checks)} quality checks")
+        
+        # Save to Delta table
+        print(f"Storing checks in {args.catalog}.{args.schema}...")
+        save_checks_to_delta(
+            spark=spark,
+            checks=checks,
+            catalog=args.catalog,
+            schema=args.schema,
+            table_name="dqx_quality_checks"
+        )
+        
+        print("\n" + "="*80)
+        print("✓ DQX checks stored successfully!")
+        print("="*80)
+        
+    except Exception as e:
+        print(f"\n❌ Error storing DQX checks: {str(e)}")
+        raise
+    
+    finally:
+        spark.stop()
+
+if __name__ == "__main__":
+    main()
+```
+
+## Applying Quality Checks Patterns
+
+### Pattern 1: Integration with DLT Silver Layer
+
+**Enhanced Silver table with DQX:**
+
+```python
+# src/altria_silver/silver_transactions_dqx.py
+import dlt
+from pyspark.sql.functions import col, current_timestamp
+from databricks.labs.dqx.engine import DQEngine
+from databricks.labs.dqx.config import FileChecksStorageConfig
+from databricks.sdk import WorkspaceClient
+
+# Initialize DQX engine (once per notebook)
+dq_engine = DQEngine(WorkspaceClient())
+
+# Load checks from YAML
+checks_path = "dqx_checks.yml"
+checks = dq_engine.load_checks(config=FileChecksStorageConfig(location=checks_path))
+
+def get_source_table(table_name, source_schema_key="bronze_schema"):
+    """Helper to get fully qualified table name."""
+    from pyspark.sql import SparkSession
+    spark = SparkSession.getActiveSession()
+    catalog = spark.conf.get("catalog")
+    schema = spark.conf.get(source_schema_key)
+    return f"{catalog}.{schema}.{table_name}"
+
+@dlt.table(
+    name="silver_transactions_dqx",
+    comment="""Silver layer transactions with DQX validation providing detailed 
+    failure diagnostics and flexible quarantine strategies""",
+    table_properties={
+        "quality": "silver",
+        "delta.enableChangeDataFeed": "true",
+        "delta.enableRowTracking": "true",
+        "layer": "silver",
+        "validation_framework": "dqx",
+        "contains_pii": "false"
+    },
+    cluster_by_auto=True
+)
+def silver_transactions_dqx():
+    """
+    Silver transactions with DQX quality validation.
+    
+    DQX provides:
+    - Detailed failure diagnostics (why checks failed)
+    - Flexible marking/flagging of invalid records
+    - Metadata enrichment for tracking
+    """
+    bronze_df = dlt.read_stream(get_source_table("bronze_transactions"))
+    
+    # Apply DQX checks and get results with diagnostics
+    result_df = dq_engine.apply_checks(
+        input_df=bronze_df,
+        checks=checks
+    )
+    
+    # Result DataFrame includes:
+    # - Original columns
+    # - dq_check_result: PASS/FAIL per row
+    # - dq_check_failures: Array of failed check names
+    # - dq_check_details: Detailed failure information
+    
+    # Add processing metadata
+    result_df = result_df.withColumn("processed_timestamp", current_timestamp())
+    
+    return result_df
+
+@dlt.table(
+    name="silver_transactions_dqx_quarantine",
+    comment="Quarantine table for records that failed DQX critical checks",
+    table_properties={
+        "quality": "quarantine",
+        "layer": "silver",
+        "validation_framework": "dqx"
+    },
+    cluster_by_auto=True
+)
+def silver_transactions_dqx_quarantine():
+    """
+    Quarantine failed records with rich diagnostic information.
+    
+    Use dq_check_failures and dq_check_details columns to understand
+    exactly why records failed validation.
+    """
+    full_df = dlt.read("silver_transactions_dqx")
+    
+    # Filter for failed records
+    quarantine_df = full_df.filter(col("dq_check_result") == "FAIL")
+    
+    # Add quarantine metadata
+    quarantine_df = (
+        quarantine_df
+        .withColumn("quarantine_timestamp", current_timestamp())
+        .withColumn("requires_review", col("dq_check_failures").isNotNull())
+    )
+    
+    return quarantine_df
+
+@dlt.view(
+    name="silver_transactions_dqx_pass",
+    comment="View of records that passed all DQX checks"
+)
+def silver_transactions_dqx_pass():
+    """Only records that passed validation."""
+    full_df = dlt.read("silver_transactions_dqx")
+    return full_df.filter(col("dq_check_result") == "PASS")
+```
+
+### Pattern 2: Split Valid/Invalid Records
+
+**Alternative pattern for cleaner separation:**
+
+```python
+# src/altria_silver/silver_transactions_dqx_split.py
+import dlt
+from databricks.labs.dqx.engine import DQEngine
+from databricks.sdk import WorkspaceClient
+
+dq_engine = DQEngine(WorkspaceClient())
+
+@dlt.table(
+    name="silver_transactions_valid",
+    comment="Valid transactions that passed all DQX checks",
+    table_properties={
+        "quality": "silver",
+        "validation_status": "passed"
+    },
+    cluster_by_auto=True
+)
+def silver_transactions_valid():
+    """Only valid records (no DQX metadata columns)."""
+    bronze_df = dlt.read_stream(get_source_table("bronze_transactions"))
+    
+    # Apply checks and split
+    valid_df, invalid_df = dq_engine.apply_checks_and_split(
+        input_df=bronze_df,
+        checks=checks
+    )
+    
+    return valid_df  # Clean, no DQX columns
+
+@dlt.table(
+    name="silver_transactions_quarantine",
+    comment="Invalid transactions with detailed DQX failure diagnostics",
+    table_properties={
+        "quality": "quarantine",
+        "validation_status": "failed"
+    },
+    cluster_by_auto=True
+)
+def silver_transactions_quarantine():
+    """Failed records with diagnostic columns."""
+    bronze_df = dlt.read_stream(get_source_table("bronze_transactions"))
+    
+    # Apply checks and split
+    valid_df, invalid_df = dq_engine.apply_checks_and_split(
+        input_df=bronze_df,
+        checks=checks
+    )
+    
+    # invalid_df includes:
+    # - dq_check_failures: Array of failed check names
+    # - dq_check_details: Detailed failure reasons
+    # - dq_validation_timestamp: When validation occurred
+    
+    return invalid_df
+```
+
+### Pattern 3: Gold Layer Pre-Merge Validation (Production Pattern)
+
+**Validate aggregated data before MERGE with proper error handling and quarantine:**
+
+**File 1: `src/altria_gold/dqx_gold_checks.py`** (Centralized check definitions)
+
+```python
+"""
+DQX quality checks for Gold layer tables.
+Pure Python file for standard imports.
+"""
+
+from databricks.labs.dqx.engine import DQEngine
+from databricks.sdk import WorkspaceClient
+from pyspark.sql import SparkSession
+from delta.tables import DeltaTable
+from typing import List, Dict, Tuple, Optional
+from pyspark.sql import DataFrame
+
+def get_fact_sales_daily_checks() -> List[Dict]:
+    """Get all DQX checks for fact_sales_daily table."""
+    return [
+        # Error-level checks (quarantine failures)
+        {
+            "name": "non_negative_net_revenue",
+            "criticality": "error",
+            "check": {
+                "function": "is_not_less_than",  # ✅ Correct function name
+                "arguments": {
+                    "column": "net_revenue",
+                    "limit": 0  # ✅ Use 'limit', not 'value'; int, not float
+                }
+            },
+            "metadata": {
+                "check_type": "validity",
+                "business_rule": "Net revenue cannot be negative after returns",
+                "failure_impact": "Critical - Invalid financial reporting",
+                "layer": "gold",
+                "entity": "fact_sales_daily"
+            }
+        },
+        {
+            "name": "positive_transaction_count",
+            "criticality": "error",
+            "check": {
+                "function": "is_greater_than",  # ✅ Correct function name
+                "arguments": {
+                    "column": "transaction_count",
+                    "limit": 0  # ✅ Integer value
+                }
+            },
+            "metadata": {
+                "check_type": "validity",
+                "business_rule": "Daily aggregates must have at least one transaction",
+                "failure_impact": "High - Empty aggregation indicates data issue",
+                "layer": "gold",
+                "entity": "fact_sales_daily"
+            }
+        },
+        
+        # Warning-level checks (log but allow)
+        {
+            "name": "reasonable_daily_revenue",
+            "criticality": "warn",
+            "check": {
+                "function": "is_not_greater_than",
+                "arguments": {
+                    "column": "net_revenue",
+                    "limit": 100000  # ✅ Integer
+                }
+            },
+            "metadata": {
+                "check_type": "reasonableness",
+                "business_rule": "Daily revenue > $100K at store-product-day level is unusual",
+                "failure_impact": "Low - Requires investigation but not blocking",
+                "layer": "gold",
+                "entity": "fact_sales_daily"
+            }
+        }
+    ]
+
+def apply_dqx_validation(
+    spark: SparkSession,
+    df: DataFrame,
+    catalog: str,
+    schema: str,
+    entity: str,
+    enable_quarantine: bool = True
+) -> Tuple[DataFrame, Optional[DataFrame], Dict]:
+    """
+    Apply DQX validation to a DataFrame before MERGE.
+    
+    Args:
+        spark: SparkSession
+        df: DataFrame to validate
+        catalog: Unity Catalog name
+        schema: Schema name
+        entity: Entity name (e.g., "fact_sales_daily")
+        enable_quarantine: If True, split into valid/invalid DataFrames
+    
+    Returns:
+        (valid_df, invalid_df, validation_stats)
+    """
+    # Initialize DQX engine
+    dq_engine = DQEngine(WorkspaceClient())
+    
+    # Load checks for this entity
+    if entity == "fact_sales_daily":
+        checks = get_fact_sales_daily_checks()
+    # Add other entities as needed
+    else:
+        raise ValueError(f"Unknown entity: {entity}")
+    
+    print(f"\n  Applying {len(checks)} DQX quality checks...")
+    
+    # ✅ CRITICAL: Use metadata-based API for dict checks
+    if enable_quarantine:
+        valid_df, invalid_df = dq_engine.apply_checks_by_metadata_and_split(df, checks)
+    else:
+        validated_df = dq_engine.apply_checks_by_metadata(df, checks)
+        return validated_df, None, {}
+    
+    # Calculate validation stats
+    valid_count = valid_df.count()
+    invalid_count = invalid_df.count() if invalid_df is not None else 0
+    total_count = valid_count + invalid_count
+    
+    validation_stats = {
+        "total": total_count,
+        "valid": valid_count,
+        "invalid": invalid_count,
+        "pass_rate_pct": round((valid_count / total_count * 100), 2) if total_count > 0 else 0
+    }
+    
+    print(f"  ✓ Validation complete:")
+    print(f"    Total: {total_count:,} records")
+    print(f"    Valid: {valid_count:,} ({validation_stats['pass_rate_pct']}%)")
+    print(f"    Invalid: {invalid_count:,}")
+    
+    if invalid_count > 0:
+        print(f"\n  ⚠️  {invalid_count:,} records failed validation")
+        print(f"    Quarantine details available in {catalog}.{schema}.{entity}_quarantine")
+    
+    return valid_df, invalid_df, validation_stats
+```
+
+**File 2: `src/altria_gold/merge_gold_tables.py`** (Updated with DQX integration)
+
+```python
+"""
+Gold layer MERGE with DQX pre-validation.
+Ensures only quality data enters Gold layer.
+"""
+
+from pyspark.sql import SparkSession
+from delta.tables import DeltaTable
+from dqx_gold_checks import apply_dqx_validation  # ✅ Standard import
+import argparse
+
+def merge_fact_sales_daily(
+    spark: SparkSession,
+    catalog: str,
+    silver_schema: str,
+    gold_schema: str
+):
+    """Merge fact_sales_daily from Silver to Gold with DQX validation."""
+    
+    silver_table = f"{catalog}.{silver_schema}.silver_transactions"
+    gold_table = f"{catalog}.{gold_schema}.fact_sales_daily"
+    
+    transactions = spark.table(silver_table)
+    
+    # Aggregate daily sales
+    from pyspark.sql.functions import sum as spark_sum, count, when, col
+    
+    daily_sales = (
+        transactions
+        .groupBy("store_number", "upc_code", "transaction_date")
+        .agg(
+            spark_sum(when(col("quantity_sold") > 0, col("final_sales_price")).otherwise(0)).alias("gross_revenue"),
+            spark_sum(col("final_sales_price")).alias("net_revenue"),
+            spark_sum(when(col("quantity_sold") > 0, col("quantity_sold")).otherwise(0)).alias("units_sold"),
+            count("*").alias("transaction_count")
+        )
+    )
+    
+    # ✅ DQX PRE-MERGE VALIDATION
+    valid_sales, invalid_sales, validation_stats = apply_dqx_validation(
+        spark=spark,
+        df=daily_sales,
+        catalog=catalog,
+        schema=gold_schema,
+        entity="fact_sales_daily",
+        enable_quarantine=True
+    )
+    
+    # Handle quarantine records if any
+    if invalid_sales is not None and validation_stats["invalid"] > 0:
+        quarantine_table = f"{gold_table}_quarantine"
+        
+        print(f"\n  Saving {validation_stats['invalid']:,} invalid records to quarantine...")
+        
+        # Save to quarantine table with mergeSchema for DQX metadata columns
+        invalid_sales.write \
+            .format("delta") \
+            .mode("append") \
+            .option("mergeSchema", "true") \
+            .saveAsTable(quarantine_table)
+        
+        print(f"  ✓ Quarantine table: {quarantine_table}")
+        print(f"    Query failures: SELECT * FROM {quarantine_table}")
+    
+    # Only merge valid records
+    if validation_stats["valid"] == 0:
+        print(f"\n  ❌ No valid records to merge! All records failed validation.")
+        print(f"     Check quarantine table for details: {catalog}.{gold_schema}.fact_sales_daily_quarantine")
+        return
+    
+    print(f"\n  Proceeding to MERGE {validation_stats['valid']:,} validated records...")
+    
+    # MERGE into Gold (using validated DataFrame)
+    delta_gold = DeltaTable.forName(spark, gold_table)
+    
+    delta_gold.alias("target").merge(
+        valid_sales.alias("source"),  # ✅ Use validated DataFrame
+        """target.store_number = source.store_number 
+           AND target.upc_code = source.upc_code 
+           AND target.transaction_date = source.transaction_date"""
+    ).whenMatchedUpdate(set={
+        "net_revenue": "source.net_revenue",
+        "units_sold": "source.units_sold",
+        "transaction_count": "source.transaction_count",
+        "record_updated_timestamp": "source.record_updated_timestamp"
+    }).whenNotMatchedInsertAll(
+    ).execute()
+    
+    print(f"✓ Merged {validation_stats['valid']:,} validated records into fact_sales_daily")
+    if validation_stats["invalid"] > 0:
+        print(f"  ({validation_stats['invalid']:,} records quarantined)")
+```
+
+**File 3: `resources/gold_merge_job.yml`** (2-step workflow)
+
+```yaml
+resources:
+  jobs:
+    gold_merge_job:
+      name: "[${bundle.target}] Gold Layer - MERGE with DQX"
+      description: "Merges from Silver to Gold with DQX pre-validation using serverless compute"
+      
+      # ✅ CRITICAL: Define DQX library at environment level
+      environments:
+        - environment_key: default
+          spec:
+            dependencies:
+              - "databricks-labs-dqx==0.8.0"
+      
+      tasks:
+        # Step 1: Store/update DQX checks in Delta table
+        - task_key: store_dqx_checks
+          environment_key: default
+          notebook_task:
+            notebook_path: ../src/altria_gold/store_dqx_gold_checks.py
+            base_parameters:
+              catalog: ${var.catalog}
+              gold_schema: ${var.gold_schema}
+        
+        # Step 2: MERGE with DQX validation (depends on checks being stored)
+        - task_key: merge_gold_tables
+          depends_on:
+            - task_key: store_dqx_checks
+          environment_key: default
+          notebook_task:
+            notebook_path: ../src/altria_gold/merge_gold_tables.py
+            base_parameters:
+              catalog: ${var.catalog}
+              silver_schema: ${var.silver_schema}
+              gold_schema: ${var.gold_schema}
+      
+      schedule:
+        quartz_cron_expression: "0 0 4 * * ?"  # Daily at 4 AM
+        timezone_id: "America/New_York"
+        pause_status: PAUSED  # Enable manually
+      
+      tags:
+        environment: ${bundle.target}
+        project: altria_demo
+        layer: gold
+        compute_type: serverless
+        job_type: merge
+```
+
+## Additional Configuration Patterns
+
+### Metadata Enrichment
+
+**Add comprehensive metadata to all checks:**
+
+```yaml
+# src/altria_silver/dqx_checks.yml with rich metadata
+- name: transaction_id_not_null
+  criticality: error
+  check:
+    function: is_not_null_and_not_empty
+    arguments:
+      column: transaction_id
+  metadata:
+    # Classification
+    check_type: completeness
+    check_category: data_integrity
+    
+    # Ownership
+    business_owner: Revenue Analytics Team
+    technical_owner: Data Engineering
+    data_steward: revenue-stewards@company.com
+    
+    # Context
+    layer: silver
+    entity: transactions
+    domain: sales
+    
+    # Business rules
+    business_rule: "Every transaction must have a unique identifier"
+    failure_impact: "High - Cannot track transaction lineage"
+    remediation: "Check source POS system for ID generation issues"
+    
+    # Lifecycle
+    created_date: "2025-01-15"
+    created_by: "data-eng@company.com"
+    last_reviewed: "2025-01-15"
+    review_frequency: quarterly
+    
+    # Compliance
+    regulatory_requirement: "SOX compliance - transaction traceability"
+    retention_period: "7_years"
+    
+    # Tags
+    tags:
+      - critical
+      - financial_reporting
+      - sox_compliance
+```
+
+### Custom Check Functions
+
+**Define reusable custom validation logic:**
+
+```python
+# src/altria_silver/custom_dqx_checks.py
+"""
+Custom DQX check functions for business-specific validations.
+"""
+
+from pyspark.sql import Column
+from pyspark.sql.functions import col
+
+def is_valid_store_format(column_name: str) -> Column:
+    """
+    Check if store number follows company format: S-####
+    
+    Returns:
+        Boolean Column indicating validity
+    """
+    return col(column_name).rlike(r'^S-\d{4}$')
+
+def discount_within_policy(
+    price_col: str,
+    multi_discount_col: str,
+    coupon_discount_col: str,
+    loyalty_discount_col: str,
+    max_discount_pct: float = 0.50
+) -> Column:
+    """
+    Check if total discounts don't exceed company policy (50% by default).
+    
+    Args:
+        price_col: Original price column name
+        multi_discount_col: Multi-unit discount column
+        coupon_discount_col: Coupon discount column
+        loyalty_discount_col: Loyalty discount column
+        max_discount_pct: Maximum allowed discount percentage
+    
+    Returns:
+        Boolean Column indicating policy compliance
+    """
+    total_discount = (
+        col(multi_discount_col) + 
+        col(coupon_discount_col) + 
+        col(loyalty_discount_col)
+    )
+    max_allowed = col(price_col) * max_discount_pct
+    return total_discount <= max_allowed
+
+def is_valid_upc(column_name: str) -> Column:
+    """
+    Check if UPC code is valid (12-14 digits).
+    
+    Returns:
+        Boolean Column indicating UPC validity
+    """
+    from pyspark.sql.functions import length
+    upc_length = length(col(column_name))
+    return (upc_length >= 12) & (upc_length <= 14) & col(column_name).rlike(r'^\d+$')
+
+# Use custom checks in DQX
+from databricks.labs.dqx.rule import DQRowRule
+
+custom_checks = [
+    DQRowRule(
+        name="valid_store_format",
+        criticality="error",
+        check_func=is_valid_store_format,
+        column="store_number",
+        user_metadata={
+            "check_type": "format_validation",
+            "custom": True
+        }
+    ),
+    DQRowRule(
+        name="discount_within_policy",
+        criticality="warn",
+        check_func=discount_within_policy,
+        column="final_sales_price",  # Reference column
+        user_metadata={
+            "check_type": "business_policy",
+            "policy": "MAX_DISCOUNT_50_PCT",
+            "custom": True
+        }
+    ),
+]
+```
+
+## DQX vs. DLT Expectations Comparison
+
+### Feature Matrix
+
+| Feature | DLT Expectations | DQX | Recommendation |
+|---------|-----------------|-----|----------------|
+| Row-level validation | ✅ Yes | ✅ Yes | Both work |
+| Failure diagnostics | ❌ Basic | ✅ Detailed | DQX for debugging |
+| Auto-profiling | ❌ No | ✅ Yes | DQX for discovery |
+| Quarantine strategies | ✅ Drop/fail | ✅ Drop/mark/flag | DQX more flexible |
+| YAML configuration | ❌ No | ✅ Yes | DQX for declarative |
+| Streaming support | ✅ Native | ✅ Yes | Both work |
+| Delta table storage | ❌ No | ✅ Yes | DQX for governance |
+| Custom dashboards | ❌ No | ✅ Yes | DQX for visualization |
+| Learning curve | ✅ Simple | ⚠️ Moderate | DLT easier |
+| External dependency | ✅ Built-in | ⚠️ External lib | DLT simpler |
+
+### Migration Strategy
+
+**Hybrid Approach (Recommended):**
+
+```python
+# Use BOTH DLT expectations AND DQX for complementary benefits
+
+import dlt
+from databricks.labs.dqx.engine import DQEngine
+from data_quality_rules import get_critical_rules_for_table
+
+dq_engine = DQEngine(WorkspaceClient())
+dqx_checks = dq_engine.load_checks(...)
+
+@dlt.table(...)
+# Keep existing DLT expectations for critical rules (fast, built-in)
+@dlt.expect_all_or_fail(get_critical_rules_for_table("silver_transactions"))
+def silver_transactions():
+    """
+    Hybrid validation:
+    1. DLT expectations: Critical rules (fast fail)
+    2. DQX: Detailed diagnostics and metadata enrichment
+    """
+    bronze_df = dlt.read_stream(get_source_table("bronze_transactions"))
+    
+    # Apply DQX for detailed diagnostics (doesn't drop, just marks)
+    dqx_result = dq_engine.apply_checks(bronze_df, dqx_checks)
+    
+    # DQX adds diagnostic columns but DLT expectations enforce drops
+    return dqx_result
+```
+
+## Common DQX Errors and Solutions
+
+### Error 1: Function Not Defined
+
+**Error Message:**
+> `function 'has_min' is not defined`
+
+**Cause:** Using incorrect DQX function name
+
+**Solution:** Always use [official DQX function names](https://databrickslabs.github.io/dqx/docs/reference/api/check_funcs/)
+- ❌ `has_min` → ✅ `is_not_less_than`
+- ❌ `has_max` → ✅ `is_not_greater_than`
+- ❌ `is_in` → ✅ `is_in_list`
+- ❌ `has_unique_key` → ✅ `is_unique`
+
+### Error 2: Unexpected Argument
+
+**Error Message:**
+> `Unexpected argument 'value' for function 'is_not_less_than'. Expected arguments are: ['column', 'limit']`
+
+**Cause:** Using wrong parameter name
+
+**Solution:** Use correct parameter names
+- ❌ `"value": 0` → ✅ `"limit": 0`
+- ❌ `"values": [...]` → ✅ `"allowed": [...]`
+- ❌ `"min_value"/"max_value"` → ✅ `"min_limit"/"max_limit"`
+
+### Error 3: Wrong Data Type for Argument
+
+**Error Message:**
+> `Argument 'limit' should be of type 'int | datetime.date | datetime.datetime | str | pyspark.sql.column.Column | None', not float`
+
+**Cause:** Using float instead of int
+
+**Solution:** Use integer types for all limit parameters
+- ❌ `"limit": 50.0` → ✅ `"limit": 50`
+- ❌ `"min_limit": 0.0` → ✅ `"min_limit": 0`
+- ❌ `"max_limit": 100.0` → ✅ `"max_limit": 100`
+
+### Error 4: Wrong API Method for Check Type
+
+**Error Message:**
+> `Use 'apply_checks_by_metadata_and_split' to pass checks as list of dicts instead.`
+
+**Cause:** Using code-based API for dictionary/YAML checks
+
+**Solution:** Use metadata-based API methods
+```python
+# ❌ WRONG for dict checks
+valid_df, invalid_df = dq_engine.apply_checks_and_split(df, checks)
+
+# ✅ CORRECT for dict checks
+valid_df, invalid_df = dq_engine.apply_checks_by_metadata_and_split(df, checks)
+```
+
+### Error 5: Spark Connect Incompatibility
+
+**Error Message:**
+> `[JVM_ATTRIBUTE_NOT_SUPPORTED] Attribute sparkContext is not supported in Spark Connect as it depends on the JVM.`
+
+**Cause:** Using `sparkContext` in serverless compute
+
+**Solution:** Use Spark Connect-compatible alternatives
+```python
+# ❌ WRONG
+current_user = spark.sparkContext.sparkUser()
+
+# ✅ CORRECT
+current_user = spark.sql("SELECT current_user() as user").collect()[0]["user"]
+```
+
+### Error 6: Serverless Library Configuration
+
+**Error Message:**
+> `Libraries field is not supported for serverless task, please specify libraries in environment.`
+
+**Cause:** Library specified at task level instead of environment level
+
+**Solution:** Move library dependency to environment level
+```yaml
+# ❌ WRONG
+tasks:
+  - task_key: my_task
+    libraries:
+      - pypi: package_name
+
+# ✅ CORRECT
+environments:
+  - environment_key: default
+    spec:
+      dependencies:
+        - "databricks-labs-dqx==0.8.0"
+
+tasks:
+  - task_key: my_task
+    environment_key: default
+```
+
+### Error 7: Obsolete Checks Persisting in Delta Table
+
+**Symptom:** Old checks that no longer exist in code still appear in validation errors
+
+**Cause:** Delta table MERGE only updates/inserts, never deletes
+
+**Solution:** Use DELETE-then-INSERT pattern
+```python
+# ✅ CORRECT: Delete old checks before inserting new ones
+if spark.catalog.tableExists(checks_table):
+    delta_table = DeltaTable.forName(spark, checks_table)
+    
+    # DELETE all existing checks for this entity
+    delta_table.delete(f"entity = '{entity}'")
+    
+    # Then INSERT all current checks
+    checks_df.write.format("delta").mode("append").saveAsTable(checks_table)
+```
+
+### Error 8: Import Errors in Serverless
+
+**Error Message:**
+> `ModuleNotFoundError: No module named 'dqx_gold_checks'`
+
+**Cause:** Trying to import a Databricks notebook (with header) as a module
+
+**Solution:** Ensure check definitions are in pure Python files (`.py`) without `# Databricks notebook source` header. See [databricks-python-imports.mdc](mdc:.cursor/rules/databricks-python-imports.mdc).
+
+## Validation Checklist
+
+When implementing DQX:
+
+### Check Definitions
+- [ ] All function names match [DQX API documentation](https://databrickslabs.github.io/dqx/docs/reference/api/check_funcs/)
+- [ ] Parameter names are correct (`limit` not `value`, `allowed` not `values`)
+- [ ] Data types are correct (int not float for limits)
+- [ ] Metadata includes business context (business_rule, failure_impact)
+- [ ] Critical checks use `criticality: error`
+- [ ] Warning checks use `criticality: warn`
+
+### Code Implementation
+- [ ] Using `apply_checks_by_metadata_and_split()` for dict checks
+- [ ] Using `apply_checks_and_split()` for DQRowRule/DQDatasetRule objects
+- [ ] Using Spark Connect-compatible APIs (no `sparkContext`)
+- [ ] Delta table persistence uses DELETE-then-INSERT pattern
+- [ ] Quarantine tables created for invalid records
+- [ ] Only valid records are merged
+- [ ] Check definitions are in pure Python files (not notebooks)
+
+### Workflow Configuration
+- [ ] DQX library at environment level (not task level)
+- [ ] 2-step workflow: store checks → validate and merge
+- [ ] Proper task dependencies configured
+- [ ] Environment references correct in all tasks
+
+### Testing & Verification
+- [ ] Job deploys without errors
+- [ ] Checks are stored in Delta table correctly
+- [ ] Valid records pass through successfully
+- [ ] Invalid records are quarantined
+- [ ] Quarantine tables are queryable
+- [ ] Validation stats are reported accurately
+
+## Common Patterns
+
+### ❌ Don't: Replace all DLT expectations immediately
+```python
+# BAD: Removing proven DLT patterns
+@dlt.table(...)
+# @dlt.expect_all_or_fail(...)  # ❌ Removed without reason
+def silver_data():
+    return dq_engine.apply_checks(...)  # Only DQX
+```
+
+### ✅ Do: Start with targeted use cases
+```python
+# GOOD: Add DQX where it provides clear value
+@dlt.table(...)
+@dlt.expect_all_or_fail(get_critical_rules_for_table("silver_data"))
+def silver_data():
+    """
+    Use DLT for critical enforcement.
+    Use DQX for detailed diagnostics and flexible quarantine.
+    """
+    df = dlt.read_stream(get_source_table("bronze_data"))
+    
+    # Add DQX for rich diagnostics
+    return dq_engine.apply_checks(df, checks)
+```
+
+### ❌ Don't: Duplicate validation logic
+```python
+# BAD: Same rules in DLT and DQX
+@dlt.expect("not_null", "col IS NOT NULL")  # ❌ Duplicated
+@dlt.expect("positive", "col > 0")  # ❌ Duplicated
+
+def table():
+    df = read_data()
+    # DQX checks for same rules ❌
+    return dq_engine.apply_checks(df, [
+        {"check": {"function": "is_not_null", "arguments": {"column": "col"}}},
+        {"check": {"function": "is_greater_than", "arguments": {"column": "col", "value": 0}}}
+    ])
+```
+
+### ✅ Do: Use complementary approaches
+```python
+# GOOD: DLT for enforcement, DQX for diagnostics
+@dlt.expect_all_or_fail(get_critical_rules_for_table("silver_data"))
+def table():
+    df = read_data()
+    
+    # DQX adds diagnostic metadata (doesn't drop, just marks)
+    # Focus on warning-level rules or complex business logic
+    return dq_engine.apply_checks(df, warning_checks)
+```
+
+## References
+
+### Official Documentation
+- [DQX GitHub Repository](https://github.com/databrickslabs/dqx)
+- [DQX Installation Guide](https://databrickslabs.github.io/dqx/docs/installation/)
+- [DQX User Guide](https://databrickslabs.github.io/dqx/docs/guide/)
+- [Quality Checks Definition](https://databrickslabs.github.io/dqx/docs/guide/quality_checks_definition/)
+- [Quality Checks Storage](https://databrickslabs.github.io/dqx/docs/guide/quality_checks_storage/)
+- [Applying Quality Checks](https://databrickslabs.github.io/dqx/docs/guide/quality_checks_apply/)
+- [Additional Configuration](https://databrickslabs.github.io/dqx/docs/guide/additional_configuration/)
+
+### Demo Examples
+- [DQX Demo Library](https://github.com/databrickslabs/dqx/blob/main/demos/dqx_demo_library.py)
+- [DQX Quick Start Demo](https://github.com/databrickslabs/dqx/blob/main/demos/dqx_quick_start_demo_library.py)
+
+### Related Project Rules
+- [DLT Expectations Patterns](mdc:.cursor/rules/dlt-expectations-patterns.mdc)
+- [Databricks Python Imports](mdc:.cursor/rules/databricks-python-imports.mdc) - Critical for DQX file structure
+- [Databricks Asset Bundles](mdc:.cursor/rules/databricks-asset-bundles.mdc) - For serverless configuration
+
+### Rule Improvement Case Studies
+- [DQX Gold Layer Implementation](../altriaDeltaShare/docs/RULE_IMPROVEMENT_DQX_GOLD_IMPLEMENTATION.md) - Complete production implementation with all API learnings
+- [DQX Framework Integration](../altriaDeltaShare/docs/RULE_IMPROVEMENT_DQX_FRAMEWORK.md) - Initial DQX pattern documentation
+
+### Project Documentation
+- [DQX Implementation Guide](../altriaDeltaShare/docs/DQX_IMPLEMENTATION_GUIDE.md) - 3-phase rollout plan
+- [DQX Quick Reference](../altriaDeltaShare/docs/DQX_QUICKREF.md) - Developer quick reference
+- [DQX Gold Implementation](../altriaDeltaShare/docs/gold/DQX_GOLD_IMPLEMENTATION.md) - Gold layer setup guide

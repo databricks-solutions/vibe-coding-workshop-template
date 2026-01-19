@@ -1,0 +1,49 @@
+# ============================================================================
+# Databricks App Configuration
+# https://docs.databricks.com/dev-tools/databricks-apps/configuration.html
+# ============================================================================
+#
+# This file defines how Databricks Apps starts your application.
+# The app runs in a managed container with Python 3.10+ and your dependencies.
+#
+# Reference: https://github.com/databricks-solutions/claude-databricks-app-template
+
+# App entry point - starts the FastAPI server
+command:
+  - "uvicorn"
+  - "server.app:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "8000"
+
+# Environment variables available to the app at runtime
+env:
+  - name: ENVIRONMENT
+    value: production
+  - name: LOG_LEVEL
+    value: INFO
+  - name: PYTHONUNBUFFERED
+    value: "1"
+  
+  # ==========================================================================
+  # Lakebase PostgreSQL Configuration
+  # ==========================================================================
+  # Get connection details from:
+  #   Compute > Lakebase Postgres > <instance-name> > Connection details
+  # ==========================================================================
+  - name: LAKEBASE_HOST
+    description: "Lakebase PostgreSQL endpoint (get from Connection details)"
+    value: "your-lakebase-instance.cloud.databricks.com"
+  - name: LAKEBASE_DATABASE
+    description: "Database name (usually 'databricks_postgres')"
+    value: "databricks_postgres"
+  - name: LAKEBASE_SCHEMA
+    description: "Schema name for your application tables"
+    value: "vibe_coding_workshop_dev"
+  - name: LAKEBASE_PORT
+    description: "PostgreSQL port (usually 443 for Lakebase)"
+    value: "443"
+  - name: LAKEBASE_USER
+    description: "Database user (usually 'databricks')"
+    value: "databricks"

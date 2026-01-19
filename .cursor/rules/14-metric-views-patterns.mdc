@@ -1,0 +1,715 @@
+---
+description: Standard patterns for creating Databricks Metric Views with semantic metadata for Genie and AI/BI
+globs: src/altria_gold/**/*.yaml
+alwaysApply: true
+---
+
+# Metric Views Patterns for Genie & AI/BI
+
+## Pattern Recognition
+Metric Views provide a semantic layer for natural language queries via Genie and AI/BI dashboards. This rule standardizes the YAML structure for comprehensive, LLM-friendly metric definitions.
+
+## ⚠️ CRITICAL: Correct SQL Syntax for Creating Metric Views
+
+**Metric views MUST be created using the `WITH METRICS LANGUAGE YAML` syntax, NOT regular views with TBLPROPERTIES.**
+
+### ❌ WRONG: Regular View with TBLPROPERTIES
+```python
+# This creates a regular view, NOT a metric view
+create_sql = f"""
+CREATE OR REPLACE VIEW {fully_qualified_name}
+COMMENT '{comment}'
+TBLPROPERTIES ('metric_view_spec' = '{yaml_str}')
+AS SELECT 1 as __metric_view_placeholder__
+"""
+```
+
+**Problem:** This creates a regular VIEW, not a METRIC_VIEW. Databricks won't recognize it as a metric view.
+
+### ✅ CORRECT: WITH METRICS LANGUAGE YAML
+```python
+# Correct syntax for metric views
+create_sql = f"""
+CREATE OR REPLACE VIEW {fully_qualified_name}
+WITH METRICS
+LANGUAGE YAML
+COMMENT '{view_comment_escaped}'
+AS $$
+{yaml_str}
+$$
+"""
+```
+
+**Key Requirements:**
+1. **`WITH METRICS`** - Identifies the view as a metric view
+2. **`LANGUAGE YAML`** - Specifies YAML format for the definition
+3. **`AS $$ ... $$`** - YAML content wrapped in dollar-quote delimiters (not single quotes)
+4. **No SELECT statement** - The YAML definition IS the view definition
+5. **`version`** field - Must be included in each metric view YAML
+
+### Verification
+After creation, verify the view type:
+```sql
+DESCRIBE EXTENDED catalog.schema.metric_view_name;
+```
+
+**Expected output:**
+- `Type: METRIC_VIEW` (not just `VIEW`)
+- `Language: YAML`
+- `View Text: <full YAML definition>` (not placeholder SELECT)
+
+## ⚠️ CRITICAL: v1.1 Unsupported Fields
+
+**These fields will cause errors and MUST NOT be used in v1.1:**
+
+| Field | Error | Action |
+|-------|-------|--------|
+| `time_dimension` | `Unrecognized field "time_dimension"` | ❌ Remove entirely - use regular dimension instead |
+| `window_measures` | `Unrecognized field "window_measures"` | ❌ Remove entirely - calculate in SQL/Python |
+| `join_type` | Unsupported | ❌ Remove - defaults to LEFT OUTER JOIN |
+| `table` (in joins) | `Missing required creator property 'source'` | ✅ Use `source` instead |
+
+## Metric View YAML Structure (v1.1)
+
+```yaml
+version: "1.1"
+
+- name: <metric_view_name>
+  comment: <Comprehensive description optimized for Genie natural language queries>
+  
+  source: ${catalog}.${gold_schema}.<fact_table>
+  
+  # Join to dimension tables
+  # ✅ REQUIRED fields: name, source, 'on' (quoted!)
+  joins:
+    - name: <dim_table_alias>
+      source: ${catalog}.${gold_schema}.<dim_table>
+      'on': source.<fk> = <dim_table_alias>.<pk> AND <dim_table_alias>.is_current = true
+  
+  dimensions:
+    # ✅ Main table columns: use source. prefix
+    - name: <dimension_name>
+      expr: source.<column>
+      comment: <Business description for LLM understanding>
+      display_name: <User-Friendly Name>
+      synonyms:
+        - <alternative name 1>
+        - <alternative name 2>
+    
+    # ✅ Joined table columns: use join name as prefix
+    - name: <joined_dimension>
+      expr: <dim_table_alias>.<column>
+      comment: <Business description>
+      display_name: <User-Friendly Name>
+      synonyms:
+        - <alternative name 1>
+  
+  measures:
+    # ✅ Main table columns: use source. prefix
+    - name: <measure_name>
+      expr: SUM(source.<column>)
+      comment: <Business description and calculation logic>
+      display_name: <User-Friendly Name>
+      format:
+        type: <currency|number|percentage>
+        # currency options
+        currency_code: USD
+        # number/currency options
+        decimal_places:
+          type: <exact|all>
+          places: 2  # For exact
+        hide_group_separator: false
+        abbreviation: compact  # Shows K, M, B
+      synonyms:
+        - <alternative name 1>
+        - <alternative name 2>
+```
+
+## Standard Dimension Patterns
+
+### Geographic Dimensions
+```yaml
+dimensions:
+  - name: store_number
+    expr: fact_table.store_number
+    comment: Store identifier for location-based analysis
+    display_name: Store Number
+    synonyms:
+      - store id
+      - location number
+      - store code
+  
+  - name: city
+    expr: dim_store.city
+    comment: City where the location is situated
+    display_name: City
+    synonyms:
+      - store city
+      - location city
+  
+  - name: state
+    expr: dim_store.state
+    comment: State where the location is situated
+    display_name: State
+    synonyms:
+      - store state
+      - location state
+```
+
+### Product Dimensions
+```yaml
+dimensions:
+  - name: upc_code
+    expr: fact_table.upc_code
+    comment: Universal Product Code for product identification
+    display_name: UPC Code
+    synonyms:
+      - product code
+      - upc
+      - barcode
+  
+  - name: brand
+    expr: dim_product.brand
+    comment: Product brand name
+    display_name: Brand
+    synonyms:
+      - product brand
+      - manufacturer brand
+  
+  - name: product_category
+    expr: dim_product.product_category
+    comment: Product category classification
+    display_name: Product Category
+    synonyms:
+      - category
+      - product type
+```
+
+### Time Dimensions (from dim_date)
+```yaml
+dimensions:
+  - name: year
+    expr: dim_date.year
+    comment: Calendar year for annual analysis
+    display_name: Year
+    synonyms:
+      - calendar year
+      - fiscal year
+  
+  - name: quarter
+    expr: dim_date.quarter
+    comment: Calendar quarter (1-4)
+    display_name: Quarter
+    synonyms:
+      - q
+      - fiscal quarter
+  
+  - name: month_name
+    expr: dim_date.month_name
+    comment: Month name for user-friendly reporting
+    display_name: Month Name
+    synonyms:
+      - month
+  
+  - name: day_of_week_name
+    expr: dim_date.day_of_week_name
+    comment: Day of week name for day-of-week analysis
+    display_name: Day of Week
+    synonyms:
+      - weekday
+      - day name
+  
+  - name: is_weekend
+    expr: dim_date.is_weekend
+    comment: Weekend indicator for weekend vs weekday analysis
+    display_name: Is Weekend
+    synonyms:
+      - weekend
+      - weekend flag
+```
+
+## Standard Measure Patterns
+
+### Revenue Measures
+```yaml
+measures:
+  - name: total_revenue
+    expr: SUM(fact_table.net_revenue)
+    comment: Total net revenue after discounts and returns. Primary revenue metric.
+    display_name: Total Revenue
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: compact
+    synonyms:
+      - revenue
+      - net revenue
+      - sales
+      - total sales
+  
+  - name: avg_transaction_value
+    expr: AVG(fact_table.avg_transaction_value)
+    comment: Average dollar value per transaction
+    display_name: Avg Transaction Value
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+    synonyms:
+      - average transaction
+      - basket value
+      - ticket size
+```
+
+### Volume Measures
+```yaml
+measures:
+  - name: total_units
+    expr: SUM(fact_table.net_units)
+    comment: Total units sold after returns
+    display_name: Total Units
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: compact
+    synonyms:
+      - units
+      - units sold
+      - quantity
+      - volume
+```
+
+### Count Measures
+```yaml
+measures:
+  - name: transaction_count
+    expr: SUM(fact_table.transaction_count)
+    comment: Total number of sales transactions
+    display_name: Transaction Count
+    format:
+      type: number
+      decimal_places:
+        type: all
+      abbreviation: compact
+    synonyms:
+      - transactions
+      - transaction volume
+      - sales count
+```
+
+### Percentage Measures
+```yaml
+measures:
+  - name: avg_discount_rate
+    expr: AVG(fact_table.discount_penetration_pct)
+    comment: Average discount percentage across transactions
+    display_name: Avg Discount Rate
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 1
+    synonyms:
+      - discount percentage
+      - discount rate
+      - promotion rate
+```
+
+## ⚠️ Window Measures NOT Supported in v1.1
+
+**`window_measures` field is NOT supported in Metric View Specification v1.1 and will cause errors.**
+
+### ❌ This Will Fail:
+```yaml
+version: "1.1"
+name: my_metric_view
+source: catalog.schema.fact_table
+
+window_measures:  # ❌ ERROR: Unrecognized field "window_measures"
+  - name: revenue_last_7_days
+    base_measure: total_revenue
+    window:
+      type: rolling
+      duration: 7d
+```
+
+**Error:** `Unrecognized field "window_measures" (class com.databricks.sql.serde.v11.MetricView)`
+
+### ✅ Alternative Approaches:
+
+#### Option 1: Calculate in SQL Query
+```sql
+SELECT 
+  store_name,
+  MEASURE(`Total Revenue`) as current_revenue,
+  SUM(MEASURE(`Total Revenue`)) OVER (
+    PARTITION BY store_name 
+    ORDER BY date 
+    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+  ) as revenue_last_7_days
+FROM metric_view
+```
+
+#### Option 2: Pre-calculate in Gold Layer
+```python
+# In fact table creation
+.withColumn("revenue_last_7_days",
+    sum("revenue").over(
+        Window.partitionBy("store_id")
+        .orderBy("date")
+        .rowsBetween(-6, 0)
+    ))
+```
+
+Then add as regular measure:
+```yaml
+measures:
+  - name: revenue_last_7_days
+    expr: SUM(source.revenue_last_7_days)
+    comment: Pre-calculated 7-day rolling revenue
+```
+
+## Format Options Reference
+
+### Currency Format
+```yaml
+format:
+  type: currency
+  currency_code: USD  # or EUR, GBP, etc.
+  decimal_places:
+    type: exact
+    places: 2
+  hide_group_separator: false  # Show commas
+  abbreviation: compact  # Shows 1.5M instead of 1,500,000
+```
+
+### Number Format
+```yaml
+format:
+  type: number
+  decimal_places:
+    type: all  # Show all decimals
+    # OR
+    type: exact
+    places: 1
+  hide_group_separator: false
+  abbreviation: compact
+```
+
+### Percentage Format
+```yaml
+format:
+  type: percentage
+  decimal_places:
+    type: exact
+    places: 1  # Shows 45.3%
+```
+
+## Joins Pattern
+
+### SCD2 Dimension Join
+```yaml
+joins:
+  - name: dim_store
+    source: ${catalog}.${gold_schema}.dim_store
+    'on': source.store_number = dim_store.store_number AND dim_store.is_current = true
+```
+
+**⚠️ CRITICAL: Version 1.1 Requirements**
+
+**Join Structure:**
+- Each join **MUST have a `name` field** - The alias used to reference the joined table (e.g., `dim_store`)
+- Each join **MUST have a `source` field** - The full table path (e.g., `catalog.schema.dim_store`)
+- Each join **MUST have an `'on'` field** (quoted) - The join condition using `source.` prefix for main table
+- Missing fields will cause: `Missing required creator property` errors
+
+**Column References:**
+- **MUST use `source.` prefix** for main table columns in dimensions and measures
+- Use join `name` prefix for joined table columns (e.g., `dim_store.column_name`)
+- Example: `expr: source.revenue` NOT `expr: fact_table.revenue`
+
+**Unsupported Fields:**
+- `time_dimension` - NOT supported in v1.1 (will cause "Unrecognized field" error)
+- `join_type` - NOT needed (defaults to LEFT OUTER JOIN)
+
+### Multiple Dimension Joins
+```yaml
+joins:
+  - name: dim_store
+    source: ${catalog}.${gold_schema}.dim_store
+    'on': source.store_number = dim_store.store_number AND dim_store.is_current = true
+  
+  - name: dim_product
+    source: ${catalog}.${gold_schema}.dim_product
+    'on': source.upc_code = dim_product.upc_code
+  
+  - name: dim_date
+    source: ${catalog}.${gold_schema}.dim_date
+    'on': source.transaction_date = dim_date.date
+```
+
+## Synonym Best Practices
+
+Provide **3-5 synonyms** per dimension/measure to improve Genie recognition:
+
+```yaml
+synonyms:
+  - <exact alternative name>
+  - <business term variant>
+  - <abbreviated form>
+  - <common misspelling or alternative>
+```
+
+**Examples:**
+- Revenue → `sales`, `net revenue`, `total sales`, `dollars`
+- Store Number → `store id`, `location number`, `store code`
+- Units → `quantity`, `volume`, `items sold`, `units sold`
+
+## LLM-Friendly Comments
+
+Comments should:
+1. Explain the business meaning
+2. Describe calculation logic
+3. Note any special considerations
+4. Use natural language
+
+```yaml
+comment: Total net revenue after discounts and returns. Primary revenue metric for business reporting. Excludes tax.
+```
+
+## Complete Example: Sales Performance Metrics
+
+```yaml
+version: 1.1
+
+- name: sales_performance_metrics
+  comment: Comprehensive sales performance metrics with revenue, units, and customer insights. Optimized for Genie natural language queries and AI/BI dashboards.
+  
+  source: ${catalog}.${gold_schema}.fact_sales_daily
+  
+  time_dimension:
+    name: transaction_date
+    expr: fact_sales_daily.transaction_date
+  
+  joins:
+    - name: dim_store
+      source: ${catalog}.${gold_schema}.dim_store
+      'on': source.store_number = dim_store.store_number AND dim_store.is_current = true
+    
+    - name: dim_product
+      source: ${catalog}.${gold_schema}.dim_product
+      'on': source.upc_code = dim_product.upc_code
+    
+    - name: dim_date
+      source: ${catalog}.${gold_schema}.dim_date
+      'on': source.transaction_date = dim_date.date
+  
+  dimensions:
+    - name: store_number
+      expr: source.store_number
+      comment: Store identifier for location-based sales analysis
+      display_name: Store Number
+      synonyms:
+        - store id
+        - location number
+    
+    - name: brand
+      expr: dim_product.brand
+      comment: Product brand name
+      display_name: Brand
+      synonyms:
+        - product brand
+  
+  measures:
+    - name: total_revenue
+      expr: SUM(fact_sales_daily.net_revenue)
+      comment: Total net revenue after discounts and returns. Primary revenue metric.
+      display_name: Total Revenue
+      format:
+        type: currency
+        currency_code: USD
+        decimal_places:
+          type: exact
+          places: 2
+        abbreviation: compact
+      synonyms:
+        - revenue
+        - sales
+  
+  window_measures:
+    - name: revenue_last_30_days
+      base_measure: total_revenue
+      window:
+        type: rolling
+        duration: 30d
+      comment: Total revenue over the last 30 days
+      display_name: Revenue (Last 30 Days)
+```
+
+## Validation Checklist
+
+### YAML Structure
+- [ ] Version is `"1.1"` (quoted string)
+- [ ] NO `time_dimension` field (not supported in v1.1)
+- [ ] NO `window_measures` field (not supported in v1.1)
+- [ ] Comment explains business purpose and Genie optimization
+- [ ] All dimensions have comments, display_name, and 3+ synonyms
+- [ ] All measures have comments, display_name, format, and synonyms
+- [ ] Format types are correct (currency/number/percentage)
+
+### Joins (if using)
+- [ ] Each join has `name` field (the alias)
+- [ ] Each join has `source` field (full table path)
+- [ ] Each join has `'on'` field (quoted!)
+- [ ] Joins include SCD2 filters (`is_current = true`) where applicable
+- [ ] ON clause uses `source.` for main table, join name for joined table
+
+### Column References
+- [ ] Main table columns use `source.` prefix in all expr fields
+- [ ] Joined table columns use join `name` as prefix in expr fields
+- [ ] No references to `fact_table.column` or table names
+
+### Python Script Error Handling
+- [ ] Script tracks failed_views list
+- [ ] Script raises RuntimeError if any metric view fails
+- [ ] Job will fail (not succeed) if metric views don't create
+- [ ] Drop existing TABLE/VIEW before creating metric view
+
+## Common Mistakes to Avoid
+
+❌ **Don't do this:**
+```yaml
+# No synonyms
+- name: revenue
+  expr: SUM(amount)
+  
+# Poor comment
+- name: total
+  comment: Total amount
+
+# Missing format
+- name: revenue
+  expr: SUM(revenue)
+  display_name: Revenue
+```
+
+✅ **Do this:**
+```yaml
+- name: total_revenue
+  expr: SUM(fact_sales.net_revenue)
+  comment: Total net revenue after discounts and returns. Primary revenue metric for business reporting.
+  display_name: Total Revenue
+  format:
+    type: currency
+    currency_code: USD
+    decimal_places:
+      type: exact
+      places: 2
+    abbreviation: compact
+  synonyms:
+    - revenue
+    - sales
+    - net revenue
+    - total sales
+```
+
+## Python Script Error Handling Pattern
+
+### ⚠️ CRITICAL: Jobs Must Fail if Metric Views Don't Create
+
+**Problem:** By default, Python scripts that catch exceptions will succeed even if metric views fail.
+
+### ❌ BAD: Job succeeds despite failures
+```python
+def create_metric_view(spark, catalog, schema, metric_view):
+    try:
+        spark.sql(create_sql)
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False  # ❌ Error swallowed
+
+def main():
+    for view in views:
+        create_metric_view(spark, catalog, schema, view)
+    
+    print("Complete!")  # ❌ Always prints, even if all failed
+```
+
+**Problem:** Job shows SUCCESS even if 0 metric views created!
+
+### ✅ GOOD: Job fails properly
+```python
+def create_metric_view(spark, catalog, schema, metric_view):
+    view_name = metric_view['name']
+    fqn = f"{catalog}.{schema}.{view_name}"
+    
+    # Drop existing table/view to avoid conflicts
+    try:
+        spark.sql(f"DROP VIEW IF EXISTS {fqn}")
+        spark.sql(f"DROP TABLE IF EXISTS {fqn}")
+    except:
+        pass
+    
+    try:
+        create_sql = f"""
+        CREATE VIEW {fqn}
+        WITH METRICS
+        LANGUAGE YAML
+        COMMENT '{comment}'
+        AS $$
+{yaml_str}
+        $$
+        """
+        spark.sql(create_sql)
+        print(f"✓ Created {view_name}")
+        return True
+    except Exception as e:
+        print(f"✗ Error creating {view_name}: {e}")
+        return False  # Track failure
+
+def main():
+    views = load_metric_views_yaml(catalog, schema)
+    
+    success_count = 0
+    failed_views = []
+    
+    for view in views:
+        if create_metric_view(spark, catalog, schema, view):
+            success_count += 1
+        else:
+            failed_views.append(view['name'])
+    
+    print(f"\nCreated {success_count} of {len(views)} metric views")
+    
+    if failed_views:
+        print(f"❌ Failed to create: {', '.join(failed_views)}")
+        # ✅ Raise exception to fail the job
+        raise RuntimeError(
+            f"Failed to create {len(failed_views)} metric view(s): "
+            f"{', '.join(failed_views)}"
+        )
+    
+    print("✅ All metric views deployed successfully!")
+```
+
+**Benefits:**
+- ✅ Job fails if any metric view doesn't create
+- ✅ Clear error messages surface to logs
+- ✅ Can identify which specific views failed
+- ✅ Prevents silent failures
+
+## References
+
+- [Metric Views Semantic Metadata](https://learn.microsoft.com/en-us/azure/databricks/metric-views/semantic-metadata)
+- [Metric Views YAML Reference](https://learn.microsoft.com/en-us/azure/databricks/metric-views/yaml-ref)
+- [Window Measures](https://learn.microsoft.com/en-us/azure/databricks/metric-views/window-measures)
+- [Metric Views Joins](https://learn.microsoft.com/en-us/azure/databricks/metric-views/joins)

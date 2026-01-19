@@ -1,0 +1,701 @@
+---
+description: Patterns for creating dual-format ad-hoc exploration notebooks that work in both Databricks workspace and locally via Databricks Connect
+---
+
+# Ad-Hoc Exploration Notebook Patterns
+
+## Core Principle: Dual-Format Notebooks for Maximum Flexibility
+
+Every data product should include exploration notebooks in **two formats** to support different development workflows:
+
+1. **Databricks Workspace Format (`.py`)** - For interactive use in Databricks UI
+2. **Jupyter Format (`.ipynb`)** - For local development with Databricks Connect
+
+**Key Insight:** Magic commands (`%pip`, `%sql`, `dbutils.library.restartPython()`) only work in Databricks workspace, not with Databricks Connect or local execution.
+
+## Pattern Recognition
+
+### When to Create Exploration Notebooks
+
+- ✅ Every data product with Bronze/Silver/Gold layers
+- ✅ After implementing data quality rules
+- ✅ When team needs to debug data issues
+- ✅ For data validation and testing
+- ✅ To demonstrate data product capabilities
+
+### File Structure
+
+```
+src/exploration/
+├── adhoc_exploration.py              # Databricks workspace format
+├── adhoc_exploration_ipynb.ipynb     # Local Jupyter format
+├── requirements.txt                  # Python dependencies
+├── README.md                         # Full documentation
+└── QUICKSTART.md                     # 5-minute setup guide
+```
+
+## Databricks Workspace Format (.py)
+
+### Template Structure
+
+```python
+# Databricks notebook source
+# MAGIC %md
+# MAGIC # Ad-Hoc Data Exploration Notebook
+# MAGIC 
+# MAGIC **Purpose:** Interactive exploration and analysis of Bronze, Silver, and Gold layer data
+# MAGIC 
+# MAGIC **Use Cases:**
+# MAGIC - Quick data quality checks
+# MAGIC - Schema exploration
+# MAGIC - Debug data issues
+# MAGIC - Test query patterns
+# MAGIC - Prototype transformations
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Setup & Configuration
+# MAGIC 
+# MAGIC **Note:** When running via Databricks Connect locally, this notebook will use direct variable assignment.
+# MAGIC In the Databricks workspace, it will use widgets for interactive parameter selection.
+
+# COMMAND ----------
+
+from databricks.connect import DatabricksSession
+from pyspark.sql.functions import *
+from databricks.sdk.runtime import dbutils
+import json
+
+# Initialize Spark session for Databricks Connect
+# ✅ CRITICAL: Specify serverless or cluster_id for Databricks Connect
+spark = DatabricksSession.builder.serverless().profile("your_profile").getOrCreate()
+
+# Configuration - Update these values for your environment
+catalog = "your_catalog"
+bronze_schema = "your_bronze_schema"
+silver_schema = "your_silver_schema"
+gold_schema = "your_gold_schema"
+
+# Try to use widgets if available (Databricks workspace)
+try:
+    dbutils.widgets.text("catalog", catalog, "Catalog")
+    dbutils.widgets.text("bronze_schema", bronze_schema, "Bronze Schema")
+    dbutils.widgets.text("silver_schema", silver_schema, "Silver Schema")
+    dbutils.widgets.text("gold_schema", gold_schema, "Gold Schema")
+    
+    catalog = dbutils.widgets.get("catalog")
+    bronze_schema = dbutils.widgets.get("bronze_schema")
+    silver_schema = dbutils.widgets.get("silver_schema")
+    gold_schema = dbutils.widgets.get("gold_schema")
+except Exception:
+    # Widgets not available (Databricks Connect), use direct assignment
+    pass
+
+print("=" * 80)
+print("CONFIGURATION")
+print("=" * 80)
+print(f"Catalog:        {catalog}")
+print(f"Bronze Schema:  {bronze_schema}")
+print(f"Silver Schema:  {silver_schema}")
+print(f"Gold Schema:    {gold_schema}")
+print("=" * 80)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Helper Functions
+
+# COMMAND ----------
+
+def list_tables(schema_name: str):
+    """List all tables in a schema with row counts and metadata."""
+    print(f"\n{'='*80}")
+    print(f"TABLES IN {catalog}.{schema_name}")
+    print(f"{'='*80}\n")
+    
+    tables = spark.sql(f"SHOW TABLES IN {catalog}.{schema_name}").collect()
+    
+    for table in tables:
+        table_name = table.tableName
+        full_name = f"{catalog}.{schema_name}.{table_name}"
+        
+        try:
+            count = spark.table(full_name).count()
+            desc = spark.sql(f"DESCRIBE EXTENDED {full_name}").collect()
+            comment = next((row.data_type for row in desc if row.col_name == "Comment"), "No comment")
+            
+            print(f"📊 {table_name}")
+            print(f"   Rows: {count:,}")
+            print(f"   Comment: {comment[:100]}")
+            print()
+        except Exception as e:
+            print(f"❌ {table_name}: Error - {str(e)}\n")
+
+def explore_table(schema_name: str, table_name: str, limit: int = 10):
+    """Display table schema, sample data, and basic statistics."""
+    full_name = f"{catalog}.{schema_name}.{table_name}"
+    
+    print(f"\n{'='*80}")
+    print(f"EXPLORING: {full_name}")
+    print(f"{'='*80}\n")
+    
+    df = spark.table(full_name)
+    
+    count = df.count()
+    print(f"📈 Total Rows: {count:,}\n")
+    
+    print("📋 SCHEMA:")
+    df.printSchema()
+    
+    print(f"\n🔍 SAMPLE DATA (showing {limit} rows):")
+    display(df.limit(limit))
+    
+    return df
+
+def check_data_quality(schema_name: str, table_name: str):
+    """Run basic data quality checks on a table."""
+    full_name = f"{catalog}.{schema_name}.{table_name}"
+    df = spark.table(full_name)
+    
+    print(f"\n{'='*80}")
+    print(f"DATA QUALITY CHECKS: {full_name}")
+    print(f"{'='*80}\n")
+    
+    total_rows = df.count()
+    print(f"📊 Total Rows: {total_rows:,}\n")
+    
+    # Null counts per column
+    print("🔍 NULL COUNTS BY COLUMN:")
+    null_counts = df.select([
+        count(when(col(c).isNull(), c)).alias(c) 
+        for c in df.columns
+    ]).collect()[0].asDict()
+    
+    for col_name, null_count in null_counts.items():
+        pct = (null_count / total_rows * 100) if total_rows > 0 else 0
+        if null_count > 0:
+            print(f"   ⚠️  {col_name}: {null_count:,} nulls ({pct:.2f}%)")
+        else:
+            print(f"   ✅ {col_name}: No nulls")
+    
+    # Duplicate check
+    id_columns = [c for c in df.columns if 'id' in c.lower() or 'key' in c.lower() or 'number' in c.lower()]
+    if id_columns:
+        print(f"\n🔑 DUPLICATE CHECK ON: {id_columns[0]}")
+        distinct_count = df.select(id_columns[0]).distinct().count()
+        duplicate_count = total_rows - distinct_count
+        if duplicate_count > 0:
+            print(f"   ⚠️  Found {duplicate_count:,} duplicate(s)")
+        else:
+            print(f"   ✅ No duplicates found")
+
+def compare_tables(schema1: str, table1: str, schema2: str, table2: str):
+    """Compare row counts and schemas between two tables."""
+    full_name1 = f"{catalog}.{schema1}.{table1}"
+    full_name2 = f"{catalog}.{schema2}.{table2}"
+    
+    print(f"\n{'='*80}")
+    print(f"COMPARING TABLES")
+    print(f"{'='*80}\n")
+    
+    df1 = spark.table(full_name1)
+    df2 = spark.table(full_name2)
+    
+    count1 = df1.count()
+    count2 = df2.count()
+    
+    print(f"📊 {full_name1}")
+    print(f"   Rows: {count1:,}")
+    print(f"   Columns: {len(df1.columns)}")
+    print()
+    
+    print(f"📊 {full_name2}")
+    print(f"   Rows: {count2:,}")
+    print(f"   Columns: {len(df2.columns)}")
+    print()
+    
+    diff = count2 - count1
+    print(f"Δ Row Difference: {diff:+,}")
+    
+    # Schema comparison
+    cols1 = set(df1.columns)
+    cols2 = set(df2.columns)
+    
+    if cols1 == cols2:
+        print("✅ Schemas match (same columns)")
+    else:
+        print("\n⚠️  SCHEMA DIFFERENCES:")
+        only_in_1 = cols1 - cols2
+        only_in_2 = cols2 - cols1
+        
+        if only_in_1:
+            print(f"   Only in {table1}: {only_in_1}")
+        if only_in_2:
+            print(f"   Only in {table2}: {only_in_2}")
+
+def show_table_properties(schema_name: str, table_name: str):
+    """Display all table properties including governance tags."""
+    full_name = f"{catalog}.{schema_name}.{table_name}"
+    
+    print(f"\n{'='*80}")
+    print(f"TABLE PROPERTIES: {full_name}")
+    print(f"{'='*80}\n")
+    
+    desc = spark.sql(f"DESCRIBE EXTENDED {full_name}").collect()
+    
+    in_props = False
+    for row in desc:
+        if row.col_name == "Table Properties":
+            in_props = True
+            continue
+        if in_props:
+            if row.col_name.startswith("["):
+                prop = row.col_name.strip("[]").split("=")
+                if len(prop) == 2:
+                    key, value = prop
+                    print(f"   {key}: {value}")
+            elif not row.col_name.strip():
+                break
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Quick Exploration Commands
+
+# COMMAND ----------
+
+# List all tables in each layer
+list_tables(bronze_schema)
+# list_tables(silver_schema)
+# list_tables(gold_schema)
+
+# COMMAND ----------
+
+# Explore a specific table
+# df = explore_table(bronze_schema, "bronze_store_dim", limit=10)
+
+# COMMAND ----------
+
+# Check data quality
+# check_data_quality(silver_schema, "silver_transactions")
+
+# COMMAND ----------
+
+# Compare Bronze vs Silver
+# compare_tables(bronze_schema, "bronze_transactions", silver_schema, "silver_transactions")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Scratch Space
+
+# COMMAND ----------
+
+# Your code here
+```
+
+## Local Jupyter Format (.ipynb)
+
+### Key Differences from .py Format
+
+```python
+# Cell 1: Markdown header (same as .py)
+
+# Cell 2: Setup instructions
+"""
+**Setup Instructions for Local Jupyter:**
+
+Before running this notebook locally:
+
+1. Install required packages: `pip install -r requirements.txt`
+2. Configure Databricks Connect: `databricks configure`
+3. Update the configuration values below
+"""
+
+# Cell 3: Imports and configuration
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import *
+from databricks.sdk.runtime import dbutils
+import json
+
+# Configuration - Update these values for your environment
+catalog = "your_catalog"
+bronze_schema = "your_bronze_schema"
+silver_schema = "your_silver_schema"
+gold_schema = "your_gold_schema"
+
+print("=" * 80)
+print("CONFIGURATION")
+print("=" * 80)
+print(f"Catalog:        {catalog}")
+print(f"Bronze Schema:  {bronze_schema}")
+print(f"Silver Schema:  {silver_schema}")
+print(f"Gold Schema:    {gold_schema}")
+print("=" * 80)
+
+# Cell 4+: Helper functions (same as .py format)
+```
+
+## Requirements File Pattern
+
+**File: `requirements.txt`**
+
+```txt
+# Requirements for running adhoc_exploration.ipynb locally
+databricks-sdk[notebook]>=0.28.0
+pyspark>=3.5.0
+```
+
+## Asset Bundle Integration
+
+**File: `resources/adhoc_exploration_job.yml`**
+
+```yaml
+# Ad-Hoc Exploration Job
+# Interactive notebook for data exploration
+
+resources:
+  jobs:
+    adhoc_exploration_job:
+      name: "[${bundle.target}] Ad-Hoc Data Exploration"
+      description: "Interactive notebook for exploring data quality, schemas, and testing queries"
+      
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: bronze_schema
+          default: ${var.bronze_schema}
+        - name: silver_schema
+          default: ${var.silver_schema}
+        - name: gold_schema
+          default: ${var.gold_schema}
+      
+      tasks:
+        - task_key: run_exploration
+          notebook_task:
+            notebook_path: ../src/exploration/adhoc_exploration.py  # ✅ Include .py extension
+            base_parameters:
+              catalog: ${var.catalog}
+              bronze_schema: ${var.bronze_schema}
+              silver_schema: ${var.silver_schema}
+              gold_schema: ${var.gold_schema}
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: "i3.xlarge"
+            num_workers: 1
+      
+      timeout_seconds: 3600
+      
+      tags:
+        environment: ${bundle.target}
+        project: ${bundle.name}
+        layer: all
+        job_type: exploration
+```
+
+## Critical Patterns and Gotchas
+
+### 1. ❌ DON'T: Use Magic Commands in Databricks Connect
+
+```python
+# ❌ WRONG: These fail with Databricks Connect
+%pip install 'databricks-sdk[notebook]'
+dbutils.library.restartPython()
+%sql SELECT * FROM table
+```
+
+**Why:** Magic commands are IPython extensions that only work in Databricks workspace notebooks, not in Python execution contexts.
+
+### 2. ✅ DO: Initialize Spark Session Properly
+
+```python
+# ✅ CORRECT: For Databricks Connect
+from databricks.connect import DatabricksSession
+
+spark = DatabricksSession.builder.serverless().profile("your_profile").getOrCreate()
+# OR
+spark = DatabricksSession.builder.clusterId("cluster-id").getOrCreate()
+```
+
+**Critical:** Must specify either `.serverless()` or `.clusterId()` - default will fail with:
+```
+Exception: Cluster id or serverless are required but were not specified.
+```
+
+### 3. ✅ DO: Use Widget Fallback Pattern
+
+```python
+# Default values
+catalog = "default_catalog"
+bronze_schema = "bronze"
+
+# Try widgets (Databricks workspace), fall back to defaults
+try:
+    dbutils.widgets.text("catalog", catalog, "Catalog")
+    catalog = dbutils.widgets.get("catalog")
+except Exception:
+    # Widgets not available (Databricks Connect)
+    pass
+```
+
+**Why:** Widgets only work in Databricks workspace. This pattern makes notebooks work in both environments.
+
+### 4. ❌ DON'T: Run .py Files as Python Scripts Locally
+
+```bash
+# ❌ WRONG: Databricks notebook .py files are NOT regular Python scripts
+python adhoc_exploration.py
+# SyntaxError: invalid syntax (due to magic commands)
+```
+
+**Solution:** Use Databricks Connect or upload to Databricks workspace.
+
+### 5. ✅ DO: Create Separate Jupyter Notebook for Local Use
+
+The `.ipynb` format should NOT have:
+- `# Databricks notebook source` header
+- `# COMMAND ----------` separators
+- `# MAGIC %md` markdown cells
+- Magic commands
+
+Instead use standard Jupyter cells.
+
+## Standard Helper Functions
+
+Every exploration notebook should include these functions:
+
+### 1. Table Discovery
+- `list_tables(schema_name)` - List all tables with metadata
+
+### 2. Table Exploration
+- `explore_table(schema_name, table_name, limit)` - Schema + sample data
+
+### 3. Data Quality
+- `check_data_quality(schema_name, table_name)` - Null counts, duplicates
+
+### 4. Comparison
+- `compare_tables(schema1, table1, schema2, table2)` - Compare across layers
+
+### 5. Governance
+- `show_table_properties(schema_name, table_name)` - View metadata tags
+
+## Documentation Requirements
+
+### README.md Structure
+
+```markdown
+# Ad-Hoc Data Exploration
+
+## Overview
+- Purpose and use cases
+- Available formats (.py vs .ipynb)
+
+## Setup
+### For Databricks Workspace
+- Upload steps
+- Cluster attachment
+
+### For Local Jupyter
+- Dependency installation
+- Databricks Connect configuration
+- Environment setup
+
+## Features
+- Helper functions documentation
+- Usage examples
+- Common use cases
+
+## Troubleshooting
+- Common errors and solutions
+- Environment-specific issues
+
+## References
+- Official documentation links
+```
+
+### QUICKSTART.md Structure
+
+```markdown
+# Quick Start - 5 Minutes
+
+## TL;DR
+- For Databricks: Use .py
+- For Local: Use .ipynb
+
+## Local Setup
+```bash
+pip install -r requirements.txt
+databricks configure
+jupyter notebook adhoc_exploration_ipynb.ipynb
+```
+
+## Key Differences
+- Table showing what works where
+
+## Common Errors
+- Quick fixes for top 3-5 issues
+```
+
+## Validation Checklist
+
+When creating exploration notebooks:
+
+### File Structure
+- [ ] Both `.py` and `.ipynb` formats created
+- [ ] `requirements.txt` with dependencies
+- [ ] README.md with full documentation
+- [ ] QUICKSTART.md with 5-minute setup
+- [ ] Asset bundle job definition (optional)
+
+### .py File (Databricks Workspace)
+- [ ] Has `# Databricks notebook source` header
+- [ ] Uses `# COMMAND ----------` cell separators
+- [ ] Markdown cells use `# MAGIC %md`
+- [ ] Initializes Spark with `.serverless()` or `.clusterId()`
+- [ ] Uses widget fallback pattern
+- [ ] All helper functions defined
+- [ ] Example usage cells included
+
+### .ipynb File (Local Jupyter)
+- [ ] Standard Jupyter notebook format
+- [ ] No Databricks-specific headers
+- [ ] No magic commands
+- [ ] Direct variable assignment (no widgets)
+- [ ] Setup instructions in markdown cell
+- [ ] Same helper functions as .py
+- [ ] Can run locally with Databricks Connect
+
+### Helper Functions
+- [ ] `list_tables()` - Table discovery
+- [ ] `explore_table()` - Schema + samples
+- [ ] `check_data_quality()` - DQ checks
+- [ ] `compare_tables()` - Layer comparison
+- [ ] `show_table_properties()` - Governance metadata
+
+### Documentation
+- [ ] README explains both formats
+- [ ] Setup instructions for each environment
+- [ ] Troubleshooting common errors
+- [ ] Usage examples provided
+- [ ] References to official docs
+
+### Asset Bundle
+- [ ] Job YAML includes `.py` extension in path
+- [ ] Parameters passed to notebook
+- [ ] Appropriate cluster/serverless config
+- [ ] Tags applied
+
+## Common Mistakes to Avoid
+
+### ❌ Mistake 1: Same Format for Both Environments
+```python
+# ❌ DON'T: Use Databricks .py format locally
+python adhoc_exploration.py  # Fails with syntax errors
+```
+
+**Solution:** Create separate `.ipynb` file for local use.
+
+### ❌ Mistake 2: Missing Spark Session Init
+```python
+# ❌ DON'T: Assume spark exists
+from databricks.connect import DatabricksSession
+# Missing: spark = DatabricksSession.builder...
+tables = spark.sql("SHOW TABLES")  # NameError: 'spark' is not defined
+```
+
+**Solution:** Always initialize spark session explicitly.
+
+### ❌ Mistake 3: Missing .serverless() or .clusterId()
+```python
+# ❌ DON'T: Use default builder
+spark = DatabricksSession.builder.getOrCreate()
+# Exception: Cluster id or serverless are required
+```
+
+**Solution:** 
+```python
+# ✅ DO: Specify execution environment
+spark = DatabricksSession.builder.serverless().profile("profile").getOrCreate()
+```
+
+### ❌ Mistake 4: Forgetting File Extension in Bundle
+```yaml
+# ❌ DON'T: Omit .py extension
+notebook_path: ../src/exploration/adhoc_exploration
+# Error: notebook not found
+```
+
+**Solution:**
+```yaml
+# ✅ DO: Include .py extension
+notebook_path: ../src/exploration/adhoc_exploration.py
+```
+
+### ❌ Mistake 5: Using %pip in Databricks Connect
+```python
+# ❌ DON'T: Use magic commands
+%pip install 'databricks-sdk[notebook]'
+# SyntaxError: invalid syntax
+```
+
+**Solution:** Install packages in your environment before running:
+```bash
+pip install -r requirements.txt
+```
+
+## Usage Examples
+
+### Scenario 1: Debug Bronze → Silver Data Flow
+
+```python
+# Compare record counts
+compare_tables(bronze_schema, "bronze_transactions", 
+               silver_schema, "silver_transactions")
+
+# Check for data quality issues
+check_data_quality(silver_schema, "silver_transactions")
+```
+
+### Scenario 2: Validate Gold Layer Aggregations
+
+```python
+# Explore fact table
+df = explore_table(gold_schema, "fact_sales_daily", limit=20)
+
+# Check for null measures
+check_data_quality(gold_schema, "fact_sales_daily")
+```
+
+### Scenario 3: Investigate Missing Rows
+
+```python
+# List all tables in Silver
+list_tables(silver_schema)
+
+# Compare row counts across layers
+bronze_df = spark.table(f"{catalog}.{bronze_schema}.bronze_data")
+silver_df = spark.table(f"{catalog}.{silver_schema}.silver_data")
+
+print(f"Bronze: {bronze_df.count():,}")
+print(f"Silver: {silver_df.count():,}")
+print(f"Dropped: {bronze_df.count() - silver_df.count():,}")
+```
+
+## References
+
+### Official Databricks Documentation
+- [Databricks Connect](https://docs.databricks.com/dev-tools/databricks-connect.html)
+- [Databricks Notebooks](https://docs.databricks.com/notebooks/)
+- [Databricks SDK for Python](https://databricks-sdk-py.readthedocs.io/)
+
+### Related Patterns
+- [Databricks Asset Bundles](./databricks-asset-bundles.mdc) - Deployment patterns
+- [Python File Imports](./databricks-python-imports.mdc) - Sharing code between notebooks
+- [Data Quality Patterns](./dlt-expectations-patterns.mdc) - DQ rules and validation
+
+---
+
+**Pattern Origin:** November 2025 - Ad-hoc exploration notebook implementation  
+**Key Learning:** Magic commands don't work with Databricks Connect - need dual-format approach  
+**Impact:** Enables both workspace and local development workflows

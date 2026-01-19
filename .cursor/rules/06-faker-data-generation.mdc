@@ -1,0 +1,616 @@
+---
+description: Patterns for generating realistic test data using Faker with configurable data quality corruption for DQ testing
+globs: 
+  - "**/*generate*.py"
+  - "**/bronze/**/*.py"
+alwaysApply: false
+---
+
+# Faker Data Generation Patterns
+
+## Pattern Recognition
+
+When generating synthetic data for Databricks Bronze layer tables, use Faker with **configurable data corruption** to test Silver layer data quality expectations.
+
+## Core Principles
+
+1. **Realistic Data**: Use Faker to generate production-like data
+2. **Referential Integrity**: Maintain proper FK relationships between dimensions and facts
+3. **Configurable Corruption**: Add intentional data quality issues for testing
+4. **DQ Mapping**: Each corruption type maps to specific DLT expectations
+5. **Documentation**: Document corruption patterns and their DQ impacts
+
+## Standard Function Signature
+
+```python
+def generate_<entity>_data(
+    dimension_keys: dict,
+    num_records: int = 1000,
+    corruption_rate: float = 0.05
+) -> list:
+    """
+    Generate fake <entity> data with realistic patterns.
+    
+    Args:
+        dimension_keys: Dictionary containing dimension keys for referential integrity
+        num_records: Number of records to generate
+        corruption_rate: Percentage of records to intentionally corrupt (0.0 to 1.0)
+        
+    Returns:
+        List of <entity> dictionaries
+    """
+    fake = Faker()
+    records = []
+    
+    print(f"\nGenerating {num_records} <entities> (corruption rate: {corruption_rate*100}%)")
+    
+    for i in range(num_records):
+        # Generate valid data first
+        record_data = generate_valid_record(fake, dimension_keys)
+        
+        # Apply corruption if selected
+        should_corrupt = random.random() < corruption_rate
+        
+        if should_corrupt:
+            record_data = apply_corruption(record_data, corruption_rate)
+        
+        records.append(record_data)
+    
+    return records
+```
+
+## Corruption Pattern
+
+### Structure
+
+```python
+# Determine if this record should be corrupted for DQ testing
+should_corrupt = random.random() < corruption_rate
+
+if should_corrupt:
+    # Apply various DQ violations to test expectations
+    corruption_type = random.choice([
+        'corruption_type_1',
+        'corruption_type_2',
+        'corruption_type_3',
+        # ... more types
+    ])
+    
+    if corruption_type == 'corruption_type_1':
+        # Will fail: <expectation_name>
+        field = invalid_value  # Description of violation
+    elif corruption_type == 'corruption_type_2':
+        # Will fail: <expectation_name>
+        field = another_invalid_value
+    # ... handle other types
+```
+
+### Comments Must Include
+
+1. **Corruption type name**: Descriptive identifier
+2. **DQ expectation failed**: Which expectation(s) this triggers
+3. **Violation description**: What makes the data invalid
+
+### Example: Transaction Corruption
+
+```python
+# From actual codebase: src/altria_bronze/generate_facts.py
+should_corrupt = random.random() < corruption_rate
+
+if should_corrupt:
+    corruption_type = random.choice([
+        'zero_quantity',
+        'negative_price',
+        'excessive_price',
+        'loyalty_without_id',
+        'multi_unit_without_quantity'
+    ])
+    
+    if corruption_type == 'zero_quantity':
+        # Will fail: non_zero_quantity
+        quantity_sold = 0
+    elif corruption_type == 'negative_price':
+        # Will fail: valid_final_price
+        final_sales_price = -random.uniform(1.0, 50.0)
+    elif corruption_type == 'excessive_price':
+        # Will fail: reasonable_price (> $500)
+        final_sales_price = random.uniform(501.0, 1000.0)
+    elif corruption_type == 'loyalty_without_id':
+        # Will fail: loyalty_id_with_discount
+        loyalty_discount = random.uniform(1.0, 5.0)
+        loyalty_id = None  # Has discount but no ID
+    elif corruption_type == 'multi_unit_without_quantity':
+        # Will fail: multi_unit_discount_logic
+        quantity_sold = 1  # Only 1 unit
+        multi_unit_discount = random.uniform(1.0, 3.0)  # But has multi-unit discount
+```
+
+## Parameter Handling
+
+### Function Parameters
+
+```python
+def get_parameters():
+    """Get parameters from notebook widgets or command line."""
+    try:
+        # Try Databricks widgets first (notebook mode)
+        catalog = dbutils.widgets.get("catalog")
+        schema = dbutils.widgets.get("schema")
+        num_records = int(dbutils.widgets.get("num_records"))
+        corruption_rate = float(dbutils.widgets.get("corruption_rate"))
+    except:
+        # Fall back to command line arguments or defaults
+        catalog = "default_catalog"
+        schema = "default_schema"
+        num_records = 1000
+        corruption_rate = 0.05  # 5% corruption by default
+        
+        for arg in sys.argv[1:]:
+            if arg.startswith("--catalog="):
+                catalog = arg.split("=")[1]
+            elif arg.startswith("--schema="):
+                schema = arg.split("=")[1]
+            elif arg.startswith("--num_records="):
+                num_records = int(arg.split("=")[1])
+            elif arg.startswith("--corruption_rate="):
+                corruption_rate = float(arg.split("=")[1])
+    
+    return catalog, schema, num_records, corruption_rate
+```
+
+### Job Configuration (YAML)
+
+```yaml
+tasks:
+  - task_key: generate_data
+    environment_key: default
+    notebook_task:
+      notebook_path: ../src/layer/generate_data.py
+      base_parameters:
+        catalog: ${var.catalog}
+        schema: ${var.schema}
+        num_records: "1000"
+        corruption_rate: "0.05"  # 5% corruption for DQ testing
+```
+
+### Main Function Integration
+
+```python
+def main():
+    """Main entry point for data generation."""
+    
+    catalog, schema, num_records, corruption_rate = get_parameters()
+    
+    print("=" * 80)
+    print("Data Generation - <Entity Name>")
+    print("=" * 80)
+    print(f"Catalog: {catalog}")
+    print(f"Schema: {schema}")
+    print(f"Number of Records: {num_records}")
+    print(f"Corruption Rate: {corruption_rate * 100}% (for DQ testing)")
+    print("=" * 80)
+    
+    # ... rest of main logic
+```
+
+## Corruption Type Categories
+
+### 1. Missing Required Fields
+
+```python
+if corruption_type == 'null_required_field':
+    # Will fail: valid_<field_name>
+    if random.random() < 0.33:
+        required_field_1 = None
+    elif random.random() < 0.5:
+        required_field_2 = None
+    else:
+        required_field_3 = ""  # Empty string
+```
+
+### 2. Invalid Format/Length
+
+```python
+if corruption_type == 'invalid_format':
+    # Will fail: valid_<field>_format
+    field = "XXX"  # Wrong format (e.g., state code not 2 letters)
+
+if corruption_type == 'too_short':
+    # Will fail: valid_<field> (length check)
+    field = "AB"  # Below minimum length
+```
+
+### 3. Out of Range Values
+
+```python
+if corruption_type == 'excessive_value':
+    # Will fail: reasonable_<field>
+    numeric_field = random.randint(10001, 50000)  # Above max threshold
+
+if corruption_type == 'negative_value':
+    # Will fail: non_negative_<field>
+    numeric_field = -random.randint(1, 100)  # Below zero
+```
+
+### 4. Business Logic Violations
+
+```python
+if corruption_type == 'logic_violation':
+    # Will fail: <business_rule_name>
+    field_a = 100
+    field_b = 50  # field_b should be > field_a
+```
+
+### 5. Temporal Issues
+
+```python
+if corruption_type == 'old_data':
+    # Will fail: recent_<field>
+    date_field = datetime.now().date() - timedelta(days=400)  # Too old
+
+if corruption_type == 'future_data':
+    # Will fail: <field>_not_future
+    date_field = datetime.now().date() + timedelta(days=100)  # Too far future
+```
+
+### 6. Referential Integrity Issues
+
+```python
+if corruption_type == 'invalid_reference':
+    # Will fail: valid_<fk_field> or has_<dimension>_reference
+    foreign_key = None  # Missing FK
+    # OR
+    foreign_key = "INVALID_KEY_999"  # Non-existent FK
+```
+
+## Dimension vs Fact Patterns
+
+### Dimension Data Generation
+
+```python
+def generate_dimension_data(num_records: int = 100, corruption_rate: float = 0.05) -> list:
+    """
+    Generate dimension data (stores, products, customers).
+    
+    Dimensions are referenced by facts, so must be generated first.
+    """
+    fake = Faker('en_US')  # Use locale for realistic data
+    records = []
+    
+    for i in range(num_records):
+        # Generate surrogate key
+        dimension_key = f"DIM{str(i+1).zfill(6)}"
+        
+        # Generate business key
+        business_key = generate_business_key(fake)
+        
+        # Generate attributes
+        attributes = generate_attributes(fake)
+        
+        # Apply corruption
+        should_corrupt = random.random() < corruption_rate
+        if should_corrupt:
+            attributes = apply_dimension_corruption(attributes)
+        
+        record = {
+            'dimension_key': dimension_key,
+            'business_key': business_key,
+            **attributes,
+            'ingestion_timestamp': datetime.now()
+        }
+        
+        records.append(record)
+    
+    return records
+```
+
+### Fact Data Generation
+
+```python
+def generate_fact_data(
+    dimension_keys: dict,
+    num_records: int = 10000,
+    corruption_rate: float = 0.05
+) -> list:
+    """
+    Generate fact data (transactions, events, measurements).
+    
+    Facts reference dimensions, so dimensions must exist first.
+    Load dimension keys for referential integrity.
+    """
+    fake = Faker()
+    records = []
+    
+    # Extract dimension keys for FKs
+    store_keys = dimension_keys['store_keys']
+    product_keys = dimension_keys['product_keys']
+    
+    for i in range(num_records):
+        # Reference valid dimension keys
+        store_key = random.choice(store_keys)
+        product_key = random.choice(product_keys)
+        
+        # Generate measures
+        measure_1 = generate_measure(fake)
+        measure_2 = generate_measure(fake)
+        
+        # Apply corruption
+        should_corrupt = random.random() < corruption_rate
+        if should_corrupt:
+            store_key, measure_1, measure_2 = apply_fact_corruption(
+                store_key, measure_1, measure_2
+            )
+        
+        record = {
+            'transaction_id': f"TXN{fake.bothify(text='##########')}",
+            'store_key': store_key,
+            'product_key': product_key,
+            'measure_1': measure_1,
+            'measure_2': measure_2,
+            'ingestion_timestamp': datetime.now()
+        }
+        
+        records.append(record)
+    
+    return records
+```
+
+## Loading Dimension Keys for Facts
+
+```python
+def load_dimension_keys(spark: SparkSession, catalog: str, schema: str) -> dict:
+    """
+    Load dimension keys from existing dimension tables for referential integrity.
+    
+    Args:
+        spark: SparkSession instance
+        catalog: Catalog name
+        schema: Schema name
+        
+    Returns:
+        Dictionary containing dimension keys
+    """
+    print("Loading dimension keys for referential integrity...")
+    
+    # Load store keys
+    stores_df = spark.table(f"{catalog}.{schema}.bronze_store_dim")
+    store_keys = [row.store_key for row in stores_df.select("store_key").collect()]
+    print(f"  ✓ Loaded {len(store_keys)} store keys")
+    
+    # Load product keys
+    products_df = spark.table(f"{catalog}.{schema}.bronze_product_dim")
+    product_keys = [row.product_key for row in products_df.select("product_key").collect()]
+    print(f"  ✓ Loaded {len(product_keys)} product keys")
+    
+    return {
+        'store_keys': store_keys,
+        'product_keys': product_keys
+    }
+```
+
+## Realistic Data Constants
+
+```python
+# Define realistic domain values at module level
+TOBACCO_BRANDS = {
+    "Copenhagen": ["Copenhagen LC Natural", "Copenhagen Straight LC", "Copenhagen Wintergreen LC"],
+    "Skoal": ["Skoal Wintergreen LC", "Skoal Mint LC", "Skoal Peach LC"],
+    "Marlboro": ["Marlboro Red", "Marlboro Gold", "Marlboro Menthol"],
+}
+
+MANUFACTURERS = ["USSTC", "Philip Morris USA", "John Middleton", "Altria Group"]
+
+US_STATES = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", ...]
+
+STORE_TYPES = ["Franchise", "Corporate", "Independent"]
+```
+
+## Documentation Requirements
+
+### 1. Inline Comments
+
+```python
+# Will fail: <expectation_name>
+field = invalid_value  # <description of why invalid>
+```
+
+### 2. Function Docstrings
+
+```python
+def generate_data(num_records: int, corruption_rate: float) -> list:
+    """
+    Generate fake <entity> data with realistic patterns.
+    
+    Args:
+        num_records: Number of records to generate
+        corruption_rate: Percentage of records to intentionally corrupt (0.0 to 1.0)
+        
+    Returns:
+        List of <entity> dictionaries
+        
+    Corruption Types:
+        - corruption_type_1: Description → Fails expectation_name
+        - corruption_type_2: Description → Fails expectation_name
+        - corruption_type_3: Description → Fails expectation_name
+    """
+```
+
+### 3. Separate Documentation File
+
+Create `docs/<layer>/DATA_CORRUPTION_FOR_DQ_TESTING.md`:
+
+```markdown
+# Data Corruption for Data Quality Testing
+
+## Corruption Types
+
+### <Entity> (<silver_table_name>)
+
+| Corruption Type | DQ Expectation Failed | Description |
+|----------------|----------------------|-------------|
+| `type_1` | `expectation_name` | What goes wrong |
+| `type_2` | `expectation_name` | What goes wrong |
+
+**Examples:**
+```python
+# Type 1
+field = invalid_value  # Why this fails
+```
+```
+
+## Validation Checklist
+
+When generating data with corruption:
+
+- [ ] `corruption_rate` parameter added with default 0.05 (5%)
+- [ ] Each corruption type has comment: `# Will fail: <expectation_name>`
+- [ ] Corruption types map 1:1 to DLT expectations
+- [ ] Parameter handling supports widgets, CLI, and defaults
+- [ ] Job YAML includes `corruption_rate` parameter
+- [ ] Documentation file created explaining all corruption types
+- [ ] Quick reference guide created for testing
+- [ ] Realistic domain constants defined at module level
+- [ ] Referential integrity maintained (facts reference valid dimensions)
+- [ ] Print statements include corruption rate visibility
+
+## Common Mistakes to Avoid
+
+### ❌ DON'T: Apply corruption before generating valid data
+
+```python
+# BAD - hard to maintain
+if should_corrupt:
+    field = generate_invalid_field()
+else:
+    field = generate_valid_field()
+```
+
+### ✅ DO: Generate valid data first, then corrupt
+
+```python
+# GOOD - clean separation
+field = generate_valid_field()
+
+if should_corrupt:
+    field = corrupt_field(field)  # Modify valid data
+```
+
+### ❌ DON'T: Hardcode corruption without comments
+
+```python
+# BAD - no DQ mapping
+if corruption_type == 'bad_data':
+    field = None
+```
+
+### ✅ DO: Document which expectation fails
+
+```python
+# GOOD - clear DQ mapping
+if corruption_type == 'null_required_field':
+    # Will fail: valid_field_name
+    field = None
+```
+
+### ❌ DON'T: Use magic numbers
+
+```python
+# BAD - unclear threshold
+if random.random() < 0.05:
+    # What is 0.05?
+```
+
+### ✅ DO: Use named parameter
+
+```python
+# GOOD - explicit parameter
+should_corrupt = random.random() < corruption_rate
+```
+
+## Testing Scenarios
+
+### Development: High Corruption
+```yaml
+corruption_rate: "0.10"  # 10% for thorough testing
+```
+
+### Staging: Realistic Corruption
+```yaml
+corruption_rate: "0.05"  # 5% production-like
+```
+
+### Production: No Synthetic Corruption
+```yaml
+corruption_rate: "0.0"  # Real data only
+```
+
+## Example: Complete Implementation
+
+From `src/altria_bronze/generate_facts.py`:
+
+```python
+def generate_transaction_data(
+    dimension_keys: dict,
+    num_transactions: int = 10000,
+    days_back: int = 90,
+    corruption_rate: float = 0.05
+) -> list:
+    """Generate fake transaction data with realistic patterns."""
+    
+    fake = Faker()
+    transactions = []
+    
+    print(f"\nGenerating {num_transactions} transactions over {days_back} days (corruption rate: {corruption_rate*100}%)")
+    
+    store_numbers = dimension_keys['store_numbers']
+    products = dimension_keys['products']
+    
+    for i in range(num_transactions):
+        # Generate valid data
+        store_number = random.choice(store_numbers)
+        upc_code, sku_description, brand = random.choice(products)
+        quantity_sold = random.randint(1, 5)
+        final_sales_price = random.uniform(5.0, 50.0)
+        
+        # Apply corruption
+        should_corrupt = random.random() < corruption_rate
+        
+        if should_corrupt:
+            corruption_type = random.choice([
+                'zero_quantity',
+                'negative_price',
+                'excessive_price'
+            ])
+            
+            if corruption_type == 'zero_quantity':
+                # Will fail: non_zero_quantity
+                quantity_sold = 0
+            elif corruption_type == 'negative_price':
+                # Will fail: valid_final_price
+                final_sales_price = -random.uniform(1.0, 50.0)
+            elif corruption_type == 'excessive_price':
+                # Will fail: reasonable_price (> $500)
+                final_sales_price = random.uniform(501.0, 1000.0)
+        
+        transaction = {
+            'transaction_id': f"TXN{fake.bothify(text='##########')}",
+            'store_number': store_number,
+            'upc_code': upc_code,
+            'sku_description': sku_description,
+            'quantity_sold': quantity_sold,
+            'final_sales_price': round(final_sales_price, 2),
+            'ingestion_timestamp': datetime.now()
+        }
+        
+        transactions.append(transaction)
+    
+    print(f"✓ Generated {len(transactions)} transactions")
+    return transactions
+```
+
+## References
+
+- [Faker Documentation](https://faker.readthedocs.io/)
+- [DLT Expectations](https://docs.databricks.com/aws/en/dlt/expectations)
+- [Project DQ Config](../../src/altria_silver/dq_expectations_config.py)
+- [Data Corruption Testing Guide](../../docs/bronze/DATA_CORRUPTION_FOR_DQ_TESTING.md)

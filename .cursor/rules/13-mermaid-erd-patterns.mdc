@@ -1,0 +1,352 @@
+---
+description: Patterns for creating clean, professional Mermaid ERD diagrams for data modeling documentation
+globs: ["docs/**/*.md", "**/*ERD*.md"]
+alwaysApply: false
+---
+
+# Mermaid ERD Diagram Patterns
+
+## Pattern Recognition
+
+Mermaid ERD diagrams are used throughout the project to document data models, especially in the Gold layer. This rule standardizes the syntax and formatting for maintainability and clarity.
+
+## Core Principles
+
+### 1. Clean and Concise Syntax
+
+❌ **DON'T: Add inline comments to every column**
+```mermaid
+erDiagram
+  dim_store {
+    string store_key PK "Surrogate key (SCD2 version)"
+    string store_number BK "Business key (natural key)"
+    string store_name "Store name"
+  }
+```
+
+✅ **DO: Use simple PK markers, describe in documentation**
+```mermaid
+erDiagram
+  dim_store {
+    string store_key PK
+    string store_number
+    string store_name
+  }
+```
+
+**Rationale:** 
+- Inline comments clutter the diagram
+- Column descriptions belong in table documentation, not ERD
+- PK/FK markers provide sufficient metadata for relationships
+
+### 2. Consistent Formatting
+
+✅ **Use 2-space indentation consistently:**
+```mermaid
+erDiagram
+  %% =========================
+  %% Dimensions
+  %% =========================
+  dim_store {
+    string store_key PK
+    string store_number
+  }
+  
+  %% =========================
+  %% Facts
+  %% =========================
+  fact_sales {
+    string store_number PK
+    date transaction_date PK
+  }
+```
+
+### 3. Section Organization
+
+✅ **Organize with clear visual separators:**
+```mermaid
+erDiagram
+  %% =========================
+  %% Dimensions
+  %% =========================
+  dim_table_1 { ... }
+  dim_table_2 { ... }
+  
+  %% =========================
+  %% Facts
+  %% =========================
+  fact_table_1 { ... }
+  fact_table_2 { ... }
+  
+  %% =========================
+  %% Relationships (cardinalities)
+  %% =========================
+  dim_table_1 ||--o{ fact_table_1 : by_key
+```
+
+### 4. Relationship Labeling
+
+❌ **DON'T: Use long, verbose relationship labels**
+```mermaid
+dim_store ||--o{ fact_sales_daily : "store_number (business key)"
+```
+
+✅ **DO: Use short, technical labels**
+```mermaid
+dim_store ||--o{ fact_sales_daily : by_store_number
+```
+
+**Pattern:** `by_{column_name}` for join columns
+
+### 5. Avoid Reserved Keywords
+
+❌ **DON'T: Use SQL reserved keywords as column names**
+```mermaid
+dim_date {
+  int date_key PK
+  date date        -- 'date' is a reserved keyword
+}
+```
+
+✅ **DO: Use descriptive alternative names**
+```mermaid
+dim_date {
+  int date_key PK
+  date date_value  -- Clear and unambiguous
+}
+```
+
+## Complete Example Pattern
+
+### Gold Layer Star Schema
+
+```mermaid
+erDiagram
+  %% =========================
+  %% Dimensions
+  %% =========================
+  dim_store {
+    string store_key PK
+    string store_number
+    string store_name
+    string city
+    string state
+    boolean is_current
+    timestamp effective_from
+    timestamp effective_to
+  }
+
+  dim_product {
+    string product_key PK
+    string upc_code
+    string sku_description
+    string brand
+    string manufacturer
+  }
+
+  dim_date {
+    int date_key PK
+    date date_value
+    int year
+    int month
+    int quarter
+    boolean is_weekend
+  }
+
+  %% =========================
+  %% Facts
+  %% =========================
+  fact_sales_daily {
+    string store_number PK
+    string upc_code PK
+    date transaction_date PK
+    double net_revenue
+    int units_sold
+    int transaction_count
+  }
+
+  fact_inventory_snapshot {
+    string store_number PK
+    string upc_code PK
+    int current_on_hand
+    int current_minimum
+    boolean needs_replenishment
+  }
+
+  %% =========================
+  %% Relationships (cardinalities)
+  %% =========================
+  dim_store   ||--o{ fact_sales_daily : by_store_number
+  dim_product ||--o{ fact_sales_daily : by_upc_code
+  dim_date    ||--o{ fact_sales_daily : by_transaction_date
+  
+  dim_store   ||--o{ fact_inventory_snapshot : by_store_number
+  dim_product ||--o{ fact_inventory_snapshot : by_upc_code
+```
+
+## Primary Key Markers
+
+Use these standard markers:
+
+| Marker | Meaning | Usage |
+|--------|---------|-------|
+| `PK` | Primary Key | Unique identifier for the table |
+| *(none)* | Regular column | No special marker needed |
+
+**Note:** Don't use `FK`, `BK`, `UK` markers in the ERD diagram itself. These are documented in the implementation plan tables.
+
+## Relationship Cardinality Notation
+
+| Notation | Meaning | Description |
+|----------|---------|-------------|
+| `\|\|--o{` | One-to-Many | One dimension record to many fact records |
+| `\|\|--\|\|` | One-to-One | Rare in dimensional modeling |
+| `}o--o{` | Many-to-Many | Requires bridge table |
+
+**Most Common:** `||--o{` for dimension-to-fact relationships (star schema)
+
+## Data Type Conventions
+
+Use Databricks SQL type names:
+
+| Type | Usage | Example Column |
+|------|-------|---------------|
+| `string` | Text, IDs | store_number, city, state |
+| `int` | Integers | year, month, quarter |
+| `bigint` | Large integers | units_sold, transaction_count |
+| `double` | Decimals | price, revenue, percentage |
+| `decimal` | Fixed precision | *(rarely used, prefer double)* |
+| `date` | Date only | transaction_date, open_date |
+| `timestamp` | Date + time | record_created_timestamp |
+| `boolean` | True/False | is_current, is_weekend |
+
+## Composite Primary Keys
+
+For fact tables with grain at multiple dimensions:
+
+```mermaid
+fact_sales_daily {
+  string store_number PK
+  string upc_code PK
+  date transaction_date PK
+  double net_revenue
+  int units_sold
+}
+```
+
+**Pattern:** Mark each column in the composite key with `PK`
+
+## SCD Type 2 Pattern
+
+For slowly changing dimensions:
+
+```mermaid
+dim_store {
+  string store_key PK           -- Surrogate, unique per version
+  string store_number           -- Business key (repeats)
+  timestamp effective_from
+  timestamp effective_to
+  boolean is_current
+}
+```
+
+**Key Point:** `store_key` is PK, but FKs reference `store_number`
+
+## Validation Checklist
+
+When creating ERD diagrams:
+- [ ] Use 2-space indentation consistently
+- [ ] Add section headers with visual separators
+- [ ] Use only `PK` markers (no inline descriptions)
+- [ ] Avoid reserved keywords (`date` → `date_value`)
+- [ ] Use `by_{column}` pattern for relationship labels
+- [ ] Group relationships at the end
+- [ ] Match actual table/column names from DDL
+- [ ] Use correct Databricks SQL type names
+
+## Common Mistakes to Avoid
+
+### ❌ Mistake 1: Over-documentation in ERD
+```mermaid
+store_key PK "Unique identifier for each version"
+```
+**Fix:** Use simple `PK` marker, document in separate table
+
+### ❌ Mistake 2: Inconsistent indentation
+```mermaid
+dim_store {
+string store_key PK
+    string store_number
+  string store_name
+}
+```
+**Fix:** Use consistent 2-space indentation
+
+### ❌ Mistake 3: Missing section headers
+```mermaid
+erDiagram
+  dim_store { ... }
+  dim_product { ... }
+  fact_sales { ... }
+```
+**Fix:** Add `%% Dimensions` and `%% Facts` headers
+
+### ❌ Mistake 4: Verbose relationship labels
+```mermaid
+dim_store ||--o{ fact_sales : "Each store can have many sales transactions"
+```
+**Fix:** Use concise label: `by_store_number`
+
+## Integration with Documentation
+
+### Where ERD Diagrams Go
+
+1. **Planning Documents:** `docs/gold/GOLD_PK_FK_PLAN.md`
+2. **Layer Documentation:** `docs/gold/GOLD_LAYER_ERD.md`
+3. **Technical Specs:** In-line with constraint definitions
+
+### Supporting Documentation
+
+The ERD diagram should be accompanied by:
+- **Implementation Plan** - Detailed constraint definitions
+- **Legend Table** - Explaining PK, FK, BK, UK markers
+- **Cardinality Rules** - Business logic for relationships
+- **Grain Documentation** - Fact table grain definition
+
+## Example: Complete Documentation Block
+
+```markdown
+## Entity Relationship Diagram
+
+### Data Model
+
+```mermaid
+erDiagram
+  %% ... ERD diagram here ...
+```
+
+### Legend
+
+| Symbol | Meaning |
+|--------|---------|
+| `PK` | Primary Key |
+| `\|\|--o{` | One-to-Many relationship |
+
+### Relationships
+
+1. **dim_store → fact_sales_daily**
+   - Join: `dim_store.store_number = fact_sales_daily.store_number`
+   - Cardinality: One-to-Many
+   - Filter: `WHERE dim_store.is_current = true` (SCD Type 2)
+```
+
+## References
+
+- [Mermaid ERD Syntax](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)
+- [Databricks Data Types](https://docs.databricks.com/sql/language-manual/sql-ref-datatypes.html)
+- [Star Schema Design](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)
+
+---
+
+**Updated:** October 17, 2025  
+**Based on:** `docs/gold/GOLD_PK_FK_PLAN.md` ERD improvements

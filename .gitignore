@@ -1,0 +1,87 @@
+# Databricks Asset Bundles
+.databricks/
+.bundle/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# uv
+.uv/
+uv.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cursor IDE (keep rules, ignore workspace settings)
+.cursor/*
+!.cursor/rules/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Environment variables (NEVER commit!)
+.env
+.env.local
+.env.*.local
+*.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+/tmp/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Secrets (never commit!)
+secrets/
+*.pem
+*.key
+credentials.json
+
+# Frontend build output
+client/build/
+client/dist/
+client/node_modules/
+node_modules/
+
+# Test output
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
