@@ -1,0 +1,599 @@
+---
+description: Fact table grain validation patterns to prevent transaction vs aggregated confusion
+alwaysApply: false
+globs: 
+  - src/gold/merge/*_facts.py
+  - src/gold/setup/*_facts.py
+---
+
+# Fact Table Grain Validation Patterns
+
+## Pattern Recognition
+
+Fact tables have a **grain** - the level of detail at which measurements are stored. Misunderstanding grain (transaction-level vs aggregated) causes 5% of Gold layer bugs but has high impact (complete table rewrite required). This rule provides patterns to infer grain from DDL and validate merge logic.
+
+**Key Principle:** DDL PRIMARY KEY reveals the grain. Merge script must match that grain.
+
+---
+
+## Understanding Fact Table Grain
+
+### Grain Definition
+
+**Grain:** The combination of dimensions that uniquely identifies one measurement row.
+
+**Examples:**
+
+| Grain | Description | Primary Key | Row Represents |
+|-------|-------------|-------------|----------------|
+| **Transaction** | One row per event | `transaction_id` | Individual sale |
+| **Daily Summary** | One row per day-store-product | `date_key, store_key, product_key` | Daily totals |
+| **Hourly Aggregate** | One row per hour-cluster | `date_key, hour_of_day, cluster_key` | Hourly metrics |
+| **Snapshot** | One row per entity-date | `entity_key, snapshot_date_key` | Daily snapshot |
+
+---
+
+## Problem: Grain Ambiguity
+
+### Common Failure Pattern
+
+```python
+# DDL (Aggregated Grain)
+CREATE TABLE fact_model_serving_inference (
+  date_key INT NOT NULL,
+  endpoint_key STRING NOT NULL,
+  model_key STRING NOT NULL,
+  request_count BIGINT,        -- ✅ Aggregated measure
+  avg_latency_ms DOUBLE,       -- ✅ Aggregated measure
+  error_count BIGINT,          -- ✅ Aggregated measure
+  PRIMARY KEY (date_key, endpoint_key, model_key) NOT ENFORCED
+)
+
+# Merge Script (Transaction Grain - WRONG!)
+def merge_fact_model_serving_inference(...):
+    updates_df = (
+        endpoint_usage_df
+        .withColumn("request_id", col("databricks_request_id"))  # ❌ Transaction ID
+        .withColumn("latency_ms", col("execution_duration_ms"))  # ❌ Single request
+        .select(
+            "request_id",      # ❌ Not in DDL!
+            "date_key",
+            "endpoint_key",
+            "model_key",
+            "latency_ms"       # ❌ Not aggregated
+        )
+    )
+    
+    # Merge with wrong primary key
+    merge_fact_table(spark, updates_df, catalog, schema, 
+                     "fact_model_serving_inference",
+                     ["request_id"])  # ❌ DDL says (date_key, endpoint_key, model_key)!
+
+# Error at Runtime:
+# [DELTA_MERGE_UNRESOLVED_EXPRESSION] Cannot resolve target.request_id
+```
+
+**Root Cause:** Merge script treats aggregated fact as transaction-level fact.
+
+---
+
+## Pattern 1: Infer Grain from DDL Primary Key
+
+### Grain Inference Rules
+
+```python
+def infer_grain_from_ddl(spark, catalog, schema, table_name):
+    """
+    Infer fact table grain from PRIMARY KEY definition.
+    
+    Returns:
+        dict with 'grain_type', 'primary_keys', 'is_aggregated'
+    """
+    # Get table DDL
+    ddl = spark.sql(f"SHOW CREATE TABLE {catalog}.{schema}.{table_name}").collect()[0][0]
+    
+    # Extract PRIMARY KEY columns
+    pk_match = re.search(r'PRIMARY KEY \((.*?)\)', ddl)
+    if not pk_match:
+        return {'grain_type': 'unknown', 'primary_keys': [], 'is_aggregated': False}
+    
+    pk_cols = [col.strip() for col in pk_match.group(1).split(',')]
+    
+    # Infer grain type
+    if len(pk_cols) == 1:
+        # Single column PK
+        col_name = pk_cols[0].lower()
+        if any(suffix in col_name for suffix in ['_id', '_key', '_uid']):
+            grain_type = 'transaction'
+            is_aggregated = False
+        else:
+            grain_type = 'unknown'
+            is_aggregated = False
+    else:
+        # Composite PK
+        has_date = any('date' in col.lower() for col in pk_cols)
+        has_dimension = any('_key' in col.lower() for col in pk_cols)
+        
+        if has_date and has_dimension:
+            grain_type = 'aggregated'
+            is_aggregated = True
+        else:
+            grain_type = 'composite'
+            is_aggregated = False
+    
+    return {
+        'grain_type': grain_type,
+        'primary_keys': pk_cols,
+        'is_aggregated': is_aggregated
+    }
+
+# Usage
+grain_info = infer_grain_from_ddl(
+    spark, catalog, schema, "fact_model_serving_inference"
+)
+print(grain_info)
+# Output: {
+#   'grain_type': 'aggregated',
+#   'primary_keys': ['date_key', 'endpoint_key', 'model_key'],
+#   'is_aggregated': True
+# }
+```
+
+### Grain Type Decision Tree
+
+```
+PRIMARY KEY column count?
+├─ 1 column
+│  ├─ Ends with _id, _uid? → Transaction Grain
+│  ├─ Is date_key? → Daily Snapshot Grain
+│  └─ Otherwise → Unknown (manual review)
+│
+└─ Multiple columns (Composite PK)
+   ├─ Contains date_key + dimension keys? → Aggregated Grain
+   ├─ Contains entity_key + date_key? → Snapshot Grain
+   └─ Otherwise → Composite (manual review)
+```
+
+---
+
+## Pattern 2: Transaction-Level Fact Pattern
+
+### When to Use
+
+- **One row per business event** (sale, click, API call)
+- **Primary Key:** Single surrogate key (`transaction_id`, `event_id`, `request_id`)
+- **Measures:** Individual event metrics (amount, duration, count=1)
+
+### Example: fact_query_execution (Transaction Grain)
+
+```python
+# DDL
+CREATE TABLE fact_query_execution (
+  query_key STRING NOT NULL,           -- ✅ Single PK (transaction grain)
+  user_key STRING,
+  warehouse_key STRING,
+  query_text STRING,
+  execution_duration_ms BIGINT,        -- ✅ Individual query duration
+  rows_returned BIGINT,                -- ✅ Individual query rows
+  status STRING,
+  PRIMARY KEY (query_key) NOT ENFORCED
+)
+
+# Merge Script
+def merge_fact_query_execution(spark, catalog, bronze_schema, gold_schema):
+    """Merge query execution facts (transaction grain)."""
+    
+    # Read source (one row per query)
+    query_history_df = spark.table(f"{catalog}.{bronze_schema}.query_history")
+    
+    # ✅ NO AGGREGATION - pass through individual records
+    updates_df = (
+        query_history_df
+        .withColumn("query_key", md5(col("query_id")))  # Generate surrogate PK
+        
+        # Lookup dimension keys
+        .join(dim_user, "user_id", "left")
+        .join(dim_warehouse, "warehouse_id", "left")
+        
+        # Select transaction-level columns
+        .select(
+            "query_key",               # ✅ Transaction PK
+            "user_key",
+            "warehouse_key",
+            "query_text",
+            "execution_duration_ms",   # ✅ Individual query metric
+            "rows_returned",           # ✅ Individual query metric
+            "status",
+            "record_created_timestamp",
+            "record_updated_timestamp"
+        )
+    )
+    
+    # Merge with transaction PK
+    merge_fact_table(
+        spark, updates_df, catalog, gold_schema, 
+        "fact_query_execution",
+        ["query_key"]  # ✅ Single PK
+    )
+```
+
+**Key Characteristics:**
+- ✅ No `.groupBy()` or `.agg()` in merge script
+- ✅ Single surrogate key as PRIMARY KEY
+- ✅ Measures are direct pass-through (no SUM, AVG, COUNT)
+- ✅ One source row → one target row
+
+---
+
+## Pattern 3: Aggregated Fact Pattern
+
+### When to Use
+
+- **Pre-aggregated summaries** (daily sales, hourly usage)
+- **Primary Key:** Composite key of dimensions defining grain (`date_key, store_key, product_key`)
+- **Measures:** Aggregated metrics (total_revenue, avg_latency, request_count)
+
+### Example: fact_sales_daily (Aggregated Grain)
+
+```python
+# DDL
+CREATE TABLE fact_sales_daily (
+  date_key INT NOT NULL,
+  store_key STRING NOT NULL,
+  product_key STRING NOT NULL,
+  gross_revenue DOUBLE,              -- ✅ SUM of transactions
+  net_revenue DOUBLE,                -- ✅ SUM after returns
+  units_sold INT,                    -- ✅ SUM of quantity
+  transaction_count INT,             -- ✅ COUNT of transactions
+  avg_transaction_value DOUBLE,     -- ✅ AVG of transactions
+  PRIMARY KEY (date_key, store_key, product_key) NOT ENFORCED
+)
+
+# Merge Script
+def merge_fact_sales_daily(spark, catalog, silver_schema, gold_schema):
+    """Merge daily sales facts (aggregated grain)."""
+    
+    # Read source (transaction-level)
+    transactions_df = spark.table(f"{catalog}.{silver_schema}.silver_transactions")
+    
+    # ✅ AGGREGATE to daily grain
+    daily_sales_df = (
+        transactions_df
+        # Lookup dimension keys
+        .join(dim_store, "store_number", "left")
+        .join(dim_product, "upc_code", "left")
+        .join(dim_date, "transaction_date", "left")
+        
+        # ✅ GROUP BY grain dimensions
+        .groupBy("date_key", "store_key", "product_key")
+        
+        # ✅ AGGREGATE measures
+        .agg(
+            sum(when(col("quantity") > 0, col("amount")).otherwise(0)).alias("gross_revenue"),
+            sum(col("amount")).alias("net_revenue"),
+            sum(when(col("quantity") > 0, col("quantity")).otherwise(0)).alias("units_sold"),
+            count("*").alias("transaction_count"),
+            avg(col("amount")).alias("avg_transaction_value")
+        )
+        
+        .withColumn("record_created_timestamp", current_timestamp())
+        .withColumn("record_updated_timestamp", current_timestamp())
+    )
+    
+    # Merge with composite PK
+    merge_fact_table(
+        spark, daily_sales_df, catalog, gold_schema,
+        "fact_sales_daily",
+        ["date_key", "store_key", "product_key"]  # ✅ Composite PK (grain)
+    )
+```
+
+**Key Characteristics:**
+- ✅ Uses `.groupBy()` on grain dimensions
+- ✅ Uses `.agg()` with SUM, COUNT, AVG, MAX
+- ✅ Composite PRIMARY KEY matches `.groupBy()` columns
+- ✅ Multiple source rows → one target row per grain
+
+---
+
+## Pattern 4: Snapshot Fact Pattern
+
+### When to Use
+
+- **Point-in-time state** (daily inventory levels, account balances)
+- **Primary Key:** Entity + date (`entity_key, snapshot_date_key`)
+- **Measures:** Current values at snapshot time (on_hand_quantity, balance_amount)
+
+### Example: fact_inventory_snapshot (Snapshot Grain)
+
+```python
+# DDL
+CREATE TABLE fact_inventory_snapshot (
+  store_key STRING NOT NULL,
+  product_key STRING NOT NULL,
+  snapshot_date_key INT NOT NULL,
+  on_hand_quantity INT,              -- ✅ Quantity at snapshot time
+  on_order_quantity INT,             -- ✅ Quantity at snapshot time
+  reorder_point INT,
+  PRIMARY KEY (store_key, product_key, snapshot_date_key) NOT ENFORCED
+)
+
+# Merge Script
+def merge_fact_inventory_snapshot(spark, catalog, silver_schema, gold_schema):
+    """Merge inventory snapshots (snapshot grain)."""
+    
+    # Read source (periodic snapshots)
+    inventory_df = spark.table(f"{catalog}.{silver_schema}.silver_inventory_snapshot")
+    
+    # ✅ NO AGGREGATION - snapshots are already at correct grain
+    # But may need deduplication if multiple snapshots per day
+    snapshot_df = (
+        inventory_df
+        # Lookup dimension keys
+        .join(dim_store, "store_number", "left")
+        .join(dim_product, "upc_code", "left")
+        .join(dim_date, "snapshot_date", "left")
+        
+        # ✅ Deduplicate: keep latest snapshot per day
+        .withColumn("row_num", 
+                   row_number().over(
+                       Window.partitionBy("store_key", "product_key", "snapshot_date_key")
+                       .orderBy(col("snapshot_timestamp").desc())
+                   ))
+        .filter(col("row_num") == 1)
+        .drop("row_num")
+        
+        # Select snapshot columns
+        .select(
+            "store_key",
+            "product_key",
+            "snapshot_date_key",
+            "on_hand_quantity",     # ✅ Point-in-time value
+            "on_order_quantity",    # ✅ Point-in-time value
+            "reorder_point",
+            "record_created_timestamp",
+            "record_updated_timestamp"
+        )
+    )
+    
+    # Merge with composite PK
+    merge_fact_table(
+        spark, snapshot_df, catalog, gold_schema,
+        "fact_inventory_snapshot",
+        ["store_key", "product_key", "snapshot_date_key"]  # ✅ Snapshot grain
+    )
+```
+
+**Key Characteristics:**
+- ✅ No aggregation (snapshots already at correct grain)
+- ✅ May need deduplication (latest snapshot wins)
+- ✅ Composite PK: entity keys + snapshot date
+- ✅ Measures are point-in-time values (not SUMs)
+
+---
+
+## Pattern 5: Grain Validation Function
+
+### Pre-Merge Validation
+
+```python
+# src/gold/merge/helpers.py
+def validate_fact_grain(
+    spark,
+    updates_df,
+    catalog,
+    schema,
+    table_name,
+    expected_primary_keys
+):
+    """
+    Validate that merge DataFrame grain matches DDL PRIMARY KEY.
+    
+    Args:
+        expected_primary_keys: List of PK columns from merge_fact_table() call
+    
+    Raises:
+        ValueError if grain mismatch detected
+    """
+    # Get DDL primary keys
+    grain_info = infer_grain_from_ddl(spark, catalog, schema, table_name)
+    ddl_pk = grain_info['primary_keys']
+    
+    # Compare
+    if set(expected_primary_keys) != set(ddl_pk):
+        raise ValueError(
+            f"Grain mismatch for {table_name}!\n"
+            f"  DDL PRIMARY KEY: {ddl_pk}\n"
+            f"  Merge script PK: {expected_primary_keys}\n"
+            f"  Grain type: {grain_info['grain_type']}\n"
+            f"  Expected aggregation: {grain_info['is_aggregated']}"
+        )
+    
+    # If aggregated grain, verify DataFrame has aggregation
+    if grain_info['is_aggregated']:
+        # Check if DataFrame has duplicate grain combinations
+        distinct_grain_count = updates_df.select(*expected_primary_keys).distinct().count()
+        total_row_count = updates_df.count()
+        
+        if distinct_grain_count != total_row_count:
+            raise ValueError(
+                f"Aggregation required for {table_name}!\n"
+                f"  Grain: {expected_primary_keys}\n"
+                f"  Distinct grain combinations: {distinct_grain_count}\n"
+                f"  Total rows: {total_row_count}\n"
+                f"  → DataFrame has duplicates at grain level. Apply .groupBy().agg()"
+            )
+    
+    print(f"✓ Grain validation passed for {table_name}")
+    print(f"  Grain: {expected_primary_keys}")
+    print(f"  Type: {grain_info['grain_type']}")
+```
+
+### Usage
+
+```python
+def merge_fact_sales_daily(spark, catalog, silver_schema, gold_schema):
+    """Merge daily sales with grain validation."""
+    
+    # Aggregate to daily grain
+    daily_sales_df = transactions_df.groupBy(...).agg(...)
+    
+    # ✅ Validate grain BEFORE merge
+    validate_fact_grain(
+        spark, daily_sales_df, catalog, gold_schema,
+        "fact_sales_daily",
+        ["date_key", "store_key", "product_key"]
+    )
+    
+    # Proceed with merge
+    merge_fact_table(...)
+```
+
+---
+
+## Common Mistakes to Avoid
+
+### ❌ Mistake 1: Aggregated DDL, Transaction Script
+
+```python
+# DDL (Aggregated)
+PRIMARY KEY (date_key, endpoint_key, model_key)
+
+# Script (Transaction - WRONG!)
+updates_df = df.select("request_id", ...)  # ❌ Transaction ID
+merge_fact_table(..., ["request_id"])      # ❌ Wrong grain!
+```
+
+**Fix:** Aggregate to match DDL grain:
+```python
+# ✅ CORRECT: Aggregate to match DDL
+updates_df = df.groupBy("date_key", "endpoint_key", "model_key").agg(...)
+merge_fact_table(..., ["date_key", "endpoint_key", "model_key"])
+```
+
+### ❌ Mistake 2: Transaction DDL, Aggregated Script
+
+```python
+# DDL (Transaction)
+PRIMARY KEY (query_key)
+
+# Script (Aggregated - WRONG!)
+updates_df = df.groupBy("query_key").agg(count("*"))  # ❌ Why aggregate?
+merge_fact_table(..., ["query_key"])
+```
+
+**Fix:** Pass through individual records:
+```python
+# ✅ CORRECT: No aggregation for transaction grain
+updates_df = df.select("query_key", "execution_duration_ms", ...)
+merge_fact_table(..., ["query_key"])
+```
+
+### ❌ Mistake 3: Ambiguous YAML Grain
+
+```yaml
+# ❌ BAD: Grain not explicitly documented
+table_name: fact_model_serving_inference
+primary_key:
+  columns:
+    - date_key
+    - endpoint_key
+    - model_key
+# What grain is this? Daily aggregate? Hourly? Per request?
+```
+
+**Fix:** Document grain explicitly:
+```yaml
+# ✅ GOOD: Grain explicitly documented
+table_name: fact_model_serving_inference
+grain: "Daily aggregate per endpoint-model combination"
+grain_type: aggregated
+primary_key:
+  columns:
+    - date_key
+    - endpoint_key
+    - model_key
+measures:
+  - name: request_count
+    aggregation: SUM
+```
+
+---
+
+## Validation Checklist
+
+Before writing any fact table merge script:
+
+### Pre-Development
+- [ ] Read DDL to identify PRIMARY KEY columns
+- [ ] Infer grain type from PRIMARY KEY structure
+- [ ] Document grain in code comments
+- [ ] Determine if aggregation is required
+
+### During Development
+- [ ] If composite PK: use `.groupBy()` on PK columns
+- [ ] If single PK: pass through individual records (no aggregation)
+- [ ] Verify measures match grain (aggregated vs individual)
+- [ ] Use grain validation function before merge
+
+### Pre-Deployment
+- [ ] Validate PRIMARY KEY matches merge script
+- [ ] Check for duplicate rows at grain level
+- [ ] Verify measures are correctly aggregated (if needed)
+- [ ] Test with sample data
+
+### Post-Deployment
+- [ ] Verify row counts match expected grain
+- [ ] Check for NULL values in PRIMARY KEY columns
+- [ ] Validate measures are within expected ranges
+- [ ] Monitor for merge conflicts
+
+---
+
+## Grain Documentation Template
+
+```python
+def merge_fact_[table_name](spark, catalog, silver_schema, gold_schema):
+    """
+    Merge fact_[table_name] from Silver to Gold.
+    
+    GRAIN: [Describe grain in plain English]
+    - Example: "One row per date-store-product combination (daily aggregate)"
+    - Example: "One row per individual query execution (transaction level)"
+    
+    PRIMARY KEY: [List PK columns]
+    - Example: (date_key, store_key, product_key)
+    - Example: (query_key)
+    
+    GRAIN TYPE: [transaction | aggregated | snapshot]
+    
+    AGGREGATION: [Required | Not Required]
+    - If Required: GroupBy on [dimensions], Aggregate [measures]
+    """
+    
+    # Implementation matching documented grain
+    ...
+```
+
+---
+
+## Related Patterns
+
+- **Gold Layer Schema Validation** - See [23-gold-layer-schema-validation.mdc](mdc:.cursor/rules/23-gold-layer-schema-validation.mdc)
+- **Gold Merge Deduplication** - See [11-gold-delta-merge-deduplication.mdc](mdc:.cursor/rules/11-gold-delta-merge-deduplication.mdc)
+- **Unity Catalog Constraints** - See [05-unity-catalog-constraints.mdc](mdc:.cursor/rules/05-unity-catalog-constraints.mdc)
+
+---
+
+## References
+
+- [Rule Improvement Case Study](../../docs/reference/rule-improvement-gold-layer-debugging.md) - Gold layer debugging methodology
+- [Kimball Dimensional Modeling](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/) - Grain definition
+- [Delta Lake Merge](https://docs.delta.io/latest/delta-update.html#upsert-into-a-table-using-merge) - Merge semantics
+
+---
+
+**Last Updated:** December 2, 2025  
+**Pattern Origin:** Bug #84 (wrong fact table grain), 2% of Gold bugs but high impact  
+**Key Lesson:** DDL PRIMARY KEY reveals grain. Composite PK = aggregated, single PK = transaction.  
+**Impact:** Prevents costly table rewrites by catching grain mismatches before deployment

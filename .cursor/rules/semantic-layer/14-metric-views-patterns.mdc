@@ -1,0 +1,1497 @@
+---
+description: Standard patterns for creating Databricks Metric Views with semantic metadata for Genie and AI/BI
+globs: src/company_gold/**/*.yaml
+alwaysApply: true
+---
+
+# Metric Views Patterns for Genie & AI/BI
+
+## Pattern Recognition
+Metric Views provide a semantic layer for natural language queries via Genie and AI/BI dashboards. This rule standardizes the YAML structure for comprehensive, LLM-friendly metric definitions.
+
+## ⚠️ CRITICAL: Correct SQL Syntax for Creating Metric Views
+
+**Metric views MUST be created using the `WITH METRICS LANGUAGE YAML` syntax, NOT regular views with TBLPROPERTIES.**
+
+### ❌ WRONG: Regular View with TBLPROPERTIES
+```python
+# This creates a regular view, NOT a metric view
+create_sql = f"""
+CREATE OR REPLACE VIEW {fully_qualified_name}
+COMMENT '{comment}'
+TBLPROPERTIES ('metric_view_spec' = '{yaml_str}')
+AS SELECT 1 as __metric_view_placeholder__
+"""
+```
+
+**Problem:** This creates a regular VIEW, not a METRIC_VIEW. Databricks won't recognize it as a metric view.
+
+### ✅ CORRECT: WITH METRICS LANGUAGE YAML
+```python
+# Correct syntax for metric views
+create_sql = f"""
+CREATE OR REPLACE VIEW {fully_qualified_name}
+WITH METRICS
+LANGUAGE YAML
+COMMENT '{view_comment_escaped}'
+AS $$
+{yaml_str}
+$$
+"""
+```
+
+**Key Requirements:**
+1. **`WITH METRICS`** - Identifies the view as a metric view
+2. **`LANGUAGE YAML`** - Specifies YAML format for the definition
+3. **`AS $$ ... $$`** - YAML content wrapped in dollar-quote delimiters (not single quotes)
+4. **No SELECT statement** - The YAML definition IS the view definition
+5. **`version`** field - Must be included in each metric view YAML
+
+### Verification
+After creation, verify the view type:
+```sql
+DESCRIBE EXTENDED catalog.schema.metric_view_name;
+```
+
+**Expected output:**
+- `Type: METRIC_VIEW` (not just `VIEW`)
+- `Language: YAML`
+- `View Text: <full YAML definition>` (not placeholder SELECT)
+
+## ⚠️ CRITICAL: v1.1 Unsupported Fields
+
+**These fields will cause errors and MUST NOT be used in v1.1:**
+
+| Field | Error | Action |
+|-------|-------|--------|
+| **`name`** | `Unrecognized field "name"` | ❌ **NEVER include** - name is in CREATE VIEW statement |
+| `time_dimension` | `Unrecognized field "time_dimension"` | ❌ Remove entirely - use regular dimension instead |
+| `window_measures` | `Unrecognized field "window_measures"` | ❌ Remove entirely - calculate in SQL/Python |
+| `join_type` | Unsupported | ❌ Remove - defaults to LEFT OUTER JOIN |
+| `table` (in joins) | `Missing required creator property 'source'` | ✅ Use `source` instead |
+
+## ⚠️ MANDATORY: Pre-Creation Schema Validation
+
+**ALWAYS validate schemas BEFORE creating metric view YAML. 100% of deployment failures are preventable schema issues.**
+
+### Schema Validation Checklist
+
+Before writing any metric view YAML, complete this checklist:
+
+#### 1. Verify Source Table Schema
+```bash
+# Check Gold layer YAML definition
+grep "^- name:" gold_layer_design/yaml/{domain}/{source_table}.yaml
+
+# Or query the table
+DESCRIBE TABLE {catalog}.{schema}.{source_table};
+```
+
+**Document available columns:**
+- [ ] Source table columns listed
+- [ ] Column data types verified
+- [ ] Primary key identified
+
+#### 2. Verify All Joined Tables
+```bash
+# For each joined dimension table
+grep "^- name:" gold_layer_design/yaml/{domain}/{dim_table}.yaml
+```
+
+**For each joined table, verify:**
+- [ ] Table exists
+- [ ] Join key column exists in both tables
+- [ ] Join key data types match
+- [ ] For SCD2 tables: `is_current` column exists
+
+#### 3. Validate Every Column Reference
+
+**For each dimension and measure, verify:**
+- [ ] Column exists in source table (for `source.column`)
+- [ ] Column exists in joined table (for `{join_name}.column`)
+- [ ] No assumed column names without verification
+
+**Common Column Name Errors:**
+- ❌ `is_active` → ✅ Often `is_current` (SCD2 tables)
+- ❌ `created_at` → ✅ May be `joined_at`, `created_date`, etc.
+- ❌ `booking_count` → ✅ Often need `COUNT(booking_id)` instead
+
+#### 4. Validate Aggregation Logic
+
+**For COUNT measures:**
+- [ ] Use `COUNT({table}.{primary_key_column})`
+- [ ] NOT `SUM({table}.count_column)` (column may not exist)
+
+**For SUM measures:**
+- [ ] Verify numeric column exists
+- [ ] NOT summing a non-existent aggregated field
+
+**Example:**
+```yaml
+# ❌ WRONG: Assumes booking_count column exists
+measures:
+  - name: total_bookings
+    expr: SUM(fact_booking.booking_count)  # Column doesn't exist!
+
+# ✅ CORRECT: Count primary key
+measures:
+  - name: total_bookings
+    expr: COUNT(fact_booking.booking_id)  # Uses actual column
+```
+
+#### 5. Validate Join Conditions
+
+**Check each join:**
+- [ ] Join is direct: `source.fk = dim_table.pk`
+- [ ] NOT transitive: `dim_table1.fk = dim_table2.pk` ❌
+- [ ] Foreign key exists in source table
+- [ ] Primary key exists in dimension table
+- [ ] For SCD2: Include `AND {dim_table}.is_current = true`
+
+---
+
+### Pre-Creation Validation Script
+
+**Create and run this validation before deployment:**
+
+```python
+# scripts/validate_metric_view_columns.py
+import yaml
+from pathlib import Path
+
+def validate_columns(yaml_file: Path, gold_layer_yaml_dir: Path):
+    """
+    Validate all column references in metric view YAML exist in source tables.
+    
+    Returns: List of errors (empty if valid)
+    """
+    metric_view = yaml.safe_load(open(yaml_file))
+    errors = []
+    
+    # 1. Get source table columns
+    source_table = metric_view['source'].split('.')[-1]
+    source_yaml = find_table_yaml(gold_layer_yaml_dir, source_table)
+    source_columns = get_yaml_columns(source_yaml)
+    
+    # 2. Validate dimension columns
+    for dim in metric_view.get('dimensions', []):
+        if 'source.' in dim['expr']:
+            col = dim['expr'].replace('source.', '').split('(')[0]
+            if col not in source_columns:
+                errors.append(f"❌ Dimension '{dim['name']}': Column '{col}' not in {source_table}")
+    
+    # 3. Validate measure columns
+    for measure in metric_view.get('measures', []):
+        if 'source.' in measure['expr']:
+            # Extract column names from expressions like SUM(source.column)
+            cols = extract_source_columns(measure['expr'])
+            for col in cols:
+                if col not in source_columns:
+                    errors.append(f"❌ Measure '{measure['name']}': Column '{col}' not in {source_table}")
+    
+    # 4. Validate joined table columns
+    for join in metric_view.get('joins', []):
+        join_name = join['name']
+        joined_table = join['source'].split('.')[-1]
+        joined_yaml = find_table_yaml(gold_layer_yaml_dir, joined_table)
+        joined_columns = get_yaml_columns(joined_yaml)
+        
+        # Validate ON clause
+        on_clause = join['on']
+        # Check source.column exists
+        # Check joined_table.column exists
+        # ...
+    
+    return errors
+
+def get_yaml_columns(yaml_file: Path) -> set:
+    """Extract column names from Gold layer YAML definition."""
+    table_def = yaml.safe_load(open(yaml_file))
+    return {col['name'] for col in table_def['columns']}
+
+# Usage
+errors = validate_columns(
+    Path("src/wanderbricks_gold/semantic/metric_views/revenue_analytics_metrics.yaml"),
+    Path("gold_layer_design/yaml")
+)
+
+if errors:
+    print("\n".join(errors))
+    sys.exit(1)
+else:
+    print("✅ All columns validated successfully")
+```
+
+**Run before deployment:**
+```bash
+python scripts/validate_metric_view_columns.py
+```
+
+---
+
+### Quick Validation Pattern
+
+**For each metric view, create a validation checklist:**
+
+```markdown
+## revenue_analytics_metrics Validation
+
+### Source Table: fact_booking_daily
+Columns (from gold_layer_design/yaml/booking/fact_booking_daily.yaml):
+- property_id ✅
+- check_in_date ✅
+- destination_id ✅
+- total_booking_value ✅
+- booking_count ✅
+- ...
+
+### Joined Table: dim_property
+Columns (from gold_layer_design/yaml/property/dim_property.yaml):
+- property_id ✅
+- property_type ✅
+- is_current ✅
+- ...
+
+### Join Validation:
+- source.property_id = dim_property.property_id ✅ (both exist)
+- dim_property.is_current ✅ (SCD2 filter)
+
+### Column References:
+Dimensions:
+- source.check_in_date ✅
+- source.destination_id ✅
+- dim_property.property_type ✅
+
+Measures:
+- SUM(source.total_booking_value) ✅
+- COUNT(source.booking_id) ✅ (primary key exists)
+```
+
+## ⚠️ CRITICAL: `name` Field NOT Supported in v1.1
+
+**The metric view name is specified in the CREATE VIEW statement, NOT in the YAML definition.**
+
+```python
+# ✅ CORRECT: Name in SQL, not YAML
+view_name = "revenue_analytics_metrics"  # From filename
+fully_qualified_name = f"{catalog}.{schema}.{view_name}"
+
+create_sql = f"""
+CREATE VIEW {fully_qualified_name}  -- Name specified here!
+WITH METRICS
+LANGUAGE YAML
+AS $$
+version: '1.1'              -- NO 'name' field here!
+comment: 'Description...'
+source: catalog.schema.fact_table
+dimensions:
+  - name: dimension1
+    expr: source.column1
+$$
+"""
+```
+
+**Common Error if `name` field is included:**
+```
+[METRIC_VIEW_INVALID_VIEW_DEFINITION] Unrecognized field "name"
+```
+
+## Metric View YAML Structure (v1.1)
+
+```yaml
+version: "1.1"
+comment: <Comprehensive description optimized for Genie natural language queries>
+
+source: ${catalog}.${gold_schema}.<fact_table>
+
+# Join to dimension tables (optional)
+# ✅ REQUIRED fields: name, source, 'on' (quoted!)
+# ⚠️ CRITICAL: Only direct joins supported (source → joined_table)
+joins:
+    - name: <dim_table_alias>
+      source: ${catalog}.${gold_schema}.<dim_table>
+      'on': source.<fk> = <dim_table_alias>.<pk> AND <dim_table_alias>.is_current = true
+  
+  dimensions:
+    # ✅ Main table columns: use source. prefix
+    - name: <dimension_name>
+      expr: source.<column>
+      comment: <Business description for LLM understanding>
+      display_name: <User-Friendly Name>
+      synonyms:
+        - <alternative name 1>
+        - <alternative name 2>
+    
+    # ✅ Joined table columns: use join name as prefix
+    - name: <joined_dimension>
+      expr: <dim_table_alias>.<column>
+      comment: <Business description>
+      display_name: <User-Friendly Name>
+      synonyms:
+        - <alternative name 1>
+  
+  measures:
+    # ✅ Main table columns: use source. prefix
+    - name: <measure_name>
+      expr: SUM(source.<column>)
+      comment: <Business description and calculation logic>
+      display_name: <User-Friendly Name>
+      format:
+        type: <currency|number|percentage>
+        # currency options
+        currency_code: USD
+        # number/currency options
+        decimal_places:
+          type: <exact|all>
+          places: 2  # For exact
+        hide_group_separator: false
+        abbreviation: compact  # Shows K, M, B
+      synonyms:
+        - <alternative name 1>
+        - <alternative name 2>
+```
+
+## Standard Dimension Patterns
+
+### Geographic Dimensions
+```yaml
+dimensions:
+  - name: store_number
+    expr: fact_table.store_number
+    comment: Store identifier for location-based analysis
+    display_name: Store Number
+    synonyms:
+      - store id
+      - location number
+      - store code
+  
+  - name: city
+    expr: dim_store.city
+    comment: City where the location is situated
+    display_name: City
+    synonyms:
+      - store city
+      - location city
+  
+  - name: state
+    expr: dim_store.state
+    comment: State where the location is situated
+    display_name: State
+    synonyms:
+      - store state
+      - location state
+```
+
+### Product Dimensions
+```yaml
+dimensions:
+  - name: upc_code
+    expr: fact_table.upc_code
+    comment: Universal Product Code for product identification
+    display_name: UPC Code
+    synonyms:
+      - product code
+      - upc
+      - barcode
+  
+  - name: brand
+    expr: dim_product.brand
+    comment: Product brand name
+    display_name: Brand
+    synonyms:
+      - product brand
+      - manufacturer brand
+  
+  - name: product_category
+    expr: dim_product.product_category
+    comment: Product category classification
+    display_name: Product Category
+    synonyms:
+      - category
+      - product type
+```
+
+### Time Dimensions (from dim_date)
+```yaml
+dimensions:
+  - name: year
+    expr: dim_date.year
+    comment: Calendar year for annual analysis
+    display_name: Year
+    synonyms:
+      - calendar year
+      - fiscal year
+  
+  - name: quarter
+    expr: dim_date.quarter
+    comment: Calendar quarter (1-4)
+    display_name: Quarter
+    synonyms:
+      - q
+      - fiscal quarter
+  
+  - name: month_name
+    expr: dim_date.month_name
+    comment: Month name for user-friendly reporting
+    display_name: Month Name
+    synonyms:
+      - month
+  
+  - name: day_of_week_name
+    expr: dim_date.day_of_week_name
+    comment: Day of week name for day-of-week analysis
+    display_name: Day of Week
+    synonyms:
+      - weekday
+      - day name
+  
+  - name: is_weekend
+    expr: dim_date.is_weekend
+    comment: Weekend indicator for weekend vs weekday analysis
+    display_name: Is Weekend
+    synonyms:
+      - weekend
+      - weekend flag
+```
+
+## Standard Measure Patterns
+
+### Revenue Measures
+```yaml
+measures:
+  - name: total_revenue
+    expr: SUM(fact_table.net_revenue)
+    comment: Total net revenue after discounts and returns. Primary revenue metric.
+    display_name: Total Revenue
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: compact
+    synonyms:
+      - revenue
+      - net revenue
+      - sales
+      - total sales
+  
+  - name: avg_transaction_value
+    expr: AVG(fact_table.avg_transaction_value)
+    comment: Average dollar value per transaction
+    display_name: Avg Transaction Value
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+    synonyms:
+      - average transaction
+      - basket value
+      - ticket size
+```
+
+### Volume Measures
+```yaml
+measures:
+  - name: total_units
+    expr: SUM(fact_table.net_units)
+    comment: Total units sold after returns
+    display_name: Total Units
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: compact
+    synonyms:
+      - units
+      - units sold
+      - quantity
+      - volume
+```
+
+### Count Measures
+```yaml
+measures:
+  - name: transaction_count
+    expr: SUM(fact_table.transaction_count)
+    comment: Total number of sales transactions
+    display_name: Transaction Count
+    format:
+      type: number
+      decimal_places:
+        type: all
+      abbreviation: compact
+    synonyms:
+      - transactions
+      - transaction volume
+      - sales count
+```
+
+### Percentage Measures
+```yaml
+measures:
+  - name: avg_discount_rate
+    expr: AVG(fact_table.discount_penetration_pct)
+    comment: Average discount percentage across transactions
+    display_name: Avg Discount Rate
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 1
+    synonyms:
+      - discount percentage
+      - discount rate
+      - promotion rate
+```
+
+## ⚠️ Window Measures NOT Supported in v1.1
+
+**`window_measures` field is NOT supported in Metric View Specification v1.1 and will cause errors.**
+
+### ❌ This Will Fail:
+```yaml
+version: "1.1"
+name: my_metric_view
+source: catalog.schema.fact_table
+
+window_measures:  # ❌ ERROR: Unrecognized field "window_measures"
+  - name: revenue_last_7_days
+    base_measure: total_revenue
+    window:
+      type: rolling
+      duration: 7d
+```
+
+**Error:** `Unrecognized field "window_measures" (class com.databricks.sql.serde.v11.MetricView)`
+
+### ✅ Alternative Approaches:
+
+#### Option 1: Calculate in SQL Query
+```sql
+SELECT 
+  store_name,
+  MEASURE(`Total Revenue`) as current_revenue,
+  SUM(MEASURE(`Total Revenue`)) OVER (
+    PARTITION BY store_name 
+    ORDER BY date 
+    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+  ) as revenue_last_7_days
+FROM metric_view
+```
+
+#### Option 2: Pre-calculate in Gold Layer
+```python
+# In fact table creation
+.withColumn("revenue_last_7_days",
+    sum("revenue").over(
+        Window.partitionBy("store_id")
+        .orderBy("date")
+        .rowsBetween(-6, 0)
+    ))
+```
+
+Then add as regular measure:
+```yaml
+measures:
+  - name: revenue_last_7_days
+    expr: SUM(source.revenue_last_7_days)
+    comment: Pre-calculated 7-day rolling revenue
+```
+
+## Format Options Reference
+
+### Currency Format
+```yaml
+format:
+  type: currency
+  currency_code: USD  # or EUR, GBP, etc.
+  decimal_places:
+    type: exact
+    places: 2
+  hide_group_separator: false  # Show commas
+  abbreviation: compact  # Shows 1.5M instead of 1,500,000
+```
+
+### Number Format
+```yaml
+format:
+  type: number
+  decimal_places:
+    type: all  # Show all decimals
+    # OR
+    type: exact
+    places: 1
+  hide_group_separator: false
+  abbreviation: compact
+```
+
+### Percentage Format
+```yaml
+format:
+  type: percentage
+  decimal_places:
+    type: exact
+    places: 1  # Shows 45.3%
+```
+
+## ⚠️ CRITICAL: Transitive Join Limitations
+
+**Metric Views v1.1 DO NOT support transitive/chained joins.**
+
+### ❌ WRONG: Transitive Join (Not Supported)
+
+```yaml
+source: fact_property_engagement
+
+joins:
+  - name: dim_property
+    source: catalog.schema.dim_property
+    'on': source.property_id = dim_property.property_id
+  
+  - name: dim_destination
+    source: catalog.schema.dim_destination
+    # ❌ ERROR: Cannot reference dim_property (another joined table)!
+    'on': dim_property.destination_id = dim_destination.destination_id
+
+dimensions:
+  - name: destination
+    expr: dim_destination.destination  # Depends on invalid transitive join
+```
+
+**Error:**
+```
+[UNRESOLVED_COLUMN.WITH_SUGGESTION] 
+dim_property.destination_id cannot be resolved
+```
+
+**Rule:** Each join must be directly between `source` and the joined table:
+- ✅ Allowed: `source.fk = dim_table.pk`
+- ❌ Not Allowed: `dim_table1.fk = dim_table2.pk`
+
+---
+
+### ✅ SOLUTION Option 1: Use Foreign Key Directly
+
+```yaml
+source: fact_property_engagement
+
+joins:
+  - name: dim_property
+    source: catalog.schema.dim_property
+    'on': source.property_id = dim_property.property_id
+  
+  # Remove dim_destination join
+
+dimensions:
+  - name: destination_id
+    expr: dim_property.destination_id  # ✅ Use FK directly
+    comment: Destination identifier for geographic segmentation
+```
+
+**Trade-off:** Users see IDs instead of names, but can still filter/group.
+
+---
+
+### ✅ SOLUTION Option 2: Denormalize Fact Table
+
+```python
+# In Gold layer fact table creation, add destination_id
+fact_engagement = (
+    fact_engagement
+    .join(dim_property, "property_id")
+    .withColumn("destination_id", col("dim_property.destination_id"))
+)
+```
+
+Then in metric view:
+```yaml
+source: fact_property_engagement  # Now has destination_id!
+
+joins:
+  - name: dim_destination
+    source: catalog.schema.dim_destination
+    'on': source.destination_id = dim_destination.destination_id  # ✅ Direct!
+
+dimensions:
+  - name: destination
+    expr: dim_destination.destination  # ✅ Works!
+```
+
+---
+
+### ✅ SOLUTION Option 3: Create Enriched View
+
+```sql
+-- Create enriched view with all needed columns
+CREATE VIEW fact_property_engagement_enriched AS
+SELECT 
+  fpe.*,
+  dp.destination_id,
+  dd.destination,
+  dd.country
+FROM fact_property_engagement fpe
+JOIN dim_property dp ON fpe.property_id = dp.property_id
+JOIN dim_destination dd ON dp.destination_id = dd.destination_id
+WHERE dp.is_current = true;
+```
+
+Then use enriched view:
+```yaml
+source: fact_property_engagement_enriched
+
+joins: []  # No joins needed!
+
+dimensions:
+  - name: destination
+    expr: source.destination  # ✅ Already in source!
+```
+
+---
+
+## Joins Pattern
+
+### SCD2 Dimension Join
+```yaml
+joins:
+  - name: dim_store
+    source: ${catalog}.${gold_schema}.dim_store
+    'on': source.store_number = dim_store.store_number AND dim_store.is_current = true
+```
+
+**⚠️ CRITICAL: Version 1.1 Requirements**
+
+**Join Structure:**
+- Each join **MUST have a `name` field** - The alias used to reference the joined table (e.g., `dim_store`)
+- Each join **MUST have a `source` field** - The full table path (e.g., `catalog.schema.dim_store`)
+- Each join **MUST have an `'on'` field** (quoted) - The join condition using `source.` prefix for main table
+- Missing fields will cause: `Missing required creator property` errors
+
+**Column References:**
+- **MUST use `source.` prefix** for main table columns in dimensions and measures
+- Use join `name` prefix for joined table columns (e.g., `dim_store.column_name`)
+- Example: `expr: source.revenue` NOT `expr: fact_table.revenue`
+
+**Unsupported Fields:**
+- `time_dimension` - NOT supported in v1.1 (will cause "Unrecognized field" error)
+- `join_type` - NOT needed (defaults to LEFT OUTER JOIN)
+
+### Multiple Dimension Joins
+```yaml
+joins:
+  - name: dim_store
+    source: ${catalog}.${gold_schema}.dim_store
+    'on': source.store_number = dim_store.store_number AND dim_store.is_current = true
+  
+  - name: dim_product
+    source: ${catalog}.${gold_schema}.dim_product
+    'on': source.upc_code = dim_product.upc_code
+  
+  - name: dim_date
+    source: ${catalog}.${gold_schema}.dim_date
+    'on': source.transaction_date = dim_date.date
+```
+
+## Synonym Best Practices
+
+Provide **3-5 synonyms** per dimension/measure to improve Genie recognition:
+
+```yaml
+synonyms:
+  - <exact alternative name>
+  - <business term variant>
+  - <abbreviated form>
+  - <common misspelling or alternative>
+```
+
+**Examples:**
+- Revenue → `sales`, `net revenue`, `total sales`, `dollars`
+- Store Number → `store id`, `location number`, `store code`
+- Units → `quantity`, `volume`, `items sold`, `units sold`
+
+## LLM-Friendly Comments
+
+Comments should:
+1. Explain the business meaning
+2. Describe calculation logic
+3. Note any special considerations
+4. Use natural language
+
+```yaml
+comment: Total net revenue after discounts and returns. Primary revenue metric for business reporting. Excludes tax.
+```
+
+---
+
+## ⚠️ CRITICAL: Standardized Metric View Comment Format (v3.0)
+
+**Issue:** Metric view comments without structured guidance cause Genie to select wrong views.
+
+### Comment Format Reference Table
+
+| Element | Purpose | Why It Matters |
+|---|---|---|
+| **PURPOSE** | One-line description of the metric view | Quick understanding for LLM |
+| **BEST FOR** | Example questions (pipe-separated) | LLM matches user query to metric view |
+| **NOT FOR** | Redirect to correct asset (TVF or other view) | Prevents wrong metric view selection |
+| **DIMENSIONS** | Available filter/grouping columns (comma-separated) | Clarifies what can be filtered/grouped |
+| **MEASURES** | Available aggregated metrics (comma-separated) | Clarifies what can be measured |
+| **SOURCE** | Source table(s) with schema | Transparency on data origin |
+| **JOINS** | Joined dimension tables (if any) | Shows data relationships |
+| **NOTE** | Critical caveats or limitations | Prevents common misuse patterns |
+
+### Standardized Comment Template
+
+```yaml
+comment: >
+  PURPOSE: [One-line description of what this metric view provides].
+  
+  BEST FOR: [Question 1] | [Question 2] | [Question 3] | [Question 4]
+  
+  NOT FOR: [What this view shouldn't be used for] (use [correct_asset] instead)
+  
+  DIMENSIONS: [dim1], [dim2], [dim3], [dim4], [dim5]
+  
+  MEASURES: [measure1], [measure2], [measure3], [measure4], [measure5]
+  
+  SOURCE: [fact_or_dim_table] ([domain] domain)
+  
+  JOINS: [dim_table1] ([description]), [dim_table2] ([description])
+  
+  NOTE: [Any critical caveats, limitations, or important context]
+```
+
+### Example 1: Cost Analytics (Complete Format)
+
+```yaml
+comment: >
+  PURPOSE: Comprehensive cost analytics for Databricks billing and usage analysis.
+  
+  BEST FOR: Total spend by workspace | Cost trend over time | SKU cost breakdown | 
+  Tagged vs untagged spend | Serverless vs classic cost comparison
+  
+  NOT FOR: Commit/contract tracking (use commit_tracking) | Real-time cost alerts (use get_daily_cost_summary TVF)
+  
+  DIMENSIONS: usage_date, workspace_name, sku_name, owner, tag_team, tag_project, is_serverless
+  
+  MEASURES: total_cost, total_dbus, cost_7d, cost_30d, tag_coverage_percentage, serverless_percentage
+  
+  SOURCE: fact_usage (billing domain)
+  
+  JOINS: dim_workspace (workspace details), dim_sku (SKU details)
+  
+  NOTE: Cost values are list prices. Actual billed amounts may differ based on contracts.
+```
+
+### Example 2: Job Performance (Reliability Focus)
+
+```yaml
+comment: >
+  PURPOSE: Job execution performance metrics for reliability and efficiency analysis.
+  
+  BEST FOR: Job success rate | Failed jobs today | Slowest jobs | Job failure rate by workspace | 
+  Performance regression detection
+  
+  NOT FOR: Real-time job monitoring (use get_failed_jobs TVF) | Cost per job (use cost_analytics)
+  
+  DIMENSIONS: job_name, workspace_name, result_state, termination_type, duration_tier, error_category
+  
+  MEASURES: success_rate, failure_rate, avg_duration_seconds, p95_duration_seconds, total_runs
+  
+  SOURCE: fact_job_run_timeline (lakeflow domain)
+  
+  JOINS: dim_workspace (workspace details), dim_job (job metadata)
+  
+  NOTE: Duration metrics exclude queued time. For queue analysis, filter by termination_type.
+```
+
+### Example 3: View with Limitations (Redirect Pattern)
+
+```yaml
+comment: >
+  PURPOSE: Security and audit event analytics for compliance and access monitoring.
+  
+  BEST FOR: Who accessed this resource | Security events by user | Failed access attempts | 
+  Sensitive actions in last 24 hours | Event trend over time
+  
+  NOT FOR: Real-time security alerts (use get_security_events TVF) | 
+  Data lineage tracking (use governance_analytics)
+  
+  DIMENSIONS: event_date, service_name, action_name, user_identity, risk_level, hour_of_day
+  
+  MEASURES: total_events, failed_events, success_rate, unique_users, high_risk_events
+  
+  SOURCE: fact_audit_logs (security domain)
+  
+  JOINS: dim_workspace (workspace details)
+  
+  NOTE: Excludes system service accounts. For complete audit trail, query fact_audit_logs directly.
+```
+
+### Element Guidelines
+
+| Element | Format | Example |
+|---|---|---|
+| **PURPOSE** | Single sentence, no period at end | `Comprehensive cost analytics for Databricks billing` |
+| **BEST FOR** | Pipe-separated questions (4-6) | `Total spend | Cost by SKU | Daily trend` |
+| **NOT FOR** | Include redirect with parentheses | `Commit tracking (use commit_tracking)` |
+| **DIMENSIONS** | Comma-separated, 5-8 key columns | `usage_date, workspace_name, sku_name, owner` |
+| **MEASURES** | Comma-separated, 5-8 key metrics | `total_cost, success_rate, avg_duration` |
+| **SOURCE** | Table name with domain in parens | `fact_usage (billing domain)` |
+| **JOINS** | Table name with brief description | `dim_workspace (workspace details)` |
+| **NOTE** | Critical caveat or limitation | `Cost values are list prices` |
+
+### Legacy Format (Still Supported)
+
+The following legacy format is still supported but **new metric views should use the structured format above**:
+
+```yaml
+comment: >
+  Host demographics, verification status, and portfolio analytics ONLY.
+  BEST FOR: Host attributes, verification analysis, geographic distribution.
+  ⚠️ DO NOT USE for: "Top performing hosts", "Host revenue rankings", "Best hosts by bookings".
+  → USE get_host_performance TVF INSTEAD for accurate host revenue/booking metrics.
+  Source: dim_host with nested joins to dim_property and fact_booking_detail.
+```
+
+---
+
+## ⚠️ CRITICAL: Source Table Selection for Metric Views
+
+**Issue:** Wrong source table selection caused revenue under-reporting by 4x.**
+
+### The Rule
+
+| Metric Type | Source Table | Reason |
+|---|---|---|
+| **Revenue, Bookings, Transactions** | FACT table (e.g., `fact_booking_daily`) | Transaction metrics come from fact tables |
+| **Property counts, Inventory** | DIMENSION table (e.g., `dim_property`) | Inventory metrics come from dimension tables |
+| **Host attributes, Demographics** | DIMENSION table (e.g., `dim_host`) | Attribute metrics come from dimension tables |
+
+### ❌ WRONG: Revenue from Dimension Table
+
+```yaml
+# BAD: Revenue from dim_property (SCD2 dimension)
+source: ${catalog}.${gold_schema}.dim_property  # ❌ Wrong for revenue!
+
+measures:
+  - name: total_revenue
+    expr: SUM(dim_property.fact_booking.total_amount)  # Under-reports by 4x!
+```
+
+**Result:** ~$10M revenue (wrong)
+
+### ✅ CORRECT: Revenue from Fact Table
+
+```yaml
+# GOOD: Revenue from fact_booking_daily
+source: ${catalog}.${gold_schema}.fact_booking_daily  # ✅ Correct for revenue!
+
+measures:
+  - name: total_revenue
+    expr: SUM(source.total_booking_value)  # Accurate!
+```
+
+**Result:** ~$40M revenue (correct)
+
+### Why Dimension Tables Under-Report
+
+1. **SCD2 dimensions** have multiple versions per entity
+2. **Joining fact to dimension** then back can cause fanout
+3. **Dimension grain** is different from transaction grain
+
+### Source Selection Decision Tree
+
+```
+Question: "Revenue/bookings/transactions?"
+├── YES → Source: FACT table
+│   └── Use: fact_booking_daily, fact_booking_detail
+└── NO → Question: "Property/host counts or attributes?"
+    ├── YES → Source: DIMENSION table
+    │   └── Use: dim_property, dim_host
+    └── NO → Question: "Cross-domain analysis?"
+        └── Consider TVF or enriched view instead
+```
+
+---
+
+## ⚠️ CRITICAL: Snowflake Schema Joins (Nested Joins)
+
+**Issue:** Direct joins fail when fact table doesn't have FK to needed dimension.**
+
+### The Problem
+
+```
+Data Model:
+dim_host (host owns) → dim_property (property has) → fact_booking_detail (booking)
+
+Needed: Host revenue from bookings
+Problem: fact_booking_detail has property_id, NOT host_id
+```
+
+### ❌ WRONG: Direct Join (Fails)
+
+```yaml
+source: ${catalog}.${gold_schema}.dim_host
+
+joins:
+  - name: fact_booking
+    source: ${catalog}.${gold_schema}.fact_booking_detail
+    'on': source.host_id = fact_booking.host_id  # ❌ fact table doesn't have host_id!
+```
+
+**Error:** `UNRESOLVED_COLUMN: fact_booking.host_id cannot be resolved`
+
+### ✅ CORRECT: Snowflake Schema (Nested Joins)
+
+```yaml
+source: ${catalog}.${gold_schema}.dim_host
+
+joins:
+  - name: dim_property
+    source: ${catalog}.${gold_schema}.dim_property
+    'on': source.host_id = dim_property.host_id AND dim_property.is_current = true
+    joins:  # ✅ Nested join under dim_property
+      - name: fact_booking
+        source: ${catalog}.${gold_schema}.fact_booking_detail
+        'on': dim_property.property_id = fact_booking.property_id
+```
+
+### Nested Column Reference Pattern
+
+**For nested joins, reference columns via full parent path:**
+
+```yaml
+measures:
+  - name: total_revenue
+    expr: SUM(dim_property.fact_booking.total_amount)  # parent.nested.column
+    
+  - name: booking_count
+    expr: COUNT(dim_property.fact_booking.booking_id)  # parent.nested.column
+```
+
+### When to Use Snowflake Joins
+
+| Scenario | Pattern |
+|---|---|
+| Host → Property → Booking | `dim_host.dim_property.fact_booking.column` |
+| Destination → Property → Engagement | `dim_destination.dim_property.fact_engagement.column` |
+| Any dim → intermediate dim → fact | Use nested `joins:` with parent path references |
+
+### Requirements
+
+- **Databricks Runtime 17.1+** for snowflake schema support
+- **Correct nesting** in YAML structure
+- **Full parent path** for column references
+
+---
+
+## ⚠️ Dimension & Measure Comment Best Practices
+
+### Dimension Comments
+
+```yaml
+dimensions:
+  - name: host_id
+    expr: source.host_id
+    comment: Unique host identifier for host-level performance analysis
+    display_name: Host ID
+    synonyms:
+      - host
+      - host number
+      - owner id
+```
+
+### Measure Comments
+
+```yaml
+measures:
+  - name: total_revenue
+    expr: SUM(dim_property.fact_booking.total_amount)
+    comment: >
+      Total revenue generated by hosts. Primary financial metric for host
+      earnings and platform transaction volume analysis.
+    display_name: Total Revenue
+    format:
+      type: currency
+      currency_code: USD
+    synonyms:
+      - revenue
+      - earnings
+      - income
+```
+
+### Key Points
+
+- `comment`: Business context and purpose (for LLM understanding)
+- `display_name`: User-friendly name (for UI)
+- `synonyms`: Alternative terms users might use (3-5 per field)
+- **Keep comments professional** - avoid phrases like "metric view is broken"
+
+---
+
+## Professional Language Standards
+
+**Issue:** Some metric view comments used unprofessional language.
+
+### ❌ Avoid
+
+```yaml
+comment: Use this because the TVF doesn't work correctly
+comment: This metric view is broken for revenue queries
+comment: The other view gives wrong results so use this instead
+```
+
+### ✅ Use
+
+```yaml
+comment: >
+  Host demographics and verification analytics ONLY.
+  → For revenue/booking queries, USE get_host_performance TVF (different join path).
+
+comment: >
+  Property-centric analytics including revenue per property.
+  PREFERRED for: "revenue per property", "verified host analysis by property".
+```
+
+### Language Guidelines
+
+| Instead of... | Use... |
+|---|---|
+| "X is broken" | "For X queries, use Y instead" |
+| "X gives wrong results" | "Y has more accurate join path for X" |
+| "Don't use X" | "X is BEST FOR Y; for Z use W instead" |
+
+## Complete Example: Sales Performance Metrics
+
+**✅ CORRECT v1.1 Structure (No `name`, `time_dimension`, or `window_measures`):**
+
+```yaml
+version: "1.1"
+comment: >
+  Comprehensive sales performance metrics with revenue, units, and customer insights. 
+  Optimized for Genie natural language queries and AI/BI dashboards.
+
+source: ${catalog}.${gold_schema}.fact_sales_daily
+
+joins:
+  - name: dim_store
+    source: ${catalog}.${gold_schema}.dim_store
+    'on': source.store_number = dim_store.store_number AND dim_store.is_current = true
+  
+  - name: dim_product
+    source: ${catalog}.${gold_schema}.dim_product
+    'on': source.upc_code = dim_product.upc_code
+  
+  - name: dim_date
+    source: ${catalog}.${gold_schema}.dim_date
+    'on': source.transaction_date = dim_date.date
+
+dimensions:
+  - name: transaction_date
+    expr: source.transaction_date
+    comment: Transaction date for time-based sales analysis and trending
+    display_name: Transaction Date
+    synonyms:
+      - date
+      - sale date
+      - order date
+  
+  - name: store_number
+    expr: source.store_number
+    comment: Store identifier for location-based sales analysis
+    display_name: Store Number
+    synonyms:
+      - store id
+      - location number
+  
+  - name: brand
+    expr: dim_product.brand
+    comment: Product brand name
+    display_name: Brand
+    synonyms:
+      - product brand
+  
+  - name: month_name
+    expr: dim_date.month_name
+    comment: Month name for seasonal analysis
+    display_name: Month
+    synonyms:
+      - month
+
+measures:
+  - name: total_revenue
+    expr: SUM(source.net_revenue)
+    comment: Total net revenue after discounts and returns. Primary revenue metric.
+    display_name: Total Revenue
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      abbreviation: compact
+    synonyms:
+      - revenue
+      - sales
+      - net revenue
+      - total sales
+  
+  - name: booking_count
+    expr: COUNT(source.booking_id)
+    comment: Total number of transactions
+    display_name: Booking Count
+    format:
+      type: number
+      decimal_places:
+        type: all
+      abbreviation: compact
+    synonyms:
+      - bookings
+      - transactions
+      - orders
+```
+
+**Note:** Window measures like "revenue_last_30_days" must be pre-calculated in the Gold layer fact table or calculated in SQL queries.
+
+## Validation Checklist
+
+### Pre-Creation Schema Validation (MANDATORY)
+- [ ] ✅ Verified source table schema (ran DESCRIBE TABLE or checked YAML)
+- [ ] ✅ Verified all joined table schemas
+- [ ] ✅ Created column reference checklist for all tables
+- [ ] ✅ Validated every dimension `expr` column exists
+- [ ] ✅ Validated every measure `expr` column exists
+- [ ] ✅ Validated join key columns exist in both tables
+- [ ] ✅ Verified no transitive joins (all joins are source → table)
+- [ ] ✅ For COUNT measures, verified primary key column exists
+- [ ] ✅ For SCD2 joins, verified `is_current` column exists
+
+### YAML Structure
+- [ ] Version is `"1.1"` (quoted string)
+- [ ] **NO `name` field** (name is in CREATE VIEW statement)
+- [ ] NO `time_dimension` field (not supported in v1.1)
+- [ ] NO `window_measures` field (not supported in v1.1)
+- [ ] Comment explains business purpose and Genie optimization
+- [ ] All dimensions have comments, display_name, and 3+ synonyms
+- [ ] All measures have comments, display_name, format, and synonyms
+- [ ] Format types are correct (currency/number/percentage)
+
+### Joins (if using)
+- [ ] Each join has `name` field (the alias)
+- [ ] Each join has `source` field (full table path)
+- [ ] Each join has `'on'` field (quoted!)
+- [ ] Joins include SCD2 filters (`is_current = true`) where applicable
+- [ ] ON clause uses `source.` for main table, join name for joined table
+- [ ] **Each join is direct** (source.fk = dim.pk, NOT dim1.fk = dim2.pk)
+- [ ] No transitive/chained joins
+
+### Column References
+- [ ] Main table columns use `source.` prefix in all expr fields
+- [ ] Joined table columns use join `name` as prefix in expr fields
+- [ ] No references to table names (use `source.` or `{join_name}.`)
+- [ ] **All column names verified against actual schemas**
+
+### Source Table Selection
+- [ ] Revenue/booking metrics source from FACT tables
+- [ ] Inventory/count metrics source from DIMENSION tables
+- [ ] Source table documented in metric view comment
+
+### Snowflake Schema Joins (if needed)
+- [ ] Nested `joins:` used when fact doesn't have direct FK
+- [ ] Nested columns reference full path (`parent.nested.column`)
+- [ ] Tested with Databricks Runtime 17.1+
+
+### Comment Format (v3.0 Structured Format)
+- [ ] Comment includes **PURPOSE** (one-line description)
+- [ ] Comment includes **BEST FOR** (4-6 pipe-separated example questions)
+- [ ] Comment includes **NOT FOR** with redirect to correct asset
+- [ ] Comment includes **DIMENSIONS** (5-8 key filterable columns)
+- [ ] Comment includes **MEASURES** (5-8 key aggregated metrics)
+- [ ] Comment includes **SOURCE** (table name with domain)
+- [ ] Comment includes **JOINS** (joined tables with descriptions)
+- [ ] Comment includes **NOTE** (critical caveats/limitations)
+- [ ] Professional language (no "broken", "doesn't work")
+
+### Python Script Error Handling
+- [ ] Script extracts view name from filename (not from YAML)
+- [ ] Function signature: `create_metric_view(spark, catalog, schema, view_name, metric_view)`
+- [ ] Script tracks failed_views list
+- [ ] Script raises RuntimeError if any metric view fails
+- [ ] Job will fail (not succeed) if metric views don't create
+- [ ] Drop existing TABLE/VIEW before creating metric view
+
+## Common Mistakes to Avoid
+
+❌ **Don't do this:**
+```yaml
+# No synonyms
+- name: revenue
+  expr: SUM(amount)
+  
+# Poor comment
+- name: total
+  comment: Total amount
+
+# Missing format
+- name: revenue
+  expr: SUM(revenue)
+  display_name: Revenue
+```
+
+✅ **Do this:**
+```yaml
+- name: total_revenue
+  expr: SUM(fact_sales.net_revenue)
+  comment: Total net revenue after discounts and returns. Primary revenue metric for business reporting.
+  display_name: Total Revenue
+  format:
+    type: currency
+    currency_code: USD
+    decimal_places:
+      type: exact
+      places: 2
+    abbreviation: compact
+  synonyms:
+    - revenue
+    - sales
+    - net revenue
+    - total sales
+```
+
+## Python Script Error Handling Pattern
+
+### ⚠️ CRITICAL: Jobs Must Fail if Metric Views Don't Create
+
+**Problem:** By default, Python scripts that catch exceptions will succeed even if metric views fail.
+
+### ❌ BAD: Job succeeds despite failures
+```python
+def create_metric_view(spark, catalog, schema, metric_view):
+    try:
+        spark.sql(create_sql)
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False  # ❌ Error swallowed
+
+def main():
+    for view in views:
+        create_metric_view(spark, catalog, schema, view)
+    
+    print("Complete!")  # ❌ Always prints, even if all failed
+```
+
+**Problem:** Job shows SUCCESS even if 0 metric views created!
+
+### ✅ GOOD: Job fails properly
+```python
+def create_metric_view(spark, catalog, schema, view_name, metric_view):
+    # view_name extracted from filename, passed as parameter
+    fqn = f"{catalog}.{schema}.{view_name}"
+    
+    # Drop existing table/view to avoid conflicts
+    try:
+        spark.sql(f"DROP VIEW IF EXISTS {fqn}")
+        spark.sql(f"DROP TABLE IF EXISTS {fqn}")
+    except:
+        pass
+    
+    try:
+        create_sql = f"""
+        CREATE VIEW {fqn}
+        WITH METRICS
+        LANGUAGE YAML
+        COMMENT '{comment}'
+        AS $$
+{yaml_str}
+        $$
+        """
+        spark.sql(create_sql)
+        print(f"✓ Created {view_name}")
+        return True
+    except Exception as e:
+        print(f"✗ Error creating {view_name}: {e}")
+        return False  # Track failure
+
+def main():
+    # Returns list of tuples: [(view_name, metric_view_dict), ...]
+    metric_views = load_metric_views_yaml(catalog, schema)
+    
+    success_count = 0
+    failed_views = []
+    
+    for view_name, metric_view in metric_views:
+        if create_metric_view(spark, catalog, schema, view_name, metric_view):
+            success_count += 1
+        else:
+            failed_views.append(view_name)
+    
+    print(f"\nCreated {success_count} of {len(views)} metric views")
+    
+    if failed_views:
+        print(f"❌ Failed to create: {', '.join(failed_views)}")
+        # ✅ Raise exception to fail the job
+        raise RuntimeError(
+            f"Failed to create {len(failed_views)} metric view(s): "
+            f"{', '.join(failed_views)}"
+        )
+    
+    print("✅ All metric views deployed successfully!")
+```
+
+**Benefits:**
+- ✅ Job fails if any metric view doesn't create
+- ✅ Clear error messages surface to logs
+- ✅ Can identify which specific views failed
+- ✅ Prevents silent failures
+
+## Version History
+
+- **v3.0** (Dec 19, 2025) - Standardized structured comment format (TVF-inspired)
+  - Added comprehensive comment format reference table with 8 elements
+  - New elements: PURPOSE, BEST FOR, NOT FOR, DIMENSIONS, MEASURES, SOURCE, JOINS, NOTE
+  - Added standardized comment template for consistency
+  - Added element guidelines with format examples
+  - Updated validation checklist with new comment format requirements
+  - **Key Learning:** Structured comments improve Genie's metric view selection accuracy
+  - Inspired by: TVF comment format from [databricks-table-valued-functions.mdc](mdc:.cursor/rules/semantic-layer/15-databricks-table-valued-functions.mdc)
+
+- **v2.0** (Dec 16, 2025) - Genie optimization patterns from production post-mortem
+  - Added standardized metric view comment format (BEST FOR / NOT FOR / SOURCE)
+  - Added source table selection guidance (FACT vs DIMENSION)
+  - Added snowflake schema (nested joins) patterns for transitive relationships
+  - Added professional language standards
+  - Updated validation checklist with new checks
+  - **Key Learning:** Wrong source table caused 4x revenue under-reporting
+  - Based on: [Genie Space Post-Mortem](../../docs/reference/genie-space-semantic-layer-postmortem.md)
+
+- **v1.0** (Oct 2025) - Initial rule based on metric view deployment learnings
+  - Schema validation patterns
+  - YAML structure standards
+  - Join patterns and column references
+
+---
+
+## References
+
+### Official Documentation
+- [**Metric Views SQL Creation** (CRITICAL - name field reference)](https://docs.databricks.com/aws/en/metric-views/create/sql)
+- [Metric Views YAML Reference](https://docs.databricks.com/aws/en/metric-views/yaml-ref)
+- [Metric Views Semantic Metadata](https://docs.databricks.com/aws/en/metric-views/semantic-metadata)
+- [Metric Views Joins](https://docs.databricks.com/aws/en/metric-views/joins)
+- [Query Metric Views](https://docs.databricks.com/aws/en/metric-views/query)
+
+### Related Cursor Rules
+- [databricks-table-valued-functions.mdc](mdc:.cursor/rules/semantic-layer/15-databricks-table-valued-functions.mdc) - TVF patterns
+- [genie-space-patterns.mdc](mdc:.cursor/rules/semantic-layer/16-genie-space-patterns.mdc) - Genie Space setup
+
+### Internal Documentation
+- [Genie Space Post-Mortem](../../docs/reference/genie-space-semantic-layer-postmortem.md) - Comprehensive lessons learned from Genie Space implementation
+- [Post-Mortem: Metric Views Schema Validation](../../docs/reference/rule-improvement-metric-views-schema-validation.md) - Comprehensive analysis of deployment failures and prevention strategies
+- [Deployment Success Summary](../../docs/deployment/metric-views-deployment-success.md) - Complete deployment history and issues fixed
+- [Gold Layer YAML Schemas](../../gold_layer_design/yaml/) - Source of truth for table schemas

@@ -9,6 +9,8 @@ This collection of cursor rules represents a **complete, sequential guide** to b
 
 Think of this as your **comprehensive playbook** - organized like a professional book that takes you from basic principles to sophisticated data product capabilities.
 
+**✨ NEW: Organized by Layer** - Rules are now organized into folders (common, bronze, silver, gold, semantic-layer, monitoring, exploration, planning) for easier navigation.
+
 ---
 
 ## 🎯 How to Use This Guide
@@ -26,10 +28,10 @@ Review **PART I** for principles, then use **PART V** to design and orchestrate 
 
 ## 📚 Table of Contents
 
-### **PART I: FOUNDATIONS** 
+### **PART I: FOUNDATIONS (common/)** 
 *Core principles and architectural patterns that govern everything*
 
-#### **Chapter 1: Architecture & Principles** → `01-databricks-expert-agent.mdc`
+#### **Chapter 1: Architecture & Principles** → `common/01-databricks-expert-agent.mdc`
 **What you'll learn**: The non-negotiable principles of production Databricks solutions
 - Unity Catalog governance
 - Delta Lake + Medallion architecture
@@ -42,7 +44,7 @@ Review **PART I** for principles, then use **PART V** to design and orchestrate 
 
 ---
 
-#### **Chapter 2: Platform Infrastructure** → `02-databricks-asset-bundles.mdc`
+#### **Chapter 2: Platform Infrastructure** → `common/02-databricks-asset-bundles.mdc`
 **What you'll learn**: Infrastructure-as-Code for Databricks workflows and pipelines
 - Main bundle configuration (databricks.yml)
 - Serverless job patterns
@@ -57,21 +59,20 @@ Review **PART I** for principles, then use **PART V** to design and orchestrate 
 
 ---
 
-#### **Chapter 3: Unity Catalog Schemas** → `03-schema-management-patterns.mdc`
-**What you'll learn**: Config-driven schema management with governance
-- resources/schemas.yml patterns
-- Development mode prefix behavior
-- Schema variable overrides
-- Schema properties and metadata
-- CREATE OR REPLACE patterns
+#### **Chapter 3: Unity Catalog Schemas** → `common/03-schema-management-patterns.mdc`
+**What you'll learn**: Programmatic schema management patterns
+- CREATE SCHEMA IF NOT EXISTS patterns
+- Schema variable usage
+- Idempotent schema creation
+- ⚠️ **DEPRECATED**: resources/schemas.yml pattern (no longer used)
 
 **When to read**: Before creating any tables
-**Lines**: 200+ | **Complexity**: Foundation
-**Key Concepts**: Dev prefixes, config-driven, idempotent operations
+**Lines**: 150+ | **Complexity**: Foundation
+**Key Concepts**: Programmatic creation, schema variables, idempotent operations
 
 ---
 
-#### **Chapter 4: Table Properties Standards** → `04-databricks-table-properties.mdc`
+#### **Chapter 4: Table Properties Standards** → `common/04-databricks-table-properties.mdc`
 **What you'll learn**: Consistent metadata and properties for all tables
 - Required TBLPROPERTIES by layer
 - CLUSTER BY AUTO (automatic liquid clustering)
@@ -85,7 +86,7 @@ Review **PART I** for principles, then use **PART V** to design and orchestrate 
 
 ---
 
-#### **Chapter 5: Unity Catalog Constraints** → `05-unity-catalog-constraints.mdc`
+#### **Chapter 5: Unity Catalog Constraints** → `common/05-unity-catalog-constraints.mdc`
 **What you'll learn**: Primary key and foreign key relationship modeling
 - PK/FK constraint patterns
 - NOT ENFORCED syntax
@@ -97,517 +98,525 @@ Review **PART I** for principles, then use **PART V** to design and orchestrate 
 
 ---
 
-### **PART II: BRONZE LAYER - RAW DATA INGESTION**
-*Capturing data from source systems with minimal transformation*
-
-#### **Chapter 6: Bronze Layer Patterns** → `01-databricks-expert-agent.mdc` (Bronze section)
-**What you'll learn**: Raw data ingestion patterns
-- Change Data Feed (CDF) enablement
-- Minimal transformation philosophy
-- Source system metadata
-- Predictive Optimization
-
-**When to read**: When implementing Bronze layer
-**Complexity**: Basic
-
----
-
-#### **Chapter 7: Test Data Generation** → `06-faker-data-generation.mdc`
-**What you'll learn**: Realistic test data with configurable corruption
-- Faker patterns for all entity types
-- Data quality corruption for DQ testing
-- Dimension and fact generation
-- Configurable error injection
-
-**When to read**: When creating Bronze data generators
-**Lines**: 250+ | **Complexity**: Basic
-**Key Concepts**: Faker, corruption strategies, DQ testing
-
----
-
-### **PART III: SILVER LAYER - VALIDATED & CLEANSED DATA**
-*Streaming data quality with comprehensive validation*
-
-#### **Chapter 8: DLT Expectations Patterns** → `07-dlt-expectations-patterns.mdc`
-**What you'll learn**: Comprehensive data quality enforcement
-- DLT Direct Publishing Mode (modern pattern)
-- Centralized DQ rules (data_quality_rules.py)
-- Critical vs. warning expectations
-- Expectation decorators (@dlt.expect_all_or_drop)
-- Standard patterns by data type
-- Quarantine tables (optional)
-
-**When to read**: When implementing Silver layer DLT pipelines
-**Lines**: 700+ | **Complexity**: Intermediate
-**Key Concepts**: Centralized rules, critical/warning split, get_source_table()
-
----
-
-#### **Chapter 9: DQX Framework (Advanced)** → `08-dqx-patterns.mdc`
-**What you'll learn**: Advanced data quality with detailed diagnostics
-- Databricks Labs DQX framework
-- Hybrid DLT+DQX approach
-- YAML and Delta storage patterns
-- Gold layer pre-merge validation
-- Quarantine strategies
-- API compatibility and troubleshooting
-
-**When to read**: When you need detailed DQ diagnostics beyond basic expectations
-**Lines**: 900+ | **Complexity**: Advanced
-**Key Concepts**: Hybrid approach, detailed diagnostics, Gold validation
-
----
-
-#### **Chapter 10: Python Module Imports** → `09-databricks-python-imports.mdc`
+#### **Chapter 6: Python Code Sharing** → `common/09-databricks-python-imports.mdc`
 **What you'll learn**: Sharing code between Databricks notebooks
-- Pure Python file patterns
-- Standard import syntax
-- Notebook header removal
-- When NOT to use %run magic
+- Pure Python files (.py) vs Databricks notebooks
+- Standard Python imports (not %run)
+- DLT imports and helper modules
+- sys.path considerations
 
-**When to read**: When creating shared Python modules
-**Lines**: 410+ | **Complexity**: Basic
-**Key Concepts**: Pure Python files, standard imports, no notebook headers
+**When to read**: When creating shared utilities or DLT helpers
+**Lines**: 410+ | **Complexity**: Foundation
+**Key Concepts**: Pure Python, NO notebook header, standard imports
 
 ---
 
-### **PART IV: GOLD LAYER - BUSINESS-READY ANALYTICS**
-*Aggregated, documented, and monitored business assets*
+### **PART II: BRONZE LAYER - RAW DATA INGESTION (bronze/)**
+*Landing zone for raw data with minimal transformation*
 
-#### **Chapter 11: Gold Layer Merge Patterns** → `10-gold-layer-merge-patterns.mdc`
-**What you'll learn**: Schema-aware transformations from Silver to Gold
-- Column name mapping patterns
-- Variable naming (avoiding PySpark function conflicts)
-- SCD Type 1 (overwrite) patterns
-- SCD Type 2 (historical tracking) patterns
+#### **Chapter 7: Faker Data Generation** → `bronze/06-faker-data-generation.mdc`
+**What you'll learn**: Generating realistic test data for prototyping
+- Faker library patterns for dimensions and facts
+- Referential integrity (FK integrity in generated data)
+- Reproducible seeded data
+- Data quality corruption for testing DQ rules
+
+**When to read**: When creating test/demo Bronze data
+**Lines**: 350+ | **Complexity**: Intermediate
+**Key Concepts**: Seeded generation, FK integrity, DQ testing
+
+---
+
+### **PART III: SILVER LAYER - VALIDATED DATA (silver/)**
+*Data quality layer with cleansing and validation*
+
+#### **Chapter 8: DLT Expectations (Delta Table-Based)** → `silver/07-dlt-expectations-patterns.mdc`
+**What you'll learn**: Data quality rules stored in Delta tables
+- Delta table for DQ rules storage
+- Rules loader module (pure Python)
+- @dlt.expect_all_or_drop() patterns
+- Severity-based rules (critical vs warning)
+- Quarantine patterns
+- Direct Publishing Mode
+
+**When to read**: When creating Silver DLT pipelines
+**Lines**: 800+ | **Complexity**: Intermediate
+**Key Concepts**: Delta table rules, runtime updates, never fails, quarantine
+
+**Official Reference**: [Portable and Reusable Expectations](https://docs.databricks.com/aws/en/ldp/expectation-patterns#portable-and-reusable-expectations)
+
+---
+
+#### **Chapter 9: DQX Integration (Advanced Quality)** → `silver/08-dqx-patterns.mdc`
+**What you'll learn**: Databricks Labs DQX for advanced data quality
+- DQX vs DLT expectations comparison
+- Hybrid approach (DLT + DQX)
+- Auto-profiling for rule generation
+- Detailed failure diagnostics
+- Gold pre-merge validation
+- YAML and Delta storage for rules
+
+**When to read**: When needing advanced quality diagnostics
+**Lines**: 410+ | **Complexity**: Advanced
+**Key Concepts**: Hybrid approach, detailed diagnostics, auto-profiling
+
+---
+
+### **PART IV: GOLD LAYER - ANALYTICS-READY (gold/)**
+*Business-focused dimensional models and aggregations*
+
+#### **Chapter 10: Gold Layer Design** → `gold/13-mermaid-erd-patterns.mdc`
+**What you'll learn**: Creating ERD diagrams for Gold layer
+- Mermaid ERD syntax
+- Dimension and fact representation
+- Relationship visualization
+- Clean professional diagrams
+
+**When to read**: When designing Gold layer schema (before implementation)
+**Lines**: 300+ | **Complexity**: Intermediate
+**Key Concepts**: ERD-first, visual design, stakeholder approval
+
+---
+
+#### **Chapter 11: YAML-Driven Setup** → `gold/25-yaml-driven-gold-setup.mdc`
+**What you'll learn**: Creating tables dynamically from YAML schemas
+- YAML as single source of truth
+- Generic setup script for all tables
+- Runtime YAML discovery
+- Schema change = YAML edit only
+- Asset Bundle integration
+
+**When to read**: When implementing Gold table creation
+**Lines**: 518 | **Complexity**: Intermediate
+**Key Concepts**: YAML-driven, single script, 94% code reduction
+
+---
+
+#### **Chapter 12: Schema Validation** → `gold/23-gold-layer-schema-validation.mdc`
+**What you'll learn**: Preventing DDL vs YAML mismatches
+- Pre-merge schema validation
+- Explicit column mapping patterns
+- DataFrame vs DDL comparison
+- DDL as runtime truth
+
+**When to read**: Before deploying Gold merge scripts
+**Lines**: 565 | **Complexity**: Intermediate
+**Key Concepts**: Schema validation, explicit mapping, DDL truth
+
+---
+
+#### **Chapter 13: Fact Table Grain** → `gold/24-fact-table-grain-validation.mdc`
+**What you'll learn**: Validating fact table grain from DDL
+- Grain inference from PRIMARY KEY
+- Transaction vs aggregated patterns
+- Preventing incorrect grain
+- Grain documentation standards
+
+**When to read**: When creating fact tables
+**Lines**: 350+ | **Complexity**: Intermediate
+**Key Concepts**: Grain validation, PRIMARY KEY inference
+
+---
+
+#### **Chapter 14: MERGE Patterns** → `gold/10-gold-layer-merge-patterns.mdc`
+**What you'll learn**: Silver → Gold merge operations
+- Column name mapping
+- Variable naming (avoid PySpark conflicts)
+- SCD Type 1 (overwrite)
+- SCD Type 2 (history tracking)
 - Fact table aggregation
-- Schema evolution handling
 
-**When to read**: When implementing Gold layer merge operations
-**Lines**: 350+ | **Complexity**: Intermediate
-**Key Concepts**: Column mapping, SCD patterns, MERGE operations
-
----
-
-#### **Chapter 12: Gold Layer Deduplication** → `11-gold-delta-merge-deduplication.mdc`
-**What you'll learn**: Preventing duplicate source key errors in Gold
-- Deduplication strategies before MERGE
-- Window function patterns
-- Handling late-arriving data
-- Idempotent merge operations
-
-**When to read**: When implementing fact table merges
-**Lines**: 200+ | **Complexity**: Intermediate
+**When to read**: When implementing Gold merge scripts
+**Lines**: 314 | **Complexity**: Intermediate
+**Key Concepts**: Explicit mapping, SCD patterns, aggregation
 
 ---
 
-#### **Chapter 13: Gold Layer Documentation** → `12-gold-layer-documentation.mdc`
-**What you'll learn**: Comprehensive documentation standards for business users
-- Dual-purpose documentation (human + LLM)
-- Table comment patterns
-- Column comment standards
-- Business context + technical details
-- Naming conventions
+#### **Chapter 15: MERGE Deduplication** → `gold/11-gold-delta-merge-deduplication.mdc`
+**What you'll learn**: Preventing duplicate key errors in MERGE
+- Window function deduplication
+- Latest record selection
+- Business key vs surrogate key
+- Error prevention patterns
 
-**When to read**: When documenting Gold layer tables
-**Lines**: 300+ | **Complexity**: Basic
-**Key Concepts**: Dual-purpose docs, no "LLM:" prefix in Gold
-
----
-
-#### **Chapter 14: Mermaid ERD Patterns** → `13-mermaid-erd-patterns.mdc`
-**What you'll learn**: Professional ERD diagrams for data modeling
-- Mermaid syntax for ERDs
-- Relationship patterns
-- Dimension and fact table representation
-- Visual documentation standards
-
-**When to read**: When documenting Gold layer relationships
-**Lines**: 150+ | **Complexity**: Basic
+**When to read**: When MERGE operations fail with duplicate keys
+**Lines**: 250+ | **Complexity**: Intermediate
+**Key Concepts**: Deduplication before MERGE, window functions
 
 ---
 
-### **PART V: SEMANTIC LAYER & INTELLIGENCE**
-*Making data consumable for humans and AI*
+#### **Chapter 16: Gold Documentation** → `gold/12-gold-layer-documentation.mdc`
+**What you'll learn**: Dual-purpose documentation standards
+- Business + Technical descriptions
+- Column comment patterns
+- Table grain documentation
+- LLM-friendly without "LLM:" prefix
 
-#### **Chapter 15: Metric Views** → `14-metric-views-patterns.mdc`
-**What you'll learn**: Semantic layer for Genie and AI/BI
-- Metric View YAML structure (v1.1)
-- WITH METRICS LANGUAGE YAML syntax
-- Dimension patterns (geographic, product, time)
-- Measure patterns (revenue, volume, count, percentage)
-- Format specifications (currency, number, percentage)
-- Join patterns with SCD2 dimensions
-- Synonym best practices
-- Python script error handling
-
-**When to read**: When creating semantic layer for Genie/dashboards
-**Lines**: 600+ | **Complexity**: Advanced
-**Key Concepts**: v1.1 spec, source. prefix, synonyms, dual-purpose comments
+**When to read**: When creating Gold tables
+**Lines**: 586 | **Complexity**: Intermediate
+**Key Concepts**: Dual-purpose, comprehensive, stakeholder-friendly
 
 ---
 
-#### **Chapter 16: Table-Valued Functions** → `15-databricks-table-valued-functions.mdc`
-**What you'll learn**: SQL functions optimized for Genie Spaces
+### **PART V: SEMANTIC LAYER - BUSINESS INTELLIGENCE (semantic-layer/)**
+*Natural language queries and business metrics*
+
+#### **Chapter 17: Metric Views** → `semantic-layer/14-metric-views-patterns.mdc`
+**What you'll learn**: Creating semantic layer for Genie and BI
+- YAML v1.1 specification
+- `WITH METRICS LANGUAGE YAML` syntax
+- Dimensions, measures, joins
+- Format specifications
+- Synonyms for LLM
+
+**When to read**: After Gold layer is complete
+**Lines**: 650+ | **Complexity**: Intermediate
+**Key Concepts**: v1.1, source prefix, format specs, runtime updates
+
+---
+
+#### **Chapter 18: Table-Valued Functions** → `semantic-layer/15-databricks-table-valued-functions.mdc`
+**What you'll learn**: Pre-built SQL queries for Genie
 - TVF syntax and patterns
-- Parameter type recommendations (STRING)
-- WHERE clause optimization (not LIMIT)
-- Parameterization strategies
-- Genie-friendly function design
-- Common SQL pitfalls
+- Parameter typing (critical!)
+- Top N, trending, comparison patterns
+- Genie-optimized queries
 
-**When to read**: When creating reusable SQL functions for Genie
-**Lines**: 450+ | **Complexity**: Intermediate
-**Key Concepts**: STRING parameters, WHERE over LIMIT, Genie optimization
+**When to read**: After Metric Views are created
+**Lines**: 371 | **Complexity**: Intermediate
+**Key Concepts**: Typed parameters, RETURNS TABLE, business patterns
 
 ---
 
-#### **Chapter 17: Genie Space Setup** → `16-genie-space-patterns.mdc`
-**What you'll learn**: Setting up Databricks Genie Spaces with comprehensive instructions
-- Agent instructions (comprehensive format)
-- Data asset configuration (tables, views, functions)
+#### **Chapter 19: Genie Space Setup** → `semantic-layer/16-genie-space-patterns.mdc`
+**What you'll learn**: Natural language query interface
+- Trusted assets configuration
+- Agent instructions (comprehensive)
 - Benchmark questions
-- Best practices for natural language queries
+- Testing and validation
 
-**When to read**: When deploying Genie Spaces
-**Lines**: 350+ | **Complexity**: Intermediate
-
----
-
-### **PART VI: OBSERVABILITY & MONITORING**
-*Tracking quality, drift, and business metrics over time*
-
-#### **Chapter 18: Lakehouse Monitoring (Comprehensive)** → `17-lakehouse-monitoring-comprehensive.mdc`
-**What you'll learn**: Complete guide for production monitoring on Gold layer
-- **Setup & Configuration**: API-based creation, error handling, SDK compatibility, async operations, cleanup patterns
-- **Custom Metrics Design**: Business-focused metrics across 5 categories (transaction, product, customer, promotional, drift)
-- **Querying Metrics**: Storage patterns, query patterns for AGGREGATE/DERIVED/DRIFT, AI/BI dashboard datasets
-- **Complete Examples**: End-to-end workflows with comprehensive error handling
-- **Troubleshooting**: 5 common mistakes, verification workflow, validation checklist
-
-**When to read**: When setting up monitoring on Gold tables or building monitoring dashboards
-**Lines**: 1,138 | **Complexity**: Advanced
-**Key Concepts**: 
-- Table-level KPIs with `input_columns=[":table"]`
-- Business-first metric design (5 categories)
-- Metrics as table columns (no separate custom_metrics table)
-- Query patterns by metric type
-- Complete setup → design → query workflow
-
-**✨ Consolidated**: Previously 3 separate rules (setup, metrics, queries) - now one comprehensive guide
+**When to read**: After Metric Views and TVFs are complete
+**Lines**: 798 | **Complexity**: Intermediate
+**Key Concepts**: Natural language, trusted assets, agent instructions
 
 ---
 
-### **PART VII: PROCESS & IMPROVEMENT**
-*Maintaining quality and evolving the framework*
+### **PART VI: MONITORING & VISUALIZATION (monitoring/)**
+*Observability and business dashboards*
 
-#### **Chapter 19: Cursor Rules Management** → `20-cursor-rules.mdc`
-**What you'll learn**: How to manage and create cursor rules
-- Rule file placement (.cursor/rules/)
+#### **Chapter 20: Lakehouse Monitoring** → `monitoring/17-lakehouse-monitoring-comprehensive.mdc`
+**What you'll learn**: Automated data quality and drift monitoring
+- Custom metrics (AGGREGATE, DERIVED, DRIFT)
+- Profile metrics table structure
+- input_columns patterns (critical!)
+- Async refresh patterns
+- Query patterns for metrics
+
+**When to read**: After Gold layer is deployed
+**Lines**: 850+ | **Complexity**: Advanced
+**Key Concepts**: Custom metrics, input_columns, async wait, table-level metrics
+
+---
+
+#### **Chapter 21: AI/BI Dashboards** → `monitoring/18-databricks-aibi-dashboards.mdc`
+**What you'll learn**: Creating Lakeview visual dashboards
+- Dashboard layout patterns
+- Counter tiles, charts, tables
+- MEASURE() function for Metric Views
+- Global filters
+- Auto-refresh configuration
+
+**When to read**: After Metric Views are created
+**Lines**: 600+ | **Complexity**: Intermediate
+**Key Concepts**: UI-based, MEASURE(), layouts, filters
+
+---
+
+#### **Chapter 22: SQL Alerting Framework** → `monitoring/19-sql-alerting-patterns.mdc`
+**What you'll learn**: Config-driven SQL alerting with Databricks SDK
+- Alert ID convention (DOMAIN-NUMBER-SEVERITY)
+- Alert rules configuration table schema
+- SQL query patterns (threshold, anomaly, summary)
+- Databricks SDK integration for alert deployment
+- Two-job pattern (setup + deploy)
+- Custom notification templates
+
+**When to read**: After Gold layer is complete for proactive monitoring
+**Lines**: 800+ | **Complexity**: Intermediate
+**Key Concepts**: Config-driven, fully qualified table names, SDK deployment, dry-run validation
+
+---
+
+### **PART VII: DEVELOPMENT & EXPLORATION (exploration/)**
+*Ad-hoc analysis and data exploration*
+
+#### **Chapter 23: Exploration Notebooks** → `exploration/22-adhoc-exploration-notebooks.mdc`
+**What you'll learn**: Dual-format notebooks for exploration
+- Databricks workspace version (.py with magic commands)
+- Local Jupyter version (.ipynb with Databricks Connect)
+- Standard helper functions
+- Environment-specific patterns
+
+**When to read**: When creating exploration utilities
+**Lines**: 800+ | **Complexity**: Intermediate
+**Key Concepts**: Dual-format, magic commands, helper functions
+
+---
+
+### **PART VIII: PROJECT PLANNING (planning/)**
+*Multi-phase project design and planning*
+
+#### **Chapter 24: Project Plan Methodology** → `planning/26-project-plan-methodology.mdc`
+**What you'll learn**: Creating comprehensive project plans
+- 5-phase structure (Bronze → Gold → Use Cases → Agents → Frontend)
+- Agent Domain Framework (Cost, Security, Performance, Reliability, Quality)
+- Phase 3 addendums pattern (7 standard use cases)
+- Enrichment methodology
+- Artifact tagging and counting
+
+**When to read**: When planning multi-phase data platform solutions
+**Lines**: 900+ | **Complexity**: Advanced
+**Key Concepts**: 5 phases, agent domains, 7 addendums, comprehensive planning
+
+---
+
+### **PART IX: META RULES (common/)**
+*Rules about rules - self-improvement and documentation*
+
+#### **Chapter 25: Cursor Rules Standards** → `common/20-cursor-rules.mdc`
+**What you'll learn**: How to create and maintain cursor rules
+- Rule file location (.cursor/rules/)
 - Naming conventions
-- Rule structure and frontmatter
-- Context7 integration for Databricks docs
+- Rule structure and format
+- When to create new rules
+- Context7 integration
 
-**When to read**: When creating new rules
-**Lines**: 73 | **Complexity**: Basic
+**When to read**: When creating new cursor rules
+**Lines**: 300+ | **Complexity**: Meta
 
 ---
 
-#### **Chapter 20: Self-Improvement Process** → `21-self-improvement.mdc`
-**What you'll learn**: Continuous rule improvement
-- When to add new rules
-- Pattern recognition triggers
-- Rule update workflow
-- Documentation templates
+#### **Chapter 26: Self-Improvement** → `common/21-self-improvement.mdc`
+**What you'll learn**: Continuous improvement of cursor rules
+- Triggers for rule updates
+- Pattern recognition
+- Rule improvement workflow
+- Documentation of improvements
 - Recent improvements log
 
-**When to read**: When proposing rule improvements
+**When to read**: When updating existing rules based on learnings
 **Lines**: 400+ | **Complexity**: Meta
+
+---
+
+#### **Chapter 27: Documentation Organization** → `common/22-documentation-organization.mdc`
+**What you'll learn**: Organizing project documentation
+- Root directory rules (only README, QUICKSTART, CHANGELOG)
+- docs/ folder structure
+- Naming conventions
+- Auto-cleanup patterns
+
+**When to read**: When creating documentation files
+**Lines**: 250+ | **Complexity**: Meta
+
+---
+
+## 📊 Statistics
+
+### By Category
+| Category | Rules | Total Lines | Avg Complexity |
+|----------|-------|-------------|----------------|
+| **Common (Foundations)** | 9 | ~3,000 | Foundation |
+| **Bronze** | 1 | ~350 | Intermediate |
+| **Silver** | 2 | ~1,200 | Intermediate-Advanced |
+| **Gold** | 7 | ~2,800 | Intermediate |
+| **Semantic Layer** | 3 | ~1,800 | Intermediate |
+| **Monitoring** | 3 | ~2,250 | Intermediate-Advanced |
+| **Exploration** | 1 | ~800 | Intermediate |
+| **Planning** | 1 | ~900 | Advanced |
+| **Total** | **27 rules** | **~13,100 lines** | Varies |
+
+### Complexity Levels
+- **Foundation** (9 rules): Core concepts, read these first
+- **Intermediate** (15 rules): Implementation patterns
+- **Advanced** (2 rules): Complex integrations (DQX, Monitoring)
+- **Meta** (3 rules): Self-referential rules
 
 ---
 
 ## 🗺️ Learning Paths
 
-### Path 1: Quick Start (Build First Product)
-**Goal**: Get a basic data product running quickly
-1. Chapter 1: Architecture & Principles
-2. Chapter 2: Platform Infrastructure (Basics)
-3. Chapter 4: Table Properties Standards
-4. Chapter 6: Bronze Layer Patterns
-5. Chapter 8: DLT Expectations Patterns (Basic)
-6. Chapter 11: Gold Layer Merge Patterns
+### Path 1: Rapid Prototyping (8 hours)
+**Goal**: Get a working Medallion Architecture quickly
+
+1. **Foundations** (1 hour): Read chapters 1-5
+2. **Bronze** (1 hour): Chapter 7 - Generate test data
+3. **Silver** (2 hours): Chapter 8 - DLT with Delta table rules
+4. **Gold** (3 hours): Chapters 11-12 - YAML-driven setup
+5. **Validation** (1 hour): Test end-to-end pipeline
+
+**Output**: Bronze → Silver → Gold pipeline with test data
 
 ---
 
-### Path 2: Complete Data Engineer
-**Goal**: Master all layers and patterns
-1. Read all of **PART I** (Foundations)
-2. Implement Bronze (Chapters 6-7)
-3. Implement Silver (Chapters 8-10)
-4. Implement Gold (Chapters 11-14)
-5. Add Semantic Layer (Chapters 15-17)
-6. Add Monitoring (Chapter 18)
+### Path 2: Production Implementation (4 weeks)
+**Goal**: Complete production-ready data product
+
+**Week 1: Foundation**
+- Day 1-2: Chapters 1-6 (deep dive)
+- Day 3: Bronze (Chapter 7)
+- Day 4-5: Silver (Chapters 8-9)
+
+**Week 2: Gold Layer**
+- Day 1: Design (Chapter 10)
+- Day 2-3: Implementation (Chapters 11-14)
+- Day 4-5: Validation & docs (Chapters 15-16)
+
+**Week 3: Semantic Layer**
+- Day 1-2: Metric Views (Chapter 17)
+- Day 3: TVFs (Chapter 18)
+- Day 4-5: Genie Space (Chapter 19)
+
+**Week 4: Monitoring & Polish**
+- Day 1-2: Lakehouse Monitoring (Chapter 20)
+- Day 3: AI/BI Dashboards (Chapter 21)
+- Day 4-5: Exploration notebooks, testing, documentation
+
+**Output**: Complete data product with semantic layer, monitoring, and dashboards
 
 ---
 
-### Path 3: Advanced Quality Engineer
-**Goal**: Become expert in data quality
-1. Chapter 1: Architecture & Principles
-2. Chapter 8: DLT Expectations Patterns (Complete)
-3. Chapter 9: DQX Framework
-4. Chapter 18: Lakehouse Monitoring (Comprehensive)
-   - Covers setup, custom metrics, and query patterns
+### Path 3: Data Quality Focus (2 weeks)
+**Goal**: Master data quality patterns
+
+**Week 1: Standard DQ**
+- Foundation (Chapters 1-5)
+- Bronze with Faker DQ corruption (Chapter 7)
+- Silver DLT with Delta table rules (Chapter 8)
+- Gold schema validation (Chapters 12-13)
+
+**Week 2: Advanced DQ**
+- DQX integration (Chapter 9)
+- Lakehouse Monitoring with custom metrics (Chapter 20)
+- Documentation and testing
+
+**Output**: Multi-layered data quality strategy with monitoring
 
 ---
 
-### Path 4: Semantic Layer Architect
-**Goal**: Master AI-ready data consumption
-1. Chapter 13: Gold Layer Documentation
-2. Chapter 14: Mermaid ERD Patterns
-3. Chapter 15: Metric Views
-4. Chapter 16: Table-Valued Functions
-5. Chapter 17: Genie Space Setup
+### Path 4: Semantic Layer Specialist (1 week)
+**Goal**: Master natural language query capabilities
+
+**Prerequisites**: Gold layer complete
+
+**Day 1-2**: Metric Views (Chapter 17)
+**Day 3**: Table-Valued Functions (Chapter 18)
+**Day 4**: Genie Space setup (Chapter 19)
+**Day 5**: AI/BI Dashboards (Chapter 21)
+
+**Output**: Complete semantic layer with NL query capability
 
 ---
 
-### Path 5: Platform Architect
-**Goal**: Design and orchestrate complete solutions
-1. Chapter 1: Architecture & Principles (Complete)
-2. Chapter 2: Platform Infrastructure (Complete)
-3. Chapter 3: Unity Catalog Schemas
-4. Chapter 5: Unity Catalog Constraints
-5. Chapter 18: Lakehouse Monitoring (Comprehensive)
+## 📖 Cross-References
+
+### Schema Design Flow
+1. Chapter 3 (Schema Management) → Chapter 4 (Table Properties) → Chapter 5 (Constraints)
+2. Chapter 10 (ERD Design) → Chapter 11 (YAML Setup) → Chapter 12 (Schema Validation)
+
+### Data Quality Flow
+1. Chapter 8 (DLT Expectations) → Chapter 9 (DQX) → Chapter 20 (Monitoring)
+2. Chapter 7 (Faker with DQ corruption) → Chapter 8 (Silver DQ rules)
+3. Chapter 20 (Monitoring) → Chapter 22 (SQL Alerting) for proactive notifications
+
+### Gold Layer Complete Flow
+1. Chapter 10 (ERD Design)
+2. Chapter 11 (YAML-Driven Setup)
+3. Chapter 12 (Schema Validation)
+4. Chapter 13 (Grain Validation)
+5. Chapter 14 (MERGE Patterns)
+6. Chapter 15 (Deduplication)
+7. Chapter 16 (Documentation)
+
+### Semantic Layer Complete Flow
+1. Chapter 17 (Metric Views)
+2. Chapter 18 (TVFs)
+3. Chapter 19 (Genie Space)
+4. Chapter 21 (AI/BI Dashboards)
 
 ---
 
-## 📊 Rules at a Glance
+## 🎓 Certification Checklist
 
-| Chapter | Rule File | Lines | Complexity | When to Use |
-|---------|-----------|-------|------------|-------------|
-| 1 | `01-databricks-expert-agent.mdc` | 272 | Foundation | Before any project |
-| 2 | `02-databricks-asset-bundles.mdc` | 1200+ | Foundation | Setting up infrastructure |
-| 3 | `03-schema-management-patterns.mdc` | 200+ | Foundation | Before creating tables |
-| 4 | `04-databricks-table-properties.mdc` | 258 | Foundation | Every table creation |
-| 5 | `05-unity-catalog-constraints.mdc` | 150+ | Foundation | Gold layer design |
-| 6 | *(See Chapter 1 - Bronze section)* | - | Basic | Bronze implementation |
-| 7 | `06-faker-data-generation.mdc` | 250+ | Basic | Test data generation |
-| 8 | `07-dlt-expectations-patterns.mdc` | 700+ | Intermediate | Silver layer DLT |
-| 9 | `08-dqx-patterns.mdc` | 900+ | Advanced | Advanced DQ diagnostics |
-| 10 | `09-databricks-python-imports.mdc` | 410+ | Basic | Shared Python modules |
-| 11 | `10-gold-layer-merge-patterns.mdc` | 350+ | Intermediate | Gold merge operations |
-| 12 | `11-gold-delta-merge-deduplication.mdc` | 200+ | Intermediate | Fact table merges |
-| 13 | `12-gold-layer-documentation.mdc` | 300+ | Basic | Gold documentation |
-| 14 | `13-mermaid-erd-patterns.mdc` | 150+ | Basic | ERD diagrams |
-| 15 | `14-metric-views-patterns.mdc` | 600+ | Advanced | Semantic layer |
-| 16 | `15-databricks-table-valued-functions.mdc` | 450+ | Intermediate | SQL functions |
-| 17 | `16-genie-space-patterns.mdc` | 350+ | Intermediate | Genie Spaces |
-| 18 | `17-lakehouse-monitoring-comprehensive.mdc` | 1,138 | Advanced | Monitor setup+metrics+queries |
-| 19 | `20-cursor-rules.mdc` | 73 | Basic | Creating rules |
-| 20 | `21-self-improvement.mdc` | 400+ | Meta | Rule improvements |
+### Bronze Layer Certified
+- [ ] Read Chapters 1-7
+- [ ] Created Bronze tables with governance metadata
+- [ ] Enabled Change Data Feed
+- [ ] Generated test data with Faker
+- [ ] Verified FK integrity
 
-**Total**: 20 Chapters | ~7,600+ Lines | 7 Complexity Levels
+### Silver Layer Certified
+- [ ] Read Chapters 8-9
+- [ ] Created dq_rules Delta table
+- [ ] Implemented DLT pipeline with Delta table-based rules
+- [ ] Created quarantine tables
+- [ ] Validated data quality metrics
 
-**Note:** Chapter 18 consolidates 3 previous rules (monitoring setup, custom metrics, query patterns) into one comprehensive guide.
+### Gold Layer Certified
+- [ ] Read Chapters 10-16
+- [ ] Created ERD diagrams
+- [ ] YAML schemas for all tables
+- [ ] Implemented YAML-driven setup
+- [ ] Schema and grain validation
+- [ ] SCD Type 1 and Type 2 patterns
+- [ ] Comprehensive documentation
 
----
+### Semantic Layer Certified
+- [ ] Read Chapters 17-19, 21
+- [ ] Created Metric Views (v1.1)
+- [ ] Implemented 10+ TVFs
+- [ ] Configured Genie Space
+- [ ] Built AI/BI dashboards
 
-## 🎯 Quick Decision Tree
-
-**"Which chapter do I need right now?"**
-
-```
-Are you starting a new project?
-├─ Yes → Chapter 1 (Architecture & Principles)
-└─ No → Continue...
-
-Are you setting up infrastructure?
-├─ Yes → Chapter 2 (Asset Bundles) + Chapter 3 (Schemas)
-└─ No → Continue...
-
-Are you creating tables?
-├─ Bronze → Chapter 4 (Table Properties) + Chapter 6 (Bronze Patterns)
-├─ Silver → Chapter 8 (DLT Expectations) [+ Chapter 9 (DQX) if needed]
-└─ Gold → Chapter 11 (Merge Patterns) + Chapter 13 (Documentation)
-
-Are you building semantic layer?
-├─ For Dashboards → Chapter 15 (Metric Views)
-├─ For Genie → Chapter 16 (TVFs) + Chapter 17 (Genie Spaces)
-└─ Both → Read all three
-
-Do you need monitoring?
-└─ Yes → Chapter 18 (Comprehensive Monitoring Guide)
-         Covers: Setup, Custom Metrics, Query Patterns
-
-Are you creating test data?
-└─ Yes → Chapter 7 (Faker Data Generation)
-
-Do you need shared Python code?
-└─ Yes → Chapter 10 (Python Imports)
-
-Are you proposing a new pattern?
-└─ Yes → Chapter 20 (Self-Improvement)
-```
+### Production Ready
+- [ ] All layers certified
+- [ ] Lakehouse Monitoring configured (Chapter 20)
+- [ ] SQL Alerting deployed (Chapter 22)
+- [ ] Exploration notebooks created (Chapter 23)
+- [ ] Complete documentation
+- [ ] Asset Bundles deployment (Chapter 2)
 
 ---
 
-## 📖 How to Read Each Chapter
+## 🔄 Continuous Improvement
 
-Each rule file (chapter) follows this structure:
+This guide evolves based on:
+- Official Databricks documentation updates
+- Real-world implementation learnings
+- Community feedback
+- New platform features
 
-1. **Pattern Recognition** - What problem does this solve?
-2. **Core Patterns** - The main implementation patterns
-3. **Examples** - Real, working code examples
-4. **Anti-Patterns** - Common mistakes to avoid (❌ DON'T)
-5. **Validation Checklist** - Verify your implementation
-6. **References** - Official Databricks documentation
+**Last Major Update**: December 2025
+- Added folder organization (common, bronze, silver, gold, semantic-layer, monitoring, exploration, planning)
+- Updated all cross-references
+- Added learning paths
+- Enhanced statistics
 
-**Reading Strategy**:
-- First time: Read completely, try examples
-- Reference use: Jump to specific pattern, check checklist
-- Validation: Use checklist before committing code
-
----
-
-## 🚀 Success Criteria
-
-You've mastered this framework when you can:
-
-✅ **Foundation**
-- [ ] Explain the 7 non-negotiable principles
-- [ ] Set up a complete Asset Bundle with orchestrators
-- [ ] Create properly governed schemas and tables
-
-✅ **Implementation**
-- [ ] Build Bronze ingestion with proper metadata
-- [ ] Implement Silver DLT with centralized DQ rules
-- [ ] Create Gold layer with MERGE and SCD patterns
-
-✅ **Intelligence**
-- [ ] Design Metric Views with proper synonyms
-- [ ] Create Table-Valued Functions for Genie
-- [ ] Set up Genie Spaces with comprehensive instructions
-
-✅ **Observability**
-- [ ] Configure Lakehouse Monitoring with custom metrics
-- [ ] Build dashboards querying monitoring data
-- [ ] Understand AGGREGATE/DERIVED/DRIFT patterns
-
-✅ **Quality**
-- [ ] Apply proper table properties and comments
-- [ ] Implement appropriate DQ expectations
-- [ ] Handle quarantine and error scenarios
+See Chapter 26 (Self-Improvement) for the improvement methodology.
 
 ---
 
-## 💡 Pro Tips
+## 📚 External References
 
-1. **Don't Skip Foundations** - Chapters 1-5 are mandatory, not optional
-2. **Use Checklists** - Every chapter has validation checklists - use them
-3. **Copy Working Code** - All examples are from production code - copy and adapt
-4. **Follow Patterns** - Don't reinvent - these patterns are battle-tested
-5. **Document as You Go** - Especially in Gold layer (dual-purpose comments)
-6. **Think LLM-First** - All documentation should be natural language
-7. **Automate Everything** - Use Asset Bundles for all infrastructure
-8. **Monitor Everything** - Add monitoring to all critical Gold tables
-9. **Test with Corrupted Data** - Use Faker patterns to generate DQ issues
-10. **Improve Continuously** - Follow Chapter 20 to contribute patterns back
+- [Official Databricks Documentation](https://docs.databricks.com/)
+- [Unity Catalog](https://docs.databricks.com/unity-catalog/)
+- [Delta Lake](https://docs.databricks.com/delta/)
+- [DLT Expectations](https://docs.databricks.com/dlt/expectations)
+- [Metric Views](https://docs.databricks.com/metric-views/)
+- [Lakehouse Monitoring](https://docs.databricks.com/lakehouse-monitoring/)
 
 ---
 
-## 🤝 Contributing to This Framework
+**Remember**: This is not just a set of rules - it's a **complete methodology** for building production data products. Follow the learning paths, validate with checklists, and build iteratively.
 
-See **Chapter 20: Self-Improvement Process** for the complete workflow.
-
-**Quick version**:
-1. Identify pattern (3+ occurrences or official best practice)
-2. Validate with team and documentation
-3. Update appropriate chapter(s)
-4. Add examples from actual code
-5. Update this Table of Contents
-6. Document in RULE_IMPROVEMENT_LOG.md
-
----
-
-## 📅 Framework Maintenance
-
-- **Daily**: Apply patterns in new development
-- **Weekly**: Review new patterns in code reviews
-- **Monthly**: Update rules based on lessons learned
-- **Quarterly**: Major documentation review
-- **Annually**: Framework architecture review
-
----
-
-## 🎓 Certification Levels
-
-### Level 1: Foundation Engineer
-- Read and understand Chapters 1-7
-- Can implement Bronze and basic Silver
-- Follows table property standards
-
-### Level 2: Data Product Engineer
-- Mastered Chapters 1-14
-- Can build complete Bronze → Silver → Gold pipelines
-- Implements proper documentation and ERDs
-
-### Level 3: Semantic Layer Architect
-- Mastered Chapters 1-17
-- Can design and implement complete semantic layers
-- Creates Genie-ready data products
-
-### Level 4: Platform Architect
-- Mastered all 20 chapters
-- Can design enterprise-scale solutions
-- Contributes patterns back to framework
-
----
-
-## 📞 Getting Help
-
-**Stuck on a pattern?**
-1. Check the chapter's "Common Mistakes" section
-2. Review the validation checklist
-3. Look at working examples in src/
-4. Search RULE_IMPROVEMENT_LOG.md for similar issues
-
-**Found a bug in the rules?**
-1. Follow Chapter 20 (Self-Improvement)
-2. Document the issue clearly
-3. Propose the fix with examples
-4. Submit for team review
-
----
-
-## 📚 External Learning Resources
-
-Complement this framework with official Databricks training:
-- [Databricks Academy](https://www.databricks.com/learn/training)
-- [Data Engineering with Databricks](https://www.databricks.com/learn/training/data-engineer)
-- [Databricks Certified Data Engineer Associate](https://www.databricks.com/learn/certification/data-engineer-associate)
-
----
-
-## ⚖️ License & Usage
-
-These rules are internal to this project but represent **production-proven patterns**. Adapt them for your own projects with attribution.
-
----
-
-## 🎯 Final Word
-
-This framework represents **thousands of hours of real-world experience** building production data products on Databricks. Every pattern, every checklist, every example comes from actual working code.
-
-**Your job is simple**: Follow the patterns, validate with checklists, and contribute improvements back.
-
-**Start with Chapter 1. Build something great. Make it better.**
-
----
-
-**Version**: 2.0 (Reorganized)
-**Last Updated**: October 28, 2025
-**Next Review**: After major feature implementations
-
----
-
-*Remember: These aren't just rules - they're the accumulated wisdom of building production data products. Read them. Use them. Improve them.*
-
+**Happy Building! 🚀**

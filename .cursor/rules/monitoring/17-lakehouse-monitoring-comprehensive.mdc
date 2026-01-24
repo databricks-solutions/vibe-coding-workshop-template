@@ -1,0 +1,1690 @@
+---
+description: Comprehensive guide for Databricks Lakehouse Monitoring - setup, custom metrics, querying, and best practices
+globs: **/*monitoring*.py
+alwaysApply: false
+---
+
+# Lakehouse Monitoring: Complete Guide for Gold Layer
+
+## 📋 Table of Contents
+
+1. [Core Principles](#core-principles)
+2. [Setup & Configuration](#setup--configuration)
+3. [Custom Metrics Design](#custom-metrics-design)
+4. [Querying Metrics](#querying-metrics)
+5. [Complete Examples](#complete-examples)
+6. [Troubleshooting](#troubleshooting)
+7. [References](#references)
+
+---
+
+## Core Principles
+
+### Principle 1: Graceful Degradation
+Monitor setup should handle SDK version differences, missing tables, and existing monitors gracefully.
+
+### Principle 2: Business-First Metrics
+Every custom metric must answer: **"What business decision would change based on this metric?"**
+
+### Principle 3: Table-Level Business KPIs
+**⚠️ CRITICAL:** For table-level business KPIs that reference each other, ALWAYS use `input_columns=[":table"]` for ALL metric types (AGGREGATE, DERIVED, DRIFT).
+
+**Why This Matters:**
+- DERIVED metrics can ONLY reference metrics in the same `column_name` row
+- DRIFT metrics can ONLY compare metrics in the same `column_name` row  
+- Mixing `input_columns` values breaks cross-references → NULL values
+
+**Decision Tree:**
+```
+Is this a table-level business KPI?
+├─ YES → Use input_columns=[":table"]
+│        - Will be used in DERIVED metrics
+│        - Will be compared in DRIFT metrics
+│        - Represents overall business state
+│        → ALL RELATED METRICS MUST USE [":table"]
+│
+└─ NO → Is it column-specific profiling?
+         └─ YES → Use input_columns=["column_name"]
+                  - Tracks column-specific statistics
+                  - Won't be referenced by other metrics
+                  - Pure data quality monitoring
+```
+
+### Principle 4: Where Custom Metrics Appear
+
+**⚠️ CRITICAL:** Custom metrics appear as **NEW COLUMNS** in monitoring output tables:
+- **AGGREGATE + DERIVED metrics** → `{table}_profile_metrics` table (as new columns)
+- **DRIFT metrics** → `{table}_drift_metrics` table (as new columns)
+- **There is NO separate `custom_metrics` table!**
+
+---
+
+## Setup & Configuration
+
+### Import with Graceful Fallback
+
+```python
+# ✅ CORRECT: Try-except for optional monitoring classes
+try:
+    from databricks.sdk.service.catalog import (
+        MonitorTimeSeries, 
+        MonitorSnapshot, 
+        MonitorMetric, 
+        MonitorMetricType, 
+        MonitorCronSchedule
+    )
+    MONITORING_AVAILABLE = True
+except ImportError:
+    MONITORING_AVAILABLE = False
+    print("⚠️  Lakehouse Monitoring classes not available in this SDK version")
+
+# Check before use
+if not MONITORING_AVAILABLE:
+    print("⚠️  Skipping monitoring setup - SDK version incompatible")
+    return
+```
+
+### Exception Handling
+
+```python
+from databricks.sdk.errors import ResourceAlreadyExists, ResourceDoesNotExist
+
+try:
+    monitor = workspace_client.quality_monitors.create(
+        table_name=f"{catalog}.{schema}.{table}",
+        # ... configuration
+    )
+    print(f"✓ Monitor created for {table}")
+except ResourceAlreadyExists:
+    print(f"⚠️  Monitor for {table} already exists - skipping")
+except ResourceDoesNotExist:
+    print(f"⚠️  Table {table} does not exist - skipping monitor creation")
+except Exception as e:
+    print(f"⚠️  Failed to create monitor for {table}: {e}")
+```
+
+### Monitor Mode Configuration
+
+**Critical Rule: Always Specify ONE of: `snapshot`, `time_series`, or `inference_log`**
+
+```python
+# ❌ WRONG: No mode specified
+monitor = workspace_client.quality_monitors.create(
+    table_name=table_name,
+    # ❌ ERROR: Must specify snapshot, time_series, or inference_log
+)
+
+# ✅ CORRECT: Snapshot mode
+monitor = workspace_client.quality_monitors.create(
+    table_name=table_name,
+    snapshot=MonitorSnapshot(),  # ✅ For non-temporal data
+    custom_metrics=[...],
+)
+
+# ✅ CORRECT: Time series mode
+monitor = workspace_client.quality_monitors.create(
+    table_name=table_name,
+    time_series=MonitorTimeSeries(
+        timestamp_col="transaction_date",
+        granularities=["1 day"]
+    ),
+    custom_metrics=[...],
+)
+```
+
+**When to Use Each Mode:**
+
+| Mode | Use Case | Example |
+|------|----------|---------|
+| `snapshot` | Daily snapshots without time dimension | `fact_inventory_snapshot` |
+| `time_series` | Temporal data with timestamp column | `fact_sales_daily` |
+| `inference_log` | ML model inference monitoring | Model prediction tables |
+
+### Complete Monitor Creation Template
+
+```python
+def create_table_monitor(
+    workspace_client: WorkspaceClient, 
+    catalog: str, 
+    schema: str,
+    table: str,
+    monitor_type: str = "time_series"
+):
+    """
+    Create Lakehouse monitor with comprehensive error handling.
+    
+    Args:
+        monitor_type: "snapshot" or "time_series"
+    """
+    table_name = f"{catalog}.{schema}.{table}"
+    
+    print(f"Creating {monitor_type} monitor for {table_name}...")
+    
+    try:
+        # Configure monitor based on type
+        if monitor_type == "snapshot":
+            config = {"snapshot": MonitorSnapshot()}
+        elif monitor_type == "time_series":
+            config = {
+                "time_series": MonitorTimeSeries(
+                    timestamp_col="transaction_date",
+                    granularities=["1 day"]
+                )
+            }
+        
+        monitor = workspace_client.quality_monitors.create(
+            table_name=table_name,
+            assets_dir=f"/Workspace/Shared/lakehouse_monitoring/{catalog}/{schema}",
+            output_schema_name=f"{catalog}.{schema}_monitoring",
+            **config,
+            custom_metrics=[
+                # See Custom Metrics Design section below
+            ],
+            slicing_exprs=["store_number", "upc_code"],  # Dimensional analysis
+            schedule=MonitorCronSchedule(
+                quartz_cron_expression="0 0 2 * * ?",  # Daily at 2 AM
+                timezone_id="America/New_York"
+            )
+        )
+        
+        print(f"✓ Monitor created for {table_name}")
+        if hasattr(monitor, 'table_name'):
+            print(f"  Table: {monitor.table_name}")
+        if hasattr(monitor, 'dashboard_id'):
+            print(f"  Dashboard: {monitor.dashboard_id}")
+        
+        return monitor
+        
+    except ResourceAlreadyExists:
+        print(f"⚠️  Monitor for {table} already exists - skipping")
+        return None
+        
+    except ResourceDoesNotExist:
+        print(f"⚠️  Table {table} does not exist - skipping monitor creation")
+        return None
+        
+    except Exception as e:
+        print(f"❌ Failed to create monitor for {table}: {str(e)}")
+        raise
+```
+
+### Async Operations Pattern
+
+**Critical Rule: Wait for Table Creation**
+
+Lakehouse Monitoring creates output tables asynchronously:
+1. Monitor API call returns immediately (~30 seconds)
+2. Initial profiling runs in background (~15 minutes)
+3. Tables don't exist until profiling completes
+
+```python
+def wait_with_progress(minutes: int = 15):
+    """Wait with progress updates."""
+    wait_seconds = minutes * 60
+    for elapsed in range(0, wait_seconds, 60):
+        progress_pct = (elapsed / wait_seconds) * 100
+        remaining = wait_seconds - elapsed
+        print(f"⏱️  Progress: {progress_pct:.1f}% | Remaining: {remaining//60}m")
+        time.sleep(60)
+    print(f"✓ Wait completed - tables should be ready")
+
+# Use in workflow
+create_sales_monitor(workspace_client, catalog, schema)
+wait_with_progress(minutes=15)  # ✅ Wait for async table creation
+document_monitoring_tables(spark, catalog, schema)  # ✅ Now tables exist
+```
+
+### Complete Monitor Cleanup Pattern
+
+**Critical Rule: Delete Monitor AND Output Tables**
+
+Problem: Deleting a monitor doesn't delete its output tables, causing schema conflicts.
+
+```python
+def delete_monitor_if_exists(workspace_client: WorkspaceClient, table_name: str, spark=None):
+    """Complete cleanup: monitor definition + output tables."""
+    from pyspark.sql import SparkSession
+    
+    if spark is None:
+        spark = SparkSession.getActiveSession()
+    
+    try:
+        # 1. Check if monitor exists
+        workspace_client.quality_monitors.get(table_name=table_name)
+        
+        # 2. Delete monitor definition
+        print(f"  Deleting existing monitor for {table_name}...")
+        workspace_client.quality_monitors.delete(table_name=table_name)
+        print(f"  ✓ Existing monitor deleted")
+        
+        # 3. Parse table name to construct monitoring table names
+        catalog, schema, table = table_name.split(".")
+        monitoring_schema = f"{schema}_monitoring"
+        
+        # 4. Drop profile_metrics table
+        profile_table = f"{catalog}.{monitoring_schema}.{table}_profile_metrics"
+        print(f"  Dropping profile metrics table: {profile_table}...")
+        spark.sql(f"DROP TABLE IF EXISTS {profile_table}")
+        print(f"  ✓ Profile metrics table dropped")
+        
+        # 5. Drop drift_metrics table
+        drift_table = f"{catalog}.{monitoring_schema}.{table}_drift_metrics"
+        print(f"  Dropping drift metrics table: {drift_table}...")
+        spark.sql(f"DROP TABLE IF EXISTS {drift_table}")
+        print(f"  ✓ Drift metrics table dropped")
+        
+        return True
+        
+    except ResourceDoesNotExist:
+        return False  # Silent success - nothing to delete
+    except Exception as e:
+        print(f"  ⚠️  Error checking/deleting monitor: {str(e)}")
+        return False
+
+# Use before creating new monitor
+delete_monitor_if_exists(workspace_client, sales_table, spark)
+create_sales_monitor(workspace_client, catalog, schema)
+```
+
+### Monitor Update Pattern
+
+**⚠️ CRITICAL:** `quality_monitors.update()` is a **REPLACEMENT operation, not a MERGE**. If you omit fields (especially `custom_metrics`), they are **DELETED**.
+
+**✅ CORRECT: Import from Pure Python Configuration File**
+
+```python
+# monitor_configs.py (pure Python file - NOT a notebook)
+"""Centralized Monitor Configuration for Lakehouse Monitoring"""
+
+from databricks.sdk.service.catalog import (
+    MonitorTimeSeries, MonitorSnapshot, MonitorMetric, 
+    MonitorMetricType, MonitorCronSchedule
+)
+import pyspark.sql.types as T
+
+def get_all_monitor_configs(catalog: str, schema: str):
+    """Get all monitor configurations with FULL custom metrics"""
+    return [
+        {
+            "table_name": f"{catalog}.{schema}.fact_sales_daily",
+            "custom_metrics": [... 99 metrics ...],  # ✅ MUST include all metrics
+            "slicing_exprs": ["store_number"],
+        }
+    ]
+```
+
+```python
+# update_monitors.py (notebook)
+from monitor_configs import get_all_monitor_configs
+from databricks.sdk import WorkspaceClient
+
+def main():
+    catalog, schema = get_parameters()
+    workspace_client = WorkspaceClient()
+    
+    # ✅ Get FULL configuration including all custom metrics
+    monitor_configs = get_all_monitor_configs(catalog, schema)
+    
+    # Verify custom metrics are included
+    for config in monitor_configs:
+        custom_metrics = config.get('custom_metrics', [])
+        print(f"Updating with {len(custom_metrics)} custom metrics")
+    
+    # Update with full configuration
+    for config in monitor_configs:
+        workspace_client.quality_monitors.update(**config)
+```
+
+**Update Behavior:**
+
+| What You Pass | What Happens |
+|---------------|--------------|
+| `custom_metrics=None` | ❌ Deletes all custom metrics |
+| `custom_metrics=[]` | ❌ Deletes all custom metrics |
+| Omit `custom_metrics` | ❌ Deletes all custom metrics |
+| `custom_metrics=[...]` | ✅ Replaces with provided list |
+
+### Document Monitor Output Tables for Genie
+
+**⚠️ CRITICAL:** After monitors initialize (~15 min), add detailed descriptions to output tables so Genie/LLMs can understand the metrics for natural language queries.
+
+**Problem:** By default, Lakehouse Monitoring creates `_profile_metrics` and `_drift_metrics` tables with no descriptions. Custom metrics appear as columns with no context, making Genie unable to interpret them correctly.
+
+**Solution:** Add table and column comments after monitors initialize.
+
+#### Documentation Registry Pattern
+
+Create a centralized metric descriptions dictionary:
+
+```python
+# monitor_utils.py
+
+METRIC_DESCRIPTIONS = {
+    # Format: "metric_name": "Business meaning. Technical: calculation details."
+    
+    # Cost metrics
+    "total_daily_cost": "Total daily cost in list prices. Business: Primary FinOps metric for budgeting. Technical: SUM(list_cost), aggregated per time window.",
+    "tag_coverage_pct": "Percentage of cost covered by tags. Business: FinOps maturity KPI (target: >90%). Technical: tagged_cost / total_cost * 100.",
+    
+    # Job metrics
+    "success_rate": "Job success rate percentage. Business: Primary reliability KPI (target: >95%). Technical: success_count / total_runs * 100.",
+    "p99_duration_minutes": "P99 job duration. Business: Critical SLA threshold for worst-case scenarios. Technical: PERCENTILE(duration, 0.99).",
+    
+    # Drift metrics
+    "cost_drift_pct": "Period-over-period cost change. Business: Budget variance indicator (alert if >10%). Technical: (current - baseline) / baseline * 100.",
+}
+
+MONITOR_TABLE_DESCRIPTIONS = {
+    "fact_usage": {
+        "profile_table": "Lakehouse Monitoring profile metrics for fact_usage. Contains daily cost aggregations, tag coverage, SKU breakdowns. Use column_name=':table' for table-level KPIs. Business: Primary source for FinOps dashboards.",
+        "drift_table": "Lakehouse Monitoring drift metrics for fact_usage. Contains period-over-period cost comparisons. Business: Alert source for budget variance monitoring."
+    },
+    # ... more tables
+}
+```
+
+#### Documentation Function
+
+```python
+def document_monitor_output_tables(
+    spark,
+    catalog: str,
+    gold_schema: str,
+    table_name: str
+) -> dict:
+    """
+    Add Genie-friendly descriptions to Lakehouse Monitoring output tables.
+    
+    Run AFTER monitors initialize (~15 min after creation).
+    """
+    monitoring_schema = f"{gold_schema}_monitoring"
+    profile_table = f"{catalog}.{monitoring_schema}.{table_name}_profile_metrics"
+    drift_table = f"{catalog}.{monitoring_schema}.{table_name}_drift_metrics"
+    
+    results = {"profile_metrics": "NOT_FOUND", "drift_metrics": "NOT_FOUND"}
+    
+    # Get table descriptions
+    table_descs = MONITOR_TABLE_DESCRIPTIONS.get(table_name, {})
+    profile_desc = table_descs.get("profile_table", f"Profile metrics for {table_name}")
+    
+    # Document profile_metrics table
+    try:
+        # Check if table exists
+        spark.sql(f"DESCRIBE TABLE {profile_table}")
+        
+        # Add table comment
+        escaped_desc = profile_desc.replace("'", "''")
+        spark.sql(f"ALTER TABLE {profile_table} SET TBLPROPERTIES ('comment' = '{escaped_desc}')")
+        print(f"  ✓ Added table comment to {table_name}_profile_metrics")
+        
+        # Add column comments for custom metrics
+        columns_documented = 0
+        for metric_name, description in METRIC_DESCRIPTIONS.items():
+            try:
+                escaped_col_desc = description.replace("'", "''")
+                spark.sql(f"ALTER TABLE {profile_table} ALTER COLUMN {metric_name} COMMENT '{escaped_col_desc}'")
+                columns_documented += 1
+            except Exception:
+                pass  # Column may not exist in this table
+        
+        print(f"  ✓ Documented {columns_documented} custom metric columns")
+        results["profile_metrics"] = f"SUCCESS: {columns_documented} columns"
+        
+    except Exception as e:
+        if "TABLE_OR_VIEW_NOT_FOUND" in str(e):
+            print(f"  ⚠ Table not found (monitor may still be initializing)")
+            results["profile_metrics"] = "NOT_READY"
+        else:
+            results["profile_metrics"] = f"ERROR: {str(e)[:50]}"
+    
+    # Similar pattern for drift_metrics table...
+    
+    return results
+```
+
+#### Integration with Setup Workflow
+
+```python
+# setup_all_monitors.py
+
+def main():
+    # 1. Create all monitors
+    results = setup_all_monitors(workspace_client, catalog, gold_schema, spark)
+    
+    # 2. Wait for tables to be created (async operation)
+    if not skip_wait:
+        wait_for_monitor_tables(minutes=15)
+        
+        # 3. Document tables for Genie AFTER tables exist
+        print("Documenting Monitor Tables for Genie...")
+        doc_results = document_all_monitor_tables(spark, catalog, gold_schema)
+        
+        doc_success = sum(
+            1 for table_results in doc_results.values()
+            for status in table_results.values()
+            if "SUCCESS" in status
+        )
+        print(f"  Documented {doc_success} monitoring tables for Genie")
+```
+
+#### Documentation Job (Run Separately)
+
+For monitors that already exist, run documentation as a separate job:
+
+```yaml
+# lakehouse_monitors_job.yml
+
+lakehouse_monitoring_document_job:
+  name: "[${bundle.target}] Document Monitoring Tables for Genie"
+  description: "Adds descriptions to Lakehouse Monitor output tables for Genie/LLM understanding"
+  
+  tasks:
+    - task_key: document_all_monitors
+      notebook_task:
+        notebook_path: ../../src/monitoring/document_monitors.py
+        base_parameters:
+          catalog: ${var.catalog}
+          gold_schema: ${var.gold_schema}
+```
+
+#### Description Format Guidelines
+
+**Dual-Purpose Format:** Business meaning + Technical details
+
+```python
+# ✅ GOOD: Both business and technical context
+"success_rate": "Job success rate percentage. Business: Primary reliability KPI (target: >95%). Technical: success_count / total_runs * 100."
+
+# ❌ BAD: Only technical
+"success_rate": "success_count / total_runs * 100"
+
+# ❌ BAD: Only business (no calculation)
+"success_rate": "Measure of job reliability"
+```
+
+**Key Elements:**
+- **One-line business description**: What decision this metric informs
+- **Business context**: Target values, stakeholders, use cases
+- **Technical context**: Calculation formula, data type, source
+
+#### Validation Checklist
+
+- [ ] Metric descriptions include business meaning AND technical calculation
+- [ ] Table descriptions explain purpose and how to query (column_name=':table')
+- [ ] Documentation runs AFTER monitors initialize (~15 min)
+- [ ] Custom metric columns documented in correct table (AGGREGATE/DERIVED → profile, DRIFT → drift)
+- [ ] Error handling for tables that don't exist yet
+
+#### Genie Integration Benefits
+
+| Without Documentation | With Documentation |
+|----------------------|-------------------|
+| Genie sees: `tag_coverage_pct` (no context) | Genie sees: "Percentage of cost covered by tags. Business: FinOps maturity KPI (target: >90%)..." |
+| User asks: "Show tag coverage" → ❓ | User asks: "Show tag coverage" → ✅ Correct metric selected |
+| Manual metric lookup required | Natural language queries work |
+
+---
+
+## Custom Metrics Syntax Reference
+
+**⚠️ CRITICAL:** Custom metrics have strict syntax requirements that differ by type. Using incorrect syntax causes **silent initialization failures** (monitor creates but never initializes).
+
+### Required Imports
+
+```python
+from databricks.sdk.service.catalog import MonitorMetric, MonitorMetricType
+from pyspark.sql import types as T  # ⚠️ MANDATORY for output_data_type
+```
+
+### The Three Custom Metric Types
+
+| Type | Purpose | References | Syntax Pattern |
+|------|---------|-----------|----------------|
+| **AGGREGATE** | Calculate from table columns | Raw table columns | `SUM(column_name)` |
+| **DERIVED** | Calculate from aggregates | Aggregate metric names | `metric_name` (NO `{{ }}`) |
+| **DRIFT** | Compare between windows | Metrics + window templates | `{{current_df}}.metric - {{base_df}}.metric` |
+
+### AGGREGATE Metrics ✅
+
+**Purpose:** Calculate statistics directly from table columns
+
+**Syntax:** Raw SQL expressions on table data
+
+```python
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="daily_revenue",
+    input_columns=[":table"],  # or specific columns: ["col1", "col2"]
+    definition="SUM(total_booking_value)",  # ✅ Raw SQL on table columns
+    output_data_type=T.StructField("output", T.DoubleType()).json()  # ✅ MUST use StructField.json()
+)
+```
+
+**Key Points:**
+- References actual table columns
+- Uses SQL aggregate functions (SUM, AVG, COUNT, STDDEV, etc.)
+- Computed directly on primary table data
+- **⚠️ `output_data_type` MUST be `T.StructField().json()` format, NOT string**
+
+### DERIVED Metrics ✅
+
+**Purpose:** Calculate from previously computed aggregate metrics
+
+**Syntax:** Direct reference to aggregate metric names (**NO `{{ }}` templates**)
+
+```python
+# First define the aggregates it depends on:
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="total_bookings",
+    input_columns=[":table"],
+    definition="SUM(booking_count)",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+),
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="total_cancellations",
+    input_columns=[":table"],
+    definition="SUM(cancellation_count)",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+),
+
+# Then define derived metric:
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+    name="cancellation_rate",
+    input_columns=[":table"],
+    definition="(total_cancellations / NULLIF(total_bookings, 0)) * 100",  # ✅ Direct reference, NO {{ }}!
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+```
+
+**Key Points:**
+- References aggregate metric **names** directly (no template syntax)
+- ❌ **NEVER use `{{ }}` for DERIVED metrics**
+- Minimizes recomputation (doesn't scan table again)
+- Must reference metrics defined earlier in same monitor
+- All referenced metrics must have same `input_columns` value
+
+**Common Error:**
+```python
+# ❌ WRONG - Using template syntax for DERIVED
+definition="({{total_cancellations}} / NULLIF({{total_bookings}}, 0)) * 100"
+# Error: INVALID_DERIVED_METRIC - UNDEFINED_TEMPLATE_VARIABLE
+
+# ✅ CORRECT - Direct reference
+definition="(total_cancellations / NULLIF(total_bookings, 0)) * 100"
+```
+
+### DRIFT Metrics ✅
+
+**Purpose:** Compare metrics between two time windows or against baseline
+
+**Syntax:** Template syntax with `{{current_df}}` and `{{base_df}}` prefixes
+
+```python
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DRIFT,
+    name="revenue_vs_baseline",
+    input_columns=[":table"],
+    definition="{{current_df}}.daily_revenue - {{base_df}}.daily_revenue",  # ✅ MUST use {{ }} templates
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+```
+
+**Key Points:**
+- **MUST use `{{current_df}}` and `{{base_df}}` templates**
+- Compares same metric across two windows
+- Stores results in **drift_metrics** table (not profile_metrics)
+- For TimeSeries: Compares consecutive windows
+- For Snapshot: Requires baseline table
+
+**Window Comparison Patterns:**
+
+```python
+# Absolute difference
+definition="{{current_df}}.metric_name - {{base_df}}.metric_name"
+
+# Percentage change
+definition="(({{current_df}}.metric_name - {{base_df}}.metric_name) / NULLIF({{base_df}}.metric_name, 0)) * 100"
+
+# Ratio
+definition="{{current_df}}.metric_name / NULLIF({{base_df}}.metric_name, 1)"
+```
+
+**Common Error:**
+```python
+# ❌ WRONG - Missing window comparison
+definition="{{daily_revenue}}"  # Just references metric
+# Error: INVALID_DRIFT_METRIC - Must specify current_df and base_df
+
+# ✅ CORRECT - Compares windows
+definition="{{current_df}}.daily_revenue - {{base_df}}.daily_revenue"
+```
+
+### Critical Syntax Rules
+
+| Rule | ✅ Correct | ❌ Wrong |
+|------|-----------|---------|
+| **SDK Objects** | `MonitorMetric(...)` | `{"name": "...", "type": "..."}` (dict) |
+| **output_data_type** | `T.StructField("output", T.DoubleType()).json()` | `"double"` (string) |
+| **DERIVED syntax** | `metric_name` | `{{metric_name}}` (template) |
+| **DRIFT syntax** | `{{current_df}}.metric - {{base_df}}.metric` | `{{metric}}` (no comparison) |
+| **imports** | `from pyspark.sql import types as T` | ❌ Missing import |
+
+### Monitor Mode and Drift Requirements
+
+**⚠️ CRITICAL:** Snapshot monitors need baseline table for drift metrics
+
+| Monitor Mode | Consecutive Windows? | Drift Without Baseline? |
+|--------------|---------------------|------------------------|
+| **TimeSeries** | ✅ Yes | ✅ Yes (consecutive comparison) |
+| **Snapshot** | ❌ No | ❌ NO (must provide baseline_table) |
+
+**For Snapshot Monitors with DRIFT:**
+
+```python
+# Option 1: Provide baseline table
+create_monitor_with_custom_metrics(
+    snapshot_config=MonitorSnapshot(),
+    baseline_table=f"{catalog}.{schema}.{table}_baseline",  # ✅ Required for drift
+    custom_metrics=[...drift metrics...]
+)
+
+# Option 2: Remove drift metrics (simpler)
+create_monitor_with_custom_metrics(
+    snapshot_config=MonitorSnapshot(),
+    custom_metrics=[...no drift metrics...]  # ✅ No baseline needed
+)
+```
+
+---
+
+## Custom Metrics Design
+
+### Business-Focused Metric Categories
+
+#### 1. Transaction Pattern Metrics
+
+**Purpose:** Track customer purchasing behavior changes
+
+```python
+# Average spend per transaction
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="avg_transaction_amount",
+    input_columns=[":table"],  # ✅ Table-level business KPI
+    definition="AVG(avg_transaction_value)",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+
+# Items per basket (DERIVED - references AGGREGATE metrics)
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+    name="avg_items_per_transaction",
+    input_columns=[":table"],  # ✅ Must match AGGREGATE
+    definition="total_net_units / NULLIF(total_transactions, 0)",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+
+# Store traffic
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="transactions_per_store_per_day",
+    input_columns=[":table"],  # ✅ Table-level business KPI
+    definition="AVG(transaction_count)",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+```
+
+**Business Questions Answered:**
+- Is average basket size declining?
+- Are customers buying fewer items?
+- Is store traffic decreasing?
+
+#### 2. Product Performance Metrics
+
+**Purpose:** Monitor product sales velocity and availability
+
+```python
+# Product sales velocity
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="product_velocity",
+    input_columns=[":table"],  # ✅ Table-level business KPI
+    definition="SUM(net_units) / NULLIF(COUNT(DISTINCT store_number), 0)",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+
+# Dollar productivity per SKU
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="revenue_per_product",
+    input_columns=[":table"],  # ✅ Table-level business KPI
+    definition="AVG(net_revenue)",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+
+# In-stock percentage
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="product_availability_rate",
+    input_columns=[":table"],  # ✅ Table-level business KPI
+    definition="(COUNT(CASE WHEN net_units > 0 THEN 1 END) / NULLIF(COUNT(*), 0)) * 100",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+```
+
+#### 3. Customer Segmentation Metrics
+
+**Purpose:** Track loyalty program and customer behavior
+
+```python
+# Loyalty member value (DERIVED - references AGGREGATE)
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+    name="loyalty_member_avg_spend",
+    input_columns=[":table"],  # ✅ Must match AGGREGATE
+    definition="total_net_revenue / NULLIF(total_loyalty_customers, 0)",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+
+# Member visit frequency (DERIVED - references AGGREGATE)
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+    name="loyalty_transaction_frequency",
+    input_columns=[":table"],  # ✅ Must match AGGREGATE
+    definition="total_loyalty_transactions / NULLIF(total_loyalty_customers, 0)",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+```
+
+#### 4. Promotional Effectiveness Metrics
+
+**Purpose:** Track discount strategy and campaign ROI
+
+```python
+# Discount intensity (DERIVED - references AGGREGATE)
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+    name="discount_intensity",
+    input_columns=[":table"],  # ✅ Must match AGGREGATE
+    definition="(total_all_discounts / NULLIF(total_gross_revenue, 0)) * 100",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+
+# Campaign effectiveness
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="coupon_redemption_rate",
+    input_columns=[":table"],  # ✅ Table-level business KPI
+    definition="(COUNT(CASE WHEN coupon_discount_total > 0 THEN 1 END) / NULLIF(COUNT(*), 0)) * 100",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+```
+
+#### 5. Drift Metrics (Period-over-Period Comparison)
+
+**Purpose:** Automatic anomaly detection for business KPIs
+
+```python
+# Revenue drift percentage
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DRIFT,
+    name="revenue_drift_pct",
+    input_columns=[":table"],  # ✅ Must match AGGREGATE
+    definition="(({{current_df}}.total_net_revenue - {{base_df}}.total_net_revenue) / NULLIF({{base_df}}.total_net_revenue, 0)) * 100",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+
+# Transaction volume drift
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DRIFT,
+    name="transaction_drift_pct",
+    input_columns=[":table"],  # ✅ Must match AGGREGATE
+    definition="(({{current_df}}.total_transactions - {{base_df}}.total_transactions) / NULLIF({{base_df}}.total_transactions, 0)) * 100",
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+```
+
+### Custom Metric Limitations
+
+**Critical Rule: No Nested Aggregations**
+
+Databricks does NOT support aggregate functions inside other aggregate functions.
+
+```python
+# ❌ WRONG: Nested aggregation
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="top_10_stores_revenue_share",
+    definition="(SUM(CASE WHEN net_revenue >= PERCENTILE(net_revenue, 0.9) THEN net_revenue ELSE 0 END) / NULLIF(SUM(net_revenue), 0)) * 100"
+    # ❌ ERROR: PERCENTILE inside SUM
+)
+
+# ✅ CORRECT: Two-step pattern (AGGREGATE → DERIVED)
+# Step 1: Define base aggregates
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="total_revenue",
+    input_columns=[":table"],
+    definition="SUM(revenue)"
+),
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="p90_revenue",
+    input_columns=[":table"],
+    definition="PERCENTILE(revenue, 0.9)"
+),
+
+# Step 2: Define derived ratio
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+    name="top_performer_share",
+    input_columns=[":table"],
+    definition="p90_revenue / NULLIF(total_revenue, 0) * 100"  # ✅ References aggregates
+)
+```
+
+### Metric Organization Pattern
+
+**Group metrics by business domain with clear comments:**
+
+```python
+custom_metrics=[
+    # ========================================
+    # TRANSACTION PATTERN METRICS
+    # ========================================
+    # Purpose: Track customer purchasing behavior changes
+    
+    MonitorMetric(...),  # avg_transaction_amount
+    MonitorMetric(...),  # avg_items_per_transaction
+    MonitorMetric(...),  # transactions_per_store_per_day
+    
+    # ========================================
+    # PRODUCT PERFORMANCE METRICS
+    # ========================================
+    # Purpose: Monitor product sales velocity and availability
+    
+    MonitorMetric(...),  # product_velocity
+    MonitorMetric(...),  # revenue_per_product
+    MonitorMetric(...),  # product_availability_rate
+    
+    # ... more categories
+]
+```
+
+### Documenting Custom Metrics
+
+**Critical: Document metrics in the correct tables**
+
+Custom metrics appear as NEW COLUMNS in monitoring output tables:
+- AGGREGATE + DERIVED metrics → `{table}_profile_metrics` table
+- DRIFT metrics → `{table}_drift_metrics` table
+- **There is NO separate `custom_metrics` table!**
+
+```python
+def document_profile_metrics_table(spark: SparkSession, catalog: str, schema: str, table: str):
+    """
+    Document profile_metrics table including custom metric columns.
+    
+    ⚠️ KEY INSIGHT: Custom aggregate/derived metrics appear as NEW COLUMNS here.
+    """
+    monitoring_schema = f"{schema}_monitoring"
+    profile_table = f"{catalog}.{monitoring_schema}.{table}_profile_metrics"
+    
+    if table == "fact_sales_daily":
+        custom_metrics_descriptions = {
+            # Use dual-purpose format: Business + Technical
+            "avg_transaction_amount": """Average transaction basket size. 
+                Business: Tracks how customer spending per visit changes over time. 
+                Decline signals reduced basket size. 
+                Technical: AVG(avg_transaction_value), key drift indicator.""",
+            
+            "product_velocity": """Average units sold per store. 
+                Business: Measures product movement speed changes. 
+                Technical: SUM(net_units) / COUNT(DISTINCT stores).""",
+            
+            # ... more metrics
+        }
+        
+        for column_name, description in custom_metrics_descriptions.items():
+            try:
+                spark.sql(f"ALTER TABLE {profile_table} ALTER COLUMN {column_name} COMMENT '{description}'")
+            except:
+                pass  # Column may not exist yet
+```
+
+---
+
+## Querying Metrics
+
+### Storage Pattern by Metric Type
+
+**Critical Rule:** The `input_columns` parameter determines WHERE metrics are stored.
+
+| input_columns Value | Stored Where |
+|---------------------|--------------|
+| `["column_name"]` | `column_name = 'column_name'` row |
+| `[":table"]` | `column_name = ':table'` row |
+| `["col1", "col2"]` | `column_name = ':table'` (multi-column) |
+
+### Query Pattern 1: Table-Level AGGREGATE (Direct SELECT)
+
+**Recommended for business KPIs**
+
+```sql
+-- Python: input_columns=[":table"]
+
+SELECT 
+  window.start,
+  window.end,
+  -- All table-level metrics available directly
+  total_gross_revenue,
+  total_net_revenue,
+  total_transactions,
+  avg_transaction_amount
+FROM fact_sales_daily_profile_metrics
+WHERE log_type = 'INPUT'
+  AND column_name = ':table'  -- ✅ All table-level metrics here
+  AND COALESCE(slice_key, 'No Slice') = :slice_key
+ORDER BY window.start DESC
+```
+
+### Query Pattern 2: DERIVED Metrics (Direct SELECT)
+
+```sql
+-- Python: input_columns=[":table"]
+
+SELECT 
+  window.start,
+  window.end,
+  overall_return_rate,
+  units_per_transaction,
+  revenue_per_unit,
+  discount_intensity
+FROM fact_sales_daily_profile_metrics
+WHERE log_type = 'INPUT'
+  AND column_name = ':table'  -- All DERIVED metrics here
+  AND COALESCE(slice_key, 'No Slice') = :slice_key
+```
+
+### Query Pattern 3: DRIFT Metrics (Separate Table)
+
+```sql
+-- Python: input_columns=[":table"]
+
+SELECT 
+  window.start,
+  drift_type,
+  revenue_drift_pct,
+  transaction_drift_pct,
+  unit_sales_drift_pct
+FROM fact_sales_daily_drift_metrics
+WHERE drift_type = 'CONSECUTIVE'  -- or 'BASELINE'
+  AND column_name = ':table'
+  AND COALESCE(slice_key, 'No Slice') = :slice_key
+ORDER BY window.start DESC
+```
+
+### Query Pattern 4: Per-Column AGGREGATE (PIVOT Required)
+
+**⚠️ Only for column-specific profiling (rare use case)**
+
+```sql
+-- Python: input_columns=["gross_revenue"]
+
+WITH base_metrics AS (
+  SELECT 
+    window, granularity, slice_key, slice_value,
+    column_name,
+    gross_revenue_outlier_count,  -- Custom metric column
+    net_revenue_outlier_count
+  FROM fact_sales_daily_profile_metrics
+  WHERE log_type = 'INPUT'
+    AND column_name IN ('gross_revenue', 'net_revenue')  -- Input columns
+)
+SELECT 
+  window.start,
+  window.end,
+  MAX(CASE WHEN column_name = 'gross_revenue' THEN gross_revenue_outlier_count END) AS gross_revenue_outliers,
+  MAX(CASE WHEN column_name = 'net_revenue' THEN net_revenue_outlier_count END) AS net_revenue_outliers
+FROM base_metrics
+GROUP BY window.start, window.end, granularity, slice_key, slice_value
+```
+
+### AI/BI Dashboard Dataset Patterns
+
+**Dataset Type 1: Table-Level Business KPIs (Direct SELECT)**
+
+```sql
+-- No PIVOT needed for table-level metrics!
+SELECT 
+  window.start AS date,
+  window.end,
+  COALESCE(slice_key, 'No Slice') AS slice_key_display,
+  COALESCE(slice_value, 'No Slice') AS slice_value_display,
+  total_net_revenue,
+  total_transactions,
+  avg_transaction_amount,
+  overall_return_rate,
+  discount_intensity
+FROM fact_sales_daily_profile_metrics
+WHERE log_type = 'INPUT'
+  AND column_name = ':table'  -- ✅ All table-level metrics in one row
+  AND slice_key_display = :slice_key
+  AND slice_value_display = :slice_value
+ORDER BY date DESC
+```
+
+**Dataset Type 2: Slice Filters (Cascading)**
+
+```sql
+-- Slice Key Filter
+SELECT 'No Slice' AS `Slice Key`
+UNION ALL
+SELECT DISTINCT slice_key AS `Slice Key`
+FROM fact_sales_daily_profile_metrics
+WHERE slice_key IS NOT NULL
+ORDER BY `Slice Key`
+
+-- Slice Value Filter (depends on Slice Key)
+SELECT 'No Slice' AS `Slice Value`
+UNION ALL
+SELECT DISTINCT slice_value AS `Slice Value`
+FROM fact_sales_daily_profile_metrics
+WHERE COALESCE(slice_key, 'No Slice') = :slice_key
+  AND slice_value IS NOT NULL
+ORDER BY `Slice Value`
+```
+
+---
+
+## Complete Examples
+
+### Example 1: Sales Monitor with Comprehensive Metrics
+
+```python
+def create_sales_monitor(workspace_client: WorkspaceClient, catalog: str, schema: str):
+    """Create fact_sales_daily monitor with business-focused metrics."""
+    
+    table_name = f"{catalog}.{schema}.fact_sales_daily"
+    
+    # Delete existing monitor + tables
+    delete_monitor_if_exists(workspace_client, table_name, spark)
+    
+    # Create new monitor
+    monitor = workspace_client.quality_monitors.create(
+        table_name=table_name,
+        assets_dir=f"/Workspace/Shared/lakehouse_monitoring/{catalog}/{schema}",
+        output_schema_name=f"{catalog}.{schema}_monitoring",
+        time_series=MonitorTimeSeries(
+            timestamp_col="transaction_date",
+            granularities=["1 day"]
+        ),
+        custom_metrics=[
+            # ========================================
+            # AGGREGATE METRICS (Base Measurements)
+            # ========================================
+            MonitorMetric(
+                type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+                name="total_gross_revenue",
+                input_columns=[":table"],  # ✅ Table-level
+                definition="SUM(gross_revenue)",
+                output_data_type=T.StructField("output", T.DoubleType()).json()
+            ),
+            MonitorMetric(
+                type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+                name="total_net_revenue",
+                input_columns=[":table"],  # ✅ Table-level
+                definition="SUM(net_revenue)",
+                output_data_type=T.StructField("output", T.DoubleType()).json()
+            ),
+            MonitorMetric(
+                type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+                name="total_transactions",
+                input_columns=[":table"],  # ✅ Table-level
+                definition="SUM(transaction_count)",
+                output_data_type=T.StructField("output", T.LongType()).json()
+            ),
+            
+            # ========================================
+            # DERIVED METRICS (Business Ratios)
+            # ========================================
+            MonitorMetric(
+                type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+                name="overall_return_rate",
+                input_columns=[":table"],  # ✅ Must match AGGREGATE
+                definition="(total_return_amount / NULLIF(total_gross_revenue, 0)) * 100",
+                output_data_type=T.StructField("output", T.DoubleType()).json()
+            ),
+            MonitorMetric(
+                type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+                name="avg_items_per_transaction",
+                input_columns=[":table"],  # ✅ Must match AGGREGATE
+                definition="total_net_units / NULLIF(total_transactions, 0)",
+                output_data_type=T.StructField("output", T.DoubleType()).json()
+            ),
+            
+            # ========================================
+            # DRIFT METRICS (Period Comparison)
+            # ========================================
+            MonitorMetric(
+                type=MonitorMetricType.CUSTOM_METRIC_TYPE_DRIFT,
+                name="revenue_drift_pct",
+                input_columns=[":table"],  # ✅ Must match AGGREGATE
+                definition="(({{current_df}}.total_net_revenue - {{base_df}}.total_net_revenue) / NULLIF({{base_df}}.total_net_revenue, 0)) * 100",
+                output_data_type=T.StructField("output", T.DoubleType()).json()
+            ),
+        ],
+        slicing_exprs=["store_number", "upc_code"],
+        schedule=MonitorCronSchedule(
+            quartz_cron_expression="0 0 2 * * ?",
+            timezone_id="America/New_York"
+        )
+    )
+    
+    return monitor
+```
+
+### Example 2: Complete Workflow
+
+```python
+def main():
+    """Setup Lakehouse monitoring with graceful error handling."""
+    
+    # Check SDK compatibility
+    if not MONITORING_AVAILABLE:
+        print("⚠️  Skipping monitoring - incompatible SDK version")
+        return
+    
+    catalog, schema = get_parameters()
+    spark = SparkSession.getActiveSession()
+    workspace_client = WorkspaceClient()
+    
+    # Tables to monitor with their types
+    monitoring_config = [
+        ("fact_sales_daily", "time_series"),
+        ("fact_inventory_snapshot", "snapshot"),
+    ]
+    
+    monitors_created = []
+    
+    for table, monitor_type in monitoring_config:
+        try:
+            monitor = create_table_monitor(
+                workspace_client, 
+                catalog, 
+                schema, 
+                table,
+                monitor_type
+            )
+            if monitor:
+                monitors_created.append(table)
+        except Exception as e:
+            print(f"⚠️  Continuing after error with {table}: {e}")
+            continue
+    
+    print("\n" + "=" * 80)
+    print("✓ Lakehouse Monitoring setup completed")
+    print("=" * 80)
+    print(f"\nMonitors successfully created: {len(monitors_created)}")
+    for table in monitors_created:
+        print(f"  • {table}")
+    
+    # Wait for tables to be created
+    if monitors_created:
+        print("\n⏱️  Waiting 15 minutes for monitor initialization...")
+        wait_with_progress(minutes=15)
+        
+        # Document monitoring tables
+        print("\n📝 Documenting monitoring tables...")
+        for table in monitors_created:
+            document_monitoring_tables(spark, catalog, schema, table)
+        
+        print("\n✅ Monitoring setup complete with documentation!")
+```
+
+---
+
+## Troubleshooting
+
+### Common Mistakes
+
+#### ❌ Mistake 1: Mixing `input_columns` Values
+
+**THE MOST COMMON ERROR**
+
+```python
+# ❌ WRONG: AGGREGATE and DERIVED use different input_columns
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE,
+    name="total_gross_revenue",
+    input_columns=["gross_revenue"],  # ← Stored in 'gross_revenue' row
+    definition="SUM(gross_revenue)"
+)
+
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+    name="overall_return_rate",
+    input_columns=[":table"],  # ← Looks in ':table' row
+    definition="(total_return_amount / NULLIF(total_gross_revenue, 0)) * 100"
+    # ❌ Can't find total_gross_revenue!
+)
+
+# Result: overall_return_rate is NULL
+```
+
+```python
+# ✅ CORRECT: All use same input_columns
+MonitorMetric(
+    name="total_gross_revenue",
+    input_columns=[":table"],  # ✅ Table-level
+    definition="SUM(gross_revenue)"
+)
+
+MonitorMetric(
+    name="overall_return_rate",
+    input_columns=[":table"],  # ✅ Same location
+    definition="(total_return_amount / NULLIF(total_gross_revenue, 0)) * 100"
+)
+
+# Result: Both calculate correctly
+```
+
+#### ❌ Mistake 2: Not Specifying Monitor Mode
+
+```python
+# ❌ WRONG: No mode specified
+monitor = workspace_client.quality_monitors.create(
+    table_name=table_name,
+    # Missing: snapshot, time_series, or inference_log
+)
+
+# ✅ CORRECT: Explicit mode
+monitor = workspace_client.quality_monitors.create(
+    table_name=table_name,
+    snapshot=MonitorSnapshot(),  # ✅ or time_series
+    custom_metrics=[...],
+)
+```
+
+#### ❌ Mistake 3: Querying Wrong `column_name`
+
+```python
+# Python: input_columns=[":table"]
+
+# ❌ WRONG Query:
+WHERE column_name IN ('gross_revenue', 'net_revenue')  # Returns NULL!
+
+# ✅ CORRECT Query:
+WHERE column_name = ':table'  # Has values!
+```
+
+#### ❌ Mistake 4: Updating Without Full Custom Metrics
+
+```python
+# ❌ WRONG: Simplified config deletes all metrics
+def get_all_monitor_configs(catalog, schema):
+    return [
+        {
+            "table_name": f"{catalog}.{schema}.fact_sales_daily",
+            "slicing_exprs": ["store_number"],
+            # ❌ Missing custom_metrics → ALL 99 METRICS DELETED!
+        }
+    ]
+
+# ✅ CORRECT: Always include full custom_metrics
+def get_all_monitor_configs(catalog, schema):
+    return [
+        {
+            "table_name": f"{catalog}.{schema}.fact_sales_daily",
+            "custom_metrics": [... all 99 metrics ...],  # ✅ Full list
+            "slicing_exprs": ["store_number"],
+        }
+    ]
+```
+
+#### ❌ Mistake 5: Trying to Document `custom_metrics` Table
+
+```python
+# ❌ WRONG: This table doesn't exist!
+custom_table = f"{catalog}.{schema}_monitoring.fact_sales_daily_custom_metrics"
+spark.sql(f"ALTER TABLE {custom_table} ALTER COLUMN metric_name COMMENT '...'")
+# ❌ ERROR: TABLE_OR_VIEW_NOT_FOUND
+
+# ✅ CORRECT: Document columns in profile_metrics and drift_metrics
+profile_table = f"{catalog}.{schema}_monitoring.fact_sales_daily_profile_metrics"
+spark.sql(f"ALTER TABLE {profile_table} ALTER COLUMN total_net_revenue COMMENT '...'")
+```
+
+### Verification Workflow
+
+**Step 1: Check Python Definition**
+
+```python
+# In lakehouse_monitoring.py
+MonitorMetric(
+    name="total_gross_revenue",
+    input_columns=[":table"],  # ← Note this!
+    definition="SUM(gross_revenue)"
+)
+```
+
+**Step 2: Determine Storage Location**
+
+| input_columns | Stored Where |
+|---------------|--------------|
+| `[":table"]` | `column_name = ':table'` |
+| `["gross_revenue"]` | `column_name = 'gross_revenue'` |
+
+**Step 3: Test Query**
+
+```sql
+-- Debug: See where metric has values
+SELECT column_name, total_gross_revenue
+FROM fact_sales_daily_profile_metrics
+WHERE total_gross_revenue IS NOT NULL
+  AND log_type = 'INPUT'
+LIMIT 10;
+
+-- Result shows: column_name = ':table'
+```
+
+### Validation Checklist
+
+**Setup & Configuration:**
+- [ ] Import monitoring classes with try-except
+- [ ] Check MONITORING_AVAILABLE before creating
+- [ ] Specify ONE of: snapshot, time_series, inference_log
+- [ ] Handle ResourceAlreadyExists and ResourceDoesNotExist
+- [ ] Use hasattr() for MonitorInfo attributes
+- [ ] Delete existing monitor + tables before recreating
+
+**Custom Metrics:**
+- [ ] **CRITICAL:** All table-level business KPIs use `input_columns=[":table"]`
+- [ ] All related metrics (AGGREGATE/DERIVED/DRIFT) use same `input_columns`
+- [ ] No nested aggregations
+- [ ] Use DERIVED metrics for ratios
+- [ ] NULLIF guards against division by zero
+- [ ] All metrics have output_data_type specified
+- [ ] Metrics organized by business category
+
+**Querying:**
+- [ ] Use `log_type = 'INPUT'` (not 'OUTPUT')
+- [ ] Filter to correct `column_name` value
+- [ ] Handle NULL slices with COALESCE
+- [ ] Use PIVOT only for per-column metrics (rare)
+- [ ] Direct SELECT for table-level metrics (common)
+
+**Documentation (Genie Integration):**
+- [ ] Run documentation job AFTER monitors initialize (~15 min)
+- [ ] Add table comments via `ALTER TABLE ... SET TBLPROPERTIES ('comment' = ...)`
+- [ ] Add column comments via `ALTER TABLE ... ALTER COLUMN ... COMMENT`
+- [ ] Document metrics in `profile_metrics` (AGGREGATE + DERIVED)
+- [ ] Document metrics in `drift_metrics` (DRIFT type)
+- [ ] Use dual-purpose format (Business meaning + Technical calculation)
+- [ ] Include METRIC_DESCRIPTIONS registry with ~100+ metric descriptions
+- [ ] Include MONITOR_TABLE_DESCRIPTIONS with table-level context
+- [ ] Do NOT try to document `custom_metrics` table (doesn't exist)
+
+**Workflow:**
+- [ ] Wait 15+ minutes after creation before querying
+- [ ] Run documentation job after wait period for Genie
+- [ ] Update with FULL configuration (never omit custom_metrics)
+- [ ] Use silent success pattern for idempotent operations
+- [ ] Verify metric counts match before/after updates
+
+---
+
+## Production Deployment Errors (December 2025)
+
+**Source:** Real production deployment of 5 monitors (22 custom metrics) - encountered 7 systematic errors through 7 iterations.
+
+**Impact:** 100% of monitors failed initialization → All patterns now documented for prevention.
+
+**Full Post-Mortem:** See `docs/reference/rule-improvement-lakehouse-monitoring-custom-metrics.md`
+
+### Error #1: Using Dictionaries Instead of SDK Objects
+
+**Symptom:** `'dict' object has no attribute 'as_dict'`
+
+**Root Cause:** Custom metrics must be `MonitorMetric` SDK objects, not plain dicts
+
+```python
+# ❌ WRONG
+custom_metrics = [{"name": "metric1", "type": "AGGREGATE", ...}]
+
+# ✅ CORRECT
+from databricks.sdk.service.catalog import MonitorMetric, MonitorMetricType
+
+custom_metrics = [MonitorMetric(name="metric1", type=MonitorMetricType.CUSTOM_METRIC_TYPE_AGGREGATE, ...)]
+```
+
+### Error #2: Incorrect output_data_type Format (Silent Killer)
+
+**Symptom:** Monitor creates successfully but never initializes (monitor_version stays at 0, all refreshes show INTERNAL_ERROR)
+
+**Root Cause:** Using string format instead of PySpark StructField
+
+```python
+# ❌ WRONG - Monitor creates but NEVER initializes!
+MonitorMetric(
+    output_data_type="double"  # String format not supported
+)
+
+# ✅ CORRECT
+from pyspark.sql import types as T
+
+MonitorMetric(
+    output_data_type=T.StructField("output", T.DoubleType()).json()
+)
+```
+
+**Why This is the Worst Error:**
+- ✅ Monitor creation succeeds (no error)
+- ❌ Background initialization fails silently
+- ❌ monitor_version = 0 (never increments)
+- ❌ No metrics tables created
+- ❌ Takes 20+ minutes to discover the issue
+
+**Prevention:** Always check monitor_version after creation - should be > 0 after initialization
+
+### Error #3: SDK Version Attribute Differences
+
+**Symptom:** `'MonitorInfo' object has no attribute 'monitor_name'`
+
+**Root Cause:** Different SDK versions have different response attributes
+
+```python
+# ❌ WRONG - Assumes attributes exist
+print(f"Monitor: {monitor_info.monitor_name}")
+print(f"Status: {monitor_info.status}")
+
+# ✅ CORRECT - Defensive attribute access
+if hasattr(monitor_info, 'table_name'):
+    print(f"Table: {monitor_info.table_name}")
+if hasattr(monitor_info, 'status'):
+    print(f"Status: {monitor_info.status}")
+```
+
+### Error #4: Wrong Monitor Mode for Table Type
+
+**Symptom:** Internal errors during monitor refresh
+
+**Root Cause:** Using TimeSeries for dimension tables with SCD2 timestamps
+
+```python
+# ❌ WRONG - Dimension tables don't have event timestamps!
+MonitorTimeSeries(
+    timestamp_col="effective_from",  # SCD2 field, not event timestamp
+    granularities=["1 day"]
+)
+
+# ✅ CORRECT - Use Snapshot for dimensions
+MonitorSnapshot()
+```
+
+**Decision Matrix:**
+
+| Table Type | Timestamps | Monitor Mode |
+|-----------|------------|--------------|
+| Fact tables (events) | Transaction timestamps | `MonitorTimeSeries` |
+| Dimension tables | SCD2 (effective_from/to) | `MonitorSnapshot` |
+| Reference tables | Static/infrequent | `MonitorSnapshot` |
+
+### Error #5: DRIFT Metric on Snapshot Without Baseline
+
+**Symptom:** Monitor creation fails or drift metrics return NULL
+
+**Root Cause:** Snapshot monitors require baseline table for drift comparison
+
+```python
+# ❌ WRONG - Snapshot with drift but no baseline
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DRIFT,
+    name="customer_growth",
+    definition="{{total_customers}}"
+)
+create_monitor(snapshot_config=MonitorSnapshot())  # No baseline!
+
+# ✅ CORRECT Option 1 - Provide baseline
+create_monitor(
+    snapshot_config=MonitorSnapshot(),
+    baseline_table=f"{catalog}.{schema}.{table}_baseline"
+)
+
+# ✅ CORRECT Option 2 - Remove drift metrics
+# (Simpler if you don't have baseline data)
+```
+
+### Error #6: INVALID_DERIVED_METRIC - Template Syntax
+
+**Symptom:** `UNDEFINED_TEMPLATE_VARIABLE: total_bookings, total_cancellations`
+
+**Root Cause:** DERIVED metrics use direct references, NOT template syntax
+
+```python
+# ❌ WRONG - Using {{ }} templates for DERIVED
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+    definition="({{total_cancellations}} / NULLIF({{total_bookings}}, 0)) * 100"
+)
+
+# ✅ CORRECT - Direct reference (no templates)
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DERIVED,
+    definition="(total_cancellations / NULLIF(total_bookings, 0)) * 100"
+)
+```
+
+**Remember:** Template syntax `{{ }}` is ONLY for DRIFT metrics!
+
+### Error #7: INVALID_DRIFT_METRIC - Missing Window Comparison
+
+**Symptom:** `UNDEFINED_TEMPLATE_VARIABLE: daily_revenue. Must specify: [base_df, current_df]`
+
+**Root Cause:** DRIFT metrics must compare two windows
+
+```python
+# ❌ WRONG - Just references metric
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DRIFT,
+    definition="{{daily_revenue}}"
+)
+
+# ✅ CORRECT - Compares current vs baseline window
+MonitorMetric(
+    type=MonitorMetricType.CUSTOM_METRIC_TYPE_DRIFT,
+    definition="{{current_df}}.daily_revenue - {{base_df}}.daily_revenue"
+)
+```
+
+### Quick Validation Checklist
+
+Before deploying ANY monitor:
+
+- [ ] Import PySpark types: `from pyspark.sql import types as T`
+- [ ] All metrics are `MonitorMetric()` objects (NOT dicts)
+- [ ] All `output_data_type` use `T.StructField("output", T.DoubleType()).json()`
+- [ ] Correct monitor mode: TimeSeries for facts, Snapshot for dimensions
+- [ ] DERIVED metrics use direct references (no `{{ }}`)
+- [ ] DRIFT metrics use `{{current_df}}` and `{{base_df}}` templates
+- [ ] Snapshot with DRIFT has baseline_table OR no drift metrics
+- [ ] Defensive `hasattr()` checks for SDK response attributes
+
+### Prevention ROI
+
+**Without Documentation:**
+- Time to deploy: 2+ hours (7 iterations)
+- Success rate: 0% (all monitors fail initialization)
+- Debugging difficulty: High (silent failures)
+
+**With Documentation:**
+- Time to deploy: < 20 minutes (follow patterns)
+- Success rate: 100% (all errors preventable)
+- Debugging difficulty: Low (clear error messages + solutions)
+
+**Break-Even:** 2 implementations (saves 1.7 hours each)
+
+---
+
+## References
+
+### Official Documentation
+- [Lakehouse Monitoring Guide](https://docs.databricks.com/lakehouse-monitoring/)
+- [Monitor API Reference](https://docs.databricks.com/api/workspace/qualitymonitors/create)
+- [Custom Metrics](https://learn.microsoft.com/azure/databricks/lakehouse-monitoring/custom-metrics)
+- [Profile Metrics Table Schema](https://docs.databricks.com/lakehouse-monitoring/monitor-output#profile-metrics-table-schema)
+- [Drift Metrics Table Schema](https://docs.databricks.com/lakehouse-monitoring/monitor-output#drift-metrics-table-schema)
+- [Column Schemas for Generated Tables](https://docs.databricks.com/lakehouse-monitoring/monitor-output#column-schemas-for-generated-tables) - **Critical for understanding where custom metrics appear**
+- [Quality Monitors Update API](https://docs.databricks.com/api/workspace/qualitymonitors/update)
+- [Time Series Monitoring Example](https://docs.databricks.com/notebooks/source/monitoring/timeseries-monitor.html)
+
+### Project Implementation
+- `src/company_gold/lakehouse_monitoring.py` - Monitor creation with 144 custom metrics
+- `src/company_gold/monitor_configs.py` - Centralized configuration (pure Python file)
+- `src/company_gold/document_monitoring_tables.py` - Automated documentation
+- `src/company_gold/update_monitors.py` - Safe monitor updates
+
+### Case Studies
+
+#### input_columns Pattern for Table-Level KPIs (October 2025)
+**Discovery:** For table-level business KPIs, ALL metrics must use `input_columns=[":table"]`
+- Updated 83 AGGREGATE metrics (60 sales + 23 inventory)
+- Queries simplified from PIVOT to direct SELECT
+- Query performance improved ~40%
+- See: `docs/RULE_IMPROVEMENT_INPUT_COLUMNS_PATTERN.md`
+
+#### Custom Metrics as Table Columns (October 2025)
+**Discovery:** Custom metrics appear as NEW COLUMNS, not in separate table
+- No `custom_metrics` table exists (common misconception)
+- AGGREGATE/DERIVED → `profile_metrics` columns
+- DRIFT → `drift_metrics` columns
+- See: `docs/MONITORING_DOCUMENTATION_ERROR_HANDLING_FIX.md`
+
+---
+
+## Summary
+
+**This comprehensive guide covers:**
+1. ✅ Setup & configuration with error handling
+2. ✅ Custom metrics design for business KPIs
+3. ✅ Query patterns for dashboards
+4. ✅ Complete working examples
+5. ✅ Troubleshooting common issues
+
+**Key Takeaways:**
+- Always use `input_columns=[":table"]` for table-level business KPIs
+- Custom metrics appear as NEW COLUMNS (no separate `custom_metrics` table)
+- DERIVED metrics can only reference metrics in the same `column_name` row
+- Wait 15+ minutes after creation for tables to be ready
+- Always update with FULL configuration (never omit custom_metrics)
+- Document metrics in `profile_metrics` and `drift_metrics` tables
+
+**Next Steps:**
+1. Read setup section for monitor creation
+2. Review custom metrics section for metric design
+3. Use query patterns for dashboards
+4. Follow examples for implementation
+5. Reference troubleshooting when issues arise

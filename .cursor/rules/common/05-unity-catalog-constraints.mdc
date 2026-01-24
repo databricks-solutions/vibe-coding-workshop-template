@@ -1,0 +1,874 @@
+---
+description: Unity Catalog Primary Key and Foreign Key constraint patterns for proper relational modeling in Databricks
+alwaysApply: false
+---
+# Unity Catalog Primary Key and Foreign Key Constraints
+
+## Pattern Recognition
+Unity Catalog supports informational constraints (NOT ENFORCED) that enrich metadata, improve query optimization, and enable BI tool relationship discovery. This rule standardizes PK/FK implementation for star schema dimensional models.
+
+## Core Principle: Surrogate Keys as Primary Keys
+
+**❌ WRONG: Business keys as PKs, facts reference business keys**
+```sql
+-- This breaks when facts need surrogate FKs!
+CREATE TABLE dim_store (
+    store_key STRING NOT NULL,  -- Surrogate key (not PK)
+    store_number STRING NOT NULL PRIMARY KEY,  -- Business key as PK
+    ...
+)
+
+-- Facts reference business keys, not surrogate keys
+CREATE TABLE fact_sales (
+    store_number STRING NOT NULL,  -- Business key
+    ...
+    CONSTRAINT fk_sales_store FOREIGN KEY (store_number) 
+        REFERENCES dim_store(store_number) NOT ENFORCED
+)
+-- ❌ PROBLEM: Facts don't have surrogate keys for performance
+-- ❌ PROBLEM: Can't leverage surrogate key benefits (integer joins, SCD Type 2)
+```
+
+**✅ CORRECT: Surrogate keys as PKs, facts reference surrogate keys**
+```sql
+-- PK on surrogate key (proper dimensional modeling)
+CREATE TABLE dim_store (
+    store_key STRING NOT NULL,  -- Surrogate PK
+    store_number STRING NOT NULL,  -- Business key (UNIQUE)
+    ...
+    CONSTRAINT pk_dim_store PRIMARY KEY (store_key) NOT ENFORCED,
+    CONSTRAINT uk_store_number UNIQUE (store_number) NOT ENFORCED
+)
+
+-- Facts reference dimension surrogate PKs
+CREATE TABLE fact_sales (
+    store_key STRING NOT NULL,  -- Surrogate FK
+    store_number STRING NOT NULL,  -- Business key (for readability)
+    ...
+    CONSTRAINT fk_sales_store FOREIGN KEY (store_key) 
+        REFERENCES dim_store(store_key) NOT ENFORCED
+)
+-- ✅ CORRECT: Facts have surrogate FKs
+-- ✅ CORRECT: Business keys preserved for human readability
+-- ✅ CORRECT: Follows Kimball dimensional modeling best practices
+```
+
+## Databricks FK Constraint Requirement
+
+### Critical Rule
+**Foreign keys MUST reference PRIMARY KEY columns, even when NOT ENFORCED.**
+
+This means:
+- You cannot create FK to any column, only to PK columns
+- FKs must reference the exact column(s) in the PK definition
+- This applies even to informational (NOT ENFORCED) constraints
+
+### Why This Matters for Star Schemas
+In dimensional models:
+- **Facts should reference surrogate keys** (store_key, product_key, date_key)
+- **Surrogate keys are PRIMARY KEYS** (unique, auto-generated identifiers)
+- **Business keys have UNIQUE constraints** (for alternate lookups)
+- **Solution**: Define PKs on surrogate keys, facts reference surrogate PKs, business keys preserved for readability
+
+## NOT NULL Requirement for Primary Keys
+
+### Error You'll See
+```
+AnalysisException: Cannot create the primary key `pk_dim_product` because 
+its child column(s) `product_key` is nullable. Please change the column nullability and retry.
+```
+
+### Solution
+**All surrogate key columns used in PKs MUST be NOT NULL.**
+
+```sql
+-- ❌ WRONG: Nullable surrogate key
+CREATE TABLE dim_product (
+    product_key STRING,  -- ❌ Nullable, cannot be PK
+    upc_code STRING NOT NULL,
+    ...
+)
+
+-- ✅ CORRECT: NOT NULL surrogate key
+CREATE TABLE dim_product (
+    product_key STRING NOT NULL,  -- ✅ Can be PK
+    upc_code STRING NOT NULL,  -- Business key (UNIQUE)
+    ...
+    CONSTRAINT pk_dim_product PRIMARY KEY (product_key) NOT ENFORCED,
+    CONSTRAINT uk_product_upc UNIQUE (upc_code) NOT ENFORCED
+)
+```
+
+## Standard Dimensional Model Pattern
+
+### Dimension Table (SCD Type 2)
+
+```sql
+CREATE TABLE dim_store (
+    -- Surrogate key (PRIMARY KEY)
+    store_key STRING NOT NULL 
+        COMMENT 'Surrogate key (unique per version) - PRIMARY KEY',
+    
+    -- Business key (UNIQUE constraint, not PK)
+    store_number STRING NOT NULL 
+        COMMENT 'Business key - Store identifier',
+    
+    -- Attributes
+    store_name STRING,
+    address STRING,
+    city STRING,
+    state STRING,
+    
+    -- SCD Type 2 fields
+    effective_from TIMESTAMP NOT NULL,
+    effective_to TIMESTAMP,
+    is_current BOOLEAN NOT NULL,
+    
+    -- Timestamps
+    record_created_timestamp TIMESTAMP,
+    record_updated_timestamp TIMESTAMP,
+    
+    -- PRIMARY KEY on surrogate key
+    CONSTRAINT pk_dim_store PRIMARY KEY (store_key) NOT ENFORCED
+    
+    -- Note: No UNIQUE constraint on store_number for SCD Type 2
+    -- (same store_number can have multiple versions)
+)
+USING DELTA
+CLUSTER BY AUTO
+TBLPROPERTIES (
+    'delta.enableChangeDataFeed' = 'true',
+    'layer' = 'gold',
+    'scd_type' = '2'
+)
+COMMENT 'Gold layer store dimension with SCD Type 2';
+```
+
+**Note:** For SCD Type 2, facts join to `dim_store.store_key` (surrogate PK), and filter `WHERE is_current = true` to get the latest version.
+
+### Dimension Table (SCD Type 1)
+
+```sql
+CREATE TABLE dim_product (
+    -- Surrogate key (PRIMARY KEY)
+    product_key STRING NOT NULL 
+        COMMENT 'Surrogate key - PRIMARY KEY',
+    
+    -- Business key (UNIQUE constraint)
+    upc_code STRING NOT NULL 
+        COMMENT 'Universal Product Code - Business key',
+    
+    -- Attributes
+    sku_description STRING,
+    brand STRING,
+    manufacturer STRING,
+    
+    -- Timestamps
+    record_created_timestamp TIMESTAMP,
+    record_updated_timestamp TIMESTAMP,
+    
+    -- PRIMARY KEY on surrogate key
+    CONSTRAINT pk_dim_product PRIMARY KEY (product_key) NOT ENFORCED,
+    
+    -- UNIQUE constraint on business key
+    CONSTRAINT uk_product_upc UNIQUE (upc_code) NOT ENFORCED
+)
+USING DELTA
+CLUSTER BY AUTO
+TBLPROPERTIES (
+    'delta.enableChangeDataFeed' = 'true',
+    'layer' = 'gold',
+    'scd_type' = '1'
+)
+COMMENT 'Gold layer product dimension';
+```
+
+### Date Dimension
+
+```sql
+CREATE TABLE dim_date (
+    -- Surrogate key (PRIMARY KEY, integer format for fast joins)
+    date_key INT NOT NULL 
+        COMMENT 'Integer YYYYMMDD format - PRIMARY KEY',
+    
+    -- Natural date (UNIQUE constraint)
+    date DATE NOT NULL 
+        COMMENT 'Actual date - Business key',
+    
+    -- Attributes
+    year INT,
+    month INT,
+    month_name STRING,
+    day_of_week INT,
+    day_of_week_name STRING,
+    quarter INT,
+    is_weekend BOOLEAN,
+    
+    record_created_timestamp TIMESTAMP,
+    
+    -- PRIMARY KEY on surrogate key
+    CONSTRAINT pk_dim_date PRIMARY KEY (date_key) NOT ENFORCED,
+    
+    -- UNIQUE constraint on natural date
+    CONSTRAINT uk_date_value UNIQUE (date) NOT ENFORCED
+)
+USING DELTA
+CLUSTER BY AUTO
+COMMENT 'Gold layer date dimension';
+```
+
+### Fact Table with Foreign Keys
+
+```sql
+CREATE TABLE fact_sales_daily (
+    -- Surrogate foreign key columns (reference dimension PKs)
+    store_key STRING NOT NULL,
+    product_key STRING NOT NULL,
+    date_key INT NOT NULL,
+    
+    -- Business keys (for readability, not part of PK/FK)
+    store_number STRING NOT NULL,
+    upc_code STRING NOT NULL,
+    transaction_date DATE NOT NULL,
+    
+    -- Measures
+    gross_revenue DOUBLE,
+    net_revenue DOUBLE,
+    units_sold INT,
+    transaction_count INT,
+    
+    -- Timestamps
+    record_created_timestamp TIMESTAMP,
+    record_updated_timestamp TIMESTAMP,
+    
+    -- Composite PRIMARY KEY on surrogate keys (grain of fact table)
+    CONSTRAINT pk_fact_sales_daily 
+        PRIMARY KEY (store_key, product_key, date_key) NOT ENFORCED,
+    
+    -- FOREIGN KEYS to dimension surrogate PKs
+    CONSTRAINT fk_sales_store 
+        FOREIGN KEY (store_key) 
+        REFERENCES dim_store(store_key) NOT ENFORCED,
+    
+    CONSTRAINT fk_sales_product 
+        FOREIGN KEY (product_key) 
+        REFERENCES dim_product(product_key) NOT ENFORCED,
+    
+    CONSTRAINT fk_sales_date 
+        FOREIGN KEY (date_key) 
+        REFERENCES dim_date(date_key) NOT ENFORCED
+)
+USING DELTA
+CLUSTER BY AUTO
+TBLPROPERTIES (
+    'delta.enableChangeDataFeed' = 'true',
+    'layer' = 'gold'
+)
+COMMENT 'Gold layer daily sales fact table';
+```
+
+**Key Points:**
+- Facts have **surrogate FKs** (store_key, product_key, date_key) for proper relationships
+- Business keys (store_number, upc_code, transaction_date) **preserved for readability**
+- All FKs reference **surrogate PKs** in dimensions (Databricks requirement)
+- Fast integer joins with date_key vs date comparisons
+
+## Implementation Pattern in Python
+
+### Embed Constraints in Table Creation Script
+
+```python
+def add_primary_and_foreign_keys(spark: SparkSession, catalog: str, schema: str):
+    """Add PRIMARY KEY and FOREIGN KEY constraints to all Gold tables.
+    
+    Strategy: Define PKs on surrogate keys (proper dimensional modeling).
+    Facts reference dimension surrogate keys via FK constraints.
+    """
+    print("\nADDING PRIMARY KEY AND FOREIGN KEY CONSTRAINTS")
+    
+    # Drop existing constraints for idempotency
+    constraint_map = {
+        "dim_store": ["pk_dim_store", "fk_sales_store", "fk_inventory_store"],
+        "dim_product": ["pk_dim_product", "uk_product_upc", "fk_sales_product", "fk_inventory_product"],
+        "dim_date": ["pk_dim_date", "uk_date_value", "fk_sales_date"],
+        "fact_sales_daily": ["pk_fact_sales_daily", "fk_sales_store", "fk_sales_product", "fk_sales_date"],
+        "fact_inventory_snapshot": ["pk_fact_inventory_snapshot", "fk_inventory_store", "fk_inventory_product"]
+    }
+    
+    for table, constraints in constraint_map.items():
+        for constraint_name in constraints:
+            try:
+                spark.sql(f"ALTER TABLE {catalog}.{schema}.{table} DROP CONSTRAINT IF EXISTS {constraint_name}")
+            except Exception:
+                pass
+    
+    # Add Primary Keys on surrogate keys
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{schema}.dim_store
+        ADD CONSTRAINT pk_dim_store PRIMARY KEY (store_key) NOT ENFORCED
+    """)
+    
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{schema}.dim_product
+        ADD CONSTRAINT pk_dim_product PRIMARY KEY (product_key) NOT ENFORCED
+    """)
+    
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{schema}.dim_date
+        ADD CONSTRAINT pk_dim_date PRIMARY KEY (date_key) NOT ENFORCED
+    """)
+    
+    # Add UNIQUE constraints on business keys
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{schema}.dim_product
+        ADD CONSTRAINT uk_product_upc UNIQUE (upc_code) NOT ENFORCED
+    """)
+    
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{schema}.dim_date
+        ADD CONSTRAINT uk_date_value UNIQUE (date) NOT ENFORCED
+    """)
+    
+    # Add Composite PKs on facts (surrogate keys)
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{schema}.fact_sales_daily
+        ADD CONSTRAINT pk_fact_sales_daily 
+        PRIMARY KEY (store_key, product_key, date_key) NOT ENFORCED
+    """)
+    
+    # Add Foreign Keys to surrogate PKs
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{schema}.fact_sales_daily
+        ADD CONSTRAINT fk_sales_store 
+        FOREIGN KEY (store_key) 
+        REFERENCES {catalog}.{schema}.dim_store(store_key) NOT ENFORCED
+    """)
+    
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{schema}.fact_sales_daily
+        ADD CONSTRAINT fk_sales_product 
+        FOREIGN KEY (product_key) 
+        REFERENCES {catalog}.{schema}.dim_product(product_key) NOT ENFORCED
+    """)
+    
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{schema}.fact_sales_daily
+        ADD CONSTRAINT fk_sales_date 
+        FOREIGN KEY (date_key) 
+        REFERENCES {catalog}.{schema}.dim_date(date_key) NOT ENFORCED
+    """)
+    
+    print("✅ All constraints added successfully!")
+    print("  • PKs on surrogate keys (store_key, product_key, date_key)")
+    print("  • UNIQUE constraints on business keys (upc_code, date)")
+    print("  • FKs reference surrogate PKs")
+```
+
+## Benefits of NOT ENFORCED Constraints
+
+| Benefit | Description |
+|---------|-------------|
+| **Zero Runtime Overhead** | Constraints are not validated at write time |
+| **Unity Catalog Metadata** | Relationships documented in UC for lineage |
+| **Query Optimization** | Optimizer leverages PK/FK metadata for better plans |
+| **BI Tool Discovery** | Tools like Tableau/Power BI auto-discover relationships |
+| **Flexible Data Loading** | Late-arriving dimensions don't cause load failures |
+
+## Validation Checklist
+
+When implementing constraints:
+- [ ] All surrogate key columns are `NOT NULL`
+- [ ] PKs defined on surrogate keys (proper dimensional modeling)
+- [ ] FKs reference surrogate PK columns exactly
+- [ ] Facts have surrogate FK columns (store_key, product_key, date_key)
+- [ ] Business keys have UNIQUE constraints (where applicable)
+- [ ] All constraints include `NOT ENFORCED`
+- [ ] Constraint names are descriptive (e.g., `pk_dim_store`, `uk_product_upc`, `fk_sales_store`)
+- [ ] Drop existing constraints before adding (idempotency)
+- [ ] Constraints embedded in table creation script
+- [ ] Facts join to dimensions via surrogate keys
+- [ ] Business keys preserved in facts for readability
+
+## Common Mistakes to Avoid
+
+### ❌ Mistake 1: PK on business key, facts without surrogate keys
+```sql
+-- This prevents proper surrogate key usage
+CREATE TABLE dim_store (
+    store_key STRING NOT NULL,
+    store_number STRING NOT NULL PRIMARY KEY,  -- ❌ Business key as PK
+    ...
+)
+
+CREATE TABLE fact_sales (
+    store_number STRING NOT NULL,  -- ❌ No surrogate key
+    ...
+    PRIMARY KEY (store_number, upc_code, date) NOT ENFORCED
+)
+```
+
+### ❌ Mistake 2: Nullable surrogate key
+```sql
+-- Cannot be used as PK
+product_key STRING COMMENT 'Surrogate key'  -- ❌ Nullable
+```
+
+### ❌ Mistake 3: FK references non-PK column
+```sql
+-- This fails even with NOT ENFORCED
+FOREIGN KEY (store_number) REFERENCES dim_store(store_number)  -- ❌ Not the PK
+```
+
+### ✅ Correct Pattern
+```sql
+-- Surrogate key as NOT NULL and PK
+CREATE TABLE dim_store (
+    store_key STRING NOT NULL,
+    store_number STRING NOT NULL,
+    ...
+    CONSTRAINT pk_dim_store PRIMARY KEY (store_key) NOT ENFORCED
+)
+
+-- Fact with surrogate FK
+CREATE TABLE fact_sales (
+    store_key STRING NOT NULL,  -- ✅ Surrogate FK
+    store_number STRING NOT NULL,  -- Business key for readability
+    ...
+    CONSTRAINT pk_fact_sales PRIMARY KEY (store_key, product_key, date_key) NOT ENFORCED,
+    CONSTRAINT fk_sales_store FOREIGN KEY (store_key) 
+        REFERENCES dim_store(store_key) NOT ENFORCED
+)
+```
+
+## Gold Table Setup Error Prevention Patterns (Production Learnings)
+
+**Rule Improvement Date:** November 22, 2025  
+**Trigger:** 10+ critical errors during Gold layer setup deployment  
+**Impact:** Reduced troubleshooting time from 2+ hours to <30 minutes with these patterns
+
+This section documents production-hardened patterns discovered during Gold table deployment, preventing common constraint application errors.
+
+### Critical Pattern 1: Never Define FK Constraints Inline in Table DDL
+
+**Problem:** Foreign key constraints defined inline during table creation fail when referenced dimension tables don't have their PRIMARY KEYs defined yet.
+
+**Error Message:**
+```
+Table `catalog.schema.dim_date` does not have a primary key constraint.
+```
+
+**❌ WRONG: Inline FK constraints in CREATE TABLE**
+```python
+def create_fact_pipeline_update(spark, catalog, gold_schema):
+    ddl = f"""
+    CREATE OR REPLACE TABLE {catalog}.{gold_schema}.fact_pipeline_update (
+      pipeline_update_key STRING NOT NULL,
+      pipeline_key STRING NOT NULL,
+      date_key INT NOT NULL,
+      
+      -- ❌ WRONG: FK constraints defined inline during table creation
+      CONSTRAINT pk_fact_pipeline_update PRIMARY KEY (pipeline_update_key) NOT ENFORCED,
+      CONSTRAINT fk_pipeline_update_pipeline FOREIGN KEY (pipeline_key) 
+        REFERENCES {catalog}.{gold_schema}.dim_pipeline(pipeline_key) NOT ENFORCED,
+      CONSTRAINT fk_pipeline_update_date FOREIGN KEY (date_key) 
+        REFERENCES {catalog}.{gold_schema}.dim_date(date_key) NOT ENFORCED
+    )
+    """
+    spark.sql(ddl)
+```
+
+**Root Cause:** When fact tables are created, dimension table PRIMARY KEYs may not exist yet. FK constraints require PKs to exist first (even with NOT ENFORCED).
+
+**✅ CORRECT: Define PKs inline, apply FKs later via ALTER TABLE**
+```python
+# Step 1: Table creation with PK only (no FKs)
+def create_fact_pipeline_update(spark, catalog, gold_schema):
+    ddl = f"""
+    CREATE OR REPLACE TABLE {catalog}.{gold_schema}.fact_pipeline_update (
+      pipeline_update_key STRING NOT NULL,
+      pipeline_key STRING NOT NULL,
+      date_key INT NOT NULL,
+      
+      -- ✅ CORRECT: Only PK defined inline
+      CONSTRAINT pk_fact_pipeline_update PRIMARY KEY (pipeline_update_key) NOT ENFORCED
+    )
+    """
+    spark.sql(ddl)
+
+# Step 2: Constraint application after all tables exist (separate script)
+def add_foreign_keys(spark, catalog, gold_schema):
+    """Apply all FKs after all dimension PKs exist."""
+    
+    # Ensure dim_date PK exists first
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{gold_schema}.dim_date
+        ADD CONSTRAINT pk_dim_date PRIMARY KEY (date_key) NOT ENFORCED
+    """)
+    
+    # Now safe to add FK
+    spark.sql(f"""
+        ALTER TABLE {catalog}.{gold_schema}.fact_pipeline_update
+        ADD CONSTRAINT fk_pipeline_update_date 
+        FOREIGN KEY (date_key) 
+        REFERENCES {catalog}.{gold_schema}.dim_date(date_key) NOT ENFORCED
+    """)
+```
+
+**Task Dependency Pattern:**
+```yaml
+# resources/gold/gold_setup_job.yml
+tasks:
+  # Step 1: Create all dimension tables (with inline PKs)
+  - task_key: setup_compute_dimensions
+    notebook_task:
+      notebook_path: ../../src/gold/setup/compute_dimensions.py
+  
+  # Step 2: Create dim_date (must be before facts that reference it)
+  - task_key: setup_dim_date
+    depends_on:
+      - task_key: setup_compute_dimensions
+    notebook_task:
+      notebook_path: ../../src/gold/setup/reference.py
+  
+  # Step 3: Create fact tables (with inline PKs only, no FKs)
+  - task_key: setup_compute_facts
+    depends_on:
+      - task_key: setup_dim_date
+    notebook_task:
+      notebook_path: ../../src/gold/setup/compute_facts.py
+  
+  # Step 4: Apply ALL FKs after all tables exist
+  - task_key: add_all_constraints
+    depends_on:
+      - task_key: setup_compute_facts
+    notebook_task:
+      notebook_path: ../../src/gold/setup/constraints.py
+```
+
+**Key Principles:**
+1. ✅ **Inline PKs are safe** - Define PRIMARY KEY constraints directly in CREATE TABLE
+2. ❌ **Inline FKs fail** - Never define FOREIGN KEY constraints in CREATE TABLE
+3. ✅ **Separate constraint script** - Create dedicated `constraints.py` to apply all FKs after tables exist
+4. ✅ **Dependency order matters** - Reference tables (dims) before fact tables, constraints last
+
+---
+
+### Critical Pattern 2: DATE Type Casting from DATE_TRUNC
+
+**Problem:** `DATE_TRUNC()` returns TIMESTAMP type, but dimension tables expect DATE type, causing schema merge failures.
+
+**Error Message:**
+```
+[DELTA_FAILED_TO_MERGE_FIELDS] Failed to merge fields 'month_start_date' and 'month_start_date'.
+```
+
+**❌ WRONG: DATE_TRUNC without casting**
+```python
+dim_date_df = (
+    dates_df
+    # ❌ Returns TIMESTAMP, not DATE
+    .withColumn("month_start_date", expr("DATE_TRUNC('MONTH', date)"))
+    .withColumn("quarter_start_date", expr("DATE_TRUNC('QUARTER', date)"))
+    .withColumn("year_start_date", expr("DATE_TRUNC('YEAR', date)"))
+)
+
+# Table expects DATE type
+CREATE TABLE dim_date (
+  date DATE NOT NULL,
+  month_start_date DATE NOT NULL,  -- ❌ Type mismatch!
+  ...
+)
+```
+
+**✅ CORRECT: Explicit CAST to DATE**
+```python
+dim_date_df = (
+    dates_df
+    # ✅ Explicitly cast to DATE type
+    .withColumn("month_start_date", expr("CAST(DATE_TRUNC('MONTH', date) AS DATE)"))
+    .withColumn("quarter_start_date", expr("CAST(DATE_TRUNC('QUARTER', date) AS DATE)"))
+    .withColumn("year_start_date", expr("CAST(DATE_TRUNC('YEAR', date) AS DATE)"))
+    .withColumn("quarter_end_date", expr("CAST(LAST_DAY(ADD_MONTHS(DATE_TRUNC('QUARTER', date), 2)) AS DATE)"))
+)
+```
+
+**Date Range Generation Pattern:**
+```python
+from pyspark.sql.types import StructType, StructField, DateType
+from datetime import datetime, timedelta
+
+def generate_date_range(spark, start_year, end_year):
+    """Generate date range with explicit DATE schema."""
+    # ✅ Convert to date objects (not datetime)
+    start_date = datetime(start_year, 1, 1).date()
+    end_date = datetime(end_year, 12, 31).date()
+    
+    date_range = []
+    current_date = start_date
+    while current_date <= end_date:
+        date_range.append((current_date,))
+        current_date += timedelta(days=1)
+    
+    # ✅ Explicit DATE schema prevents type issues
+    schema = StructType([StructField("date", DateType(), nullable=False)])
+    df = spark.createDataFrame(date_range, schema=schema)
+    return df
+```
+
+**Common DATE_TRUNC Operations Requiring Casting:**
+```python
+# Month boundaries
+.withColumn("month_start_date", expr("CAST(DATE_TRUNC('MONTH', date) AS DATE)"))
+.withColumn("month_end_date", last_day("date"))  # ✅ last_day() returns DATE natively
+
+# Quarter boundaries  
+.withColumn("quarter_start_date", expr("CAST(DATE_TRUNC('QUARTER', date) AS DATE)"))
+.withColumn("quarter_end_date", expr("CAST(LAST_DAY(ADD_MONTHS(DATE_TRUNC('QUARTER', date), 2)) AS DATE)"))
+
+# Year boundaries
+.withColumn("year_start_date", expr("CAST(DATE_TRUNC('YEAR', date) AS DATE)"))
+.withColumn("year_end_date", expr("CAST(ADD_MONTHS(DATE_TRUNC('YEAR', date), 12) - INTERVAL 1 DAY AS DATE)"))
+```
+
+**Rule:** Always `CAST(DATE_TRUNC(...) AS DATE)` when populating DATE columns.
+
+---
+
+### Critical Pattern 3: Avoid Module Imports in Databricks Notebooks
+
+**Problem:** Using `sys.path.append()` and importing helper modules fails in Databricks serverless environments.
+
+**Error Message:**
+```
+ModuleNotFoundError: No module named 'constraint_manager'
+```
+
+**❌ WRONG: Separate module with sys.path import**
+```python
+# src/gold/shared/constraint_manager.py (separate module)
+def add_primary_key(spark, catalog, schema, table_name, pk_columns):
+    """Add PK constraint."""
+    # ... implementation
+
+# src/gold/setup/constraints.py
+import sys
+sys.path.append("../gold_shared")  # ❌ Doesn't work in serverless
+from constraint_manager import add_primary_key  # ❌ ModuleNotFoundError
+```
+
+**✅ CORRECT: Inline helper functions**
+```python
+# src/gold/setup/constraints.py - All functions inline
+from pyspark.sql import SparkSession
+from typing import List, Dict
+
+def add_primary_key(spark, catalog, schema, table_name, pk_columns, constraint_name=None):
+    """Add PRIMARY KEY constraint to table."""
+    fqn = f"{catalog}.{schema}.{table_name}"
+    
+    if constraint_name is None:
+        constraint_name = f"pk_{table_name}"
+    
+    pk_cols = ", ".join(pk_columns)
+    spark.sql(f"""
+        ALTER TABLE {fqn}
+        ADD CONSTRAINT {constraint_name} PRIMARY KEY ({pk_cols}) NOT ENFORCED
+    """)
+    print(f"  ✓ Added PK: {constraint_name} on {table_name}({pk_cols})")
+
+def add_foreign_key(spark, catalog, schema, table_name, fk_columns, 
+                    referenced_table, referenced_columns, constraint_name=None):
+    """Add FOREIGN KEY constraint to table."""
+    fqn = f"{catalog}.{schema}.{table_name}"
+    ref_fqn = f"{catalog}.{schema}.{referenced_table}"
+    
+    if constraint_name is None:
+        constraint_name = f"fk_{table_name}_{referenced_table}"
+    
+    fk_cols = ", ".join(fk_columns)
+    ref_cols = ", ".join(referenced_columns)
+    
+    spark.sql(f"""
+        ALTER TABLE {fqn}
+        ADD CONSTRAINT {constraint_name}
+        FOREIGN KEY ({fk_cols})
+        REFERENCES {ref_fqn}({ref_cols}) NOT ENFORCED
+    """)
+    print(f"  ✓ Added FK: {constraint_name} ({table_name}.{fk_cols} → {referenced_table}.{ref_cols})")
+
+# Main constraint application logic
+def main():
+    catalog, gold_schema = get_parameters()
+    spark = SparkSession.builder.getOrCreate()
+    
+    # Apply constraints using inlined functions
+    add_primary_key(spark, catalog, gold_schema, "dim_date", ["date_key"])
+    add_foreign_key(spark, catalog, gold_schema, "fact_sales", ["date_key"], 
+                    "dim_date", ["date_key"])
+```
+
+**Alternative: Pure Python Module (No Notebook Header)**
+```python
+# src/gold/shared/constraint_helpers.py - Pure Python file (no "# Databricks notebook source")
+"""Pure Python module for constraint helpers - importable after restartPython()."""
+
+def add_primary_key(spark, catalog, schema, table_name, pk_columns):
+    # ... implementation
+
+# src/gold/setup/constraints.py  
+# Databricks notebook source
+
+from gold.shared.constraint_helpers import add_primary_key  # ✅ Works if pure Python
+```
+
+**Rule:** Inline helper functions in constraint scripts OR use pure Python files (without notebook header). See [09-databricks-python-imports.mdc](mdc:.cursor/rules/09-databricks-python-imports.mdc) for details.
+
+---
+
+### Critical Pattern 4: Widget Parameter Naming Consistency
+
+**Problem:** Job definitions pass parameters with one name, but notebooks expect different parameter names.
+
+**Error Message:**
+```
+InputWidgetNotDefined: No input widget named 'gold_schema' is defined
+```
+
+**❌ WRONG: Mismatched parameter names**
+```yaml
+# resources/gold/gold_setup_job.yml
+tasks:
+  - task_key: setup_alert_config
+    notebook_task:
+      notebook_path: ../../src/gold/setup/alert_config.py
+      base_parameters:
+        catalog: ${var.catalog}
+        schema: ${var.gold_schema}  # ❌ Passes 'schema'
+```
+
+```python
+# src/gold/setup/alert_config.py
+def get_parameters():
+    catalog = dbutils.widgets.get("catalog")
+    gold_schema = dbutils.widgets.get("gold_schema")  # ❌ Expects 'gold_schema'
+    return catalog, gold_schema
+```
+
+**✅ CORRECT: Consistent parameter names**
+```yaml
+# Option 1: Use consistent 'gold_schema' everywhere
+base_parameters:
+  catalog: ${var.catalog}
+  gold_schema: ${var.gold_schema}  # ✅ Matches script
+```
+
+```python
+def get_parameters():
+    catalog = dbutils.widgets.get("catalog")
+    gold_schema = dbutils.widgets.get("gold_schema")  # ✅ Matches YAML
+    return catalog, gold_schema
+```
+
+**OR**
+
+```yaml
+# Option 2: Use 'schema' everywhere
+base_parameters:
+  catalog: ${var.catalog}
+  schema: ${var.gold_schema}  # ✅ Simple name
+```
+
+```python
+def get_parameters():
+    catalog = dbutils.widgets.get("catalog")
+    schema = dbutils.widgets.get("schema")  # ✅ Matches YAML
+    return catalog, schema
+```
+
+**Standardization Pattern:**
+```python
+# Recommended: Use layer-specific parameter names
+# Bronze layer
+bronze_schema = dbutils.widgets.get("bronze_schema")
+
+# Silver layer  
+silver_schema = dbutils.widgets.get("silver_schema")
+
+# Gold layer
+gold_schema = dbutils.widgets.get("gold_schema")
+
+# ✅ Explicit, no ambiguity about which layer
+```
+
+**Validation Checklist:**
+- [ ] Job YAML `base_parameters` keys match script `dbutils.widgets.get()` names exactly
+- [ ] Use layer-specific names (`bronze_schema`, `silver_schema`, `gold_schema`) for clarity
+- [ ] Test standalone job execution before adding to orchestrator
+- [ ] Document parameter contracts in script docstrings
+
+**Rule:** Widget parameter names in job YAML must EXACTLY match `dbutils.widgets.get()` calls in notebooks.
+
+---
+
+### Production Deployment Checklist for Gold Tables with Constraints
+
+Use this checklist to prevent the 10+ errors encountered during production Gold setup:
+
+**Table Creation Phase:**
+- [ ] All dimension tables define PRIMARY KEY inline in CREATE TABLE
+- [ ] **NO** fact tables define FOREIGN KEY inline in CREATE TABLE
+- [ ] Date columns use explicit `CAST(DATE_TRUNC(...) AS DATE)` 
+- [ ] Date range generation uses explicit `DateType()` schema
+- [ ] Reference dimension (dim_date) created before facts that reference it
+- [ ] No duplicate `main()` functions from copy-paste
+- [ ] Helper functions inlined OR in pure Python modules (no notebook header)
+
+**Constraint Application Phase:**
+- [ ] Separate `constraints.py` script applies ALL FKs via ALTER TABLE
+- [ ] Constraint script runs AFTER all table creation tasks
+- [ ] Primary keys applied to dimensions before foreign keys applied to facts
+- [ ] Each FK references an existing PK column
+- [ ] Constraint names are descriptive (e.g., `pk_dim_date`, `fk_sales_date`)
+
+**Job Configuration Phase:**
+- [ ] Task dependencies ensure correct execution order (dims → dim_date → facts → constraints)
+- [ ] Widget parameter names match between YAML `base_parameters` and `dbutils.widgets.get()`
+- [ ] Layer-specific parameter names used (`bronze_schema`, `silver_schema`, `gold_schema`)
+- [ ] Standalone job tested successfully before adding to orchestrator
+- [ ] No references to non-existent tasks in `depends_on`
+
+**Validation Phase:**
+- [ ] Run atomic jobs individually first (e.g., `gold_setup_job`)
+- [ ] Check for schema type mismatches in error logs
+- [ ] Verify constraint application succeeded (query `INFORMATION_SCHEMA.TABLE_CONSTRAINTS`)
+- [ ] Test FK relationships work in BI tools
+- [ ] Verify orchestrator calls jobs correctly (not duplicate inline logic)
+
+---
+
+## Design Philosophy
+
+### Proper Dimensional Modeling
+
+Follow Kimball dimensional modeling best practices:
+- ✅ **Surrogate keys as PRIMARY KEYS** (unique, auto-generated)
+- ✅ **Facts reference surrogate PKs** (proper FK relationships)
+- ✅ **Business keys have UNIQUE constraints** (alternate lookups)
+- ✅ **Business keys preserved in facts** (human readability)
+- ✅ **SCD Type 2 works correctly** (store_key unique per version)
+
+### Surrogate Keys Provide Benefits
+
+With PKs on surrogate keys:
+- ✅ **Fast joins**: Integer date_key vs date comparisons
+- ✅ **SCD Type 2**: store_key uniquely identifies each version
+- ✅ **Stable identifiers**: Surrogate keys don't change
+- ✅ **Query optimization**: Optimizer leverages PK/FK metadata
+- ✅ **BI tool integration**: Proper relationships for Tableau/Power BI
+
+## References
+
+- [Unity Catalog Constraints](https://docs.databricks.com/data-governance/unity-catalog/constraints.html)
+- [Primary and Foreign Keys](https://docs.databricks.com/tables/constraints.html#declare-primary-key-and-foreign-key-relationships)
+- [Dimensional Modeling Best Practices](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)
+- [Star Schema Design](https://docs.databricks.com/lakehouse-architecture/medallion.html)
