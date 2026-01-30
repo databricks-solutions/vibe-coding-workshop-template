@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Vibe Coding Workshop Template - Lakebase Table Setup
+# Vibe Coding Workshop - Lakebase Table Setup
 # =============================================================================
 #
 # Creates or recreates the tables in Lakebase using Python/psycopg2.
@@ -23,13 +23,13 @@
 #   - databricks CLI (authenticated)
 #
 # SQL FILES:
-#   db/lakebase/ddl/           - Table definitions (PostgreSQL syntax)
-#   db/lakebase/dml_seed/      - Seed data (will be transformed from Spark to PG)
+#   db/lakehouse/ddl/           - Table definitions (PostgreSQL syntax)
+#   db/lakehouse/dml_seed/      - Seed data (will be transformed from Spark to PG)
 #
 # CONFIGURATION (environment variables):
 #   DATABRICKS_HOST             - Workspace URL (default from app.yaml)
 #   LAKEBASE_INSTANCE_NAME      - Instance name (default: vibe-coding-workshop-lakebase)
-#   APP_NAME                    - App name (default: vibe-coding-workshop-template)
+#   APP_NAME                    - App name (default: vibe-coding-workshop-app)
 #
 # =============================================================================
 
@@ -47,7 +47,7 @@ cd "$PROJECT_ROOT"
 
 # Default configuration
 LAKEBASE_INSTANCE_NAME="${LAKEBASE_INSTANCE_NAME:-vibe-coding-workshop-lakebase}"
-APP_NAME="${APP_NAME:-vibe-coding-workshop-template}"
+APP_NAME="${APP_NAME:-vibe-coding-workshop-app}"
 DATABRICKS_HOST="${DATABRICKS_HOST:-https://e2-demo-field-eng.cloud.databricks.com}"
 
 # Parse arguments
@@ -255,8 +255,8 @@ ACTION = os.environ.get('ACTION', 'create')
 PROJECT_ROOT = os.environ.get('PROJECT_ROOT', '.')
 
 # Paths to SQL files
-DDL_DIR = os.path.join(PROJECT_ROOT, 'db', 'lakebase', 'ddl')
-DML_SEED_DIR = os.path.join(PROJECT_ROOT, 'db', 'lakebase', 'dml_seed')
+DDL_DIR = os.path.join(PROJECT_ROOT, 'db', 'lakehouse', 'ddl')
+DML_SEED_DIR = os.path.join(PROJECT_ROOT, 'db', 'lakehouse', 'dml_seed')
 
 print(f"Action: {ACTION}")
 print()
@@ -473,27 +473,11 @@ except Exception as e:
 # Execute Actions
 # =============================================================================
 
-# Get list of tables from DDL files (extract table names)
-def get_table_names_from_ddl():
-    """Extract table names from DDL files."""
-    tables = []
-    ddl_files = get_ddl_files()
-    for ddl_file in ddl_files:
-        with open(ddl_file, 'r') as f:
-            content = f.read()
-        # Look for CREATE TABLE statements
-        matches = re.findall(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?\$\{schema\}\.(\w+)', content, re.IGNORECASE)
-        tables.extend(matches)
-    return tables
-
 try:
-    tables = get_table_names_from_ddl()
-    if not tables:
-        tables = ['example_table']  # Fallback for empty DDL directory
-    
     if ACTION == "status":
         print("Checking table status...")
         
+        tables = ['usecase_descriptions', 'section_input_prompts', 'sessions']
         for table in tables:
             cursor.execute(f"""
                 SELECT COUNT(*) FROM information_schema.tables 
@@ -510,6 +494,7 @@ try:
     
     elif ACTION == "drop":
         print("Dropping tables...")
+        tables = ['usecase_descriptions', 'section_input_prompts', 'sessions']
         for table in tables:
             cursor.execute(f"DROP TABLE IF EXISTS {SCHEMA}.{table}")
             print(f"  Dropped {table}")
@@ -521,6 +506,7 @@ try:
         
         # Drop existing tables
         print("  Dropping existing tables...")
+        tables = ['usecase_descriptions', 'section_input_prompts', 'sessions']
         for table in tables:
             cursor.execute(f"DROP TABLE IF EXISTS {SCHEMA}.{table}")
         
@@ -548,26 +534,15 @@ try:
         
         # Reset sequences after seeding to avoid duplicate key errors
         print("  Resetting sequences...")
-        # Find tables with SERIAL columns and reset their sequences
-        for table in tables:
+        for table, col in [('usecase_descriptions', 'config_id'), ('section_input_prompts', 'input_id')]:
             try:
-                # Get the first column that might be a serial
-                cursor.execute(f"""
-                    SELECT column_name FROM information_schema.columns 
-                    WHERE table_schema='{SCHEMA}' AND table_name='{table}' 
-                    AND column_default LIKE 'nextval%'
-                    LIMIT 1
-                """)
-                result = cursor.fetchone()
-                if result:
-                    col = result[0]
-                    cursor.execute(f"SELECT MAX({col}) FROM {SCHEMA}.{table}")
-                    max_val = cursor.fetchone()[0] or 0
-                    seq_name = f"{SCHEMA}.{table}_{col}_seq"
-                    cursor.execute(f"SELECT setval('{seq_name}', {max_val + 1}, false)")
-                    print(f"    {table}.{col} sequence reset to {max_val + 1}")
+                cursor.execute(f"SELECT MAX({col}) FROM {SCHEMA}.{table}")
+                max_val = cursor.fetchone()[0] or 0
+                seq_name = f"{SCHEMA}.{table}_{col}_seq"
+                cursor.execute(f"SELECT setval('{seq_name}', {max_val + 1}, false)")
+                print(f"    {table}.{col} sequence reset to {max_val + 1}")
             except Exception as e:
-                pass  # Sequence might not exist or table might be empty
+                print(f"    (sequence for {table}.{col} not found or already correct)")
         
         print()
         print("✓ Tables recreated and seeded successfully")
@@ -590,18 +565,12 @@ try:
             print(f"({count} statements)")
         
         # Check if tables need seeding
-        needs_seed = False
-        for table in tables:
-            try:
-                cursor.execute(f"SELECT COUNT(*) FROM {SCHEMA}.{table}")
-                count = cursor.fetchone()[0]
-                if count == 0:
-                    needs_seed = True
-                    break
-            except:
-                pass
+        cursor.execute(f"SELECT COUNT(*) FROM {SCHEMA}.usecase_descriptions")
+        uc_count = cursor.fetchone()[0]
+        cursor.execute(f"SELECT COUNT(*) FROM {SCHEMA}.section_input_prompts")
+        sip_count = cursor.fetchone()[0]
         
-        if needs_seed:
+        if uc_count == 0 or sip_count == 0:
             print(f"  Executing DML seed from {DML_SEED_DIR}/...")
             dml_files = get_dml_seed_files()
             for dml_file in dml_files:
@@ -610,28 +579,19 @@ try:
                 count = execute_sql_file(cursor, dml_file, SCHEMA, ignore_errors=True)
                 print(f"({count} statements)")
             
-            # Reset sequences after seeding
+            # Reset sequences after seeding to avoid duplicate key errors
             print("  Resetting sequences...")
-            for table in tables:
+            for table, col in [('usecase_descriptions', 'config_id'), ('section_input_prompts', 'input_id')]:
                 try:
-                    cursor.execute(f"""
-                        SELECT column_name FROM information_schema.columns 
-                        WHERE table_schema='{SCHEMA}' AND table_name='{table}' 
-                        AND column_default LIKE 'nextval%'
-                        LIMIT 1
-                    """)
-                    result = cursor.fetchone()
-                    if result:
-                        col = result[0]
-                        cursor.execute(f"SELECT MAX({col}) FROM {SCHEMA}.{table}")
-                        max_val = cursor.fetchone()[0] or 0
-                        seq_name = f"{SCHEMA}.{table}_{col}_seq"
-                        cursor.execute(f"SELECT setval('{seq_name}', {max_val + 1}, false)")
-                        print(f"    {table}.{col} sequence reset to {max_val + 1}")
+                    cursor.execute(f"SELECT MAX({col}) FROM {SCHEMA}.{table}")
+                    max_val = cursor.fetchone()[0] or 0
+                    seq_name = f"{SCHEMA}.{table}_{col}_seq"
+                    cursor.execute(f"SELECT setval('{seq_name}', {max_val + 1}, false)")
+                    print(f"    {table}.{col} sequence reset to {max_val + 1}")
                 except Exception as e:
-                    pass
+                    print(f"    (sequence for {table}.{col} not found or already correct)")
         else:
-            print("  Tables already have data, skipping seed")
+            print(f"  Tables already have data (usecase: {uc_count}, section_prompts: {sip_count})")
         
         print()
         print("✓ Tables ready")
