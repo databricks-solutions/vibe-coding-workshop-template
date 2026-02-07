@@ -1,0 +1,48 @@
+# =============================================================================
+# Skill: Genie Space Search
+# =============================================================================
+# Sends a rewritten query to Databricks Genie Space and parses the response
+# into structured accommodation results.
+#
+skill_id: genie_search
+name: "Genie Space Search"
+description: >
+  Queries Databricks Genie Space with a natural language query to find
+  accommodation recommendations backed by enterprise data.
+version: 1
+type: genie_query
+
+config:
+  space_id: "${GENIE_SPACE_ID}"
+  timeout_seconds: 60
+  max_retries: 1
+
+input_schema:
+  - name: query_text
+    type: string
+    required: true
+    description: "The query to send to Genie (ideally rewritten by LLM)"
+
+output_schema:
+  - name: answer_text
+    type: string
+    required: false
+    description: "Natural language answer from Genie"
+  - name: items
+    type: list
+    required: false
+    description: "List of structured result items (hotels, listings, etc.)"
+  - name: genie_status
+    type: string
+    required: true
+    description: "Status of the Genie query: ok, no_answer, error"
+
+fallback:
+  strategy: skip
+
+tags:
+  - search
+  - genie
+  - primary
+
+mock_enabled: true

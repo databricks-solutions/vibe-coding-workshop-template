@@ -1,0 +1,73 @@
+# =============================================================================
+# Skill: Web Result Summarizer
+# =============================================================================
+# Uses an LLM to summarize web search results into a helpful answer
+# and ranked suggestions.
+#
+skill_id: web_result_summarizer
+name: "Web Result Summarizer"
+description: >
+  Takes raw web search snippets and uses an LLM to produce a concise summary
+  and ranked hotel/accommodation suggestions.
+version: 1
+type: llm_call
+
+config:
+  endpoint: "${LLM_ENDPOINT_URL}"
+  temperature: 0.3
+  max_tokens: 1024
+  timeout_seconds: 30
+  prompt:
+    source: inline
+    inline_text: |
+      You are a helpful travel assistant. Given web search results about hotels
+      and accommodations, provide a brief summary and ranked suggestions.
+
+      Respond ONLY with valid JSON in this format:
+      {
+          "summary": "A brief 2-3 sentence summary",
+          "suggestions": [
+              {"name": "Hotel name", "reason": "Why it's recommended", "source": "Where you found this"}
+          ]
+      }
+
+      Be concise and only include factual information from the snippets.
+      Do not hallucinate prices or ratings unless explicitly stated
+      in the search results.
+
+input_schema:
+  - name: snippets
+    type: list
+    required: true
+    description: "List of web search result snippets"
+  - name: user_query
+    type: string
+    required: true
+    description: "The original user query for context"
+  - name: preferences
+    type: object
+    required: false
+    description: "User preferences for personalized summary"
+
+output_schema:
+  - name: summary
+    type: string
+    required: true
+    description: "Concise summary of web findings"
+  - name: suggestions
+    type: list
+    required: true
+    description: "Ranked list of hotel/property suggestions"
+
+fallback:
+  strategy: default_value
+  default_value:
+    summary: "Unable to summarize web results at this time."
+    suggestions: []
+
+tags:
+  - search
+  - llm
+  - summarization
+
+mock_enabled: true

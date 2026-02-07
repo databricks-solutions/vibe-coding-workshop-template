@@ -1,0 +1,53 @@
+# =============================================================================
+# Flow: Standard Search (Structured Filters)
+# =============================================================================
+#
+# Simple flow that queries Lakebase with structured filters.
+# This is the baseline search experience using location + dates + guests.
+#
+
+flow_id: standard_search
+name: "Standard Search"
+description: >
+  Structured search flow using location, dates, and guest count
+  to query the Lakebase database directly.
+version: 1
+trigger: "POST /api/search/standard"
+
+steps:
+  # Step 1: Search Lakebase with structured filters
+  - skill: lakebase_search
+    id: search
+    inputs:
+      - field: location
+        reference: "${request.location}"
+      - field: guests
+        reference: "${request.guests}"
+      - field: price_max
+        reference: "${request.filters.maxPrice}"
+      - field: rating_min
+        reference: "${request.filters.rating}"
+      - field: limit
+        value: 20
+
+# Map step outputs to the final API response
+response:
+  - field: results
+    reference: "${search.output.items}"
+  - field: totalResults
+    reference: "${search.output.total_count}"
+    default: 0
+
+# Frontend display configuration
+display:
+  type: page             # Navigate to search results page
+  show_answer: false
+  results_format: cards
+  show_sources: false
+  show_rewritten_query: false
+  show_follow_up: false
+
+tags:
+  - search
+  - standard
+  - structured

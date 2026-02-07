@@ -1,0 +1,118 @@
+# =============================================================================
+# Flow: Assistant Search (Natural Language)
+# =============================================================================
+#
+# This flow replicates the existing hardcoded assistant_search endpoint
+# in a declarative, configurable format.
+#
+# Pipeline:
+#   1. Rewrite query via LLM         → structured, Genie-friendly query
+#   2. Query Genie Space              → get recommendations from enterprise data
+#   3. Web search fallback            → if Genie fails or returns no results
+#   4. Summarize web results via LLM  → if web search was used
+#   5. Extract location hint          → for Lakebase augmentation
+#   6. Lakebase augmentation          → add local DB results if needed
+#
+# IMPORTANT: Results are displayed INLINE in the SearchBar component.
+# Do NOT trigger onSearch() or navigate to SearchResultsPage.
+#
+
+flow_id: assistant_search
+name: "Assistant Search"
+description: >
+  AI-powered natural language search flow using LLM query rewriting,
+  Genie Space, and web search fallback. Displays results inline.
+version: 1
+trigger: "POST /api/search/assistant"
+
+steps:
+  # Step 1: Rewrite the natural language query
+  - skill: query_rewriter
+    id: rewrite
+    inputs:
+      - field: user_query
+        reference: "${request.message}"
+      - field: preferences
+        reference: "${request.preferences}"
+
+  # Step 2: Query Genie Space with the rewritten query
+  - skill: genie_search
+    id: genie
+    inputs:
+      - field: query_text
+        reference: "${rewrite.output.rewritten_query}"
+
+  # Step 3: Web search fallback (only if Genie didn't return "ok")
+  - skill: web_search
+    id: web_fallback
+    condition: '${genie.output.genie_status} != "ok"'
+    inputs:
+      - field: query
+        reference: "${rewrite.output.rewritten_query}"
+      - field: num_results
+        value: 10
+
+  # Step 4: Summarize web results (only if web search succeeded)
+  - skill: web_result_summarizer
+    id: summarize
+    condition: '${web_fallback.output.search_status} == "ok"'
+    inputs:
+      - field: snippets
+        reference: "${web_fallback.output.snippets}"
+      - field: user_query
+        reference: "${request.message}"
+      - field: preferences
+        reference: "${request.preferences}"
+
+  # Step 5: Extract location for Lakebase query
+  - skill: location_extractor
+    id: extract_location
+    inputs:
+      - field: query_text
+        reference: "${rewrite.output.rewritten_query}"
+
+  # Step 6: Lakebase augmentation (only if no results yet from Genie or web)
+  - skill: lakebase_search
+    id: lakebase_augment
+    condition: '${genie.output.genie_status} != "ok"'
+    inputs:
+      - field: location
+        reference: "${extract_location.output.location}"
+      - field: guests
+        value: 2
+      - field: limit
+        value: 5
+
+# Map step outputs to the final API response
+response:
+  - field: rewrittenQuery
+    reference: "${rewrite.output.rewritten_query}"
+  - field: assumptions
+    reference: "${rewrite.output.assumptions}"
+  - field: answer
+    reference: "${genie.output.answer_text}"
+    default: "Here are some options based on your search."
+  - field: genie_items
+    reference: "${genie.output.items}"
+  - field: genie_status
+    reference: "${genie.output.genie_status}"
+  - field: web_summary
+    reference: "${summarize.output.summary}"
+  - field: web_suggestions
+    reference: "${summarize.output.suggestions}"
+  - field: lakebase_items
+    reference: "${lakebase_augment.output.items}"
+
+# Frontend display configuration
+display:
+  type: inline          # Display results inline in SearchBar
+  show_answer: true     # Show the AI-generated answer
+  results_format: cards # Use card layout for results
+  show_sources: true    # Show source badges (Genie, Web, Lakehouse)
+  show_rewritten_query: true  # Show expandable rewritten query
+  show_follow_up: false
+
+tags:
+  - search
+  - assistant
+  - nlp

@@ -1,0 +1,50 @@
+# =============================================================================
+# Agent Skills - Master Registry Configuration
+# =============================================================================
+#
+# This file defines all available skills and flows for the agent framework.
+# Add new skills by creating a folder under skills/ with a manifest.yaml,
+# then listing the folder name here.
+#
+# Add new flows by creating a YAML file under flows/ and listing it here.
+#
+version: 1
+description: "StayBook Agent Skills Registry - Dynamic skills for booking and search"
+
+# Skill folder names (each must contain a manifest.yaml)
+skills:
+  - query_rewriter
+  - genie_search
+  - web_search
+  - web_result_summarizer
+  - lakebase_search
+  - location_extractor
+
+# Flow file names (without .yaml extension)
+flows:
+  - assistant_search
+  - standard_search
+
+# Default flow for the assistant endpoint
+default_flow: assistant_search
+
+# Global settings shared across skills
+settings:
+  mock_mode_env: APP_MOCK_MODE
+  default_timeout_seconds: 60
+  max_query_length: 2000
+  supported_locations:
+    - miami
+    - lake tahoe
+    - austin
+    - san diego
+    - boston
+    - fredericksburg
+    - new york
+    - los angeles
+    - san francisco
+    - seattle
+    - denver
+    - chicago
+    - orlando
+    - las vegas
