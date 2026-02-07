@@ -253,11 +253,11 @@ pytest agent_skills/tests/test_executors.py -v
 
 ## Comparison: Hardcoded vs Dynamic
 
-| Aspect | Current (Hardcoded) | Dynamic (Skills Framework) |
-|--------|---------------------|---------------------------|
-| Adding a skill | Write Python code in `search.py` | Add a YAML manifest |
-| Changing flow order | Modify Python logic | Edit flow YAML |
-| New use case | Copy & modify entire router | Create new skill + flow YAMLs |
-| Prompt updates | Redeploy application | Update in Prompt Registry |
-| Frontend rendering | Skill-specific components | Generic `SkillResultRenderer` |
-| Testing | Mock each service | Mock mode per skill |
+| Aspect | Dynamic (Skills Framework) |
+|--------|---------------------------|
+| Adding a skill | Add a YAML manifest |
+| Changing flow order | Edit flow YAML |
+| New use case |Create new skill + flow YAMLs |
+| Prompt updates |Update in Prompt Registry |
+| Frontend rendering | Generic `SkillResultRenderer` |
+| Testing | Mock mode per skill |
