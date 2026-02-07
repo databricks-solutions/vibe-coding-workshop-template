@@ -251,7 +251,7 @@ pytest agent_skills/tests/test_executors.py -v
 | `WEB_SEARCH_PROVIDER` | Web search provider | `serpapi` |
 | `WEB_SEARCH_API_KEY` | API key for web search | Optional |
 
-## Comparison: Hardcoded vs Dynamic
+## Support new Use cases
 
 | Aspect | Dynamic (Skills Framework) |
 |--------|---------------------------|
