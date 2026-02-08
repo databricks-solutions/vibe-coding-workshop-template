@@ -1,0 +1,135 @@
+# Gold Layer Table Documentation Template
+# Use this template when creating new Gold layer tables
+
+table_name: dim_example  # Replace with actual table name
+catalog: ${catalog}       # Unity Catalog catalog name
+schema: ${schema}         # Schema name
+
+# Table-level documentation
+table_comment: |
+  Gold layer conformed {entity} dimension with {SCD Type}.
+  Business: {Business purpose, history tracking, use cases}.
+  Technical: {SCD implementation details, key strategy, update behavior}.
+
+# Column definitions
+columns:
+  # Surrogate Key Pattern
+  - name: {entity}_key
+    type: STRING
+    nullable: false
+    is_primary_key: true
+    comment: |
+      Surrogate key uniquely identifying each version of a {entity} record.
+      Business: Used for joining fact tables to dimension.
+      Technical: {Hash method} generated from {source columns} to ensure uniqueness across {SCD type} versions.
+
+  # Business Key Pattern
+  - name: {business_key}
+    type: STRING
+    nullable: false
+    is_unique: true
+    comment: |
+      {Natural description} uniquely identifying {entity} in source system.
+      Business: {Business use cases and context}.
+      Technical: {Data type, format, source system, immutability}.
+
+  # SCD Type 2 Fields (for dimensions)
+  - name: effective_from
+    type: TIMESTAMP
+    nullable: false
+    comment: |
+      Start timestamp for SCD Type 2 version validity period.
+      Business: Beginning of time period when this dimension version was active.
+      Technical: TIMESTAMP in UTC, set from source system processed_timestamp, used for time-based joins.
+
+  - name: effective_to
+    type: TIMESTAMP
+    nullable: true
+    comment: |
+      End timestamp for SCD Type 2 version validity period.
+      Business: End of time period when this dimension version was active, NULL indicates current version.
+      Technical: TIMESTAMP in UTC, NULL for current version, set to next version effective_from when superseded.
+
+  - name: is_current
+    type: BOOLEAN
+    nullable: false
+    comment: |
+      Current version indicator for SCD Type 2 dimension.
+      Business: TRUE indicates active/current record, FALSE indicates historical version.
+      Technical: BOOLEAN, default TRUE, used for efficient current version joins (WHERE is_current = true).
+
+  # Measure Pattern (for fact tables)
+  - name: net_revenue
+    type: DECIMAL(18,2)
+    nullable: true
+    comment: |
+      Net revenue after subtracting returns from gross revenue.
+      Business: The actual revenue realized from sales, primary KPI for financial reporting.
+      Technical: gross_revenue - return_amount, represents true daily sales value in USD.
+
+  # Foreign Key Pattern (for fact tables)
+  - name: store_key
+    type: STRING
+    nullable: false
+    is_foreign_key: true
+    references_table: dim_store
+    references_column: store_key
+    comment: |
+      Foreign key referencing dim_store.store_key.
+      Business: Links sales transactions to store location dimension.
+      Technical: References surrogate PK dim_store.store_key for referential integrity.
+
+# Primary Key
+primary_key:
+  - {entity}_key
+
+# Foreign Keys (for fact tables)
+foreign_keys:
+  - name: fk_{table_name}_store
+    columns:
+      - store_key
+    references_table: ${catalog}.${schema}.dim_store
+    references_columns:
+      - store_key
+
+# Table Properties
+table_properties:
+  # Performance
+  delta.enableChangeDataFeed: 'true'
+  delta.enableRowTracking: 'true'
+  delta.enableDeletionVectors: 'true'
+  delta.autoOptimize.autoCompact: 'true'
+  delta.autoOptimize.optimizeWrite: 'true'
+  
+  # Layer and Quality
+  quality: 'gold'
+  layer: 'gold'
+  source_layer: 'silver'
+  source_table: '<silver_source_table>'  # Replace with actual Silver table name
+  
+  # Domain and Classification
+  domain: '<retail|sales|inventory|product>'  # Replace with actual domain
+  entity_type: '<dimension|fact>'  # Replace with actual entity type
+  
+  # Governance
+  contains_pii: '<true|false>'  # Replace with actual PII status
+  data_classification: '<confidential|internal|public>'  # Replace with actual classification
+  business_owner: '<Team Name>'  # Replace with actual business owner
+  technical_owner: 'Data Engineering'
+  
+  # Dimension-specific (if applicable)
+  scd_type: '<1|2>'  # Only for dimensions
+  
+  # Fact-specific (if applicable)
+  grain: '<description of grain>'  # Only for fact tables, e.g., 'daily_store_product'
+  gold_type: '<aggregated|snapshot>'  # Only for fact tables
+
+# Clustering
+cluster_by: AUTO
+
+# Usage Notes
+# 1. Replace all placeholder values ({entity}, {business_key}, etc.) with actual values
+# 2. Remove SCD Type 2 fields if creating SCD Type 1 dimension
+# 3. Remove measure/foreign key patterns if creating dimension table
+# 4. Update table_comment with actual business and technical context
+# 5. Ensure all column comments follow dual-purpose format: [Definition]. Business: [context]. Technical: [details].

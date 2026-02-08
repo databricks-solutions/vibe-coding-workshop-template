@@ -1,0 +1,54 @@
+# Gold Layer Setup Job Template
+#
+# Creates Gold layer tables from YAML schema definitions.
+# Two-task structure: (1) Create tables with PKs, (2) Apply FK constraints.
+#
+# Replace {project} with your project name.
+# Ensure gold_layer_design/yaml/**/*.yaml is synced in databricks.yml.
+
+resources:
+  jobs:
+    gold_setup_job:
+      name: "[${bundle.target}] {Project} Gold Layer - Setup"
+      description: "Creates Gold layer tables from YAML schema definitions"
+
+      # PyYAML dependency required for YAML parsing
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "pyyaml>=6.0"
+
+      tasks:
+        # Task 1: Create all tables from YAMLs
+        - task_key: setup_all_tables
+          environment_key: default
+          notebook_task:
+            notebook_path: ../../src/{project}_gold/setup_tables.py
+            base_parameters:
+              catalog: ${var.catalog}
+              gold_schema: ${var.gold_schema}
+              domain: all  # or specific domain name
+          timeout_seconds: 1800
+
+        # Task 2: Add FK constraints (runs AFTER all PKs exist)
+        - task_key: add_fk_constraints
+          depends_on:
+            - task_key: setup_all_tables
+          environment_key: default
+          notebook_task:
+            notebook_path: ../../src/{project}_gold/add_fk_constraints.py
+            base_parameters:
+              catalog: ${var.catalog}
+              gold_schema: ${var.gold_schema}
+              domain: all
+
+      email_notifications:
+        on_failure:
+          - data-engineering@company.com
+
+      tags:
+        environment: ${bundle.target}
+        layer: gold
+        job_type: setup

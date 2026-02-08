@@ -1,0 +1,74 @@
+# Monitoring Job Template for Databricks Asset Bundles
+#
+# Two-task pattern:
+#   1. setup_monitors: Creates monitors with custom metrics
+#   2. wait_for_initialization: Polls until all monitors are active
+#
+# Variables required in bundle:
+#   var.catalog: Target catalog name
+#   var.gold_schema: Gold layer schema name
+#   var.gold_schema_monitoring: Monitoring output schema (convention: {gold_schema}_monitoring)
+
+resources:
+  jobs:
+    monitoring_setup:
+      name: "${bundle.target}-monitoring-setup"
+      description: "Create and initialize Lakehouse Monitors for Gold layer tables"
+      tags:
+        domain: "monitoring"
+        layer: "gold"
+
+      tasks:
+        - task_key: setup_monitors
+          description: "Create monitors with custom business metrics"
+          notebook_task:
+            notebook_path: src/monitoring/setup_monitors.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.gold_schema}"
+              monitoring_schema: "${var.gold_schema}_monitoring"
+          environment_key: default
+
+        - task_key: wait_for_initialization
+          description: "Wait for all monitors to complete first refresh"
+          depends_on:
+            - task_key: setup_monitors
+          notebook_task:
+            notebook_path: src/monitoring/wait_for_initialization.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.gold_schema}"
+              monitoring_schema: "${var.gold_schema}_monitoring"
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            client: "1"
+
+    monitoring_refresh:
+      name: "${bundle.target}-monitoring-refresh"
+      description: "Scheduled refresh of Lakehouse Monitors"
+      tags:
+        domain: "monitoring"
+        layer: "gold"
+
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"  # Daily at 6 AM
+        timezone_id: "America/New_York"
+        pause_status: UNPAUSED
+
+      tasks:
+        - task_key: refresh_monitors
+          description: "Trigger refresh for all monitored tables"
+          notebook_task:
+            notebook_path: src/monitoring/refresh_monitors.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.gold_schema}"
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            client: "1"

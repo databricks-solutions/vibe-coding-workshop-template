@@ -1,0 +1,32 @@
+# SQL Alert Configuration Template
+# Use this template to define alert rules
+
+alerts:
+  - alert_id: "REV-001-CRIT"
+    alert_name: "Revenue Drop Alert"
+    domain: "revenue"
+    severity: "CRITICAL"
+    alert_description: "Triggers when daily revenue drops below 80% of 7-day average."
+    alert_query: |
+      SELECT 
+          CURRENT_DATE() as alert_date,
+          yesterday_revenue,
+          avg_7d_revenue,
+          ROUND((yesterday_revenue - avg_7d_revenue) / avg_7d_revenue * 100, 1) as pct_change,
+          'CRITICAL: Revenue dropped ' || 
+              ROUND((avg_7d_revenue - yesterday_revenue) / avg_7d_revenue * 100, 1) || 
+              '% below 7-day average' as alert_message
+      FROM ${catalog}.${gold_schema}.fact_booking_daily
+      WHERE yesterday_revenue < avg_7d_revenue * 0.8
+    condition_column: "pct_change"
+    condition_operator: "<"
+    condition_threshold: "-20"
+    aggregation_type: "FIRST"
+    schedule_cron: "0 0 6 * * ?"  # Daily at 6 AM
+    schedule_timezone: "America/Los_Angeles"
+    notification_emails: "finance@company.com,revenue@company.com"
+    notification_slack_channel: "#revenue-alerts"
+    notify_on_ok: true
+    rearm_seconds: 1800
+    is_enabled: true
+    owner: "data-engineering@company.com"

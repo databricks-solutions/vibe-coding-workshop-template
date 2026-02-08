@@ -1,0 +1,158 @@
+# DQX Quality Checks Template (DQX >= 0.12.0)
+# Copy this template and customize for your tables.
+# Reference: https://databrickslabs.github.io/dqx/docs/reference/api/check_funcs/
+
+# ── Null / Empty Checks ──────────────────────────────────────────────
+- name: transaction_id_not_null
+  criticality: error
+  check:
+    function: is_not_null_and_not_empty
+    arguments:
+      column: transaction_id
+  metadata:
+    check_type: completeness
+    layer: silver
+    entity: transactions
+    business_rule: "Transaction ID must be present and non-empty"
+
+# ── Comparison Checks (use 'limit' parameter) ────────────────────────
+- name: non_negative_price
+  criticality: error
+  check:
+    function: is_not_less_than  # column >= limit
+    arguments:
+      column: final_sales_price
+      limit: 0  # int or float (float supported >= 0.12.0)
+  metadata:
+    check_type: validity
+    layer: silver
+    entity: transactions
+    business_rule: "Prices must be non-negative"
+
+# ── Range Checks (use 'min_limit' / 'max_limit') ─────────────────────
+- name: reasonable_quantity
+  criticality: warn
+  check:
+    function: is_in_range  # min_limit <= column <= max_limit
+    arguments:
+      column: quantity_sold
+      min_limit: -50
+      max_limit: 100
+  metadata:
+    check_type: reasonableness
+    layer: silver
+    entity: transactions
+    business_rule: "Quantities outside range are unusual"
+
+# ── Equality Checks (use 'value' parameter, NOT 'limit') ─────────────
+- name: status_is_active
+  criticality: warn
+  check:
+    function: is_equal_to  # column == value (added in 0.9.1)
+    arguments:
+      column: status
+      value: "active"
+  metadata:
+    check_type: validity
+    business_rule: "Expected status is 'active'"
+
+# ── List Membership (use 'allowed' parameter) ────────────────────────
+- name: valid_channel
+  criticality: error
+  check:
+    function: is_in_list
+    arguments:
+      column: sales_channel
+      allowed: ["web", "store", "app", "phone"]
+  metadata:
+    check_type: referential_integrity
+    business_rule: "Channel must be a known value"
+
+# ── SQL Expression (for complex / strict comparisons) ─────────────────
+- name: strict_positive_price
+  criticality: error
+  check:
+    function: sql_expression  # NOT 'sql_expr'
+    arguments:
+      expression: "final_sales_price > 0"
+  metadata:
+    check_type: validity
+    business_rule: "Price must be strictly positive (> 0, not >= 0)"
+
+# ── Regex Pattern Match ──────────────────────────────────────────────
+- name: valid_email_format
+  criticality: warn
+  check:
+    function: regex_match
+    arguments:
+      column: email
+      regex: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+  metadata:
+    check_type: format_validation
+    business_rule: "Email must be in valid format"
+
+# ── Data Freshness (added in 0.8.0) ──────────────────────────────────
+- name: data_not_stale
+  criticality: warn
+  check:
+    function: is_data_fresh
+    arguments:
+      column: updated_timestamp
+      max_age_minutes: 1440  # 24 hours
+  metadata:
+    check_type: freshness
+    business_rule: "Data should not be older than 24 hours"
+
+# ── Date Validation ──────────────────────────────────────────────────
+- name: valid_transaction_date
+  criticality: error
+  check:
+    function: is_valid_date
+    arguments:
+      column: transaction_date
+      date_format: "yyyy-MM-dd"
+  metadata:
+    check_type: format_validation
+    business_rule: "Transaction date must be valid yyyy-MM-dd"
+
+# ── Dataset-Level: Uniqueness ────────────────────────────────────────
+- name: unique_transaction_ids
+  criticality: error
+  check:
+    function: is_unique  # dataset-level, takes 'columns' (list)
+    arguments:
+      columns:
+        - transaction_id
+  metadata:
+    check_type: uniqueness
+    business_rule: "Transaction IDs must be unique"
+
+# ── Dataset-Level: Foreign Key ───────────────────────────────────────
+- name: valid_store_reference
+  criticality: error
+  check:
+    function: foreign_key
+    arguments:
+      columns:
+        - store_id
+      ref_columns:
+        - store_id
+      ref_table: catalog.gold_schema.dim_store
+  metadata:
+    check_type: referential_integrity
+    business_rule: "store_id must exist in dim_store"
+
+# ── Gold Layer: Aggregation Checks ───────────────────────────────────
+- name: non_negative_net_revenue
+  criticality: error
+  check:
+    function: is_not_less_than
+    arguments:
+      column: net_revenue
+      limit: 0
+  metadata:
+    check_type: validity
+    layer: gold
+    entity: fact_sales_daily
+    business_rule: "Net revenue cannot be negative"
+    failure_impact: "Critical - Invalid financial reporting"

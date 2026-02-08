@@ -1,0 +1,57 @@
+# Bronze Layer - Data Generator Job
+#
+# Generates fake data for Bronze tables using Faker.
+# Dimensions are generated first, then facts (to ensure FK integrity).
+#
+# Template Instructions:
+#   1. Replace {project} with your project name
+#   2. Update notebook_path entries to match your project structure
+#   3. Adjust num_* parameters for desired record counts
+#   4. Add more tasks for additional dimension/fact tables
+#
+# Usage:
+#   databricks bundle deploy -t dev
+#   databricks bundle run bronze_data_generator_job -t dev
+
+resources:
+  jobs:
+    bronze_data_generator_job:
+      name: "[${bundle.target}] {Project} Bronze Layer - Generate Data"
+      description: "Generates fake data for Bronze tables using Faker"
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "Faker==22.0.0"
+
+      tasks:
+        # Task 1: Generate dimension data (runs first)
+        - task_key: generate_dimensions
+          environment_key: default
+          notebook_task:
+            notebook_path: ../src/{project}_bronze/generate_dimensions.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.bronze_schema}
+              num_stores: "100"
+              num_products: "50"
+
+        # Task 2: Generate fact data (depends on dimensions for FK integrity)
+        - task_key: generate_facts
+          depends_on:
+            - task_key: generate_dimensions
+          environment_key: default
+          notebook_task:
+            notebook_path: ../src/{project}_bronze/generate_facts.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.bronze_schema}
+              num_transactions: "10000"
+
+      tags:
+        environment: ${bundle.target}
+        layer: bronze
+        job_type: data_generation
+        data_purpose: testing_demo

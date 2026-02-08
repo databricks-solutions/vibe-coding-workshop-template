@@ -1,0 +1,59 @@
+# Metric Views Creation Job
+#
+# Creates metric views from YAML configuration using WITH METRICS LANGUAGE YAML syntax.
+# Supports per-file mode (one YAML per view) and multi-file mode (single YAML with list).
+#
+# Usage:
+#   databricks bundle deploy -t dev
+#   databricks bundle run metric_views_job -t dev
+#
+# Prerequisites:
+#   - Gold layer tables must exist (run gold_setup_job first)
+#   - Metric view YAML files must be synced (see sync section below)
+#
+# CRITICAL: Add YAML sync to databricks.yml:
+#   sync:
+#     include:
+#       - "src/semantic/metric_views/**/*.yaml"
+
+resources:
+  jobs:
+    metric_views_job:
+      name: "${bundle.target}-metric-views-creation"
+
+      tags:
+        environment: "${bundle.target}"
+        layer: "semantic"
+        job_type: "metric_views"
+
+      tasks:
+        - task_key: create_metric_views
+          notebook_task:
+            notebook_path: "../../src/${var.project_name}_semantic/create_metric_views.py"
+            base_parameters:
+              catalog: "${var.catalog}"
+              gold_schema: "${var.gold_schema}"
+              yaml_dir: "src/semantic/metric_views"
+
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "pyyaml>=6.0"
+
+      email_notifications:
+        on_failure:
+          - "${var.notification_email}"
+
+      timeout_seconds: 1800
+
+      # Schedule: Uncomment and configure for production
+      # Metric views typically only need recreation when YAML definitions change.
+      # Consider running on-demand rather than on a schedule.
+      # schedule:
+      #   quartz_cron_expression: "0 0 6 * * ?"
+      #   timezone_id: "America/Los_Angeles"
+      #   pause_status: "PAUSED"

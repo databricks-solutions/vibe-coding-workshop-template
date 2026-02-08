@@ -1,0 +1,53 @@
+version: "1.1"
+comment: >
+  PURPOSE: [One-line description of what this metric view provides]
+  
+  BEST FOR: [Question 1] | [Question 2] | [Question 3] | [Question 4]
+  
+  NOT FOR: [What this view shouldn't be used for] (use [correct_asset] instead)
+  
+  DIMENSIONS: [dim1], [dim2], [dim3], [dim4], [dim5]
+  
+  MEASURES: [measure1], [measure2], [measure3], [measure4], [measure5]
+  
+  SOURCE: [fact_or_dim_table] ([domain] domain)
+  
+  JOINS: [dim_table1] ([description]), [dim_table2] ([description])
+  
+  NOTE: [Any critical caveats, limitations, or important context]
+
+source: ${catalog}.${gold_schema}.<fact_table>
+
+# Optional: Join to dimension tables
+joins:
+  - name: <dim_table_alias>
+    source: ${catalog}.${gold_schema}.<dim_table>
+    'on': source.<fk> = <dim_table_alias>.<pk> AND <dim_table_alias>.is_current = true
+
+dimensions:
+  - name: <dimension_name>
+    expr: source.<column>
+    comment: <Business description for LLM understanding>
+    display_name: <User-Friendly Name>
+    synonyms:
+      - <alternative name 1>
+      - <alternative name 2>
+      - <alternative name 3>
+
+measures:
+  - name: <measure_name>
+    expr: SUM(source.<column>)
+    comment: <Business description and calculation logic>
+    display_name: <User-Friendly Name>
+    format:
+      type: currency  # or number, percentage
+      currency_code: USD
+      decimal_places:
+        type: exact  # or all
+        places: 2
+      hide_group_separator: false
+      abbreviation: compact
+    synonyms:
+      - <alternative name 1>
+      - <alternative name 2>
+      - <alternative name 3>

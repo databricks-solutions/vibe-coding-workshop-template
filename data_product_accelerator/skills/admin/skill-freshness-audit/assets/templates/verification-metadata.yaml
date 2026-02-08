@@ -1,0 +1,53 @@
+# Verification Metadata Template
+# Copy these fields into any SKILL.md frontmatter to enable freshness auditing.
+#
+# Usage:
+#   1. Add these fields to your skill's metadata section
+#   2. Set volatility based on how often the underlying APIs change
+#   3. Add verification_sources for skills with external documentation links
+#   4. Update last_verified each time the skill is verified against docs
+
+# --- Add to frontmatter metadata section ---
+
+metadata:
+  # ISO date when skill was last verified against official documentation
+  # Update this even if no changes were needed after verification
+  last_verified: "2026-02-07"
+
+  # How often the underlying APIs/patterns change
+  # high   = APIs change frequently (GenAI, MLflow 3.x, Genie APIs) → stale after 30 days
+  # medium = Features evolve but core stable (DLT, monitoring, DABs) → stale after 90 days
+  # low    = Stable patterns, rarely change (ERDs, naming, merge)    → stale after 180 days
+  volatility: medium
+
+  # URLs to verify skill content against (optional but recommended)
+  # Only include for skills that reference specific external documentation
+  verification_sources:
+    - url: "https://docs.databricks.com/path/to/relevant/page"
+      check_for: "Brief description of what to verify (e.g., API signature, YAML syntax)"
+    - url: "https://mlflow.org/docs/latest/path/to/page"
+      check_for: "Brief description of what to verify"
+
+# --- Example: Fully populated for a GenAI skill ---
+# metadata:
+#   author: databricks-sa
+#   version: "1.0.0"
+#   domain: genai-agents
+#   role: worker
+#   last_verified: "2026-02-07"
+#   volatility: high
+#   verification_sources:
+#     - url: "https://mlflow.org/docs/latest/genai/serving/responses-agent"
+#       check_for: "ResponsesAgent class API, predict() signature, predict_stream() behavior"
+#     - url: "https://docs.databricks.com/en/machine-learning/model-serving/create-manage-serving-endpoints.html"
+#       check_for: "OBO authentication flow, SystemAuthPolicy format"
+
+# --- Example: Minimal for a stable skill ---
+# metadata:
+#   author: databricks-sa
+#   version: "1.0.0"
+#   domain: gold
+#   role: worker
+#   last_verified: "2026-02-07"
+#   volatility: low
+#   # No verification_sources needed — patterns are stable and self-contained

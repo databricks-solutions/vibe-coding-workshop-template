@@ -1,0 +1,6 @@
+source_table,source_description,status,gold_table,domain,entity_type,rationale,phase,priority
+EXAMPLE_TABLE_1,Example dimension source table,INCLUDED,dim_example,example_domain,dimension,Core entity needed for all analytics,1,HIGH
+EXAMPLE_TABLE_2,Example fact source table,INCLUDED,fact_example,example_domain,fact,Primary transactional data for reporting,1,HIGH
+EXAMPLE_AUDIT_LOG,System audit log table,EXCLUDED,N/A,system,audit,System/audit table - no business value,N/A,LOW
+EXAMPLE_ARCHIVE,Historical archive table,EXCLUDED,N/A,example_domain,archive,Historical archive - superseded by EXAMPLE_TABLE_1,N/A,LOW
+EXAMPLE_FUTURE,Future phase source table,PLANNED,dim_future_example,future_domain,dimension,Out of scope for phase 1 - planned for domain expansion,2,MEDIUM

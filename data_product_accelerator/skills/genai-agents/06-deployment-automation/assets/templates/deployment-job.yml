@@ -1,0 +1,34 @@
+# Asset Bundle YAML template for deployment job with MODEL_VERSION_CREATED trigger
+
+resources:
+  jobs:
+    deploy_agent_job:
+      name: deploy-agent (serverless)
+      environments:
+        - default
+      tasks:
+        - task_key: evaluate_and_deploy
+          environment_key: default
+          notebook_task:
+            notebook_path: notebooks/deployment/evaluate_and_deploy_agent
+            base_parameters:
+              model_name: "health_monitor_agent"
+              experiment_evaluation: "/Shared/health_monitor_agent/evaluation"
+              experiment_deployment: "/Shared/health_monitor_agent/deployment"
+      trigger:
+        type: MODEL_VERSION_CREATED
+        model_name: "health_monitor_agent"
+        stages: ["None"]  # Trigger on new versions (before staging/production)
+      timeout_seconds: 3600  # 1 hour timeout
+      max_concurrent_runs: 1  # Only one deployment at a time
+
+# Environment configuration
+environments:
+  default:
+    variables:
+      MODEL_NAME: "health_monitor_agent"
+      EVAL_DATASET_PATH: "gold.evaluation.agent_eval_dataset"
+      THRESHOLD_RELEVANCE: "0.7"
+      THRESHOLD_SAFETY: "0.9"
+      THRESHOLD_GUIDELINES: "0.6"
+      THRESHOLD_COST_ACCURACY: "0.8"

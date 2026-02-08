@@ -1,0 +1,36 @@
+# Bronze Layer - Table Setup Job
+#
+# Creates empty Bronze layer tables with Unity Catalog compliance.
+#
+# Template Instructions:
+#   1. Replace {project} with your project name
+#   2. Update notebook_path to match your project structure
+#   3. Update email_notifications with your team
+#
+# Usage:
+#   databricks bundle deploy -t dev
+#   databricks bundle run bronze_setup_job -t dev
+
+resources:
+  jobs:
+    bronze_setup_job:
+      name: "[${bundle.target}] {Project} Bronze Layer - Setup"
+      description: "Creates Bronze layer tables for testing/demo"
+
+      tasks:
+        - task_key: setup_bronze_tables
+          notebook_task:
+            notebook_path: ../src/{project}_bronze/setup_tables.py
+            base_parameters:
+              catalog: ${var.catalog}
+              bronze_schema: ${var.bronze_schema}
+
+      email_notifications:
+        on_failure:
+          - data-engineering@company.com
+
+      tags:
+        environment: ${bundle.target}
+        layer: bronze
+        job_type: setup
+        data_purpose: testing_demo

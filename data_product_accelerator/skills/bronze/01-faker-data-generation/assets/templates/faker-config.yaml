@@ -1,0 +1,51 @@
+# Faker Data Generation Configuration Template
+# Asset Bundle job configuration for data generation tasks
+#
+# Required libraries: Faker, holidays, numpy, pandas
+# These are installed via the shared environment spec below.
+
+resources:
+  jobs:
+    generate_bronze_data:
+      name: "[${bundle.target}] Generate Bronze Data"
+
+      # ✅ MANDATORY: Serverless environment with required libraries
+      environments:
+        - environment_key: "default"
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "Faker==22.0.0"
+              - "holidays>=0.40"
+
+      tasks:
+        # Step 1: Generate dimensions FIRST (facts reference these)
+        - task_key: generate_dimensions
+          environment_key: default
+          notebook_task:
+            notebook_path: ../src/bronze/generate_dimensions.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.bronze_schema}
+              num_records: "2500"          # See data volume guidance
+              corruption_rate: "0.05"      # 5% for DQ testing
+              locale: "en_US"
+
+        # Step 2: Generate facts AFTER dimensions (FK integrity)
+        - task_key: generate_facts
+          environment_key: default
+          depends_on:
+            - task_key: generate_dimensions
+          notebook_task:
+            notebook_path: ../src/bronze/generate_facts.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.bronze_schema}
+              num_records: "25000"         # 10K-50K minimum for patterns
+              corruption_rate: "0.05"      # 5% for DQ testing
+
+      tags:
+        environment: ${bundle.target}
+        layer: bronze
+        job_type: data_generation
+        job_level: atomic

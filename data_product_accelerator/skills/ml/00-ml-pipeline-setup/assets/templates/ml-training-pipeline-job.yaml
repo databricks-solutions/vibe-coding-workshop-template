@@ -1,0 +1,86 @@
+# =============================================================================
+# ML Training Pipeline Job — Asset Bundle Template
+# =============================================================================
+# COPY this file into your project's resources/ml/ directory.
+# Replace {project} with your project name.
+#
+# ⚠️ PIN EXACT VERSIONS — mismatches cause deserialization failures.
+# ⚠️ DO NOT define experiments in Asset Bundle — creates duplicates
+#    with [dev username] prefix. Use setup_mlflow_experiment() in code.
+#
+# Tasks run in PARALLEL (no depends_on between them).
+# Add one task per model. Each notebook is self-contained.
+#
+# See: references/dab-integration.md for full Asset Bundle patterns.
+# =============================================================================
+
+resources:
+  jobs:
+    ml_training_pipeline_job:
+      name: "[${bundle.target}] ML Training Pipeline"
+      description: "Trains all ML models with Feature Engineering"
+
+      # Shared environment for all tasks — PIN EXACT VERSIONS
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "mlflow==3.7.0"                          # Pin to match your environment
+              - "databricks-feature-engineering==0.8.0"   # Pin to match your environment
+              - "scikit-learn==1.3.2"                     # Pin to match your environment
+              - "xgboost==2.0.3"                          # Pin to match your environment
+              - "pandas==2.1.4"                           # Pin to match your environment
+              - "numpy==1.26.2"                           # Pin to match your environment
+
+      # DO NOT define experiments in Asset Bundle — creates duplicates!
+      # experiments:
+      #   my_experiment:
+      #     name: /Shared/my_experiment  # ❌ Don't do this!
+
+      # Tasks run in PARALLEL (no depends_on between them)
+      tasks:
+        - task_key: train_budget_forecaster
+          environment_key: default
+          notebook_task:
+            notebook_path: ../../src/{project}_ml/cost/train_budget_forecaster.py
+            base_parameters:  # NOT parameters with --flags!
+              catalog: ${var.catalog}
+              gold_schema: ${var.gold_schema}
+              feature_schema: ${var.feature_schema}
+          timeout_seconds: 3600
+
+        - task_key: train_cost_anomaly_detector
+          environment_key: default
+          notebook_task:
+            notebook_path: ../../src/{project}_ml/cost/train_cost_anomaly_detector.py
+            base_parameters:
+              catalog: ${var.catalog}
+              gold_schema: ${var.gold_schema}
+              feature_schema: ${var.feature_schema}
+          timeout_seconds: 3600
+
+        # Add more models — one task per model, all run in parallel
+        # - task_key: train_job_failure_predictor
+        #   environment_key: default
+        #   notebook_task:
+        #     notebook_path: ../../src/{project}_ml/reliability/train_job_failure_predictor.py
+        #     base_parameters:
+        #       catalog: ${var.catalog}
+        #       gold_schema: ${var.gold_schema}
+        #       feature_schema: ${var.feature_schema}
+        #   timeout_seconds: 3600
+
+      # Schedule: Weekly retraining (adjust as needed)
+      schedule:
+        quartz_cron_expression: "0 0 2 ? * SUN"
+        timezone_id: "America/Los_Angeles"
+        pause_status: PAUSED  # Enable in production
+
+      timeout_seconds: 14400  # 4 hours total
+
+      tags:
+        environment: ${bundle.target}
+        project: "{project}"
+        layer: ml
+        job_type: training

@@ -1,0 +1,125 @@
+# =============================================================================
+# Canonical Tagging Schema — INTERNAL AGENT REFERENCE
+# =============================================================================
+#
+# This file is the INTERNAL normalization target. The user NEVER sees or fills
+# in this file. When the agent finds customer tagging standards in context/
+# (in ANY format — CSV, MD, YAML, JSON, TXT), it mentally maps the customer's
+# values into this canonical structure, then uses it for all tagging operations.
+#
+# WORKFLOW:
+#   1. Agent scans context/ for any file containing tagging info
+#   2. Agent parses customer file (any format) and maps values to this schema
+#   3. Agent fills any gaps with smart defaults (see derivation notes below)
+#   4. Agent uses the normalized result for all tag applications
+#
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Section 1: Workflow Tags
+# Applied to: Asset Bundle jobs, pipelines, dashboards
+# ---------------------------------------------------------------------------
+workflow_tags:
+  team: ""                              # REQUIRED — customer value or default "data-engineering"
+  cost_center: ""                       # REQUIRED — customer value or "REVIEW-REQUIRED" (only tag that can't be inferred)
+  project: ""                           # RECOMMENDED — customer value or inferred from schema CSV / catalog / repo folder
+  # environment is NEVER stored here — always resolved as ${bundle.target} at generation time
+  # layer and job_type are auto-derived from the specific resource being created
+
+  # Customer may supply additional key:value pairs — store them here
+  custom_tags: {}                       # e.g. { department: "merchandising", initiative: "q1-modernization" }
+
+# ---------------------------------------------------------------------------
+# Section 2: UC Governed Tags
+# Applied to: Catalogs, schemas, tables
+# ---------------------------------------------------------------------------
+governed_tags:
+  catalog:
+    cost_center: ""                     # Customer value or "REVIEW-REQUIRED"
+    business_unit: ""                   # Customer value or inferred from domain context
+  schema:
+    data_owner: ""                      # Customer value or "{project}-data-team" pattern
+  table_defaults:
+    data_classification: "internal"     # Customer value or "internal" (safe default)
+                                        # Allowed: "public", "internal", "confidential", "restricted"
+  # Per-table overrides — customer may declare different classification for specific tables
+  table_overrides: {}                   # e.g. { dim_guest: { data_classification: "confidential" } }
+
+# ---------------------------------------------------------------------------
+# Section 3: PII — Databricks Data Classification class.* Tags
+# Applied to: Columns
+#
+# TWO SOURCES (merged, customer takes precedence):
+#   A. Column-name inference (always active, see SKILL.md Step 3)
+#   B. Customer declarations (explicit entries in their tagging file)
+# ---------------------------------------------------------------------------
+pii_columns: {}
+  # Normalized structure after parsing customer input:
+  # {
+  #   "dim_guest": [
+  #     { "column": "email",          "class_tag": "class.email_address" },
+  #     { "column": "phone_number",   "class_tag": "class.phone_number" },
+  #     { "column": "guest_name",     "class_tag": "class.name" }
+  #   ]
+  # }
+
+# Columns the customer explicitly says are NOT PII (suppress false positive inference)
+exclude_pii: []
+  # e.g. ["fact_events.event_name", "dim_property.property_name"]
+
+# ---------------------------------------------------------------------------
+# Section 4: Serverless Budget Policy (Optional)
+# ---------------------------------------------------------------------------
+budget_policy:
+  serverless_policy_name: ""            # Customer value or omitted
+
+# =============================================================================
+# NORMALIZATION EXAMPLES
+# =============================================================================
+#
+# The agent maps FROM any customer format TO this schema. Examples:
+#
+# ── Customer CSV row ──────────────────────────────────────────────────────
+# scope,object_type,tag_name,tag_value
+# workflow,all,team,platform-engineering
+#
+# → Maps to: workflow_tags.team = "platform-engineering"
+#
+# ── Customer Markdown ─────────────────────────────────────────────────────
+# | Tag | Value | Applies To |
+# |-----|-------|------------|
+# | cost_center | CC-9901 | All workflows |
+#
+# → Maps to: workflow_tags.cost_center = "CC-9901"
+#            governed_tags.catalog.cost_center = "CC-9901"  (same value reused)
+#
+# ── Customer CSV PII row ──────────────────────────────────────────────────
+# column,dim_guest.email,class.email_address,
+#
+# → Maps to: pii_columns.dim_guest = [{ column: "email", class_tag: "class.email_address" }]
+#
+# ── Customer Markdown PII ─────────────────────────────────────────────────
+# - dim_guest.email → class.email_address
+#
+# → Maps to: pii_columns.dim_guest = [{ column: "email", class_tag: "class.email_address" }]
+#
+# ── Customer free-form text ───────────────────────────────────────────────
+# "Our team is platform-engineering, cost center CC-9901, 
+#  PII columns: guest email and phone"
+#
+# → Agent extracts: team="platform-engineering", cost_center="CC-9901"
+#   Agent infers from column names: email→class.email_address, phone→class.phone_number
+#
+# =============================================================================
+# SMART DEFAULT DERIVATION (when no customer value found for a field)
+# =============================================================================
+#
+# team             → "data-engineering"
+# cost_center      → "REVIEW-REQUIRED" + # TODO comment (only un-inferable tag)
+# project          → From schema CSV (table_schema column), catalog name, or repo folder name
+# business_unit    → Infer domain from schema/table names (hospitality, retail, sales, finance, etc.)
+# data_owner       → "{project}-data-team" (e.g. "wanderbricks-data-team")
+# data_classification → "internal" (safe default for all tables)
+# pii_columns      → Always inferred from column names via pattern matching (SKILL.md Step 3)
+# environment      → Always ${bundle.target} — never stored, always resolved at generation time
+# =============================================================================

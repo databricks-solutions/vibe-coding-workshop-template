@@ -1,0 +1,162 @@
+# Genie Space Configuration Template
+# Use this template to structure your Genie Space setup document
+
+# Section A: Space Name
+space_name: "{Project} {Domain} Analytics Space"
+# Example: "RetailChain Revenue Analytics Space"
+
+# Section B: Space Description
+space_description: |
+  This Genie Space enables natural language analytics for {domain} data,
+  providing {users} with instant insights into {key metrics}.
+  Users can ask questions about {topics} and get accurate,
+  business-contextualized answers powered by {data sources}.
+
+# Section C: Sample Questions
+sample_questions:
+  revenue_analytics:
+    - "What are the top 10 stores by revenue this month?"
+    - "How much revenue did we generate last quarter?"
+    - "Which product categories have the highest revenue?"
+    - "Show me revenue trends over the last 6 months."
+  
+  performance_analysis:
+    - "Which properties are underperforming this year?"
+    - "What are the top 5 hosts by booking count?"
+    - "Show me customer segments with highest lifetime value."
+    - "Which markets have the best conversion rates?"
+  
+  trend_analysis:
+    - "How has revenue changed month-over-month?"
+    - "What are the seasonal booking patterns?"
+    - "Show me customer acquisition trends."
+    - "How do weekends compare to weekdays for bookings?"
+  
+  comparative_analysis:
+    - "Compare revenue across different regions."
+    - "How does this quarter compare to last quarter?"
+    - "Show me the difference between top and bottom performers."
+
+# Section D: Data Assets
+data_assets:
+  metric_views:
+    - name: "{metric_view_name}"
+      description: "{Description of measures and dimensions}"
+      use_cases:
+        - "{Use case 1}"
+        - "{Use case 2}"
+      measures:
+        - "{measure_name}"
+      dimensions:
+        - "{dimension_name}"
+  
+  table_valued_functions:
+    - name: "{tvf_name}"
+      signature: "{tvf_name}(param1 TYPE, param2 TYPE)"
+      description: "{What the TVF does}"
+      use_cases:
+        - "{Use case 1}"
+        - "{Use case 2}"
+      example: |
+        SELECT * FROM ${catalog}.${gold_schema}.{tvf_name}('param1_value', 'param2_value');
+  
+  tables:
+    - name: "{table_name}"
+      description: "{Purpose and when to use}"
+      use_cases:
+        - "{Use case 1}"
+
+# Section E: General Instructions (≤20 LINES - CRITICAL LIMIT)
+general_instructions: |
+  You are an expert {domain} analyst. Follow these rules:
+  
+  1. **Primary Data Source:** Always use Metric Views first
+  2. **Use TVFs:** For common queries, prefer Table-Valued Functions
+  3. **Date Defaults:** If no date specified, default to last 30 days
+  4. **Aggregations:** Use SUM for totals, AVG for averages
+  5. **Sorting:** Sort by primary metric DESC unless specified
+  6. **Limits:** Return top 10-20 rows for ranking queries
+  7. **Currency:** Format as USD with 2 decimal places
+  8. **Percentages:** Show as % with 1 decimal place
+  9. **Synonyms:** Handle common term equivalents
+  10. **Context:** Explain results in business terms
+  11. **Comparisons:** Show absolute values and % difference
+  12. **Time Periods:** Support today, yesterday, last week, month, quarter, YTD
+  13. **Null Handling:** Exclude nulls from calculations
+  14. **Performance:** Never scan raw Bronze/Silver tables
+  15. **Accuracy:** State assumptions when uncertain
+
+# Section F: TVFs
+tvfs:
+  - name: "{tvf_name}"
+    signature: "{tvf_name}(param1 STRING, param2 STRING, param3 STRING)"
+    returns: |
+      - column1 TYPE
+      - column2 TYPE
+    use_cases:
+      - "{Use case 1}"
+      - "{Use case 2}"
+    examples:
+      - description: "{Example description}"
+        sql: |
+          SELECT * FROM ${catalog}.${gold_schema}.{tvf_name}('param1', 'param2', 'param3');
+
+# Section G: Benchmark Questions
+benchmark_questions:
+  - question: "{Natural language question}"
+    expected_sql: |
+      SELECT 
+        {columns}
+      FROM ${catalog}.${gold_schema}.{metric_view}
+      WHERE {conditions}
+      GROUP BY {dimensions}
+      ORDER BY MEASURE({metric}) DESC
+      LIMIT {n};
+    expected_result: "{Description of expected output}"
+
+# Deployment Configuration
+deployment:
+  catalog: "{catalog_name}"
+  schema: "{gold_schema_name}"
+  workspace: "{workspace_url}"
+
+# Testing Checklist
+testing:
+  pre_deployment:
+    - "All 7 sections complete"
+    - "General Instructions ≤20 lines"
+    - "Every benchmark question has working SQL"
+    - "SQL tested and runs successfully"
+    - "MEASURE() uses actual column names"
+    - "All tables/functions use full UC namespace"
+    - "No contradictory routing rules"
+    - "Ambiguous terms explicitly defined"
+  
+  post_deployment:
+    - "Test all benchmark questions"
+    - "Verify Genie routes correctly"
+    - "Check response quality and formatting"
+    - "Validate business context in responses"
+    - "Monitor for routing issues"
+
+# Success Metrics
+success_metrics:
+  adoption:
+    - "Active users per week"
+    - "Questions asked per day"
+    - "Unique questions (not repeated)"
+  
+  quality:
+    - "Query success rate (target: 90%+)"
+    - "Average response time (target: < 10 sec)"
+    - "User satisfaction rating (target: 4.5/5)"
+  
+  usage_patterns:
+    - "Most asked questions"
+    - "Most used metric views"
+    - "Peak usage times"
+  
+  business_impact:
+    - "Time saved vs traditional dashboards"
+    - "Ad-hoc SQL requests reduction"
+    - "Decisions made faster"

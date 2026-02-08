@@ -1,0 +1,38 @@
+# Gold Layer Merge Job Template
+#
+# Periodic MERGE operations from Silver to Gold.
+# Includes optional schedule (PAUSED by default for dev).
+#
+# Replace {project} with your project name.
+
+resources:
+  jobs:
+    gold_merge_job:
+      name: "[${bundle.target}] {Project} Gold Layer - MERGE Updates"
+      description: "Periodic MERGE operations from Silver to Gold"
+
+      tasks:
+        - task_key: merge_gold_tables
+          notebook_task:
+            notebook_path: ../../src/{project}_gold/merge_gold_tables.py
+            base_parameters:
+              catalog: ${var.catalog}
+              silver_schema: ${var.silver_schema}
+              gold_schema: ${var.gold_schema}
+          timeout_seconds: 3600
+
+      # Schedule for periodic updates
+      # Set pause_status to UNPAUSED in prod target override
+      schedule:
+        quartz_cron_expression: "0 0 3 * * ?"  # Daily at 3 AM
+        timezone_id: "America/New_York"
+        pause_status: PAUSED  # Enable manually or in prod
+
+      email_notifications:
+        on_failure:
+          - data-engineering@company.com
+
+      tags:
+        environment: ${bundle.target}
+        layer: gold
+        job_type: pipeline

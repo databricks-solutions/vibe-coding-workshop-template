@@ -1,0 +1,40 @@
+# DLT Expectations Configuration Template
+# Copy this template and customize for your DLT pipeline
+
+# DLT Pipeline Configuration
+resources:
+  pipelines:
+    silver_dlt_pipeline:
+      name: "[${bundle.target}] Silver Layer Pipeline"
+      
+      # ✅ CORRECT: Use 'schema' (Direct Publishing Mode)
+      catalog: ${var.catalog}
+      schema: ${var.silver_schema}
+      
+      # ❌ WRONG: Don't use 'target' (deprecated)
+      # target: ${var.catalog}.${var.silver_schema}
+      
+      # Pass configuration to notebooks
+      configuration:
+        catalog: ${var.catalog}
+        bronze_schema: ${var.bronze_schema}
+        silver_schema: ${var.silver_schema}
+      
+      serverless: true
+      edition: ADVANCED
+
+# Example DQ Rules SQL (to insert into dq_rules table)
+# CRITICAL Rules (use with @dlt.expect_all_or_drop())
+INSERT INTO {catalog}.{schema}.dq_rules VALUES
+('silver_transactions', 'valid_transaction_id', 'transaction_id IS NOT NULL AND LENGTH(transaction_id) > 0', 'critical', 'Transaction ID must be present and non-empty', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('silver_transactions', 'valid_store_number', 'store_number IS NOT NULL', 'critical', 'Store number must be present (FK)', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('silver_transactions', 'non_zero_quantity', 'quantity_sold != 0', 'critical', 'Quantity cannot be zero', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+
+# WARNING Rules (use with @dlt.expect_all())
+('silver_transactions', 'reasonable_quantity', 'quantity_sold BETWEEN -20 AND 50', 'warning', 'Quantity within normal range', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('silver_transactions', 'reasonable_price', 'final_sales_price BETWEEN 0.01 AND 500.00', 'warning', 'Price within normal range', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
+
+# Reference: See references/expectation-patterns.md for complete patterns
+# - Rules loader module: dq_rules_loader.py (pure Python, no notebook header)
+# - Use toPandas() with module-level cache to avoid .collect() warnings
+# - Update rules at runtime: UPDATE dq_rules SET constraint_sql = '...' WHERE ...

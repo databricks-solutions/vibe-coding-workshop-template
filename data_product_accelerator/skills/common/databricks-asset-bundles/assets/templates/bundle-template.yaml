@@ -1,0 +1,113 @@
+# Databricks Asset Bundle Template
+# Copy this template and customize for your project
+
+bundle:
+  name: <project_name>
+  
+variables:
+  catalog:
+    description: Unity Catalog name
+    default: <default_catalog>
+  
+  bronze_schema:
+    description: Schema name for Bronze layer (raw data ingestion)
+    default: <bronze_schema_name>
+  
+  silver_schema:
+    description: Schema name for Silver layer (cleaned, validated)
+    default: <silver_schema_name>
+  
+  gold_schema:
+    description: Schema name for Gold layer (business-ready aggregates)
+    default: <gold_schema_name>
+  
+  warehouse_id:
+    description: SQL Warehouse ID for serverless execution
+    # ✅ PREFERRED: Lookup by name (portable across environments)
+    lookup:
+      warehouse: "Shared SQL Warehouse"
+    # Alternative: hardcode ID (less portable)
+    # default: "<warehouse_id>"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      catalog: <dev_catalog>
+      bronze_schema: dev_<username>_<bronze_schema_name>
+      silver_schema: dev_<username>_<silver_schema_name>
+      gold_schema: dev_<username>_<gold_schema_name>
+      
+  prod:
+    mode: production
+    variables:
+      catalog: <prod_catalog>
+      # Production uses standard schema names (no prefix)
+
+# Include all resource definitions from resources/ folder
+include:
+  - resources/*.yml
+  - resources/bronze/*.yml
+  - resources/silver/*.yml
+  - resources/gold/*.yml
+
+# Example: Serverless Job Resource
+# Place this in resources/<layer>/<job_name>.yml
+#
+# resources:
+#   jobs:
+#     <job_key>:
+#       name: "[${bundle.target}] <Job Display Name>"
+#       
+#       # ✅ MANDATORY: Serverless environment configuration
+#       environments:
+#         - environment_key: "default"
+#           spec:
+#             environment_version: "4"
+#       
+#       tasks:
+#         - task_key: <task_key>
+#           environment_key: default  # ✅ MANDATORY
+#           notebook_task:
+#             notebook_path: ../src/<path_to_script>.py
+#             base_parameters:
+#               catalog: ${var.catalog}
+#               schema: ${var.<schema>}
+#       
+#       tags:
+#         environment: ${bundle.target}
+#         project: <project_name>
+#         layer: <bronze|silver|gold>
+#         job_level: atomic  # atomic, composite, or orchestrator
+#
+# Example: DLT Pipeline Resource
+# Place this in resources/<layer>/<pipeline_name>.yml
+#
+# resources:
+#   pipelines:
+#     <pipeline_key>:
+#       name: "[${bundle.target}] <Pipeline Display Name>"
+#       
+#       # ✅ MANDATORY: Root path for Lakeflow Pipelines Editor
+#       root_path: ../src/<layer>_pipeline
+#       
+#       # ✅ Direct Publishing Mode (Modern Pattern)
+#       catalog: ${var.catalog}
+#       schema: ${var.<layer>_schema}
+#       
+#       libraries:
+#         - notebook:
+#             path: ../src/<layer>/<notebook>.py
+#       
+#       configuration:
+#         catalog: ${var.catalog}
+#         bronze_schema: ${var.bronze_schema}
+#       
+#       serverless: true
+#       photon: true
+#       edition: ADVANCED
+#       
+#       tags:
+#         environment: ${bundle.target}
+#         layer: <layer>

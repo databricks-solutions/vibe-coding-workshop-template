@@ -1,0 +1,39 @@
+# =============================================================================
+# ML Feature Pipeline Job — Asset Bundle Template
+# =============================================================================
+# COPY this file into your project's resources/ml/ directory.
+# Replace {project} with your project name.
+#
+# Pin databricks-feature-engineering to match your training pipeline.
+# See: references/dab-integration.md for full Asset Bundle patterns.
+# =============================================================================
+
+resources:
+  jobs:
+    ml_feature_pipeline_job:
+      name: "[${bundle.target}] ML Feature Pipeline"
+      description: "Creates and updates feature tables in Unity Catalog"
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "databricks-feature-engineering==0.8.0"  # Pin to match your environment
+
+      tasks:
+        - task_key: create_feature_tables
+          environment_key: default
+          notebook_task:
+            notebook_path: ../../src/{project}_ml/features/create_feature_tables.py
+            base_parameters:  # NOT parameters with --flags!
+              catalog: ${var.catalog}
+              gold_schema: ${var.gold_schema}
+              feature_schema: ${var.feature_schema}
+          timeout_seconds: 3600
+
+      tags:
+        environment: ${bundle.target}
+        project: "{project}"
+        layer: ml
+        job_type: feature_engineering

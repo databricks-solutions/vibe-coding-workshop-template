@@ -1,0 +1,111 @@
+# Gold Layer Table YAML Template
+# Copy this template and customize for your Gold layer table
+
+# Table metadata
+table_name: dim_example  # Change to your table name
+domain: example_domain    # Change to your domain (billing, compute, etc.)
+description: >
+  Brief description of the table's purpose and business context.
+  This description appears as the table COMMENT in Unity Catalog.
+  Use LLM-friendly language that explains what the table represents.
+
+# Primary key definition
+primary_key:
+  columns: ['example_id']  # Single column PK, or ['col1', 'col2'] for composite
+  composite: false         # true if multiple columns
+
+# Foreign key definitions (optional - typically handled in separate script)
+# foreign_keys:
+#   - name: fk_example_ref_table
+#     columns: ['ref_id']
+#     references: 'catalog.schema.ref_table'
+#     ref_columns: ['ref_id']
+
+# Column definitions
+columns:
+  # Primary key column (must be NOT NULL)
+  - name: example_id
+    type: STRING           # STRING, INT, BIGINT, DOUBLE, BOOLEAN, DATE, TIMESTAMP, DECIMAL(38,10)
+    nullable: false        # Must be false for PK columns
+    description: "Unique identifier for the example entity. Surrogate key."
+
+  # Standard columns
+  - name: example_name
+    type: STRING
+    nullable: true         # Default is true if not specified
+    description: "Human-readable name for the example entity."
+
+  - name: example_code
+    type: STRING
+    nullable: false
+    description: "Business key code for the example entity."
+
+  # Timestamp columns
+  - name: created_timestamp
+    type: TIMESTAMP
+    nullable: false
+    description: "Timestamp when the record was created in the source system."
+
+  - name: updated_timestamp
+    type: TIMESTAMP
+    nullable: true
+    description: "Timestamp when the record was last updated in the source system."
+
+  - name: processed_timestamp
+    type: TIMESTAMP
+    nullable: false
+    description: "Timestamp when the record was processed into Gold layer."
+
+  # Numeric columns
+  - name: numeric_value
+    type: DECIMAL(18,2)    # Precision and scale for DECIMAL
+    nullable: true
+    description: "Numeric value with 2 decimal places."
+
+  # Boolean columns
+  - name: is_active
+    type: BOOLEAN
+    nullable: false
+    description: "Flag indicating whether the entity is currently active."
+
+  # Date columns
+  - name: effective_date
+    type: DATE
+    nullable: true
+    description: "Date when the entity became effective."
+
+  # SCD Type 2 columns (for dimension tables)
+  # - name: is_current
+  #   type: BOOLEAN
+  #   nullable: false
+  #   description: "Flag indicating whether this is the current version of the record."
+  #
+  # - name: valid_from
+  #   type: TIMESTAMP
+  #   nullable: false
+  #   description: "Timestamp when this version of the record became valid."
+  #
+  # - name: valid_to
+  #   type: TIMESTAMP
+  #   nullable: true
+  #   description: "Timestamp when this version of the record became invalid (NULL for current)."
+
+# Example: Complex types (if needed)
+# columns:
+#   - name: tags
+#     type: ARRAY<STRING>
+#     nullable: true
+#     description: "Array of tags associated with the entity."
+#
+#   - name: metadata
+#     type: MAP<STRING,STRING>
+#     nullable: true
+#     description: "Key-value map of additional metadata."
+
+# Notes:
+# - All column descriptions should be LLM-friendly (clear, business-oriented)
+# - Use consistent naming conventions (snake_case for columns)
+# - Primary key columns must have nullable: false
+# - Timestamp columns typically use TIMESTAMP type (not DATE)
+# - For SCD Type 2 dimensions, include is_current, valid_from, valid_to columns
+# - Foreign keys are typically added in a separate script after all tables are created
