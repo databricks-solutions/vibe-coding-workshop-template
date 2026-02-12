@@ -24,6 +24,7 @@ metadata:
     - databricks-autonomous-operations
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal setup patterns
 ---
 
 # Bronze Layer Setup
@@ -262,13 +263,13 @@ TBLPROPERTIES (
 
 | Step | Read Skill (MANDATORY) | What It Provides |
 |------|------------------------|------------------|
-| All steps | `skills/common/databricks-expert-agent/SKILL.md` | Core extraction principle: extract names from source, never hardcode |
-| Step 3 (DDLs) | `skills/common/databricks-table-properties/SKILL.md` | Bronze TBLPROPERTIES, `CLUSTER BY AUTO`, governance metadata |
-| Step 3 (DDLs) | `skills/common/schema-management-patterns/SKILL.md` | `CREATE SCHEMA IF NOT EXISTS`, Predictive Optimization |
-| Step 4 (Data) | `skills/bronze/01-faker-data-generation/SKILL.md` | Faker corruption patterns, function signatures, provider examples |
-| Step 5 (Jobs) | `skills/common/databricks-asset-bundles/SKILL.md` | Serverless job YAML, Environments V4, `notebook_task`, `base_parameters` |
-| Step 5 (Jobs) | `skills/common/databricks-python-imports/SKILL.md` | Pure Python import patterns for notebook code sharing |
-| Troubleshooting | `skills/common/databricks-autonomous-operations/SKILL.md` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs fail |
+| All steps | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Core extraction principle: extract names from source, never hardcode |
+| Step 3 (DDLs) | `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` | Bronze TBLPROPERTIES, `CLUSTER BY AUTO`, governance metadata |
+| Step 3 (DDLs) | `data_product_accelerator/skills/common/schema-management-patterns/SKILL.md` | `CREATE SCHEMA IF NOT EXISTS`, Predictive Optimization |
+| Step 4 (Data) | `data_product_accelerator/skills/bronze/01-faker-data-generation/SKILL.md` | Faker corruption patterns, function signatures, provider examples |
+| Step 5 (Jobs) | `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` | Serverless job YAML, Environments V4, `notebook_task`, `base_parameters` |
+| Step 5 (Jobs) | `data_product_accelerator/skills/common/databricks-python-imports/SKILL.md` | Pure Python import patterns for notebook code sharing |
+| Troubleshooting | `data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs fail |
 
 **NEVER do these without FIRST reading the corresponding skill:**
 - NEVER write `TBLPROPERTIES` without reading `databricks-table-properties`

@@ -7,7 +7,7 @@ Usage:
     
 Examples:
     python convert-rule-to-skill.py 21-self-improvement.mdc
-    python convert-rule-to-skill.py rules/my-rule.mdc --output-dir skills/
+    python convert-rule-to-skill.py rules/my-rule.mdc --output-dir data_product_accelerator/skills/
 """
 
 import argparse
@@ -340,8 +340,8 @@ def main():
         epilog="""
 Examples:
   %(prog)s my-rule.mdc
-  %(prog)s my-rule.mdc --output-dir ./skills/
-  %(prog)s .cursor/rules/21-self-improvement.mdc --output-dir ~/skills/
+  %(prog)s my-rule.mdc --output-dir data_product_accelerator/skills/
+  %(prog)s .cursor/rules/21-self-improvement.mdc --output-dir data_product_accelerator/skills/
         """
     )
     parser.add_argument(

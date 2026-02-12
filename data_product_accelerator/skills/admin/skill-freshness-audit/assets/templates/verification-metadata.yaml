@@ -28,6 +28,28 @@ metadata:
     - url: "https://mlflow.org/docs/latest/path/to/page"
       check_for: "Brief description of what to verify"
 
+# Upstream source lineage tracking (tracks repo-level dependencies)
+  # Links this skill back to its source(s) in databricks-solutions/ai-dev-kit or other repos.
+  # This complements verification_sources (which checks live doc URLs) by tracking structured
+  # repo-level lineage for systematic upstream sync audits.
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/agent-bricks/SKILL.md"       # specific file(s) this skill derives from
+      relationship: "extended"    # derived | extended | inspired | reference
+      last_synced: "2026-02-09"   # ISO date when skill was last synced with upstream
+      sync_commit: "abc1234"      # short hash of upstream commit at time of last sync
+
+  # Relationship types:
+  #   derived  — skill content directly draws from upstream source
+  #   extended — skill extends upstream with significant additional patterns
+  #   inspired — upstream was conceptual starting point, heavily customized
+  #   reference — skill references upstream for accuracy, content is original
+
+  # For skills with NO upstream dependency, use an empty array:
+  # upstream_sources: []  # Internal methodology, no upstream dependency
+
 # --- Example: Fully populated for a GenAI skill ---
 # metadata:
 #   author: databricks-sa
@@ -41,8 +63,16 @@ metadata:
 #       check_for: "ResponsesAgent class API, predict() signature, predict_stream() behavior"
 #     - url: "https://docs.databricks.com/en/machine-learning/model-serving/create-manage-serving-endpoints.html"
 #       check_for: "OBO authentication flow, SystemAuthPolicy format"
+#   upstream_sources:
+#     - name: "ai-dev-kit"
+#       repo: "databricks-solutions/ai-dev-kit"
+#       paths:
+#         - "databricks-skills/agent-bricks/SKILL.md"
+#       relationship: "extended"
+#       last_synced: "2026-02-09"
+#       sync_commit: "a1b2c3d"
 
-# --- Example: Minimal for a stable skill ---
+# --- Example: Minimal for a stable skill (no upstream) ---
 # metadata:
 #   author: databricks-sa
 #   version: "1.0.0"
@@ -50,4 +80,5 @@ metadata:
 #   role: worker
 #   last_verified: "2026-02-07"
 #   volatility: low
+#   upstream_sources: []  # Internal methodology, no upstream dependency
 #   # No verification_sources needed — patterns are stable and self-contained

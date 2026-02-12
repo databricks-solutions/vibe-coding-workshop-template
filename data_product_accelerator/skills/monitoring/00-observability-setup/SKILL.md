@@ -41,6 +41,7 @@ metadata:
     - databricks-python-imports
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources: []  # Internal orchestrator
 ---
 
 # Observability Setup Orchestrator
@@ -145,8 +146,8 @@ else:
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `skills/common/databricks-expert-agent/SKILL.md` | Extract-don't-generate principle |
-| 2 | `skills/monitoring/01-lakehouse-monitoring-comprehensive/SKILL.md` | Monitor setup, custom metrics |
+| 1 | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Extract-don't-generate principle |
+| 2 | `data_product_accelerator/skills/monitoring/01-lakehouse-monitoring-comprehensive/SKILL.md` | Monitor setup, custom metrics |
 
 **Steps:**
 1. Inventory Gold tables that need monitoring (fact tables are highest priority)
@@ -162,7 +163,7 @@ else:
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `skills/monitoring/02-databricks-aibi-dashboards/SKILL.md` | Dashboard JSON, widget patterns |
+| 1 | `data_product_accelerator/skills/monitoring/02-databricks-aibi-dashboards/SKILL.md` | Dashboard JSON, widget patterns |
 
 **Steps:**
 1. Design dashboard layout: monitoring overview + business metrics sections
@@ -178,8 +179,8 @@ else:
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `skills/monitoring/03-sql-alerting-patterns/SKILL.md` | Config-driven alerts, SDK deployment |
-| 2 | `skills/common/databricks-asset-bundles/SKILL.md` | Job YAML for alert deployment |
+| 1 | `data_product_accelerator/skills/monitoring/03-sql-alerting-patterns/SKILL.md` | Config-driven alerts, SDK deployment |
+| 2 | `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` | Job YAML for alert deployment |
 
 **Steps:**
 1. Create alert configuration table (Delta table-based, severity-driven)

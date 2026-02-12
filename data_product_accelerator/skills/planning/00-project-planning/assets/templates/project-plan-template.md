@@ -179,7 +179,7 @@ start_date STRING COMMENT 'Format: YYYY-MM-DD'
 
 ## References
 
-- Related skills: See `skills/` directory
+- Related skills: See `data_product_accelerator/skills/` directory
 - Official Documentation: https://docs.databricks.com/
 
 ## Notes

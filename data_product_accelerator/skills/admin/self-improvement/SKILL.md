@@ -1,15 +1,16 @@
 ---
 name: self-improvement
-description: Enables agent self-reflection and learning from mistakes through systematic skill updates. Prioritizes updating existing skills over creating new ones - always searches existing skills first, creates new skills only when justified. Use after encountering errors, completing complex tasks, or when asked to reflect, learn, or document a mistake. Triggers on "learn from this", "don't repeat", "remember this pattern", "what went wrong", "update skills", "what went wrong", "capture this learning", "document mistake", "prevent this error".
+description: Enables agent self-reflection and learning from mistakes through systematic skill updates. Prioritizes updating existing skills over creating new ones - always searches existing skills first, creates new skills only when justified. Includes upstream source sync workflow for tracking and updating skills from databricks-solutions/ai-dev-kit. Use after encountering errors, completing complex tasks, or when asked to reflect, learn, or document a mistake. Triggers on "learn from this", "don't repeat", "remember this pattern", "what went wrong", "update skills", "capture this learning", "document mistake", "prevent this error", "AI-Dev-Kit updated", "upstream changed", "sync with ai-dev-kit".
 license: Apache-2.0
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
   author: prashanth subrahmanyam
   domain: admin
   role: utility
   standalone: true
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal workflow
 ---
 
 # Agent Self-Improvement
@@ -49,6 +50,7 @@ These triggers are **proactive** — they don't require an error to fire. They k
 |---------|--------|--------|
 | **Periodic review** | User says "audit skills" or "check freshness" | Run `admin/skill-freshness-audit` skill |
 | **Platform release** | User says "Databricks released X" or "new MLflow version" | Find affected skills by domain → fetch verification_sources → flag drift |
+| **AI-Dev-Kit updated** | User says "AI-Dev-Kit updated" or "upstream changed" | Find skills with `upstream_sources` referencing ai-dev-kit → fetch upstream → compare → flag drift |
 | **Documentation change** | WebFetch returns different API pattern than skill documents | Flag skill for update, log drift details in drift report |
 | **Pre-task verification** | Loading a high-volatility skill for implementation | Check `last_verified` age; if stale (>30 days for high), suggest quick verification |
 | **Post-implementation review** | Completed a task using a skill | If skill patterns needed adjustment, update the skill and `last_verified` |
@@ -66,6 +68,7 @@ Respond to phrases like:
 - "Create a skill from this"
 - "Audit skills" / "Check freshness" (→ delegates to `skill-freshness-audit`)
 - "Databricks released X" / "New MLflow version" (→ platform release audit)
+- "AI-Dev-Kit updated" / "Upstream changed" / "Sync with ai-dev-kit" (→ upstream sync workflow)
 
 ---
 
@@ -88,13 +91,13 @@ Ask yourself these questions:
 
 ```bash
 # Step 2a: List all existing skills
-find skills -name "SKILL.md" -exec dirname {} \; | xargs -I {} basename {}
+find data_product_accelerator/skills -name "SKILL.md" -exec dirname {} \; | xargs -I {} basename {}
 
 # Step 2b: Search skill descriptions for related terms
-grep -ri "keyword1\|keyword2\|keyword3" skills/*/SKILL.md
+grep -ri "keyword1\|keyword2\|keyword3" data_product_accelerator/skills/*/SKILL.md
 
 # Step 2c: Read potentially related skills in full
-cat skills/{potential-match}/SKILL.md
+cat data_product_accelerator/skills/{potential-match}/SKILL.md
 ```
 
 **Analysis checklist before proposing ANY new skill:**
@@ -161,7 +164,7 @@ Can ANY existing skill be reasonably extended?
 
 Before starting similar tasks:
 
-1. **Scan relevant skills** in `skills/`
+1. **Scan relevant skills** in `data_product_accelerator/skills/`
 2. **Apply prevention patterns** from skill instructions
 3. **Reference skill** during implementation
 
@@ -299,6 +302,97 @@ I'm about to use a high-volatility skill. Quick freshness check:
 - Does the skill's version history show recent updates?
 ```
 
+### After AI-Dev-Kit Update
+```
+The AI-Dev-Kit upstream has been updated. Let me sync:
+- Which skills have upstream_sources pointing to ai-dev-kit? (check lineage map)
+- What changed in the upstream files? (WebFetch raw GitHub URLs)
+- Do any of our skills need updating based on upstream changes?
+- For derived/extended skills: are there new patterns we should adopt?
+- For reference skills: have any API signatures changed?
+- Update last_synced and sync_commit after syncing each skill
+```
+
+---
+
+## Upstream Source Sync Workflow
+
+Skills in this repository track their lineage to `databricks-solutions/ai-dev-kit` via `upstream_sources` metadata in their frontmatter. This workflow describes how to sync skills when the upstream changes.
+
+**Lineage Map:** See `admin/skill-freshness-audit/references/ai-dev-kit-lineage-map.md` for the complete mapping.
+
+### When to Sync
+
+- User says "AI-Dev-Kit updated", "sync with ai-dev-kit", or "upstream changed"
+- After a known AI-Dev-Kit release or major commit
+- During periodic freshness audits (check `last_synced` staleness)
+- When a skill with upstream sources produces incorrect patterns
+
+### Sync Workflow
+
+```
+1. IDENTIFY affected skills:
+   a. Read the lineage map (admin/skill-freshness-audit/references/ai-dev-kit-lineage-map.md)
+   b. OR: Glob all SKILL.md files and read upstream_sources from frontmatter
+   c. Filter to skills where upstream_sources is non-empty
+
+2. FETCH upstream content:
+   a. For each upstream path, construct the raw GitHub URL:
+      https://raw.githubusercontent.com/{repo}/main/{path}
+   b. WebFetch each URL to get the current upstream content
+   c. Note the latest commit hash for sync_commit tracking
+
+3. COMPARE upstream against our skill:
+   a. Check for new patterns, sections, or capabilities in upstream
+   b. Check for deprecated approaches still present in our skill
+   c. Check for API signature changes (function names, parameters)
+   d. Check for new best practices or warnings
+
+4. REPORT differences:
+   a. Use the Upstream Drift Report format from skill-freshness-audit
+   b. Classify each difference by impact (high/medium/low)
+   c. Prioritize derived > extended > reference relationships
+
+5. APPLY updates (with human approval):
+   a. Update skill content to incorporate upstream changes
+   b. Preserve our custom extensions and additions
+   c. Update frontmatter: last_synced date and sync_commit hash
+   d. Update last_verified date
+   e. Bump version if substantive changes were made
+```
+
+### Priority Order for Syncing
+
+| Relationship | Priority | How to Sync |
+|---|---|---|
+| `derived` | High | Our skill directly draws from upstream. Align closely with upstream patterns. |
+| `extended` | Medium | Our skill extends upstream. Adopt new base patterns, keep our extensions. |
+| `inspired` | Low | Heavily customized. Only check for major direction changes. |
+| `reference` | Low | Original content. Only verify API/pattern accuracy. |
+
+### After Syncing a Skill
+
+Update the skill's frontmatter:
+
+```yaml
+metadata:
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/agent-bricks/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-02-09"    # ← Update to today's date
+      sync_commit: "97a3637"       # ← Update to latest upstream commit
+```
+
+### Key Principles
+
+- **Never blindly copy upstream.** Our skills are extended/customized. Upstream is a source of truth for base patterns, not a replacement for our content.
+- **Preserve our extensions.** When upstream adds new patterns, merge them alongside our existing additions.
+- **Human approval required.** Always report differences and wait for approval before modifying skill content.
+- **Update metadata even if no content changes.** If upstream hasn't changed since last sync, still update `last_synced` to prove it was checked.
+
 ---
 
 ## Skill Update vs New Skill
@@ -361,7 +455,7 @@ Self-Improvement Checkpoint:
    - [ ] Docs/examples misled me
 
 2. SEARCH EXISTING SKILLS (mandatory before any skill changes):
-   - [ ] Listed all skills: find skills -name "SKILL.md"
+   - [ ] Listed all skills: find data_product_accelerator/skills -name "SKILL.md"
    - [ ] Searched for related keywords in skill descriptions
    - [ ] Read potentially related skills in full
 
@@ -378,8 +472,8 @@ Self-Improvement Checkpoint:
 ### Create New Skill Directory
 ```bash
 SKILL_NAME="your-skill-name"
-mkdir -p "skills/${SKILL_NAME}"
-cat > "skills/${SKILL_NAME}/SKILL.md" << 'EOF'
+mkdir -p "data_product_accelerator/skills/${SKILL_NAME}"
+cat > "data_product_accelerator/skills/${SKILL_NAME}/SKILL.md" << 'EOF'
 ---
 name: your-skill-name
 description: What this skill does. When to use it. Trigger phrases.
@@ -411,19 +505,19 @@ Clear instructions for the correct approach.
 
 > **Key Insight:** One-sentence takeaway.
 EOF
-echo "Created: skills/${SKILL_NAME}/SKILL.md"
+echo "Created: data_product_accelerator/skills/${SKILL_NAME}/SKILL.md"
 ```
 
 ### List Existing Skills
 ```bash
 # List all skills in project
-find skills -name "SKILL.md" -exec dirname {} \; | xargs -I {} basename {}
+find data_product_accelerator/skills -name "SKILL.md" -exec dirname {} \; | xargs -I {} basename {}
 ```
 
 ### Search Skills by Description
 ```bash
 # Find skills related to "import"
-grep -l "import" skills/*/SKILL.md 2>/dev/null
+grep -l "import" data_product_accelerator/skills/*/SKILL.md 2>/dev/null
 ```
 
 ---

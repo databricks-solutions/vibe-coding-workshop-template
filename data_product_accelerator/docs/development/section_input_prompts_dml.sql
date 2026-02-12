@@ -127,9 +127,9 @@ INSERT INTO ${catalog}.${schema}.section_input_prompts
 (input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
 VALUES
 (6, 'gold_layer_design',
-'I have a customer schema at @context/Schema.csv.
+'I have a customer schema at @data_product_accelerator/context/Schema.csv.
 
-Please design the Gold layer using @skills/gold/00-gold-layer-design/SKILL.md
+Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
 
 The orchestrator skill will automatically load its worker skills for merge patterns, deduplication, documentation standards, Mermaid ERDs, schema validation, grain validation, and YAML-driven setup.',
 'Static prompt - no LLM processing required. This prompt is copied directly to the AI coding assistant.',
@@ -191,7 +191,7 @@ The Gold Layer is the **business-ready** analytics layer that transforms Silver 
 
 Ensure you have:
 - ✅ `context/Schema.csv` - Your source schema file (from Bronze/Silver)
-- ✅ `skills/gold/00-gold-layer-design/SKILL.md` - The Gold layer design orchestrator skill
+- ✅ `data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md` - The Gold layer design orchestrator skill
 
 ---
 
@@ -235,7 +235,7 @@ Share the ERD and design summary with business stakeholders before proceeding to
 
 This framework uses a **skills-first architecture** with an **orchestrator/worker pattern**:
 
-1. You paste **one prompt** referencing the orchestrator: `@skills/gold/00-gold-layer-design/SKILL.md`
+1. You paste **one prompt** referencing the orchestrator: `@data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md`
 2. The AI reads the orchestrator skill, which lists **mandatory dependencies** (worker skills + common skills)
 3. The AI automatically loads each worker skill as needed during the workflow
 4. You never need to reference individual worker skills — the orchestrator handles it
@@ -246,7 +246,7 @@ This framework uses a **skills-first architecture** with an **orchestrator/worke
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  YOUR PROMPT                                                                │
-│  "@skills/gold/00-gold-layer-design/SKILL.md"                              │
+│  "@data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md"                              │
 │         │                                                                   │
 │         ▼                                                                   │
 │  ┌─────────────────────────────────────┐                                   │
@@ -272,13 +272,13 @@ This framework uses a **skills-first architecture** with an **orchestrator/worke
 
 | Worker Skill | Path | Purpose |
 |-----------|------|---------|
-| `02-yaml-driven-gold-setup` | `skills/gold/02-*/SKILL.md` | YAML as single source of truth for schemas |
-| `03-gold-layer-documentation` | `skills/gold/03-*/SKILL.md` | Dual-purpose (business + technical) documentation standards |
-| `04-gold-layer-merge-patterns` | `skills/gold/04-*/SKILL.md` | MERGE/upsert patterns for dimension and fact tables |
-| `05-gold-delta-merge-deduplication` | `skills/gold/05-*/SKILL.md` | Handling duplicates in MERGE operations |
-| `06-fact-table-grain-validation` | `skills/gold/06-*/SKILL.md` | Grain definition and validation patterns |
-| `07-gold-layer-schema-validation` | `skills/gold/07-*/SKILL.md` | Schema validation before deployment |
-| `08-mermaid-erd-patterns` | `skills/gold/08-*/SKILL.md` | ERD diagram syntax and organization |
+| `02-yaml-driven-gold-setup` | `data_product_accelerator/skills/gold/02-*/SKILL.md` | YAML as single source of truth for schemas |
+| `03-gold-layer-documentation` | `data_product_accelerator/skills/gold/03-*/SKILL.md` | Dual-purpose (business + technical) documentation standards |
+| `04-gold-layer-merge-patterns` | `data_product_accelerator/skills/gold/04-*/SKILL.md` | MERGE/upsert patterns for dimension and fact tables |
+| `05-gold-delta-merge-deduplication` | `data_product_accelerator/skills/gold/05-*/SKILL.md` | Handling duplicates in MERGE operations |
+| `06-fact-table-grain-validation` | `data_product_accelerator/skills/gold/06-*/SKILL.md` | Grain definition and validation patterns |
+| `07-gold-layer-schema-validation` | `data_product_accelerator/skills/gold/07-*/SKILL.md` | Schema validation before deployment |
+| `08-mermaid-erd-patterns` | `data_product_accelerator/skills/gold/08-*/SKILL.md` | ERD diagram syntax and organization |
 
 ---
 
@@ -402,7 +402,7 @@ INSERT INTO ${catalog}.${schema}.section_input_prompts
 (input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
 VALUES
 (7, 'bronze_layer_creation',
-'Set up the Bronze layer using @skills/bronze/00-bronze-layer-setup/SKILL.md with Approach C — copy data from the existing source tables in the samples.wanderbricks schema.
+'Set up the Bronze layer using @data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md with Approach C — copy data from the existing source tables in the samples.wanderbricks schema.
 
 Use default catalog as: <YOUR_CATALOG>',
 'Static prompt - no LLM processing required. This prompt is copied directly to the AI coding assistant.',
@@ -474,7 +474,7 @@ We copy sample data from `samples.wanderbricks` because:
 **Run this in your cloned Template Repository** (see Prerequisites in Step 0).
 
 Ensure you have:
-- ✅ `skills/bronze/00-bronze-layer-setup/SKILL.md` - The Bronze layer setup skill
+- ✅ `data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md` - The Bronze layer setup skill
 - ✅ Access to `samples.wanderbricks` catalog in your Databricks workspace
 - ✅ Permissions to create tables in your target catalog
 
@@ -547,7 +547,7 @@ DESCRIBE EXTENDED {catalog}.{bronze_schema}.bookings;
 
 ## 🔧 What Happens Behind the Scenes
 
-When you paste the prompt, the AI reads `@skills/bronze/00-bronze-layer-setup/SKILL.md` — the **Bronze orchestrator skill**. Behind the scenes:
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md` — the **Bronze orchestrator skill**. Behind the scenes:
 
 1. **Orchestrator reads approach** — detects "Approach C" and activates the clone-from-source workflow
 2. **Common skills auto-loaded** — the orchestrator''s mandatory dependencies include:
@@ -736,7 +736,7 @@ INSERT INTO ${catalog}.${schema}.section_input_prompts
 (input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
 VALUES
 (8, 'silver_layer_sdp',
-'Set up the Silver layer using @skills/silver/00-silver-layer-setup/SKILL.md
+'Set up the Silver layer using @data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md
 
 Ensure bundle is validated and deployed successfully, and silver layer jobs run with no errors.
 
@@ -782,7 +782,7 @@ Silver should **mirror the Bronze schema** with minimal changes — same column 
 
 Ensure you have:
 - ✅ Bronze layer created and populated (Step 10 complete)
-- ✅ `skills/silver/00-silver-layer-setup/SKILL.md` - The Silver layer setup skill (loads worker skills automatically)
+- ✅ `data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md` - The Silver layer setup skill (loads worker skills automatically)
 
 ---
 
@@ -863,7 +863,7 @@ After pipeline completes, verify in Databricks UI:
 
 ## 🔧 What Happens Behind the Scenes
 
-When you paste the prompt, the AI reads `@skills/silver/00-silver-layer-setup/SKILL.md` — the **Silver orchestrator skill**. Behind the scenes:
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md` — the **Silver orchestrator skill**. Behind the scenes:
 
 1. **Orchestrator activates** — reads the Silver setup workflow with streaming ingestion and DQ rules
 2. **Worker skills auto-loaded:**
@@ -1033,7 +1033,7 @@ INSERT INTO ${catalog}.${schema}.section_input_prompts
 (input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
 VALUES
 (9, 'gold_layer_pipeline',
-'Implement the Gold layer using @skills/gold/01-gold-layer-setup/SKILL.md
+'Implement the Gold layer using @data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md
 
 Use the gold layer design YAML files as the target destination, and the silver layer tables as source.
 
@@ -1164,7 +1164,7 @@ Ensure you have:
 - ✅ Gold Layer Design completed (Step 9) with YAML files in `gold_layer_design/yaml/`
 - ✅ Column lineage documentation in `gold_layer_design/COLUMN_LINEAGE.csv` (Silver→Gold column mappings)
 - ✅ Silver Layer populated (Step 11) with data in Silver tables
-- ✅ `skills/gold/01-gold-layer-setup/SKILL.md` — The Gold implementation orchestrator (auto-loads 7 worker + 8 common skills)
+- ✅ `data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md` — The Gold implementation orchestrator (auto-loads 7 worker + 8 common skills)
 
 ---
 
@@ -1271,7 +1271,7 @@ LIMIT 5;
 
 ## 🔧 What Happens Behind the Scenes
 
-When you paste the prompt, the AI reads `@skills/gold/01-gold-layer-setup/SKILL.md` — the **Gold implementation orchestrator**. Behind the scenes:
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md` — the **Gold implementation orchestrator**. Behind the scenes:
 
 1. **YAML-driven approach** — the orchestrator reads your `gold_layer_design/yaml/` files (from Step 9) as the **single source of truth**. Table names, columns, types, PKs, FKs are all extracted from YAML — never generated from scratch.
 2. **Worker skills auto-loaded:**
@@ -1558,9 +1558,9 @@ INSERT INTO ${catalog}.${schema}.section_input_prompts
 (input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
 VALUES
 (10, 'usecase_plan',
-'Perform project planning using @skills/planning/00-project-planning/SKILL.md with planning_mode: workshop
+'Perform project planning using @data_product_accelerator/skills/planning/00-project-planning/SKILL.md with planning_mode: workshop
 
-If a PRD exists at @docs/ui_design.md, reference it for business requirements, user personas, and workflows.',
+If a PRD exists at @data_product_accelerator/docs/ui_design.md, reference it for business requirements, user personas, and workflows.',
 'Static prompt - no LLM processing required. This prompt is copied directly to the AI coding assistant.',
 'Create Use-Case Plan',
 'Generate implementation plans for operationalizing use cases with supporting artifacts',
@@ -1717,7 +1717,7 @@ Phase 3: Frontend App (User interface — optional)
 Ensure you have:
 - ✅ Gold Layer Design completed (Step 9)
 - ✅ Gold Layer Implementation completed (Step 12)
-- ✅ `skills/planning/00-project-planning/SKILL.md` - The project planning skill
+- ✅ `data_product_accelerator/skills/planning/00-project-planning/SKILL.md` - The project planning skill
 - ✅ `docs/ui_design.md` - PRD with business requirements (optional, if available)
 
 ---
@@ -1757,7 +1757,7 @@ Use the plans to guide subsequent steps:
 
 ## 🔧 What Happens Behind the Scenes
 
-When you paste the prompt, the AI reads `@skills/planning/00-project-planning/SKILL.md` — the **Project Planning orchestrator**. Behind the scenes:
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/planning/00-project-planning/SKILL.md` — the **Project Planning orchestrator**. Behind the scenes:
 
 1. **Workshop mode detection** — `planning_mode: workshop` activates the workshop profile, which produces a **minimal representative plan** (3-5 TVFs, 1-2 Metric Views, 1 Genie Space) designed for hands-on workshops. The first line of output confirms: `**Planning Mode:** Workshop (explicit opt-in — artifact caps active)`.
 2. **Interactive quick start** — the skill asks key decisions before generating plans:
@@ -1994,13 +1994,13 @@ INSERT INTO ${catalog}.${schema}.section_input_prompts
 (input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
 VALUES
 (11, 'genie_space',
-'Set up the semantic layer using @skills/semantic-layer/00-semantic-layer-setup/SKILL.md
+'Set up the semantic layer using @data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md
 
 Implement in this order:
 
-1. **Table-Valued Functions (TVFs)** — using plan at @plans/phase1-addendum-1.2-tvfs.md
-2. **Metric Views** — using plan at @plans/phase1-addendum-1.3-metric-views.md
-3. **Genie Space** — using plan at @plans/phase1-addendum-1.6-genie-spaces.md
+1. **Table-Valued Functions (TVFs)** — using plan at @data_product_accelerator/plans/phase1-addendum-1.2-tvfs.md
+2. **Metric Views** — using plan at @data_product_accelerator/plans/phase1-addendum-1.3-metric-views.md
+3. **Genie Space** — using plan at @data_product_accelerator/plans/phase1-addendum-1.6-genie-spaces.md
 4. **Genie JSON Exports** — create export/import deployment jobs
 
 The orchestrator skill automatically loads worker skills for TVFs, Metric Views, Genie Space patterns, and export/import API.',
@@ -2079,7 +2079,7 @@ The **Semantic Layer** sits between your Gold data and end users, providing:
 
 ## 🔧 What Happens Behind the Scenes
 
-When you paste the prompt, the AI reads `@skills/semantic-layer/00-semantic-layer-setup/SKILL.md` — the **Semantic Layer orchestrator**. Behind the scenes:
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md` — the **Semantic Layer orchestrator**. Behind the scenes:
 
 1. **Phase 0: Read Plan** — the orchestrator first looks for `plans/manifests/semantic-layer-manifest.yaml`. If found, it uses this as the implementation checklist (every TVF, Metric View, and Genie Space pre-defined). If not found, it falls back to self-discovery from Gold tables.
 2. **5 Worker skills auto-loaded:**
@@ -2579,9 +2579,9 @@ INSERT INTO ${catalog}.${schema}.section_input_prompts
 (input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
 VALUES
 (12, 'aibi_dashboard',
-'Build an AI/BI (Lakeview) Dashboard using @skills/monitoring/02-databricks-aibi-dashboards/SKILL.md
+'Build an AI/BI (Lakeview) Dashboard using @data_product_accelerator/skills/monitoring/02-databricks-aibi-dashboards/SKILL.md
 
-Reference the dashboard plan at @plans/phase1-addendum-1.1-dashboards.md
+Reference the dashboard plan at @data_product_accelerator/plans/phase1-addendum-1.1-dashboards.md
 
 The skill provides:
 - Dashboard JSON structure with **6-column grid** layout (NOT 12!)
@@ -2682,7 +2682,7 @@ Build the dashboard in this order:
 
 ## 🔧 What Happens Behind the Scenes
 
-When you paste the prompt, the AI reads `@skills/monitoring/02-databricks-aibi-dashboards/SKILL.md` — the **AI/BI Dashboard worker skill**. Behind the scenes:
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/monitoring/02-databricks-aibi-dashboards/SKILL.md` — the **AI/BI Dashboard worker skill**. Behind the scenes:
 
 1. **Plan reading** — the skill reads your dashboard plan (`plans/phase1-addendum-1.1-dashboards.md`) to extract: KPIs, charts, filters, layout requirements
 2. **Dashboard skill loaded** — provides complete JSON templates, widget specs, grid layout rules, query patterns, validation scripts, and deployment workflows
@@ -2698,7 +2698,7 @@ When you paste the prompt, the AI reads `@skills/monitoring/02-databricks-aibi-d
 
 **Key principle:** The AI reads your plan to **extract** KPI/chart requirements. Dashboard queries use `${catalog}` and `${gold_schema}` variable substitution — never hardcoded schemas.
 
-> **Note:** For the full observability stack (Lakehouse Monitoring + Dashboards + SQL Alerts), use the orchestrator at `@skills/monitoring/00-observability-setup/SKILL.md`. This step focuses specifically on the dashboard.
+> **Note:** For the full observability stack (Lakehouse Monitoring + Dashboards + SQL Alerts), use the orchestrator at `@data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md`. This step focuses specifically on the dashboard.
 
 ### 🏅 Databricks Best Practices Applied
 
@@ -3076,9 +3076,9 @@ INSERT INTO ${catalog}.${schema}.section_input_prompts
 (input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
 VALUES
 (15, 'redeploy_test',
-'Build, deploy, and test the complete application using @skills/common/databricks-autonomous-operations/SKILL.md for self-healing deployment and @skills/common/databricks-asset-bundles/SKILL.md for DAB validation.
+'Build, deploy, and test the complete application using @data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md for self-healing deployment and @data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md for DAB validation.
 
-After deployment succeeds, document the entire repository using @skills/admin/documentation-organization/SKILL.md in Framework Documentation Authoring mode.
+After deployment succeeds, document the entire repository using @data_product_accelerator/skills/admin/documentation-organization/SKILL.md in Framework Documentation Authoring mode.
 
 ---
 
@@ -3260,7 +3260,7 @@ databricks bundle deploy -t dev --verbose
 **After deployment succeeds**, run this prompt in a new AI assistant thread:
 
 ```
-Document this entire repository using @skills/admin/documentation-organization/SKILL.md
+Document this entire repository using @data_product_accelerator/skills/admin/documentation-organization/SKILL.md
 
 Use Framework Documentation Authoring mode to create a complete docs/ set:
 - Architecture overview with diagrams
@@ -3449,7 +3449,7 @@ databricks apps get <app-name> --output json | jq .app_status
 After deployment succeeds, paste this prompt in a **new AI assistant thread**:
 
 ```
-Document this entire repository using @skills/admin/documentation-organization/SKILL.md
+Document this entire repository using @data_product_accelerator/skills/admin/documentation-organization/SKILL.md
 
 Use Framework Documentation Authoring mode to create a complete docs/ set:
 - Architecture overview with diagrams
@@ -3474,7 +3474,7 @@ This triggers the documentation-organization skill''''s **Mode 2: Framework Docu
 
 ## 🔧 What Happens Behind the Scenes
 
-When you paste the deployment prompt, the AI reads `@skills/common/databricks-autonomous-operations/SKILL.md` — the **autonomous operations skill**. Behind the scenes:
+When you paste the deployment prompt, the AI reads `@data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md` — the **autonomous operations skill**. Behind the scenes:
 
 ### Autonomous Operations Skill
 
@@ -3555,7 +3555,7 @@ After deployment succeeds, run the documentation-organization skill to create co
 Paste this in a **new AI assistant thread** after deployment:
 
 ```
-Document this entire repository using @skills/admin/documentation-organization/SKILL.md
+Document this entire repository using @data_product_accelerator/skills/admin/documentation-organization/SKILL.md
 
 Use Framework Documentation Authoring mode to create a complete docs/ set:
 - Architecture overview with diagrams

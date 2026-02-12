@@ -18,6 +18,7 @@ metadata:
     - databricks-asset-bundles
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources: []  # DQX is from databrickslabs, not ai-dev-kit
 ---
 # DQX Data Quality Framework Patterns
 

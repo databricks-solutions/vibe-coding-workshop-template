@@ -9,6 +9,14 @@ metadata:
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/asset-bundles/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-02-09"
+      sync_commit: "97a3637"
 ---
 
 # Databricks Asset Bundles (DABs)

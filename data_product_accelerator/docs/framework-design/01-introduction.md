@@ -103,7 +103,7 @@ The architecture is **skills-first**: instead of embedding patterns in cursor ru
 
 ### Skill References
 
-Skills are referenced using their domain path: `skills/{domain}/{skill-name}/SKILL.md`. In the Cursor IDE, use the `@` syntax to reference them directly (e.g., `@skills/gold/00-gold-layer-design/SKILL.md`).
+Skills are referenced using their domain path: `data_product_accelerator/skills/{domain}/{skill-name}/SKILL.md`. In the Cursor IDE, use the `@` syntax to reference them directly (e.g., `@data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md`).
 
 ### Diagrams
 

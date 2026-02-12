@@ -9,6 +9,14 @@ metadata:
   used_by_stages: [3, 4]
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/databricks-unity-catalog/SKILL.md"
+      relationship: "derived"
+      last_synced: "2026-02-09"
+      sync_commit: "97a3637"
 ---
 
 # Unity Catalog Primary Key and Foreign Key Constraints

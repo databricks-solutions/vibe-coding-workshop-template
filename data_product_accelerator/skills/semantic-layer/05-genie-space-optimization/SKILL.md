@@ -14,6 +14,14 @@ metadata:
   source: 34-genie-space-optimization.mdc
   last_verified: "2026-02-07"
   volatility: high
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/databricks-genie/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-02-09"
+      sync_commit: "97a3637"
 ---
 
 # Genie Space Optimization

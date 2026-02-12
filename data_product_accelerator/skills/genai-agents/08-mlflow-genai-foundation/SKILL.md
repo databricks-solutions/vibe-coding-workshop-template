@@ -9,6 +9,14 @@ metadata:
   role: worker
   pipeline_stage: 9
   pipeline_stage_name: genai-agents
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/agent-bricks/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-02-09"
+      sync_commit: "97a3637"
 ---
 
 # MLflow GenAI Foundation Patterns

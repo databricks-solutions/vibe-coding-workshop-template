@@ -46,6 +46,7 @@ metadata:
     - databricks-python-imports
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources: []  # Internal orchestrator
 ---
 
 # Semantic Layer Setup Orchestrator
@@ -156,8 +157,8 @@ else:
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `skills/common/databricks-expert-agent/SKILL.md` | Extract-don't-generate principle |
-| 2 | `skills/semantic-layer/01-metric-views-patterns/SKILL.md` | YAML syntax, validation, joins |
+| 1 | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Extract-don't-generate principle |
+| 2 | `data_product_accelerator/skills/semantic-layer/01-metric-views-patterns/SKILL.md` | YAML syntax, validation, joins |
 
 **Steps:**
 1. Inventory all Gold tables that need Metric Views
@@ -172,7 +173,7 @@ else:
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `skills/semantic-layer/02-databricks-table-valued-functions/SKILL.md` | STRING params, null safety, Genie compat |
+| 1 | `data_product_accelerator/skills/semantic-layer/02-databricks-table-valued-functions/SKILL.md` | STRING params, null safety, Genie compat |
 
 **Steps:**
 1. Identify business questions that require parameterized queries
@@ -187,7 +188,7 @@ else:
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `skills/semantic-layer/03-genie-space-patterns/SKILL.md` | 7-section deliverable, agent instructions |
+| 1 | `data_product_accelerator/skills/semantic-layer/03-genie-space-patterns/SKILL.md` | 7-section deliverable, agent instructions |
 
 **Steps:**
 1. Verify all Gold tables have column comments (Genie depends on these)
@@ -203,7 +204,7 @@ else:
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `skills/semantic-layer/04-genie-space-export-import-api/SKILL.md` | REST API, JSON schema, CI/CD |
+| 1 | `data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/SKILL.md` | REST API, JSON schema, CI/CD |
 
 **Steps:**
 1. Export existing Genie Space as JSON
@@ -216,7 +217,7 @@ else:
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `skills/semantic-layer/05-genie-space-optimization/SKILL.md` | Benchmark testing, 6 control levers |
+| 1 | `data_product_accelerator/skills/semantic-layer/05-genie-space-optimization/SKILL.md` | Benchmark testing, 6 control levers |
 
 **Steps:**
 1. Run benchmark questions via Conversation API

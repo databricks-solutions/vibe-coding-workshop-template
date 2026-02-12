@@ -36,16 +36,16 @@ git clone https://github.com/prashsub/data-product-accelerator.git
 cd data-product-accelerator
 ```
 
-2. **Place your schema CSV** in the `context/` directory
+2. **Place your schema CSV** in the `data_product_accelerator/context/` directory
 
 3. **Open in your AI coding assistant** and start with the first prompt:
 
 ```
-I have a customer schema at @context/Wanderbricks_Schema.csv.
-Please design the Gold layer using @skills/gold/00-gold-layer-design/SKILL.md
+I have a customer schema at @data_product_accelerator/context/Wanderbricks_Schema.csv.
+Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
 ```
 
-> **Note:** Most IDEs support `@` for file references. If yours doesn't, ask the agent to "read the file at skills/gold/00-gold-layer-design/SKILL.md" instead.
+> **Note:** Most IDEs support `@` for file references. If yours doesn't, ask the agent to "read the file at data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md" instead.
 
 4. **Follow the [QUICKSTART guide](QUICKSTART.md)** for all 9 stages
 
@@ -60,7 +60,7 @@ The framework uses a **skills-first architecture**: a single `AGENTS.md` entry p
 One prompt per stage. One new agent conversation per stage.
 
 ```
-context/*.csv
+data_product_accelerator/context/*.csv
   → Gold Design (1)      — dimensional model, ERDs, YAML schemas
   → Bronze (2)           — source tables + test data
   → Silver (3)           — DLT pipelines + data quality
@@ -80,32 +80,44 @@ Design the target Gold dimensional model **first** (from the customer's schema C
 
 ## Repository Structure
 
+This module lives inside a multi-module repository. The framework (skills, docs, context) is in `data_product_accelerator/`, while generated artifacts are created at the **repository root**.
+
 ```
-.
-├── AGENTS.md                           # Universal entry point (routing table + common skills index)
-├── QUICKSTART.md                       # One-prompt-per-stage guide
-├── README.md                           # This file
+repo-root/
 │
-├── skills/                            # 50 Agent Skills (open SKILL.md format)
-│   ├── admin/                          #   Skill creation, auditing, docs (4)
-│   ├── bronze/                         #   Bronze layer + Faker data (2)
-│   ├── common/                         #   Cross-cutting shared skills (8)
-│   ├── exploration/                    #   Ad-hoc notebooks (1)
-│   ├── genai-agents/                   #   GenAI agent patterns (9)
-│   ├── gold/                           #   Gold design + implementation (9)
-│   ├── ml/                             #   MLflow pipelines (1)
-│   ├── monitoring/                     #   Monitors, dashboards, alerts (5)
-│   ├── planning/                       #   Project planning (1)
-│   ├── semantic-layer/                 #   Metric Views, TVFs, Genie (6)
-│   ├── silver/                         #   DLT pipelines, DQ rules (3)
-│   └── skill-navigator/                #   Master routing system (1)
+├── data_product_accelerator/           # Framework module
+│   ├── AGENTS.md                       #   Universal entry point (routing table + common skills)
+│   ├── QUICKSTART.md                   #   One-prompt-per-stage guide
+│   ├── README.md                       #   This file
+│   │
+│   ├── skills/                         #   50 Agent Skills (open SKILL.md format)
+│   │   ├── admin/                      #     Skill creation, auditing, docs (4)
+│   │   ├── bronze/                     #     Bronze layer + Faker data (2)
+│   │   ├── common/                     #     Cross-cutting shared skills (8)
+│   │   ├── exploration/                #     Ad-hoc notebooks (1)
+│   │   ├── genai-agents/               #     GenAI agent patterns (9)
+│   │   ├── gold/                       #     Gold design + implementation (9)
+│   │   ├── ml/                         #     MLflow pipelines (1)
+│   │   ├── monitoring/                 #     Monitors, dashboards, alerts (5)
+│   │   ├── planning/                   #     Project planning (1)
+│   │   ├── semantic-layer/             #     Metric Views, TVFs, Genie (6)
+│   │   ├── silver/                     #     DLT pipelines, DQ rules (3)
+│   │   └── skill-navigator/            #     Master routing system (1)
+│   │
+│   ├── context/
+│   │   └── Wanderbricks_Schema.csv     #   Customer schema input
+│   │
+│   └── docs/                           #   Framework documentation
+│       └── framework-design/           #     Complete design documentation
 │
-├── context/
-│   └── Wanderbricks_Schema.csv         # Customer schema input
-│
-└── docs/                               # Framework documentation
-    └── framework-design/   #   Complete design documentation
+├── gold_layer_design/                  # GENERATED: dimensional model YAML schemas and ERDs
+├── src/                                # GENERATED: notebooks and scripts (Bronze, Silver, Gold, etc.)
+├── plans/                              # GENERATED: phase plans and YAML manifest contracts
+├── resources/                          # GENERATED: DAB job and pipeline YAML
+└── databricks.yml                      # GENERATED: Asset Bundle root configuration
 ```
+
+> **Note:** Generated artifact directories (`gold_layer_design/`, `src/`, `plans/`, `resources/`, `databricks.yml`) are created by skills during pipeline execution. They do not exist until you run the first stages. Other modules may coexist at the repository root.
 
 ---
 
@@ -217,8 +229,8 @@ These patterns work for any industry:
 ### Framework Support
 
 - See the [Skill Navigator](skills/skill-navigator/SKILL.md) for routing to the right skill
-- Run `@skills/admin/self-improvement/SKILL.md` to capture learnings from errors
-- Run `@skills/admin/skill-freshness-audit/SKILL.md` to verify skills are current
+- Run `@data_product_accelerator/skills/admin/self-improvement/SKILL.md` to capture learnings from errors
+- Run `@data_product_accelerator/skills/admin/skill-freshness-audit/SKILL.md` to verify skills are current
 
 ---
 

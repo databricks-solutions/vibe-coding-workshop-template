@@ -9,6 +9,7 @@ metadata:
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal philosophy/principles, not API-dependent
 ---
 # Databricks Expert Agent
 

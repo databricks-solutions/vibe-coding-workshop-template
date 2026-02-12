@@ -44,6 +44,7 @@ metadata:
     - databricks-expert-agent
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal setup patterns
 ---
 
 # Gold Layer Implementation Orchestrator
@@ -285,11 +286,11 @@ databricks bundle run gold_merge_job -t dev
 
 **MANDATORY: Read each skill below using the Read tool BEFORE writing any code for this phase:**
 
-1. `skills/gold/yaml-driven-gold-setup/SKILL.md` — YAML-to-DDL patterns, `find_yaml_base()`, `build_create_table_ddl()`
-2. `skills/gold/gold-layer-documentation/SKILL.md` — Dual-purpose column descriptions, naming conventions
-3. `skills/common/databricks-table-properties/SKILL.md` — Standard TBLPROPERTIES by layer
-4. `skills/common/unity-catalog-constraints/SKILL.md` — PK/FK `ALTER TABLE` patterns, NOT NULL requirements
-5. `skills/common/schema-management-patterns/SKILL.md` — `CREATE SCHEMA IF NOT EXISTS` pattern
+1. `data_product_accelerator/skills/gold/yaml-driven-gold-setup/SKILL.md` — YAML-to-DDL patterns, `find_yaml_base()`, `build_create_table_ddl()`
+2. `data_product_accelerator/skills/gold/gold-layer-documentation/SKILL.md` — Dual-purpose column descriptions, naming conventions
+3. `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` — Standard TBLPROPERTIES by layer
+4. `data_product_accelerator/skills/common/unity-catalog-constraints/SKILL.md` — PK/FK `ALTER TABLE` patterns, NOT NULL requirements
+5. `data_product_accelerator/skills/common/schema-management-patterns/SKILL.md` — `CREATE SCHEMA IF NOT EXISTS` pattern
 
 **Activities:**
 1. Create `setup_tables.py` — Single generic script reads ALL YAML files, creates tables
@@ -319,11 +320,11 @@ See `scripts/add_fk_constraints_template.py` for starter template.
 
 **MANDATORY: Read each skill below using the Read tool BEFORE writing any merge code:**
 
-1. `skills/gold/gold-layer-merge-patterns/SKILL.md` — SCD Type 1/2, fact aggregation, column mapping, `spark_sum` alias
-2. `skills/gold/gold-delta-merge-deduplication/SKILL.md` — Deduplication before MERGE (ALWAYS required, prevents `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE`)
-3. `skills/gold/fact-table-grain-validation/SKILL.md` — Grain inference from PK, transaction vs aggregated patterns
-4. `skills/gold/gold-layer-schema-validation/SKILL.md` — `validate_merge_schema()`, DataFrame-to-DDL checks
-5. `skills/common/databricks-python-imports/SKILL.md` — Pure Python modules, avoid `sys.path` issues in serverless
+1. `data_product_accelerator/skills/gold/gold-layer-merge-patterns/SKILL.md` — SCD Type 1/2, fact aggregation, column mapping, `spark_sum` alias
+2. `data_product_accelerator/skills/gold/gold-delta-merge-deduplication/SKILL.md` — Deduplication before MERGE (ALWAYS required, prevents `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE`)
+3. `data_product_accelerator/skills/gold/fact-table-grain-validation/SKILL.md` — Grain inference from PK, transaction vs aggregated patterns
+4. `data_product_accelerator/skills/gold/gold-layer-schema-validation/SKILL.md` — `validate_merge_schema()`, DataFrame-to-DDL checks
+5. `data_product_accelerator/skills/common/databricks-python-imports/SKILL.md` — Pure Python modules, avoid `sys.path` issues in serverless
 
 **Activities:**
 
@@ -385,7 +386,7 @@ See `scripts/merge_gold_tables_template.py` for starter template.
 
 **MANDATORY: Read this skill using the Read tool BEFORE creating job YAML files:**
 
-1. `skills/common/databricks-asset-bundles/SKILL.md` — Job YAML patterns, serverless config, `notebook_task` vs `python_task`, `base_parameters`, sync
+1. `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` — Job YAML patterns, serverless config, `notebook_task` vs `python_task`, `base_parameters`, sync
 
 **Activities:**
 1. Add YAML sync to `databricks.yml` — `gold_layer_design/yaml/**/*.yaml`
@@ -429,7 +430,7 @@ See `references/validation-queries.md` for complete validation SQL.
 
 **MANDATORY: Read this skill using the Read tool:**
 
-1. `skills/monitoring/04-anomaly-detection/SKILL.md` — Schema-level freshness/completeness monitoring
+1. `data_product_accelerator/skills/monitoring/04-anomaly-detection/SKILL.md` — Schema-level freshness/completeness monitoring
 
 **Why:** Every Gold schema should have anomaly detection enabled from day one. Gold tables are the primary consumer-facing layer — stale or incomplete data here directly impacts dashboards, Genie Spaces, and business decisions.
 
@@ -472,7 +473,7 @@ except Exception as e:
 
 **MANDATORY: Read this skill using the Read tool to cross-reference created tables against ERD:**
 
-1. `skills/gold/mermaid-erd-patterns/SKILL.md` — Verify all ERD entities have corresponding tables, all relationships match FK constraints
+1. `data_product_accelerator/skills/gold/mermaid-erd-patterns/SKILL.md` — Verify all ERD entities have corresponding tables, all relationships match FK constraints
 
 **Activities:**
 1. ERD cross-reference — Compare created tables against `erd_master.md` to confirm nothing was missed

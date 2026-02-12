@@ -21,7 +21,7 @@
 | `CONSTRAINT_ALREADY_EXISTS` | FK constraint applied twice | Use `IF NOT EXISTS` or check constraints before applying |
 | `TABLE_OR_VIEW_NOT_FOUND` | Table referenced before creation | Ensure table creation jobs run before merge/constraint jobs |
 | `bundle deploy` permission error | Insufficient workspace permissions | Verify user has `CAN_MANAGE` on jobs, `CREATE TABLE` on schema |
-| Agent ignores skill content | Skill not loaded or wrong skill loaded | Use `@` syntax explicitly: `@skills/{path}/SKILL.md` |
+| Agent ignores skill content | Skill not loaded or wrong skill loaded | Use `@` syntax explicitly: `@data_product_accelerator/skills/{path}/SKILL.md` |
 | Agent response is truncated/confused | Context budget exceeded | Start a new conversation; load fewer skills per turn |
 | `ModuleNotFoundError` in notebook | `sys.path` not configured for Asset Bundle paths | Follow `databricks-python-imports` skill patterns |
 | DLT pipeline fails to start | Missing `cluster_by_auto` or wrong table properties | Check `databricks-table-properties` skill for Silver patterns |
@@ -32,9 +32,9 @@
 ### Quick Diagnostics
 
 **Skill not loading?**
-1. Verify the skill exists: check `skills/{domain}/{skill-name}/SKILL.md`
+1. Verify the skill exists: check `data_product_accelerator/skills/{domain}/{skill-name}/SKILL.md`
 2. Use explicit `@` reference in the prompt
-3. Check if routing keywords match (see `AGENTS.md` or `skills/skill-navigator/SKILL.md`)
+3. Check if routing keywords match (see `AGENTS.md` or `data_product_accelerator/skills/skill-navigator/SKILL.md`)
 
 **Wrong code generated?**
 1. Check if "Extract, Don't Generate" was followed
@@ -44,7 +44,7 @@
 **Deployment failed?**
 1. Run `databricks bundle validate -t dev` to check config
 2. Check job logs: `databricks runs get --run-id {run_id}`
-3. Invoke autonomous operations: `@skills/common/databricks-autonomous-operations/SKILL.md`
+3. Invoke autonomous operations: `@data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md`
 
 ### Detailed Investigation
 
@@ -172,7 +172,7 @@ A: The framework scales to any size. For large schemas, the Gold Design stage wi
 
 | Issue Type | Resource |
 |------------|----------|
-| Skill pattern errors | Run self-improvement skill: `@skills/admin/self-improvement/SKILL.md` |
+| Skill pattern errors | Run self-improvement skill: `@data_product_accelerator/skills/admin/self-improvement/SKILL.md` |
 | Databricks platform issues | [Databricks Support](https://docs.databricks.com/support/) |
 | Framework questions | Check this documentation set or the skill navigator |
 | Bug reports | Submit via git issue on the repository |

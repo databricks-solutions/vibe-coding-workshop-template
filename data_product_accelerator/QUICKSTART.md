@@ -18,14 +18,17 @@ This guide walks you through building a complete Databricks data platform — fr
 
 ## Step 0: Place Your Schema CSV
 
-Drop the customer's schema CSV into the `context/` directory:
+Drop the customer's schema CSV into the `data_product_accelerator/context/` directory:
 
 ```
-context/
-└── Wanderbricks_Schema.csv    ← your file here
+data_product_accelerator/
+└── context/
+    └── Wanderbricks_Schema.csv    ← your file here
 ```
 
 Expected CSV columns: `table_catalog`, `table_schema`, `table_name`, `column_name`, `ordinal_position`, `full_data_type`, `is_nullable`, `comment`
+
+> **Where do generated artifacts go?** All artifacts created by skills (`gold_layer_design/`, `src/`, `plans/`, `resources/`, `databricks.yml`) are placed at the **repository root**, not inside `data_product_accelerator/`. See the [Project Layout](AGENTS.md#project-layout) in AGENTS.md for the full directory map.
 
 ---
 
@@ -36,10 +39,10 @@ Design the target dimensional model first — ERDs, YAML schemas, and documentat
 **Prompt:**
 
 ```
-I have a customer schema at @context/Wanderbricks_Schema.csv. Please design the Gold layer using @skills/gold/00-gold-layer-design/SKILL.md
+I have a customer schema at @data_product_accelerator/context/Wanderbricks_Schema.csv. Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
 ```
 
-**What it produces:**
+**What it produces** (at the repo root):
 - Schema intake report (table inventory, dimension/fact classification, FK relationships)
 - Mermaid ERD diagrams
 - YAML schema files in `gold_layer_design/yaml/`
@@ -55,19 +58,19 @@ Create Bronze tables and populate them with data. Three approaches available:
 **Approach A — Schema CSV + Faker (recommended for demos):**
 
 ```
-Set up the Bronze layer using @skills/bronze/00-bronze-layer-setup/SKILL.md with Approach A — generate Faker data matching the source schema.
+Set up the Bronze layer using @data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md with Approach A — generate Faker data matching the source schema.
 ```
 
 **Approach B — Existing tables (data already in Databricks):**
 
 ```
-Set up the Bronze layer using @skills/bronze/00-bronze-layer-setup/SKILL.md with Approach B — read from existing tables in the wanderbricks schema.
+Set up the Bronze layer using @data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md with Approach B — read from existing tables in the wanderbricks schema.
 ```
 
 **Approach C — Copy from source:**
 
 ```
-Set up the Bronze layer using @skills/bronze/00-bronze-layer-setup/SKILL.md with Approach C — copy data from the existing source tables in the wanderbricks schema.
+Set up the Bronze layer using @data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md with Approach C — copy data from the existing source tables in the wanderbricks schema.
 ```
 
 **What it produces:**
@@ -84,7 +87,7 @@ Create DLT pipelines with data quality expectations.
 **Prompt:**
 
 ```
-Set up the Silver layer using @skills/silver/00-silver-layer-setup/SKILL.md
+Set up the Silver layer using @data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md
 ```
 
 **What it produces:**
@@ -102,7 +105,7 @@ Create the Gold tables, merge scripts, and FK constraints from the YAML designs.
 **Prompt:**
 
 ```
-Implement the Gold layer using @skills/gold/01-gold-layer-setup/SKILL.md
+Implement the Gold layer using @data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md
 ```
 
 **What it produces:**
@@ -120,16 +123,16 @@ Plan the semantic layer, observability, ML, and GenAI phases. This stage asks yo
 **Prompt (Data Product Acceleration — default):**
 
 ```
-Perform project planning using @skills/planning/00-project-planning/SKILL.md
+Perform project planning using @data_product_accelerator/skills/planning/00-project-planning/SKILL.md
 ```
 
 **Prompt (Workshop mode — for Learning & Enablement):**
 
 ```
-Perform project planning using @skills/planning/00-project-planning/SKILL.md with planning_mode: workshop
+Perform project planning using @data_product_accelerator/skills/planning/00-project-planning/SKILL.md with planning_mode: workshop
 ```
 
-> **Workshop mode** produces a minimal representative plan (3-5 TVFs, 1-2 Metric Views, 1 Genie Space) designed for hands-on workshops. It is only activated when `planning_mode: workshop` is explicitly included. See `skills/planning/00-project-planning/references/workshop-mode-profile.md` for details.
+> **Workshop mode** produces a minimal representative plan (3-5 TVFs, 1-2 Metric Views, 1 Genie Space) designed for hands-on workshops. It is only activated when `planning_mode: workshop` is explicitly included. See `data_product_accelerator/skills/planning/00-project-planning/references/workshop-mode-profile.md` for details.
 
 **What it produces:**
 - Phase plan documents (TVFs, Metric Views, Monitoring, Dashboards, Genie Spaces, ML, Alerting)
@@ -145,7 +148,7 @@ Create Metric Views, Table-Valued Functions, and Genie Spaces.
 **Prompt:**
 
 ```
-Set up the semantic layer using @skills/semantic-layer/00-semantic-layer-setup/SKILL.md
+Set up the semantic layer using @data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md
 ```
 
 **What it produces:**
@@ -163,7 +166,7 @@ Set up Lakehouse Monitors, AI/BI Dashboards, and SQL Alerts.
 **Prompt:**
 
 ```
-Set up observability using @skills/monitoring/00-observability-setup/SKILL.md
+Set up observability using @data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md
 ```
 
 **What it produces:**
@@ -181,7 +184,7 @@ Create ML experiments, model training, and batch inference.
 **Prompt:**
 
 ```
-Set up the ML pipeline using @skills/ml/00-ml-pipeline-setup/SKILL.md
+Set up the ML pipeline using @data_product_accelerator/skills/ml/00-ml-pipeline-setup/SKILL.md
 ```
 
 **What it produces:**
@@ -199,7 +202,7 @@ Build AI agents with Genie Space integration, evaluation, and deployment.
 **Prompt:**
 
 ```
-Set up GenAI agents using @skills/genai-agents/00-genai-agents-setup/SKILL.md
+Set up GenAI agents using @data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md
 ```
 
 **What it produces:**
@@ -222,7 +225,7 @@ Set up GenAI agents using @skills/genai-agents/00-genai-agents-setup/SKILL.md
 ## Pipeline at a Glance
 
 ```
-context/*.csv
+data_product_accelerator/context/*.csv
   → Gold Design (1)      — dimensional model, ERDs, YAML schemas
   → Bronze (2)           — source tables + test data
   → Silver (3)           — DLT pipelines + data quality

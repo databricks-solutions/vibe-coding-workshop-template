@@ -9,6 +9,14 @@ metadata:
   used_by_stages: [1, 2, 3, 4]
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/databricks-unity-catalog/SKILL.md"
+      relationship: "derived"
+      last_synced: "2026-02-09"
+      sync_commit: "97a3637"
 ---
 
 # Schema Management Patterns for Databricks Asset Bundles
@@ -108,7 +116,7 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{bronze_schema}")
 
 **Schema properties and metadata are now managed at the table level via TBLPROPERTIES.**
 
-See `skills/common/databricks-table-properties/SKILL.md` for table-level property standards.
+See `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` for table-level property standards.
 
 ## Enabling Predictive Optimization at Schema Level
 

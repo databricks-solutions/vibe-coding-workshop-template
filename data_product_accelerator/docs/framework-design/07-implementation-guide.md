@@ -30,7 +30,7 @@ Expected columns: `table_catalog`, `table_schema`, `table_name`, `column_name`, 
 Open a new Cursor Agent conversation and enter:
 
 ```
-I have a customer schema at @context/Wanderbricks_Schema.csv. Please design the Gold layer using @skills/gold/00-gold-layer-design/SKILL.md
+I have a customer schema at @data_product_accelerator/context/Wanderbricks_Schema.csv. Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
 ```
 
 **Expected Result:** The agent will:
@@ -56,7 +56,7 @@ Verify ERD diagrams render correctly in Markdown preview
 Open a **new** Cursor Agent conversation:
 
 ```
-Set up the Bronze layer using @skills/bronze/00-bronze-layer-setup/SKILL.md with Approach A — generate Faker data matching the source schema.
+Set up the Bronze layer using @data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md with Approach A — generate Faker data matching the source schema.
 ```
 
 For real data instead of Faker, use Approach B (existing tables) or C (copy from source).
@@ -91,7 +91,7 @@ DESCRIBE DETAIL {catalog}.bronze.{table_name};
 Open a **new** Cursor Agent conversation:
 
 ```
-Set up the Silver layer using @skills/silver/00-silver-layer-setup/SKILL.md
+Set up the Silver layer using @data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md
 ```
 
 **Expected Result:**
@@ -124,7 +124,7 @@ SELECT * FROM {catalog}.silver.dq_expectations LIMIT 10;
 Open a **new** Cursor Agent conversation:
 
 ```
-Implement the Gold layer using @skills/gold/01-gold-layer-setup/SKILL.md
+Implement the Gold layer using @data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md
 ```
 
 **Expected Result:**
@@ -158,7 +158,7 @@ SHOW CONSTRAINTS ON {catalog}.gold.fact_{entity};
 Open a **new** Cursor Agent conversation:
 
 ```
-Perform project planning using @skills/planning/00-project-planning/SKILL.md
+Perform project planning using @data_product_accelerator/skills/planning/00-project-planning/SKILL.md
 ```
 
 The agent will ask interactive questions about which domains and addendums to include.
@@ -176,7 +176,7 @@ The agent will ask interactive questions about which domains and addendums to in
 Open a **new** Cursor Agent conversation:
 
 ```
-Set up the semantic layer using @skills/semantic-layer/00-semantic-layer-setup/SKILL.md
+Set up the semantic layer using @data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md
 ```
 
 **Expected Result:**
@@ -193,7 +193,7 @@ Set up the semantic layer using @skills/semantic-layer/00-semantic-layer-setup/S
 Open a **new** Cursor Agent conversation:
 
 ```
-Set up observability using @skills/monitoring/00-observability-setup/SKILL.md
+Set up observability using @data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md
 ```
 
 **Expected Result:**
@@ -206,7 +206,7 @@ Set up observability using @skills/monitoring/00-observability-setup/SKILL.md
 ## Phase 8: ML Pipeline (6-12 hours, optional)
 
 ```
-Set up the ML pipeline using @skills/ml/00-ml-pipeline-setup/SKILL.md
+Set up the ML pipeline using @data_product_accelerator/skills/ml/00-ml-pipeline-setup/SKILL.md
 ```
 
 ---
@@ -214,7 +214,7 @@ Set up the ML pipeline using @skills/ml/00-ml-pipeline-setup/SKILL.md
 ## Phase 9: GenAI Agents (8-16 hours, optional)
 
 ```
-Set up GenAI agents using @skills/genai-agents/00-genai-agents-setup/SKILL.md
+Set up GenAI agents using @data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md
 ```
 
 ---

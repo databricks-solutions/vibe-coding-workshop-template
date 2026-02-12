@@ -9,6 +9,14 @@ metadata:
   used_by_stages: [1, 2, 3, 4]
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/databricks-unity-catalog/SKILL.md"
+      relationship: "derived"
+      last_synced: "2026-02-09"
+      sync_commit: "97a3637"
 ---
 
 # Databricks Table Properties Standards
@@ -120,7 +128,7 @@ CLUSTER BY AUTO  -- ✅ CORRECT: Let Delta choose optimal clustering
 ### Modern Pattern (RECOMMENDED for Gold Layer)
 **For Gold layer tables, use dual-purpose documentation without "LLM:" prefix.**
 
-See `skills/gold/03-gold-layer-documentation/SKILL.md` for comprehensive Gold layer standards.
+See `data_product_accelerator/skills/gold/03-gold-layer-documentation/SKILL.md` for comprehensive Gold layer standards.
 
 **Pattern:**
 ```

@@ -33,6 +33,7 @@ metadata:
     - "operations guide"
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal convention
 ---
 
 # Documentation Organization & Framework Authoring
@@ -394,7 +395,7 @@ Generating docs/ml-framework-design/ with:
 
 | Location | Purpose | Maintained By |
 |----------|---------|---------------|
-| `skills/` | Agent skills (AI behavioral patterns) | This skill system |
+| `data_product_accelerator/skills/` | Agent skills (AI behavioral patterns) | This skill system |
 | `context/prompts/` | Domain context for AI | Project team |
 | `docs/` | Human-readable documentation | This skill (organizational + framework) |
 

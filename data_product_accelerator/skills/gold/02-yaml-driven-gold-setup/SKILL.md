@@ -14,6 +14,7 @@ metadata:
   standalone: true
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal YAML-driven approach
 ---
 
 # YAML-Driven Gold Layer Table Setup

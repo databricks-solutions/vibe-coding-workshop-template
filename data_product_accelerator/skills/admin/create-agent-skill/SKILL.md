@@ -11,6 +11,7 @@ metadata:
   source: AgentSkills.io Specification
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal convention (AgentSkills.io spec)
 ---
 
 # Create Agent Skills
@@ -30,7 +31,7 @@ A guide for creating new Agent Skills following the [AgentSkills.io specificatio
 
 ```bash
 SKILL_NAME="my-skill-name"
-mkdir -p "skills/admin/${SKILL_NAME}"
+mkdir -p "data_product_accelerator/skills/admin/${SKILL_NAME}"
 ```
 
 Then create `SKILL.md`:
@@ -168,7 +169,7 @@ my-skill/
 
 ### Skill Location
 
-Place skills under `skills/{domain}/`:
+Place skills under `data_product_accelerator/skills/{domain}/`:
 
 ```
 skills/

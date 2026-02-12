@@ -19,6 +19,7 @@ metadata:
     - genai-agents/00-genai-agents-setup
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal naming convention
 ---
 
 # Naming, Comment & Tagging Standards

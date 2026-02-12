@@ -2,20 +2,23 @@
 name: skill-freshness-audit
 description: >
   Systematic skill freshness auditing with verification anchors, volatility classification,
-  and staleness detection across all Agent Skills. Fetches official documentation URLs embedded
-  in skills, compares patterns against live docs, and reports drift. Use when auditing skill
-  currency, verifying skills against latest Databricks/MLflow docs, checking for stale skills,
-  or after a platform release. Triggers on "audit skills", "check freshness", "stale skills",
-  "verify skills", "skill audit", "update check", "Databricks released", "new MLflow version".
+  staleness detection, and upstream lineage tracking across all Agent Skills. Fetches official
+  documentation URLs embedded in skills, compares patterns against live docs, tracks lineage
+  to databricks-solutions/ai-dev-kit, and reports drift. Use when auditing skill currency,
+  verifying skills against latest Databricks/MLflow docs, checking for stale skills, syncing
+  with upstream AI-Dev-Kit, or after a platform release. Triggers on "audit skills",
+  "check freshness", "stale skills", "verify skills", "skill audit", "update check",
+  "Databricks released", "new MLflow version", "upstream sync", "ai-dev-kit lineage".
 license: Apache-2.0
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "2.0.0"
   domain: admin
   role: utility
   standalone: true
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # This audit system (self-referential)
 ---
 
 # Skill Freshness Audit
@@ -45,7 +48,17 @@ metadata:
       check_for: "YAML syntax, supported field types"
     - url: "https://mlflow.org/docs/latest/genai/serving/responses-agent"
       check_for: "ResponsesAgent API, predict() signature"
+  upstream_sources:                     # Repo-level lineage tracking (tracks upstream dependencies)
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/agent-bricks/SKILL.md"
+      relationship: "extended"          # derived | extended | inspired | reference
+      last_synced: "2026-02-09"
+      sync_commit: "97a3637"
 ```
+
+`verification_sources` checks live documentation URLs for API drift. `upstream_sources` tracks structured repo-level lineage for systematic upstream sync audits. Both are complementary.
 
 **Template:** See [assets/templates/verification-metadata.yaml](assets/templates/verification-metadata.yaml) for a copy-paste starter.
 
@@ -98,6 +111,58 @@ metadata:
 5. Update last_verified dates
 ```
 
+### Upstream Source Audit — Check AI-Dev-Kit Lineage
+
+Skills track their lineage to `databricks-solutions/ai-dev-kit` via `upstream_sources` metadata. This audit checks whether upstream sources have changed since the skill was last synced.
+
+```
+1. Run scan script to find skills with stale last_synced dates
+2. For each skill with upstream_sources:
+   a. Read the skill's upstream_sources from frontmatter
+   b. For each upstream path, WebFetch the raw GitHub URL:
+      https://raw.githubusercontent.com/{repo}/main/{path}
+   c. Compare key patterns against the skill's current content
+   d. Check for new patterns, deprecated approaches, or API changes in upstream
+3. Report upstream drift grouped by relationship type (derived > extended > reference)
+4. After syncing, update last_synced date and sync_commit in the skill frontmatter
+```
+
+**Lineage Map:** See [references/ai-dev-kit-lineage-map.md](references/ai-dev-kit-lineage-map.md) for the complete mapping of all skills to their upstream AI-Dev-Kit sources.
+
+**Priority by relationship type:**
+
+| Relationship | Sync Priority | Reasoning |
+|---|---|---|
+| `derived` | High | Skill directly draws from upstream; changes likely require updates |
+| `extended` | Medium | Skill extends upstream; check for new base patterns |
+| `inspired` | Low | Heavily customized; check for major direction changes only |
+| `reference` | Low | Original content; check for API/pattern accuracy only |
+
+### Upstream Drift Report Format
+
+When upstream drift is detected, report in this format:
+
+```markdown
+## Upstream Drift Report: {skill-name}
+
+**Skill:** `data_product_accelerator/skills/{domain}/{skill-name}/SKILL.md`
+**Upstream:** `{repo}` → `{path}`
+**Relationship:** {derived|extended|inspired|reference}
+**Last Synced:** {date} (commit: {hash})
+**Status:** UPSTREAM DRIFT DETECTED
+
+### Changes in Upstream:
+1. **{Pattern Name}** — {description of what changed upstream}
+   - **Our skill says:** {current pattern in our skill}
+   - **Upstream says:** {new pattern in upstream}
+   - **Impact:** {high|medium|low} — {why this matters}
+
+### Recommended Actions:
+- [ ] Update {section} to align with upstream {pattern}
+- [ ] Add new {capability} from upstream
+- [ ] Update `last_synced` and `sync_commit` in frontmatter
+```
+
 ---
 
 ## Critical Rules
@@ -135,7 +200,7 @@ When drift is detected, report in this format:
 ```markdown
 ## Drift Report: {skill-name}
 
-**Skill:** `skills/{domain}/{skill-name}/SKILL.md`
+**Skill:** `data_product_accelerator/skills/{domain}/{skill-name}/SKILL.md`
 **Last Verified:** {date}
 **Volatility:** {high|medium|low}
 **Status:** DRIFT DETECTED
@@ -161,7 +226,7 @@ When drift is detected, report in this format:
 The scan script parses all SKILL.md frontmatter and reports staleness:
 
 ```bash
-python skills/admin/skill-freshness-audit/scripts/scan_skill_freshness.py
+python data_product_accelerator/skills/admin/skill-freshness-audit/scripts/scan_skill_freshness.py
 ```
 
 ### Manual Scan Pattern
@@ -220,6 +285,8 @@ Before marking a skill as "verified":
 - [ ] No new major capabilities missing from skill
 - [ ] Code examples still compile/run correctly
 - [ ] `last_verified` date updated in frontmatter
+- [ ] If skill has `upstream_sources`, check upstream for changes since `last_synced`
+- [ ] If upstream changes found, update skill content and `last_synced` / `sync_commit`
 - [ ] Version history entry added if changes were made
 
 ---
@@ -227,12 +294,14 @@ Before marking a skill as "verified":
 ## Additional Resources
 
 - [Verification Sources Master List](references/verification-sources.md) — All skills mapped to their verification URLs
+- [AI-Dev-Kit Lineage Map](references/ai-dev-kit-lineage-map.md) — All skills mapped to their upstream AI-Dev-Kit sources
 - [Volatility Classification](references/volatility-classification.md) — Complete volatility ratings for all skills
-- [Verification Metadata Template](assets/templates/verification-metadata.yaml) — Copy-paste frontmatter template
-- [Scan Script](scripts/scan_skill_freshness.py) — Automated staleness scanner
+- [Verification Metadata Template](assets/templates/verification-metadata.yaml) — Copy-paste frontmatter template (includes `upstream_sources`)
+- [Scan Script](scripts/scan_skill_freshness.py) — Automated staleness and upstream sync scanner
 
 ## Version History
 
 | Date | Changes |
 |---|---|
+| Feb 9, 2026 | Added upstream_sources lineage tracking: AI-Dev-Kit lineage map, upstream source audit workflow, upstream drift report format, scan script upstream sync support |
 | Feb 7, 2026 | Initial creation: audit workflow, verification anchors, volatility classification, scan script |

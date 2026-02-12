@@ -15,7 +15,7 @@ graph TB
         CSR["Common Skills Index<br/>8 shared skills"]
     end
 
-    subgraph Skills["Knowledge Layer (skills/)"]
+    subgraph Skills["Knowledge Layer (data_product_accelerator/skills/)"]
         subgraph Orchestrators["Orchestrators (00-*)"]
             O1["gold/00-gold-layer-design"]
             O2["bronze/00-bronze-layer-setup"]
@@ -105,7 +105,7 @@ sequenceDiagram
     participant C as Common Skills
     participant D as Databricks Workspace
 
-    U->>R: "Design Gold layer from @context/schema.csv"
+    U->>R: "Design Gold layer from @data_product_accelerator/context/schema.csv"
     R->>O: Route to gold/00-gold-layer-design
     O->>W: Read gold/08-mermaid-erd-patterns
     O->>W: Read gold/02-yaml-driven-gold-setup

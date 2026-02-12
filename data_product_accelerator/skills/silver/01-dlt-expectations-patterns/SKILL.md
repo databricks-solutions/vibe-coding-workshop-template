@@ -13,6 +13,14 @@ metadata:
   standalone: true
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/spark-declarative-pipelines/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-02-09"
+      sync_commit: "97a3637"
 ---
 # Delta Live Tables Expectations Patterns
 

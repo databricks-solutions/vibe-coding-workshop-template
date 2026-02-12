@@ -14,6 +14,7 @@ metadata:
   standalone: true
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Stable schema validation logic
 ---
 
 # Gold Layer Schema Validation Patterns

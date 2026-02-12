@@ -262,16 +262,16 @@ How to invoke a skill in the Cursor IDE:
 
 ```
 # Stage 1: Gold Design
-I have a customer schema at @context/Wanderbricks_Schema.csv. Please design the Gold layer using @skills/gold/00-gold-layer-design/SKILL.md
+I have a customer schema at @data_product_accelerator/context/Wanderbricks_Schema.csv. Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
 
 # Stage 2: Bronze Setup
-Set up the Bronze layer using @skills/bronze/00-bronze-layer-setup/SKILL.md with Approach A
+Set up the Bronze layer using @data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md with Approach A
 
 # Stage 3: Silver Setup
-Set up the Silver layer using @skills/silver/00-silver-layer-setup/SKILL.md
+Set up the Silver layer using @data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md
 
 # Stage 4: Gold Implementation
-Implement the Gold layer using @skills/gold/01-gold-layer-setup/SKILL.md
+Implement the Gold layer using @data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md
 ```
 
 Each prompt triggers the orchestrator skill, which handles the full workflow.

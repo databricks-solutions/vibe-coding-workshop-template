@@ -44,7 +44,7 @@ context/*.csv
 
 **Prompt:**
 ```
-I have a customer schema at @context/Wanderbricks_Schema.csv. Please design the Gold layer using @skills/gold/00-gold-layer-design/SKILL.md
+I have a customer schema at @data_product_accelerator/context/Wanderbricks_Schema.csv. Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
 ```
 
 ---
@@ -68,7 +68,7 @@ I have a customer schema at @context/Wanderbricks_Schema.csv. Please design the 
 
 **Prompt:**
 ```
-Set up the Bronze layer using @skills/bronze/00-bronze-layer-setup/SKILL.md with Approach A
+Set up the Bronze layer using @data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md with Approach A
 ```
 
 ---
@@ -90,7 +90,7 @@ Set up the Bronze layer using @skills/bronze/00-bronze-layer-setup/SKILL.md with
 
 **Prompt:**
 ```
-Set up the Silver layer using @skills/silver/00-silver-layer-setup/SKILL.md
+Set up the Silver layer using @data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md
 ```
 
 ---
@@ -113,7 +113,7 @@ Set up the Silver layer using @skills/silver/00-silver-layer-setup/SKILL.md
 
 **Prompt:**
 ```
-Implement the Gold layer using @skills/gold/01-gold-layer-setup/SKILL.md
+Implement the Gold layer using @data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md
 ```
 
 ---
@@ -152,7 +152,7 @@ Each downstream orchestrator has a **Phase 0: Read Plan** step. If no manifest e
 
 **Prompt:**
 ```
-Perform project planning using @skills/planning/00-project-planning/SKILL.md
+Perform project planning using @data_product_accelerator/skills/planning/00-project-planning/SKILL.md
 ```
 
 ---
@@ -175,7 +175,7 @@ Perform project planning using @skills/planning/00-project-planning/SKILL.md
 
 **Prompt:**
 ```
-Set up the semantic layer using @skills/semantic-layer/00-semantic-layer-setup/SKILL.md
+Set up the semantic layer using @data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md
 ```
 
 ---
@@ -197,7 +197,7 @@ Set up the semantic layer using @skills/semantic-layer/00-semantic-layer-setup/S
 
 **Prompt:**
 ```
-Set up observability using @skills/monitoring/00-observability-setup/SKILL.md
+Set up observability using @data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md
 ```
 
 ---
@@ -220,7 +220,7 @@ Set up observability using @skills/monitoring/00-observability-setup/SKILL.md
 
 **Prompt:**
 ```
-Set up the ML pipeline using @skills/ml/00-ml-pipeline-setup/SKILL.md
+Set up the ML pipeline using @data_product_accelerator/skills/ml/00-ml-pipeline-setup/SKILL.md
 ```
 
 ---
@@ -243,7 +243,7 @@ Set up the ML pipeline using @skills/ml/00-ml-pipeline-setup/SKILL.md
 
 **Prompt:**
 ```
-Set up GenAI agents using @skills/genai-agents/00-genai-agents-setup/SKILL.md
+Set up GenAI agents using @data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md
 ```
 
 ---

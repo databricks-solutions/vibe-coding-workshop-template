@@ -25,6 +25,14 @@ metadata:
   source: context/prompts/02-silver-layer-prompt.md
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/spark-declarative-pipelines/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-02-09"
+      sync_commit: "97a3637"
 ---
 
 # Silver Layer Setup - Orchestrator Skill

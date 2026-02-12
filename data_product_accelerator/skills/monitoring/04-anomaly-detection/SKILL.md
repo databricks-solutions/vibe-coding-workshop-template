@@ -27,6 +27,7 @@ metadata:
   standalone: true
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources: []  # Internal anomaly detection patterns
 ---
 
 ## Overview

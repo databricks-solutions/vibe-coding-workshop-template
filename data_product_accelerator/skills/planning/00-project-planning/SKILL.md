@@ -36,6 +36,7 @@ metadata:
   default_mode: acceleration
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal planning methodology
 ---
 
 # Project Plan Methodology for Databricks Solutions
@@ -688,11 +689,11 @@ Domain 3: "Miscellaneous" ❌ (forced)
 - [Table-Valued Functions](https://docs.databricks.com/sql/language-manual/sql-ref-syntax-ddl-create-sql-function.html)
 
 ### Related Skills
-- [databricks-table-valued-functions](skills/semantic-layer/databricks-table-valued-functions/SKILL.md)
-- [metric-views-patterns](skills/semantic-layer/metric-views-patterns/SKILL.md)
-- [lakehouse-monitoring-comprehensive](skills/monitoring/01-lakehouse-monitoring-comprehensive/SKILL.md)
-- [databricks-aibi-dashboards](skills/monitoring/02-databricks-aibi-dashboards/SKILL.md)
-- [genie-space-patterns](skills/semantic-layer/genie-space-patterns/SKILL.md) — Genie Space setup for agents
+- [databricks-table-valued-functions](../../semantic-layer/02-databricks-table-valued-functions/SKILL.md)
+- [metric-views-patterns](../../semantic-layer/01-metric-views-patterns/SKILL.md)
+- [lakehouse-monitoring-comprehensive](../../monitoring/01-lakehouse-monitoring-comprehensive/SKILL.md)
+- [databricks-aibi-dashboards](../../monitoring/02-databricks-aibi-dashboards/SKILL.md)
+- [genie-space-patterns](../../semantic-layer/03-genie-space-patterns/SKILL.md) — Genie Space setup for agents
 
 ### Agent Framework Technologies
 - [LangChain](https://python.langchain.com/) — Agent framework

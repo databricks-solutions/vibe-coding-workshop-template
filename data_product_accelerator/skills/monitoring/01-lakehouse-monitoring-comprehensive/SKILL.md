@@ -24,6 +24,7 @@ metadata:
     - anomaly-detection
   last_verified: "2026-02-07"
   volatility: medium
+  upstream_sources: []  # Internal monitoring patterns
 ---
 
 # Lakehouse Monitoring Comprehensive

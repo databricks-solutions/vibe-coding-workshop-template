@@ -1,6 +1,13 @@
 #!/bin/bash
 # Auto-organize documentation files into proper directory structure
 # Ensures project root stays clean and documentation is properly categorized
+# NOTE: Run this script from the data_product_accelerator/ directory (project root)
+
+# Verify we're in the right directory
+if [ ! -d "skills" ] || [ ! -d "docs" ]; then
+    echo "ERROR: Run this script from the data_product_accelerator/ directory." >&2
+    exit 1
+fi
 
 # Create structure
 mkdir -p docs/{deployment/deployment-history,troubleshooting,architecture,operations,development,reference}

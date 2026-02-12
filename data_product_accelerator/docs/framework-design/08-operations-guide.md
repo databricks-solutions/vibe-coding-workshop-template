@@ -10,7 +10,7 @@ This guide covers the ongoing maintenance, evolution, and operational procedures
 
 | Check | Frequency | How | Expected Result |
 |-------|-----------|-----|-----------------|
-| Skill count | Weekly | `find skills -name "SKILL.md" \| wc -l` | 50 skills present |
+| Skill count | Weekly | `find data_product_accelerator/skills -name "SKILL.md" \| wc -l` | 50 skills present |
 | Entry point | Weekly | `test -f AGENTS.md && echo "OK"` | AGENTS.md present |
 | Broken references | Monthly | Grep for dead links in SKILL.md files | 0 broken links |
 | Skill freshness | Monthly | Run `skill-freshness-audit` skill | All skills within verification window |
@@ -33,7 +33,7 @@ Skills encode Databricks platform patterns that evolve over time. The `admin/ski
 ### Running an Audit
 
 ```
-Audit skill freshness using @skills/admin/skill-freshness-audit/SKILL.md
+Audit skill freshness using @data_product_accelerator/skills/admin/skill-freshness-audit/SKILL.md
 ```
 
 The audit skill:
@@ -81,7 +81,7 @@ The `admin/self-improvement` skill should be invoked when:
 ### How It Works
 
 ```
-Learn from this error using @skills/admin/self-improvement/SKILL.md
+Learn from this error using @data_product_accelerator/skills/admin/self-improvement/SKILL.md
 ```
 
 The self-improvement skill:
@@ -106,7 +106,7 @@ The self-improvement skill:
 ### Creation Process
 
 ```
-Create a new skill using @skills/admin/create-agent-skill/SKILL.md
+Create a new skill using @data_product_accelerator/skills/admin/create-agent-skill/SKILL.md
 ```
 
 ### Required Steps
@@ -198,9 +198,9 @@ Create a new skill using @skills/admin/create-agent-skill/SKILL.md
 
 | Role | Permissions | Responsibility |
 |------|-------------|----------------|
-| Framework Maintainer | Full write to `skills/` | Skill updates, freshness audits |
-| Contributor | PR to `skills/` | New patterns, bug fixes |
-| User | Read `skills/` | Use skills via Cursor Agent |
+| Framework Maintainer | Full write to `data_product_accelerator/skills/` | Skill updates, freshness audits |
+| Contributor | PR to `data_product_accelerator/skills/` | New patterns, bug fixes |
+| User | Read `data_product_accelerator/skills/` | Use skills via Cursor Agent |
 
 ### Skill Update Procedure
 

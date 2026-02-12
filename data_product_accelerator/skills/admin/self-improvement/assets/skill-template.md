@@ -1,6 +1,23 @@
 ---
 name: {kebab-case-name}
 description: {What this skill does}. {When to use it}. Use when {trigger scenario 1}, {trigger scenario 2}, or {trigger scenario 3}.
+metadata:
+  author: {author}
+  version: "1.0.0"
+  domain: {domain}
+  role: {worker|orchestrator|utility}
+  last_verified: "{YYYY-MM-DD}"
+  volatility: {high|medium|low}
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "{path to upstream source file}"
+      relationship: "{derived|extended|inspired|reference}"
+      last_synced: "{YYYY-MM-DD}"
+      sync_commit: "{short-hash}"
+  # For skills with NO upstream dependency, replace the above with:
+  # upstream_sources: []
 ---
 
 # {Skill Title}

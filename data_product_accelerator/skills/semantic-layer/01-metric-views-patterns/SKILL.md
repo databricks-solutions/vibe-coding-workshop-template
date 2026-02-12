@@ -13,6 +13,7 @@ metadata:
   standalone: true
   last_verified: "2026-02-07"
   volatility: high
+  upstream_sources: []  # Internal metric view patterns
 ---
 
 # Metric Views Patterns for Genie & AI/BI

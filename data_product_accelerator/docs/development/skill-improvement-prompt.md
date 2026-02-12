@@ -11,12 +11,12 @@ Copy the block below, replace the `{placeholders}`, and paste into a new convers
 ---
 
 ```
-Review and improve the opinionated skill at @skills/{domain}/{skill-name} using
+Review and improve the opinionated skill at @data_product_accelerator/skills/{domain}/{skill-name} using
 the generic reference material at @databricks-skills/{reference-folder} .
 
 ## Context
 
-- **Our skill** (skills/) is part of an opinionated execution framework.
+- **Our skill** (data_product_accelerator/skills/) is part of an opinionated execution framework.
   It prescribes ONE correct way to do things, with mandatory patterns and error prevention.
 - **The generic skill** (databricks-skills/) is a reference library offering multiple
   approaches, explanations, and flexibility. It is NOT opinionated.
@@ -73,31 +73,31 @@ the generic reference material at @databricks-skills/{reference-folder} .
 
 ### Example 1: Asset Bundles (already done)
 ```
-Review and improve the opinionated skill at @skills/common/databricks-asset-bundles
+Review and improve the opinionated skill at @data_product_accelerator/skills/common/databricks-asset-bundles
 using the generic reference material at @databricks-skills/asset-bundles .
 ```
 
 ### Example 2: Unity Catalog Constraints
 ```
-Review and improve the opinionated skill at @skills/common/unity-catalog-constraints
+Review and improve the opinionated skill at @data_product_accelerator/skills/common/unity-catalog-constraints
 using the generic reference material at @databricks-skills/databricks-unity-catalog .
 ```
 
 ### Example 3: DLT Expectations
 ```
-Review and improve the opinionated skill at @skills/silver/dlt-expectations-patterns
+Review and improve the opinionated skill at @data_product_accelerator/skills/silver/dlt-expectations-patterns
 using the generic reference material at @databricks-skills/databricks-dlt .
 ```
 
 ### Example 4: Lakehouse Monitoring
 ```
-Review and improve the opinionated skill at @skills/monitoring/lakehouse-monitoring-comprehensive
+Review and improve the opinionated skill at @data_product_accelerator/skills/monitoring/lakehouse-monitoring-comprehensive
 using the generic reference material at @databricks-skills/databricks-monitoring .
 ```
 
 ### Example 5: AI/BI Dashboards
 ```
-Review and improve the opinionated skill at @skills/monitoring/databricks-aibi-dashboards
+Review and improve the opinionated skill at @data_product_accelerator/skills/monitoring/databricks-aibi-dashboards
 using the generic reference material at @databricks-skills/databricks-dashboards .
 ```
 

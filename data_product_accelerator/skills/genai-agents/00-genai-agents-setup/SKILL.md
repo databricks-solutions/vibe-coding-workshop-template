@@ -52,6 +52,14 @@ metadata:
     - semantic-layer/genie-space-optimization
   last_verified: "2026-02-07"
   volatility: high
+  upstream_sources:
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/agent-bricks/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-02-09"
+      sync_commit: "97a3637"
 ---
 
 # GenAI Agent Implementation Orchestrator
@@ -283,7 +291,7 @@ else:
 
 ### Phase 8: Genie Optimization
 
-**Load skill:** `@skills/semantic-layer/05-genie-space-optimization/SKILL.md` (cross-domain)
+**Load skill:** `@data_product_accelerator/skills/semantic-layer/05-genie-space-optimization/SKILL.md` (cross-domain)
 
 **Goal:** Improve Genie Space accuracy and repeatability.
 

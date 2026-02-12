@@ -38,6 +38,7 @@ metadata:
     - gold-layer-merge-patterns
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal dimensional modeling methodology
 ---
 
 # Gold Layer Design Orchestrator
@@ -298,7 +299,7 @@ The report summarizes: table inventory, entity classification, inferred relation
 
 **MANDATORY: Read this skill using the Read tool BEFORE defining fact table grains:**
 
-1. `skills/gold/fact-table-grain-validation/SKILL.md` — Grain inference from PRIMARY KEY structure, transaction vs aggregated vs snapshot patterns, PK-grain decision tree
+1. `data_product_accelerator/skills/gold/fact-table-grain-validation/SKILL.md` — Grain inference from PRIMARY KEY structure, transaction vs aggregated vs snapshot patterns, PK-grain decision tree
 
 **Apply from skill:**
 - Infer grain type from PRIMARY KEY structure (transaction, aggregated, snapshot)
@@ -318,7 +319,7 @@ The report summarizes: table inventory, entity classification, inferred relation
 
 **MANDATORY: Read this skill using the Read tool BEFORE creating any ERD diagrams:**
 
-1. `skills/gold/mermaid-erd-patterns/SKILL.md` — ERD organization strategy (master/domain/summary), Mermaid syntax standards, domain emoji markers, relationship patterns, cross-domain references
+1. `data_product_accelerator/skills/gold/mermaid-erd-patterns/SKILL.md` — ERD organization strategy (master/domain/summary), Mermaid syntax standards, domain emoji markers, relationship patterns, cross-domain references
 
 **Activities:**
 1. Count tables to determine ERD strategy (1-8, 9-20, 20+)
@@ -345,8 +346,8 @@ The report summarizes: table inventory, entity classification, inferred relation
 
 **MANDATORY: Read each skill below using the Read tool BEFORE generating any YAML schema files:**
 
-1. `skills/gold/yaml-driven-gold-setup/SKILL.md` — YAML schema file structure, domain-organized directories, column definition format, PK/FK in YAML
-2. `skills/gold/gold-layer-documentation/SKILL.md` — Dual-purpose description pattern (`[Definition]. Business: [...]. Technical: [...].`), surrogate key naming, TBLPROPERTIES metadata, column comment standards
+1. `data_product_accelerator/skills/gold/yaml-driven-gold-setup/SKILL.md` — YAML schema file structure, domain-organized directories, column definition format, PK/FK in YAML
+2. `data_product_accelerator/skills/gold/gold-layer-documentation/SKILL.md` — Dual-purpose description pattern (`[Definition]. Business: [...]. Technical: [...].`), surrogate key naming, TBLPROPERTIES metadata, column comment standards
 
 **Activities:**
 1. Create domain-organized YAML directory structure (`yaml/{domain}/`)
@@ -436,7 +437,7 @@ The report summarizes: table inventory, entity classification, inferred relation
 
 **MANDATORY: Read this skill using the Read tool BEFORE running design validation:**
 
-1. `skills/gold/gold-layer-schema-validation/SKILL.md` — Schema consistency validation, DDL-first workflow, column matching between YAML and ERD
+1. `data_product_accelerator/skills/gold/gold-layer-schema-validation/SKILL.md` — Schema consistency validation, DDL-first workflow, column matching between YAML and ERD
 
 **Also read:** `references/validation-checklists.md`
 
@@ -524,7 +525,7 @@ gold_layer_design/
 
 After completing design and obtaining stakeholder sign-off, **read the implementation orchestrator skill:**
 
-1. `skills/gold/01-gold-layer-setup/SKILL.md` — End-to-end implementation of tables, merge scripts, FK constraints, and Asset Bundle jobs from the YAML designs created here
+1. `data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md` — End-to-end implementation of tables, merge scripts, FK constraints, and Asset Bundle jobs from the YAML designs created here
 
 That skill will in turn invoke:
 - `gold-layer-merge-patterns` — SCD Type 1/2 dimension merges, fact aggregation patterns

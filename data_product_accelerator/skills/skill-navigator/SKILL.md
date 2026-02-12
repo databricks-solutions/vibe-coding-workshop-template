@@ -8,6 +8,7 @@ metadata:
   role: navigator
   last_verified: "2026-02-07"
   volatility: low
+  upstream_sources: []  # Internal routing
 ---
 
 # Skill Navigator: Context-Aware Tiered Loading System
@@ -24,7 +25,7 @@ This navigation skill implements **tiered context loading** with **orchestrator-
 
 This framework uses a **Design-First** pipeline: design the target Gold model from the customer's schema CSV, then build the data layers (Bronze → Silver) to feed it, then implement.
 
-**Entry point:** Customer provides a source schema CSV in `context/`. Start with Gold Design.
+**Entry point:** Customer provides a source schema CSV in `data_product_accelerator/context/`. Start with Gold Design.
 
 | Stage | Name | Orchestrator Skill | Key Deliverables |
 |-------|------|-------------------|-----------------|
@@ -39,7 +40,7 @@ This framework uses a **Design-First** pipeline: design the target Gold model fr
 | 9 | GenAI Agents | `genai-agents/00-genai-agents-setup` | Agents, evaluation, deployment |
 
 ```
-context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Observability (7) → ML (8) → GenAI (9)
+data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Observability (7) → ML (8) → GenAI (9)
 ```
 
 ---
@@ -68,22 +69,37 @@ Each downstream orchestrator has a **Phase 0: Read Plan** step that reads its ma
 
 ---
 
-## Input Convention: `context/` Directory
+## Input Convention: `data_product_accelerator/context/` Directory
 
-The `context/` directory is the **standard location** for customer-provided input metadata that drives the entire pipeline:
+The `data_product_accelerator/context/` directory is the **standard location** for customer-provided input metadata that drives the entire pipeline:
 
 ```
-context/
-├── {ProjectName}_Schema.csv     # MANDATORY: Customer source schema (THE starting input)
-├── business_requirements.md     # Optional: Business context, use cases, stakeholders
-└── prompts/                     # Legacy prompt templates (reference only)
+data_product_accelerator/
+└── context/
+    ├── {ProjectName}_Schema.csv     # MANDATORY: Customer source schema (THE starting input)
+    ├── business_requirements.md     # Optional: Business context, use cases, stakeholders
+    └── prompts/                     # Legacy prompt templates (reference only)
 ```
 
-**The schema CSV** (e.g., `context/Wanderbricks_Schema.csv`) contains table and column metadata exported from the customer's source system. Expected columns: `table_catalog`, `table_schema`, `table_name`, `column_name`, `ordinal_position`, `full_data_type`, `data_type`, `is_nullable`, `comment`.
+**The schema CSV** (e.g., `data_product_accelerator/context/Wanderbricks_Schema.csv`) contains table and column metadata exported from the customer's source system. Expected columns: `table_catalog`, `table_schema`, `table_name`, `column_name`, `ordinal_position`, `full_data_type`, `data_type`, `is_nullable`, `comment`.
 
 **Who reads it:**
 - `gold/00-gold-layer-design` (Phase 0: Schema Intake) — parses into table inventory for dimensional modeling
 - `bronze/00-bronze-layer-setup` (Approach A) — creates Bronze DDLs matching source schema
+
+## Output Convention: Generated Artifacts at Repository Root
+
+All generated artifacts are created at the **repository root** (parent of `data_product_accelerator/`), not inside the framework module:
+
+| Artifact | Created By | Path (from repo root) |
+|----------|-----------|----------------------|
+| Dimensional model YAMLs, ERDs | Gold Design (stage 1) | `gold_layer_design/` |
+| Notebooks and scripts | Bronze, Silver, Gold, Semantic, ML skills | `src/` |
+| Phase plans and manifests | Planning (stage 5) | `plans/` |
+| DAB job/pipeline YAML | Asset Bundle skills | `resources/` |
+| Bundle root config | Asset Bundle skills | `databricks.yml` |
+
+This separation keeps the framework (`data_product_accelerator/`) read-only and portable, while generated code lives alongside it at the repo root.
 
 ---
 
@@ -153,7 +169,7 @@ domain-folder/
 
 | Task Keywords | Route To |
 |---|---|
-| "new project", "schema CSV", "customer schema", "bootstrap", "start from scratch", "onboarding", "build data platform" | `gold/00-gold-layer-design` (Stage 1 — reads schema CSV from `context/`) |
+| "new project", "schema CSV", "customer schema", "bootstrap", "start from scratch", "onboarding", "build data platform" | `gold/00-gold-layer-design` (Stage 1 — reads schema CSV from `data_product_accelerator/context/`) |
 
 ### Orchestrator Routes (prefer these for end-to-end workflows)
 
