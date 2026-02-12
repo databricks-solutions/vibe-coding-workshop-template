@@ -78,6 +78,28 @@ Set up the Bronze layer using @data_product_accelerator/skills/bronze/00-bronze-
 - Data generation or copy notebooks
 - Asset Bundle job configuration
 
+### ⚠️ Validation Checkpoint
+
+> **Important:** Due to the non-deterministic nature of LLMs, it may take a few tries of troubleshooting with the LLM to ensure the jobs run correctly and the tables are set-up correctly. It's of utmost importance that you verify the output before proceeding further.
+
+**Recommended:** Validate the Bronze layer deployment before moving to the next step.
+
+**Validation Prompt:**
+
+```
+Using @data_product_accelerator/skills/common/databricks-autonomous-operations, validate, deploy, run, troubleshoot until success for the Bronze layer jobs?
+```
+
+This prompt will:
+- Deploy the Asset Bundle
+- Run the Bronze jobs
+- Monitor execution
+- Diagnose any failures
+- Apply fixes automatically
+- Redeploy and retry (up to 3 iterations)
+
+> **Prerequisite:** Ensure Databricks CLI is installed and authenticated (`databricks auth login`).
+
 ---
 
 ## Step 3: Silver Layer Setup
@@ -96,6 +118,28 @@ Set up the Silver layer using @data_product_accelerator/skills/silver/00-silver-
 - Quarantine patterns for failed records
 - Asset Bundle pipeline configuration
 
+### ⚠️ Validation Checkpoint
+
+> **Important:** Due to the non-deterministic nature of LLMs, it may take a few tries of troubleshooting with the LLM to ensure the jobs run correctly and the tables are set-up correctly. It's of utmost importance that you verify the output before proceeding further.
+
+**Recommended:** Validate the Silver layer DLT pipeline deployment before moving to the next step.
+
+**Validation Prompt:**
+
+```
+Using @data_product_accelerator/skills/common/databricks-autonomous-operations, validate, deploy, run, troubleshoot until success for the Silver layer DLT pipelines?
+```
+
+This prompt will:
+- Deploy the Asset Bundle
+- Run the DLT pipelines
+- Monitor execution
+- Diagnose any failures
+- Apply fixes automatically
+- Redeploy and retry (up to 3 iterations)
+
+> **Prerequisite:** Ensure Databricks CLI is installed and authenticated (`databricks auth login`).
+
 ---
 
 ## Step 4: Gold Layer Implementation
@@ -113,6 +157,29 @@ Implement the Gold layer using @data_product_accelerator/skills/gold/01-gold-lay
 - Silver-to-Gold MERGE notebooks (SCD Type 1/2 dimensions, fact tables)
 - FK constraint application scripts
 - Asset Bundle job configuration
+
+### ⚠️ Validation Checkpoint
+
+> **Important:** Due to the non-deterministic nature of LLMs, it may take a few tries of troubleshooting with the LLM to ensure the jobs run correctly and the tables are set-up correctly. It's of utmost importance that you verify the output before proceeding further.
+
+**Recommended:** Validate the Gold layer implementation (table creation and merge operations) before moving to the next step.
+
+**Validation Prompt:**
+
+```
+Using @data_product_accelerator/skills/common/databricks-autonomous-operations, validate, deploy, run, troubleshoot until success for the Gold layer setup and merge jobs?
+```
+
+This prompt will:
+- Deploy the Asset Bundle
+- Run the Gold table creation jobs
+- Run the Silver-to-Gold merge jobs
+- Monitor execution
+- Diagnose any failures
+- Apply fixes automatically
+- Redeploy and retry (up to 3 iterations)
+
+> **Prerequisite:** Ensure Databricks CLI is installed and authenticated (`databricks auth login`).
 
 ---
 
@@ -219,6 +286,7 @@ Set up GenAI agents using @data_product_accelerator/skills/genai-agents/00-genai
 - **New conversation per stage.** Start a fresh agent conversation for each stage to keep context clean.
 - **The skill does the thinking.** You don't need to specify details — the orchestrator reads its worker skills, common skills, and your existing artifacts automatically.
 - **If something fails,** the `databricks-autonomous-operations` common skill kicks in for troubleshooting (Deploy → Poll → Diagnose → Fix → Redeploy).
+- **Validate at checkpoints.** After Bronze, Silver, and Gold setup, use the validation prompts with `@data_product_accelerator/skills/common/databricks-autonomous-operations` to deploy, run, and troubleshoot until success. LLM non-determinism may require multiple iterations — verify output before proceeding to the next stage. Requires Databricks CLI installed and authenticated.
 
 ---
 
