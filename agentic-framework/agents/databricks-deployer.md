@@ -77,31 +77,53 @@ For project-specific deployment scripts, look in `agentic-framework/skills/*/scr
 
 ## Deployment Workflow
 
-### Step 1: Register the Agent Model
+### Step 0: Validate Environment (DO THIS FIRST)
 
-If the project has an agent model to register (check for MLflow Pyfunc model in `server/agents/`):
+Before any deployment action:
+1. **Query available Spark versions**: `GET /api/2.0/clusters/spark-versions` — use `16.4.x-cpu-ml-scala2.12` (note the `-cpu-`)
+2. **Check for existing serving endpoints** and their types (langchain vs pyfunc)
+3. **Verify UC catalog/schema exists** for model registration
+4. **Read `agentic-framework/skills/databricks-job-runner/SKILL.md`** — contains:
+   - Runtime compatibility matrix (15.4 vs 16.4, pydantic issues)
+   - pyfunc vs langchain decision tree
+   - Notebook template (recommended for initial deployment)
+   - `handle_tool_errors=True` requirement
 
-1. Look for registration scripts in `agentic-framework/skills/*/scripts/` or `server/agents/`
-2. If a script exists, run it:
-   ```bash
-   python server/agents/log_model.py
-   ```
-3. If no script exists, follow the patterns in https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-skills/model-serving/6-logging-registration.md to create one in `agentic-framework/skills/` or `server/agents/`
+### Step 1: Register the Agent Model (NOTEBOOK-FIRST)
+
+**DO NOT create a Databricks Job as the first step.** Use a notebook for instant feedback:
+
+1. Upload agent code to workspace: `databricks workspace import --format AUTO --overwrite`
+2. Create a notebook on a **16.4 LTS ML** interactive cluster
+3. Cell 1: `%pip install databricks-langchain langgraph langchain-core databricks-agents` then `dbutils.library.restartPython()`
+4. Cell 2: Test agent locally — `GRAPH.invoke({"messages": [...]})` 
+5. Cell 3: `mlflow.pyfunc.log_model(python_model=agent_file, ...)` — verify success
+6. **Only after all cells succeed**, optionally convert to a reusable job.
+
+See the full notebook template in `agentic-framework/skills/databricks-job-runner/SKILL.md`.
+
+**Why notebook-first?** Both `pyfunc.log_model()` and `langchain.log_model()` import agent.py at log time. Deps like `databricks-langchain` are NOT pre-installed on ML runtimes. A notebook's `%pip install` solves this; a job requires complex cluster library config. Each job failure costs 5-10 min; a notebook error is instant.
 
 ### Step 2: Deploy to Serving Endpoint
 
-If the project needs a serving endpoint:
+From the same notebook or a new cell:
 
-1. Follow the deployment patterns in https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-skills/model-serving/7-deployment.md
-2. Use `databricks.agents.deploy()` for GenAI agents (async, ~15 min)
-3. Use the Databricks SDK directly for classical ML models
+1. **Check for endpoint type conflicts**: If an existing endpoint was created with a different model type (langchain vs pyfunc), delete it first:
+   ```python
+   from databricks.sdk import WorkspaceClient
+   WorkspaceClient().serving_endpoints.delete("old_endpoint_name")
+   ```
+2. Deploy: `databricks.agents.deploy(model_name, version, scale_to_zero_enabled=True)`
+3. Wait ~15 minutes for endpoint to reach READY state
+
+**WARNING:** `databricks.agents.deploy()` locks the endpoint type to the model's flavour. You CANNOT deploy a pyfunc model to a langchain endpoint or vice versa. Delete and recreate if switching.
 
 ### Step 3: Validate the Endpoint
 
 1. Follow the patterns in https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-skills/model-serving/8-querying-endpoints.md
 2. Validate:
    - Check endpoint status via Databricks SDK or `get_serving_endpoint_status` MCP tool
-   - Send a test request and verify the response
+   - Send a test request and verify the response — confirm no `null` responses on tool-use queries
    - Check latency is within acceptable bounds
 
 ### Step 4: Update app.yaml and Wire Endpoint into App
