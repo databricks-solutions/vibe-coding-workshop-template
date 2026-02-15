@@ -1,4 +1,4 @@
-Wire the multi-agent system to the existing StayFinder frontend UI.
+Wire the multi-agent system to the existing project's frontend UI.
 
 ## Objective
 
