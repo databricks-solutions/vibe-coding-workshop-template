@@ -2,7 +2,7 @@ Build a multi-agent orchestrator for this project using Databricks Foundation Mo
 
 ## Objective
 
-Create a **super agent** — a backend agentic loop that uses a Databricks-hosted
+Create a **supervisor agent** — a backend agentic loop that uses a Databricks-hosted
 Foundation Model (e.g., `databricks-meta-llama-3-3-70b-instruct`) with **function
 calling** to orchestrate tool execution. The Foundation Model acts as the brain;
 your backend code executes the tools and manages the conversation loop.
@@ -26,121 +26,230 @@ The backend implements a **tool-calling loop**:
 3. Repeat until the model returns a final text response (no more tool calls)
 4. Return the response to the user
 
+## Prerequisites (MUST COMPLETE FIRST)
+
+Before starting this build, ensure all Databricks resources are created and validated.
+Follow `docs/pre-req.md` and complete every item in its Section 7 Readiness Checklist:
+
+- [ ] UC tables created and seeded (gold-layer listing data)
+- [ ] UC functions (TVFs) created and returning results
+- [ ] Genie Space created, configured, and answering queries via API
+- [ ] Lakebase instance running with tables created
+- [ ] Foundation Model endpoint reachable and supports function calling
+- [ ] All environment variables collected
+
+**DO NOT proceed to Step 1 unless all prerequisites pass.**
+
 ## Required Skill Reading (READ BEFORE BUILDING)
 
 | Order | Skill | File(s) | Why |
 |-------|-------|---------|-----|
-| 1 | `databricks-app-python/` | `2-app-resources.md` | **App-to-endpoint auth**: `Config().authenticate()` + `requests.post()` for calling Foundation Model endpoints |
-| 2 | `databricks-app-python/` | `SKILL.md` | App deployment, framework selection, port config |
-| 3 | `databricks-genie/` | `conversation.md` | Genie Conversation API patterns for the Genie tool |
+| 1 | `databricks-app-python/` | `2-app-resources.md` | **App-to-endpoint auth**: `Config().authenticate()` + `requests.post()` |
+| 2 | `databricks-genie/` | `conversation.md` | Genie Conversation API patterns for the Genie tool |
+| 3 | `foundation-model-agent-loop/` | `SKILL.md` (local) | **Canonical agent loop pattern** — reference code for `agent_loop.py` |
 
-**No model-serving, MLflow, or job-runner skills are needed** — the Foundation Model
-is already deployed by Databricks.
+**No model-serving, MLflow, or job-runner skills are needed.**
 
 ## Constraints (READ FIRST)
 
-- **DO NOT** create any Genie spaces. Discover and use existing ones.
-- **DO NOT** create any Unity Catalog functions, tables, or catalogs.
-- **DO NOT** register or deploy any custom models. Use the hosted Foundation Model directly.
+- **DO NOT** create any Genie spaces, UC functions, tables, or catalogs — use existing ones from pre-req.
+- **DO NOT** register or deploy any custom models.
+- **DO NOT** create separate LLM tools for parsing, classification, or summarization — the FM handles these natively.
 - **DO** discover all pre-existing Databricks resources by analyzing the project folder.
 - **DO** ask the user for confirmation before modifying or overwriting existing files.
 - Use environment variables for all credentials and service identifiers.
 
-## Chain
+## Build Steps
 
-### Phase 1: Analyze
-Use the **prd-analyzer** subagent from `agentic-framework/agents/`.
+Each step produces **exactly one artifact** and has **one validation gate**. Complete
+each gate before proceeding to the next step.
 
-- Scan the project: `docs/`, config files (`app.yaml`, `env.example`, `.env`,
-  `pyproject.toml`), `server/routers/`, and any existing `server/agents/` directory.
-- Analyze the PRD found in `docs/`.
-- **Inventory existing Databricks resources** by analyzing the project folder:
-  - Genie spaces (record space IDs, names, tables)
-  - Foundation Model endpoints (record endpoint names like `databricks-meta-llama-3-3-70b-instruct`)
-  - UC schemas and tables referenced in config files
+### Step 1: Analyze PRD
+
+**Subagent:** prd-analyzer (`agentic-framework/agents/prd-analyzer.md`)
+
+**Input:** `docs/design_prd.md` + project config files (`app.yaml`, `.env.example`)
+
+**Task:**
+- Scan the project: `docs/`, config files, `server/routers/`, `server/agents/`
+- Analyze the PRD
+- Inventory existing Databricks resources from config files:
+  - Genie Space ID (from `GENIE_SPACE_ID` in `app.yaml`)
+  - FM endpoint name (from `LLM_ENDPOINT_NAME` in `app.yaml`)
+  - UC tables and TVFs (from `docs/pre-req.md` if available)
 - Classify each PRD requirement into a tool type:
-  - **Genie tool**: Requirements answerable via SQL over existing tables
-  - **LLM-native**: Requirements the Foundation Model handles directly (intent
-    classification, summarization, conversational responses) — NO separate tool needed
-  - **Custom Python tool**: Business logic, computation, date math, external API calls
-- Output the analysis to `docs/agent_architecture.md`, including:
-  1. Existing resource inventory
-  2. Architecture pattern (Foundation Model with function calling)
-  3. Requirement → tool mapping matrix
-  4. Tools to build (only Genie wrapper + custom Python tools)
-  5. Gaps: any requirement needing a resource that doesn't exist
+  - **Genie tool**: Requirements answerable via SQL (listing search, availability, reviews)
+  - **LLM-native**: Requirements the FM handles directly (intent classification, summarization, conversation) — NO separate tool needed
+  - **Custom Python tool**: Business logic (price calculation, date validation, confirmation numbers)
 
-### Phase 2: Scaffold
-Use the **skill-scaffolder** subagent from `agentic-framework/agents/`.
+**Output:** `docs/agent_architecture.md` — rewritten to match FM approach
 
-- Read `docs/agent_architecture.md` (Phase 1 output).
+**Gate:** User reviews and approves the architecture document before proceeding.
 
-  **Step 1 — Tool modules** (plain Python functions):
-  Create under `server/agents/tools/`:
-  - **Genie query tool**: Calls the Genie Conversation API for database queries.
-    Reads `GENIE_SPACE_ID` from environment variables.
-  - **Custom Python tools**: Business logic (e.g., price calculation, date
-    validation, confirmation number generation).
-  - **NO separate LLM tools needed** — the Foundation Model handles NL
-    understanding, classification, and summarization natively as part of its
-    response. Don't create tools for things the LLM already does.
+---
 
-  Each tool module should:
-  - Define a plain Python function with clear docstring
-  - Define a matching JSON schema (OpenAI function-calling format) for the
-    Foundation Model to understand when/how to call it
-  - Handle errors gracefully (return error strings, never raise)
+### Step 2a: Build Genie Tool (parallel with 2b)
 
-  **Step 2 — Agent loop (`server/agents/agent_loop.py`)**:
-  Create a plain Python module that:
-  - Defines `SYSTEM_PROMPT` derived from the PRD
-  - Defines `TOOL_SCHEMAS` (list of tool definitions in OpenAI format)
-  - Defines `TOOL_FUNCTIONS` (dispatch dict mapping tool names to functions)
-  - Implements `async def run_agent_loop(user_message, cfg)` that:
-    1. Calls the Foundation Model endpoint with system prompt + user message + tools
-    2. If the response contains tool_calls → executes each tool → appends results
-    3. Loops until the model returns a final text response (max 10 iterations)
-    4. Returns the final response text
-  - Uses `Config().authenticate()` + `requests.post()` for endpoint calls
-  - All errors caught and returned as user-friendly messages
+**Subagent:** tool-builder (`agentic-framework/agents/tool-builder.md`)
 
-  **Step 3 — Wire into API routes (`server/routers/api.py`)**:
-  Update the existing API routes to call `run_agent_loop()` directly:
-  - `POST /search/natural-language` → agent loop
-  - `POST /search/agent` → agent loop
-  - Remove `_query_agent()` (HTTP call to serving endpoint)
-  - Keep fallback logic for when the LLM endpoint is unavailable
+**Input:** Tool specification for `query_genie` from `docs/agent_architecture.md`
 
-  **Step 4 — Test script (`test_agent.py`)**:
-  Create a local test script that calls `run_agent_loop()` with sample queries
-  and validates tool execution.
+**Task:**
+- Create `server/agents/tools/genie_tool.py`
+- Implement `query_genie_fn(question: str) -> str`
+- Use `WorkspaceClient().genie.start_conversation_and_wait()`
+- Read `GENIE_SPACE_ID` from environment
+- **CRITICAL**: Guard against `None` responses — `get_message_query_result()` may return
+  `None` for `statement_response` or `manifest` when Genie gives a text-only answer.
+  Always check for `None` before accessing `.manifest.schema.columns`.
+- Support `APP_MOCK_MODE=true` with canned data
+- Define the matching JSON schema in OpenAI function-calling format
 
-### Phase 3: Deploy
-Use the **databricks-deployer** subagent from `agentic-framework/agents/`.
+**Output:** `server/agents/tools/genie_tool.py`
 
-Deployment is **dramatically simpler** — no model registration, no serving endpoint:
+**Gate:**
+```bash
+APP_MOCK_MODE=true python3 -c "from server.agents.tools.genie_tool import query_genie_fn; print(query_genie_fn('test'))"
+```
+Must print valid JSON without errors.
 
-  **Step 1 — Update `app.yaml`**:
-  - Ensure `LLM_ENDPOINT_NAME` and `GENIE_SPACE_ID` are set
-  - **Remove** `AGENT_ENDPOINT_NAME` (no separate agent endpoint)
-  - Add the Foundation Model endpoint as an app resource for auth
+---
 
-  **Step 2 — Deploy the Databricks App**:
-  - Sync files to workspace
-  - Deploy via `databricks apps deploy`
-  - The app calls the Foundation Model directly — no other endpoints to manage
+### Step 2b: Build Custom Tools (parallel with 2a)
 
-  **Step 3 — Validate**:
-  - Test via the app's API endpoints
-  - Verify tool calling works (Genie queries, price calculations, date validation)
+**Subagent:** tool-builder (`agentic-framework/agents/tool-builder.md`)
 
-### Phase 4: Test
-Use the **agent-tester** subagent from `agentic-framework/agents/`.
+**Input:** Tool specifications for business logic from `docs/agent_architecture.md`
 
-- Test tool routing (does the model call the right tool for each query type?)
-- Test error handling (what happens when Genie is unavailable?)
-- Test multi-turn tool calling (model calls tool → gets result → calls another tool)
-- Test latency (direct FM call should be faster than the custom endpoint approach)
+**Task:**
+- Create `server/agents/tools/custom_tools.py`
+- Implement:
+  - `calculate_booking_price_fn(nightly_rate, num_nights, ...)` — price breakdown
+  - `validate_dates_fn(check_in, check_out)` — date validation
+  - `generate_confirmation_number_fn()` — booking reference (SF-XXXXXXXX)
+- Pure Python — no external services, no mock mode needed
+- Define matching JSON schemas in OpenAI function-calling format
+
+**Output:** `server/agents/tools/custom_tools.py`
+
+**Gate:**
+```bash
+python3 -c "from server.agents.tools.custom_tools import calculate_booking_price_fn; print(calculate_booking_price_fn(nightly_rate=150, num_nights=3))"
+```
+Must print valid JSON with price breakdown.
+
+---
+
+### Step 3: Build Agent Loop
+
+**Reference:** Read `agentic-framework/skills/foundation-model-agent-loop/SKILL.md` for the canonical implementation pattern.
+
+**Input:** Tools from Steps 2a and 2b + the SKILL.md reference
+
+**Task:**
+- Create `server/agents/agent_loop.py`
+- Define `SYSTEM_PROMPT` derived from the PRD (who the agent is, what it can do)
+- Define `TOOL_SCHEMAS` — list of all tool JSON schemas
+- Define `TOOL_FUNCTIONS` — dispatch dict mapping tool names to functions
+- Implement `def run_agent_loop(user_message: str) -> str:` following the SKILL.md pattern:
+  1. Build messages list with system prompt + user message
+  2. Call Foundation Model via `Config().authenticate()` + `requests.post()`
+  3. Parse response — check for `tool_calls`
+  4. If tool_calls → execute → append results → loop
+  5. If `finish_reason == "stop"` → return content
+  6. Safety cap at max 10 iterations
+- **Synchronous** (not async) — `requests.post()` is blocking
+- All errors caught and returned as user-friendly messages
+
+**Output:** `server/agents/agent_loop.py`
+
+**Gate:**
+```bash
+APP_MOCK_MODE=true python3 -c "from server.agents.agent_loop import run_agent_loop; print(run_agent_loop('Find apartments in Austin'))"
+```
+Must return a string response without errors.
+
+---
+
+### Step 4: Test Agent Loop Live
+
+**Subagent:** agent-tester (`agentic-framework/agents/agent-tester.md`) — Mode 2 (Loop Test)
+
+**Input:** `server/agents/agent_loop.py` + live FM endpoint
+
+**Task:**
+- Run the 5 test queries from agent-tester Mode 2
+- Verify tool routing: data queries trigger `query_genie`, price queries trigger `calculate_booking_price`
+- Verify conversational queries are handled by FM directly (no tool calls)
+- Verify error handling for empty/invalid inputs
+
+**Output:** Test results — pass/fail per query type
+
+**Gate:** At least 3 out of 5 test queries return coherent responses with correct tool routing.
+
+---
+
+### Step 5: Deploy
+
+**Subagent:** databricks-deployer (`agentic-framework/agents/databricks-deployer.md`)
+
+**Input:** All files from Steps 1-4
+
+**Task:**
+- Verify `app.yaml` has correct env vars and `resources:` block
+- Stage files (exclude `node_modules/`, `.databricks/`, `src/`, `__pycache__/`)
+- Upload to workspace via `databricks workspace import-dir`
+- Deploy via `databricks apps deploy`
+
+**Output:** Running Databricks App
+
+**Gate:**
+```bash
+curl -s https://<app-url>/api/health | python3 -c "import sys,json; d=json.load(sys.stdin); print('PASS' if d.get('status')=='healthy' else 'FAIL')"
+```
+
+---
+
+## Step Dependency Diagram
+
+```
+Prerequisites (docs/pre-req.md)
+        │
+   Step 1: Analyze PRD
+        │
+   ┌────┴────┐
+   │         │
+Step 2a    Step 2b     ← parallel
+(Genie)   (Custom)
+   │         │
+   └────┬────┘
+        │
+   Step 3: Agent Loop
+        │
+   Step 4: Test Live
+        │
+   Step 5: Deploy
+```
+
+## What Comes After
+
+After this build is complete and the agent is deployed and tested:
+- **Part 2 (separate prompt):** Wire the agent to the existing UI using
+  `agentic-framework/agents/agent-ui-wiring-prompt.md`
+
+## Dependencies
+
+Only these packages are needed. **Do NOT add** `langgraph`, `langchain-*`,
+`databricks-langchain`, `databricks-agents`, or `mlflow`.
+
+```
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+databricks-sdk>=0.20.0
+requests>=2.31.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+```
 
 ## Rules
 
@@ -152,14 +261,21 @@ Use the **agent-tester** subagent from `agentic-framework/agents/`.
 - Tools should ONLY be created for things the LLM cannot do: database queries
   (Genie), business logic (price math), and side effects (booking IDs).
 - All tool functions must catch exceptions and return error strings.
+- **One file per step, one gate per step.** Do not combine multiple steps.
+
+## Subagents Reference
+
+| Subagent | File | Used In |
+|----------|------|---------|
+| prd-analyzer | `agentic-framework/agents/prd-analyzer.md` | Step 1 |
+| tool-builder | `agentic-framework/agents/tool-builder.md` | Steps 2a, 2b |
+| agent-tester | `agentic-framework/agents/agent-tester.md` | Step 4 |
+| databricks-deployer | `agentic-framework/agents/databricks-deployer.md` | Step 5 |
 
 ## Skills Reference
 
 | Skill | When to Read | Used By |
 |-------|-------------|---------|
-| `databricks-app-python/` | **App auth, deployment, framework** | Phase 2, 3 |
-| `databricks-genie/` | **Genie Space query patterns** | Phase 1, 2 |
-| `databricks-config/` | Workspace auth and configuration | Phase 3 |
-| `databricks-python-sdk/` | SDK patterns for Databricks APIs | Phase 2 |
-
-Also read any **project-local skills** in `agentic-framework/skills/`.
+| `databricks-app-python/` | App auth, deployment, framework | Steps 3, 5 |
+| `databricks-genie/` | Genie Space query patterns | Steps 1, 2a |
+| `foundation-model-agent-loop/` (local) | **Canonical agent loop pattern** | Step 3 |
