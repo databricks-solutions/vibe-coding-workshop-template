@@ -29,7 +29,7 @@ The backend implements a **tool-calling loop**:
 ## Prerequisites (MUST COMPLETE FIRST)
 
 Before starting this build, ensure all Databricks resources are created and validated.
-Follow `docs/pre-req.md` and complete every item in its Section 7 Readiness Checklist:
+Refer if there are any pre-req documents avaible as part of the projects or interact with the user to get the confirmation:
 
 - [ ] UC tables created and seeded (gold-layer listing data)
 - [ ] UC functions (TVFs) created and returning results
