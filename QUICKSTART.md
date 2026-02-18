@@ -1,10 +1,18 @@
 # Quick Start
 
-Deploy your Databricks App in 4 commands:
+Get started building your data product on Databricks. Choose your starting point:
+
+> **Workshop participants:** Complete the [PRE-REQUISITES.md](PRE-REQUISITES.md) checklist before beginning.
+
+---
+
+## Path A: Deploy a Databricks App
+
+Get a FastAPI backend with Lakebase running on Databricks Apps in 4 commands:
 
 ```bash
 # 1. Clone template
-git clone https://github.com/YOUR_ORG/vibe-coding-workshop-template.git my-app && cd my-app
+git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git my-project && cd my-project
 
 # 2. Setup (configure auth + install deps)
 cd apps_lakebase && ./scripts/setup.sh
@@ -17,15 +25,30 @@ cd apps_lakebase && ./scripts/setup.sh
 
 ---
 
-## Repository Layout
+## Path B: Build an End-to-End Data Pipeline
 
-This template has three main components:
+Take a raw schema CSV through the full medallion architecture — Bronze, Silver, Gold, semantic layer, Genie Spaces, ML, and GenAI agents — using one prompt per stage:
+
+1. Drop your schema CSV into `data_product_accelerator/context/`
+2. Open your AI coding assistant (Cursor, Claude Code, Windsurf, etc.)
+3. Prompt:
+
+```
+I have a customer schema at @data_product_accelerator/context/Wanderbricks_Schema.csv.
+Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
+```
+
+4. Follow the full [9-stage pipeline guide](data_product_accelerator/QUICKSTART.md) — one prompt per stage, one new conversation per stage.
+
+---
+
+## Repository Layout
 
 | Directory | What It Does |
 |-----------|-------------|
-| `apps_lakebase/` | Databricks App — FastAPI backend + Lakebase integration |
-| `agent_skills/` | YAML-driven skill orchestration framework |
-| `data_product_accelerator/` | 50 agent skills for building data products (9 stages) |
+| `apps_lakebase/` | Databricks App — FastAPI backend + Lakebase (managed PostgreSQL) |
+| `data_product_accelerator/` | 50 agent skills for building end-to-end data products (9 stages) |
+| `agentic-framework/` | Multi-agent build framework for Databricks Foundation Models |
 
 ---
 
@@ -55,17 +78,14 @@ All app commands are run from the `apps_lakebase/` directory:
 
 ## Data Product Accelerator
 
-Build a complete Databricks data product using one prompt per stage. See the full guide:
+Build a complete Databricks data product using one prompt per stage:
+
+```
+Schema CSV → Gold Design → Bronze → Silver → Gold → Semantic Layer → Observability → ML → GenAI Agents
+```
 
 - [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md) — Step-by-step (9 stages)
 - [data_product_accelerator/AGENTS.md](data_product_accelerator/AGENTS.md) — Skill routing table
-
-Quick example:
-
-```
-I have a customer schema at @data_product_accelerator/context/Wanderbricks_Schema.csv.
-Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
-```
 
 ---
 
@@ -85,4 +105,4 @@ databricks current-user me
 
 ---
 
-**Full docs**: [README.md](README.md)
+**Full docs**: [README.md](README.md) | **Prerequisites**: [PRE-REQUISITES.md](PRE-REQUISITES.md) | **9-stage guide**: [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md)

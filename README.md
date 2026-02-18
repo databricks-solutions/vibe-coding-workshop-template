@@ -1,18 +1,20 @@
 # Vibe Coding Workshop Template
 
-> **Build and deploy Databricks Apps with AI-assisted development**
+> **Build end-to-end data products on Databricks with AI-assisted development**
 
-This template provides everything you need to build and deploy full-stack applications on the **Databricks Apps** platform — from a FastAPI backend with Lakebase integration to a complete data product accelerator with 50 agent skills.
+This template is a complete **data product builder** powered by vibe coding. Start from a raw customer schema or existing data, and build your way through the full Databricks stack — Databricks Apps with Lakebase, medallion architecture (Bronze, Silver, Gold), semantic layer, Genie Spaces, ML pipelines, and GenAI agents — all guided by 50 agent skills and your AI coding assistant.
 
 ---
 
 ## What is Vibe Coding?
 
-**Vibe Coding** is an AI-assisted development approach where you collaborate with AI tools (like Cursor, GitHub Copilot, Claude Code, Windsurf, or similar) to rapidly build, iterate, and deploy production-quality code.
+**Vibe Coding** is an AI-assisted development approach where you collaborate with AI tools (like Cursor, GitHub Copilot, Claude Code, Windsurf, or similar) to rapidly build, iterate, and deploy production-quality data products. Instead of writing every line from scratch, you describe what you want and let the AI handle the implementation — guided by structured agent skills that encode best practices.
 
 ---
 
-## Quick Start (5 minutes)
+## Quick Start
+
+> **Workshop participants:** See [PRE-REQUISITES.md](PRE-REQUISITES.md) for the full setup checklist (workspace access, CLI, IDE, and authentication).
 
 ### Prerequisites
 
@@ -20,62 +22,58 @@ This template provides everything you need to build and deploy full-stack applic
 |------|----------|-------------|
 | **Databricks Workspace** | Yes | Access to a Databricks workspace with Unity Catalog |
 | **Databricks CLI** | Yes | `curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh \| sh` |
+| **AI-Powered IDE** | Yes | [Cursor](https://cursor.com), [Windsurf](https://windsurf.com), VS Code + Copilot, or similar |
 | **Python 3.10+** | Yes | [python.org](https://www.python.org/downloads/) |
 | **Git** | Yes | [git-scm.com](https://git-scm.com/) |
-| **Node.js** | Optional | For frontend development |
 
-### Step 1: Clone the Template
+### Clone the Template
 
 ```bash
-git clone https://github.com/YOUR_ORG/vibe-coding-workshop-template.git my-app
-cd my-app
+git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git my-project
+cd my-project
 ```
 
-### Step 2: Run Setup
+### Choose Your Starting Point
 
-The setup script configures authentication and installs dependencies:
+#### Path A: Deploy a Databricks App
+
+Get a FastAPI backend with Lakebase (managed PostgreSQL) running on Databricks Apps:
 
 ```bash
 cd apps_lakebase
-./scripts/setup.sh
+./scripts/setup.sh          # Configure auth + install deps
+./scripts/deploy.sh --create # Deploy to Databricks Apps
 ```
 
-You'll be prompted to:
-1. Choose authentication method (PAT or CLI profile)
-2. Enter your Databricks workspace URL
-3. Enter your access token (get from Workspace > User Settings > Access Tokens)
-4. Name your app
+After deployment, open your app URL in the browser.
 
-### Step 3: Deploy to Databricks
+#### Path B: Build an End-to-End Data Pipeline
 
-```bash
-# First deployment (creates the app)
-./scripts/deploy.sh --create
+Take a raw schema CSV through the full medallion architecture to production AI agents — one prompt per stage:
 
-# Subsequent deployments
-./scripts/deploy.sh
+1. Drop your schema CSV into `data_product_accelerator/context/`
+2. Open your AI coding assistant and prompt:
+
+```
+I have a customer schema at @data_product_accelerator/context/Wanderbricks_Schema.csv.
+Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
 ```
 
-### Step 4: Open Your App
+3. Follow the [9-stage pipeline guide](data_product_accelerator/QUICKSTART.md) — one prompt per stage, one new conversation per stage.
 
-After deployment, you'll see your app URL:
-```
-App URL: https://your-app.cloud.databricks.com
-```
-
-Open the URL in your browser to see your running app.
+> **Both paths work together.** Build your data pipeline first, then deploy a Databricks App on top of it — or start with the app and add data products incrementally.
 
 ---
 
 ## Project Structure
 
-This repository is organized as a **monorepo** with three major components:
-
 ```
 vibe-coding-workshop-template/
 │
 ├── README.md                       # This file
-├── QUICKSTART.md                   # Minimal quick-deploy guide
+├── QUICKSTART.md                   # Quick-start guide with two pathways
+├── AGENTS.md                       # AI assistant routing (universal entry point)
+├── PRE-REQUISITES.md               # Workshop prerequisites checklist
 ├── CONTRIBUTING.md                 # Contribution guidelines
 ├── LICENSE.md                      # License
 ├── SECURITY.md                     # Security policy
@@ -100,63 +98,94 @@ vibe-coding-workshop-template/
 │   └── lakebase/
 │       └── README.md               #   Lakebase DDL/DML reference
 │
-├── agent_skills/                   # Agent Skills Framework (YAML-driven orchestration)
-│   ├── README.md                   #   Framework documentation
-│   ├── models.py                   #   Pydantic models
-│   ├── registry.py                 #   Skill/flow discovery
-│   ├── engine.py                   #   Flow orchestration engine
-│   ├── router.py                   #   FastAPI router integration
-│   ├── prd_mapper.py               #   PRD-to-skills generator
-│   ├── skill_registry.yaml         #   Master registry config
-│   ├── skills/                     #   Skill manifests (YAML)
-│   │   ├── query_rewriter/
-│   │   ├── genie_search/
-│   │   ├── web_search/
-│   │   ├── web_result_summarizer/
-│   │   ├── lakebase_search/
-│   │   └── location_extractor/
-│   ├── flows/                      #   Flow definitions (YAML pipelines)
-│   │   ├── assistant_search.yaml
-│   │   └── standard_search.yaml
-│   ├── executors/                  #   Typed executor classes
-│   │   ├── llm_executor.py         #     Databricks model serving
-│   │   ├── genie_executor.py       #     Databricks Genie Space
-│   │   ├── web_search_executor.py  #     External web search
-│   │   ├── lakebase_executor.py    #     Lakebase PostgreSQL
-│   │   ├── function_executor.py    #     Python functions
-│   │   └── prompt_registry_executor.py  # Databricks Prompt Registry
-│   └── tests/                      #   Test suite
+├── data_product_accelerator/       # 50 Agent Skills for End-to-End Data Products
+│   ├── AGENTS.md                   #   Detailed skill routing table
+│   ├── QUICKSTART.md               #   One-prompt-per-stage guide (9 stages)
+│   ├── README.md                   #   Accelerator overview
+│   ├── context/                    #   Schema CSV inputs (starting point)
+│   │   ├── Wanderbricks_Schema.csv
+│   │   └── booking_app_schema.csv
+│   ├── skills/                     #   50 skills across 12 domains
+│   │   ├── admin/                  #     Skill creation, auditing (4)
+│   │   ├── bronze/                 #     Bronze layer + Faker data (2)
+│   │   ├── common/                 #     Cross-cutting shared skills (8)
+│   │   ├── exploration/            #     Ad-hoc notebooks (1)
+│   │   ├── genai-agents/           #     GenAI agent patterns (9)
+│   │   ├── gold/                   #     Gold design + implementation (9)
+│   │   ├── ml/                     #     MLflow pipelines (1)
+│   │   ├── monitoring/             #     Monitors, dashboards, alerts (5)
+│   │   ├── planning/               #     Project planning (1)
+│   │   ├── semantic-layer/         #     Metric Views, TVFs, Genie (6)
+│   │   ├── silver/                 #     DLT pipelines, DQ rules (3)
+│   │   └── skill-navigator/        #     Master routing system (1)
+│   └── docs/                       #   Framework design documentation
 │
-└── data_product_accelerator/       # 50 Agent Skills for Data Products
-    ├── AGENTS.md                   #   Universal entry point (routing table)
-    ├── QUICKSTART.md               #   One-prompt-per-stage guide
-    ├── README.md                   #   Accelerator overview
-    ├── context/                    #   Schema CSV inputs
-    │   ├── Wanderbricks_Schema.csv
-    │   └── booking_app_schema.csv
-    ├── skills/                     #   50 skills across 12 domains
-    │   ├── admin/                  #     Skill creation, auditing (4)
-    │   ├── bronze/                 #     Bronze layer + Faker data (2)
-    │   ├── common/                 #     Cross-cutting shared skills (8)
-    │   ├── exploration/            #     Ad-hoc notebooks (1)
-    │   ├── genai-agents/           #     GenAI agent patterns (9)
-    │   ├── gold/                   #     Gold design + implementation (9)
-    │   ├── ml/                     #     MLflow pipelines (1)
-    │   ├── monitoring/             #     Monitors, dashboards, alerts (5)
-    │   ├── planning/               #     Project planning (1)
-    │   ├── semantic-layer/         #     Metric Views, TVFs, Genie (6)
-    │   ├── silver/                 #     DLT pipelines, DQ rules (3)
-    │   └── skill-navigator/        #     Master routing system (1)
-    └── docs/                       #   Framework design documentation
+└── agentic-framework/              # Multi-Agent Build Framework
+    ├── agents/                     #   Agent prompts for building multi-agent systems
+    │   ├── prd-analyzer.md         #     Parse PRDs, map to agent capabilities
+    │   ├── skill-scaffolder.md     #     Create new Agent Skills (SKILL.md)
+    │   ├── tool-builder.md         #     Build runtime Python tools
+    │   ├── agent-tester.md         #     Configure agent behavior tests
+    │   ├── agent-ui-wiring-prompt.md #   Guide agent-to-UI wiring
+    │   ├── multi-agent-build-prompt.md # Orchestrator build with Foundation Models
+    │   ├── databricks-deployer.md  #     Deployment guidance
+    │   └── prd-template.md         #     PRD template
+    └── skills/
+        └── foundation-model-agent-loop/
+            └── SKILL.md            #   Tool-calling loop with Foundation Models
 ```
 
 ---
 
-## Components
+## How It All Fits Together
 
-### 1. Databricks App (`apps_lakebase/`)
+This template supports a unified workflow from raw data to production data products:
 
-A production-ready **FastAPI backend** with Lakebase (PostgreSQL) integration, deployable to Databricks Apps.
+```
+Raw Schema CSV or Existing Data
+  │
+  ├─► Gold Design         — dimensional model, ERDs, YAML schemas
+  ├─► Bronze Layer         — source tables + test data (Faker)
+  ├─► Silver Layer         — DLT pipelines + data quality expectations
+  ├─► Gold Layer           — tables, MERGE scripts, FK constraints
+  ├─► Semantic Layer       — Metric Views, TVFs, Genie Spaces
+  ├─► Observability        — Lakehouse Monitors, AI/BI Dashboards, SQL Alerts
+  ├─► ML Pipelines         — MLflow experiments, training, inference
+  ├─► GenAI Agents         — ResponsesAgent, evaluation, deployment
+  │
+  └─► Databricks App       — FastAPI + Lakebase, deployed on Databricks Apps
+```
+
+Each stage is driven by a single prompt to your AI coding assistant. The 50 agent skills in `data_product_accelerator/` encode production-tested patterns so you get governed, high-quality output at every step.
+
+---
+
+## Data Product Accelerator (50 Agent Skills)
+
+The `data_product_accelerator/` directory contains **50 agent skills** organized by domain that guide your AI assistant through the entire pipeline:
+
+| Domain | Skills | Focus |
+|--------|--------|-------|
+| **Gold** | 9 | Dimensional modeling, ERDs, YAML schemas, MERGE scripts |
+| **GenAI Agents** | 9 | ResponsesAgent, evaluation, deployment |
+| **Common** | 8 | Asset Bundles, naming, constraints, imports |
+| **Semantic Layer** | 6 | Metric Views, TVFs, Genie Spaces |
+| **Monitoring** | 5 | Lakehouse Monitors, dashboards, SQL alerts |
+| **Admin** | 4 | Skill creation, auditing, docs |
+| **Silver** | 3 | DLT pipelines, expectations, DQX |
+| **Bronze** | 2 | Bronze tables, Faker data generation |
+| **ML** | 1 | MLflow pipelines |
+| **Planning** | 1 | Project planning |
+| **Exploration** | 1 | Ad-hoc notebooks |
+| **Skill Navigator** | 1 | Master routing system |
+
+See [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md) for the step-by-step 9-stage guide.
+
+---
+
+## Databricks App (FastAPI + Lakebase)
+
+The `apps_lakebase/` directory contains a production-ready **FastAPI backend** with Lakebase (managed PostgreSQL) integration, deployable to Databricks Apps.
 
 **Key features:**
 - FastAPI with structured logging and CORS
@@ -166,68 +195,20 @@ A production-ready **FastAPI backend** with Lakebase (PostgreSQL) integration, d
 - Optional frontend serving (React/Vite from `client/build`)
 - Deploy scripts for Databricks Apps platform
 
-### 2. Agent Skills Framework (`agent_skills/`)
+### App Commands
 
-A dynamic, **declarative framework** for building agentic search and data pipelines. Skills are defined as YAML manifests and composed into flows — no hardcoded orchestration logic.
-
-**Supported skill types:**
-
-| Type | Description |
-|------|-------------|
-| `llm_call` | Databricks model serving |
-| `genie_query` | Databricks Genie Space |
-| `web_search` | External web search (SerpAPI, Bing) |
-| `lakebase_query` | Lakebase PostgreSQL queries |
-| `function` | Arbitrary Python functions |
-| `prompt_registry` | Databricks Prompt Registry |
-
-See [agent_skills/README.md](agent_skills/README.md) for full documentation.
-
-### 3. Data Product Accelerator (`data_product_accelerator/`)
-
-**50 agent skills** that teach your AI coding assistant to build fully governed Databricks data products — from a schema CSV to production AI agents.
-
-**Design-First Pipeline (9 stages):**
-
-```
-context/*.csv
-  → Gold Design (1)      — dimensional model, ERDs, YAML schemas
-  → Bronze (2)           — source tables + test data
-  → Silver (3)           — DLT pipelines + data quality
-  → Gold Impl (4)        — tables, merges, constraints
-  → Planning (5)         — phase plans + manifest contracts
-  → Semantic (6)         — Metric Views, TVFs, Genie Spaces
-  → Observability (7)    — monitors, dashboards, alerts
-  → ML (8)               — experiments, training, inference
-  → GenAI Agents (9)     — agents, evaluation, deployment
-```
-
-See [data_product_accelerator/README.md](data_product_accelerator/README.md) and [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md) for the full guide.
-
----
-
-## Commands Reference
-
-All app commands are run from the `apps_lakebase/` directory.
-
-### Setup & Development
+All commands run from the `apps_lakebase/` directory:
 
 | Command | Description |
 |---------|-------------|
 | `./scripts/setup.sh` | Configure authentication and install dependencies |
-| `./scripts/watch.sh` | Start local dev server with hot reload |
-| `./scripts/run_local.sh` | Test app locally (production mode) |
-| `./scripts/setup-lakebase.sh` | Set up Lakebase tables and permissions |
-
-### Deployment
-
-| Command | Description |
-|---------|-------------|
 | `./scripts/deploy.sh --create` | First deployment (creates the app) |
 | `./scripts/deploy.sh` | Update existing app |
 | `./scripts/deploy.sh --verbose` | Deploy with detailed output |
+| `./scripts/watch.sh` | Start local dev server with hot reload |
+| `./scripts/run_local.sh` | Test app locally (production mode) |
+| `./scripts/setup-lakebase.sh` | Set up Lakebase tables and permissions |
 | `./scripts/app_status.sh` | Check app status and URL |
-| `./scripts/app_status.sh --verbose` | Detailed status with workspace files |
 
 ### Local Development URLs
 
@@ -239,14 +220,28 @@ All app commands are run from the `apps_lakebase/` directory.
 | Readiness Check | http://localhost:8000/ready |
 | Frontend (if enabled) | http://localhost:5173 |
 
-### Agent Skills Framework
+---
 
-| Command | Description |
-|---------|-------------|
-| `pytest agent_skills/tests/ -v` | Run agent skills test suite |
-| `curl POST /api/skills/execute/{flow_id}` | Execute a flow via API |
-| `curl GET /api/skills/registry` | List all registered skills and flows |
-| `curl GET /api/skills/health` | Check framework health |
+## Agentic Framework
+
+The `agentic-framework/` directory provides prompts and patterns for building **multi-agent systems** with Databricks Foundation Models.
+
+**Agent prompts** (in `agentic-framework/agents/`):
+
+| Agent | Purpose |
+|-------|---------|
+| **prd-analyzer** | Parse PRDs, map requirements to agent capabilities |
+| **skill-scaffolder** | Create new Agent Skills (SKILL.md) for any domain |
+| **tool-builder** | Build runtime Python tools for agents |
+| **agent-tester** | Configure tests for agent behavior |
+| **agent-ui-wiring-prompt** | Guide agent-to-UI integration |
+| **multi-agent-build-prompt** | Build multi-agent orchestrators with Foundation Models |
+| **databricks-deployer** | Deployment guidance for agents |
+| **prd-template** | PRD template for agent projects |
+
+**Foundation Model Agent Loop** (in `agentic-framework/skills/foundation-model-agent-loop/`):
+- Pattern for tool-calling loops with Databricks Foundation Models (e.g., `databricks-meta-llama-3-3-70b-instruct`)
+- Supports function calling without custom model deployment
 
 ---
 
@@ -342,24 +337,6 @@ async def get_data(table_name: str):
    ./scripts/deploy.sh
    ```
 
-### Integrating the Agent Skills Framework
-
-Add the skills router to your FastAPI app:
-
-```python
-from agent_skills.router import router as skills_router
-
-app.include_router(skills_router, prefix="/api", tags=["Agent Skills"])
-```
-
-Then execute flows via API:
-
-```bash
-curl -X POST http://localhost:8000/api/skills/execute/assistant_search \
-  -H "Content-Type: application/json" \
-  -d '{"inputs": {"message": "Find hotels near Taylor Swift concert in Miami"}}'
-```
-
 ---
 
 ## Troubleshooting
@@ -404,31 +381,10 @@ cd apps_lakebase
 
 ---
 
-## Data Product Accelerator Skills
-
-The `data_product_accelerator/` directory contains **50 agent skills** organized by domain:
-
-| Domain | Skills | Focus |
-|--------|--------|-------|
-| **Gold** | 9 | Dimensional modeling, ERDs, YAML schemas, MERGE scripts |
-| **GenAI Agents** | 9 | ResponsesAgent, evaluation, deployment |
-| **Common** | 8 | Asset Bundles, naming, constraints, imports |
-| **Semantic Layer** | 6 | Metric Views, TVFs, Genie Spaces |
-| **Monitoring** | 5 | Lakehouse Monitors, dashboards, SQL alerts |
-| **Admin** | 4 | Skill creation, auditing, docs |
-| **Silver** | 3 | DLT pipelines, expectations, DQX |
-| **Bronze** | 2 | Bronze tables, Faker data generation |
-| **ML** | 1 | MLflow pipelines |
-| **Planning** | 1 | Project planning |
-| **Exploration** | 1 | Ad-hoc notebooks |
-| **Skill Navigator** | 1 | Master routing system |
-
-See [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md) for the step-by-step guide.
-
----
-
 ## Resources
 
+- [PRE-REQUISITES.md](PRE-REQUISITES.md) — Workshop prerequisites checklist
+- [Data Product Accelerator QUICKSTART](data_product_accelerator/QUICKSTART.md) — 9-stage pipeline guide
 - [Databricks Apps Documentation](https://docs.databricks.com/dev-tools/databricks-apps/)
 - [Databricks CLI Installation](https://docs.databricks.com/dev-tools/cli/install.html)
 - [Databricks SDK for Python](https://docs.databricks.com/dev-tools/sdk-python.html)
@@ -445,10 +401,11 @@ See [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART
 This is a **Git template repository**. To use it:
 
 1. Click "Use this template" on GitHub, or clone directly
-2. Run setup: `cd apps_lakebase && ./scripts/setup.sh`
-3. Add your API endpoints in `apps_lakebase/server/routers/api.py`
-4. Deploy: `./scripts/deploy.sh --create`
-5. Use the Data Product Accelerator skills to build your data platform
+2. Choose your starting point:
+   - **Deploy an app:** `cd apps_lakebase && ./scripts/setup.sh && ./scripts/deploy.sh --create`
+   - **Build a data product:** Drop a schema CSV in `data_product_accelerator/context/` and follow the [9-stage guide](data_product_accelerator/QUICKSTART.md)
+   - **Build agents:** Use the prompts in `agentic-framework/agents/` to scaffold multi-agent systems
+3. Iterate with your AI coding assistant — the agent skills handle the patterns
 
 ---
 
@@ -457,7 +414,8 @@ This is a **Git template repository**. To use it:
 **Ready to build? Let's go!**
 
 ```bash
-cd apps_lakebase && ./scripts/setup.sh && ./scripts/deploy.sh --create
+git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git my-project
+cd my-project
 ```
 
 </div>

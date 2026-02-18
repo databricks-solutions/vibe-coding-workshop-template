@@ -2,7 +2,7 @@
 
 > **This file is the universal entry point for any AI coding assistant** — Cursor, Claude Code, Windsurf, Copilot, Codex, or any agent that reads `AGENTS.md`.
 
-This is a **monorepo** with three components: a Databricks App, an Agent Skills orchestration framework, and a Data Product Accelerator with 50 agent skills.
+This is a **monorepo** with three components: a Databricks App with Lakebase, a Data Product Accelerator with 50 agent skills, and an Agentic Framework for building multi-agent systems.
 
 ---
 
@@ -12,7 +12,8 @@ This is a **monorepo** with three components: a Databricks App, an Agent Skills 
 vibe-coding-workshop-template/          <-- workspace root / agent CWD
 ├── AGENTS.md                           <-- THIS FILE (root navigator)
 ├── README.md                           <-- Human-readable project overview
-├── QUICKSTART.md                       <-- 4-command deploy guide
+├── QUICKSTART.md                       <-- Quick-start guide (two pathways)
+├── PRE-REQUISITES.md                   <-- Workshop prerequisites checklist
 ├── env.example                         <-- Environment variable template
 │
 ├── apps_lakebase/                      <-- Component 1: Databricks App (FastAPI + Lakebase)
@@ -24,16 +25,11 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 │   ├── scripts/                        #   Setup, deploy, local dev scripts
 │   └── lakebase/                       #   Lakebase DDL/DML reference
 │
-├── agent_skills/                       <-- Component 2: YAML-Driven Skill Orchestration
-│   ├── README.md                       #   Framework documentation
-│   ├── skill_registry.yaml             #   Master registry config
-│   ├── engine.py                       #   Flow orchestration engine
-│   ├── registry.py                     #   Skill/flow discovery
-│   ├── router.py                       #   FastAPI router integration
-│   ├── skills/                         #   6 skill manifests (YAML)
-│   ├── flows/                          #   Flow definitions (YAML pipelines)
-│   ├── executors/                      #   Typed executor classes
-│   └── tests/                          #   Test suite
+├── agentic-framework/                  <-- Component 2: Multi-Agent Build Framework
+│   ├── agents/                         #   Agent prompts (PRD analyzer, skill scaffolder, etc.)
+│   └── skills/
+│       └── foundation-model-agent-loop/
+│           └── SKILL.md                #   Tool-calling loop with Foundation Models
 │
 ├── data_product_accelerator/           <-- Component 3: 50 Agent Skills for Data Products
 │   ├── AGENTS.md                       #   *** DETAILED SKILL ROUTING TABLE ***
@@ -52,10 +48,10 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 
 | Direction | Location | Examples |
 |-----------|----------|----------|
-| **Read from** (framework) | `apps_lakebase/`, `agent_skills/`, `data_product_accelerator/` | Skills, manifests, server code, docs |
+| **Read from** (framework) | `apps_lakebase/`, `agentic-framework/`, `data_product_accelerator/` | Skills, manifests, server code, docs |
 | **Write to** (artifacts) | Repository root | `gold_layer_design/`, `src/`, `plans/`, `resources/`, `databricks.yml` |
 
-> **Rule:** Generated artifact paths (`gold_layer_design/`, `src/`, `plans/`, `resources/`, `databricks.yml`) are relative to the repository root. Never create generated files inside `data_product_accelerator/`, `apps_lakebase/`, or `agent_skills/`.
+> **Rule:** Generated artifact paths (`gold_layer_design/`, `src/`, `plans/`, `resources/`, `databricks.yml`) are relative to the repository root. Never create generated files inside `data_product_accelerator/`, `apps_lakebase/`, or `agentic-framework/`.
 
 ---
 
@@ -93,18 +89,18 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 | "dependencies", "pyproject.toml", "requirements" | `apps_lakebase/pyproject.toml` |
 | "app status", "app logs" | `apps_lakebase/scripts/app_status.sh` |
 
-### Agent Skills Framework — `agent_skills/`
+### Agentic Framework — `agentic-framework/`
 
 | Keywords | Read This |
 |----------|-----------|
-| "YAML skill", "skill manifest", "skill type", "add a skill" | `agent_skills/README.md`, `agent_skills/skills/` |
-| "flow", "pipeline", "orchestration", "multi-step" | `agent_skills/README.md`, `agent_skills/flows/` |
-| "executor", "LLM call", "genie query", "web search executor" | `agent_skills/executors/`, `agent_skills/README.md` |
-| "skill registry", "skill_registry.yaml" | `agent_skills/skill_registry.yaml` |
-| "PRD mapper", "generate skills from PRD" | `agent_skills/prd_mapper.py` |
-| "genie_search", "web_search", "lakebase_search", "query_rewriter" | `agent_skills/skills/` |
-| "test skills", "pytest" | `agent_skills/tests/` |
-| "integrate skills with app", "skills router" | `agent_skills/router.py` |
+| "multi-agent", "Foundation Model", "tool-calling loop", "agent loop" | `agentic-framework/skills/foundation-model-agent-loop/SKILL.md` |
+| "PRD", "product requirements", "analyze PRD" | `agentic-framework/agents/prd-analyzer.md` |
+| "scaffold skill", "create skill", "SKILL.md template" | `agentic-framework/agents/skill-scaffolder.md` |
+| "build tool", "Python tool", "agent tool" | `agentic-framework/agents/tool-builder.md` |
+| "test agent", "agent behavior test" | `agentic-framework/agents/agent-tester.md` |
+| "agent UI", "wire agent to UI", "frontend agent" | `agentic-framework/agents/agent-ui-wiring-prompt.md` |
+| "multi-agent orchestrator", "orchestrator build" | `agentic-framework/agents/multi-agent-build-prompt.md` |
+| "deploy agent", "agent deployment" | `agentic-framework/agents/databricks-deployer.md` |
 
 ---
 
@@ -145,7 +141,7 @@ data_product_accelerator/context/*.csv
 
 1. **Route first, act second.** Match keywords in the tables above, then read the linked file before writing any code.
 2. **Read the component-level AGENTS.md or README.md FIRST** — each component owns its own detailed routing.
-3. **Generated artifacts go at the repo root** — never inside `data_product_accelerator/`, `apps_lakebase/`, or `agent_skills/`.
+3. **Generated artifacts go at the repo root** — never inside `data_product_accelerator/`, `apps_lakebase/`, or `agentic-framework/`.
 4. **Framework content is read-only** — skills, manifests, and server code are inputs; do not modify them unless explicitly asked.
 5. **For data product tasks**, always defer to `data_product_accelerator/AGENTS.md` — it contains the full 50-skill routing table.
 
@@ -182,11 +178,11 @@ Add a new API endpoint to the Databricks App.
 Read @apps_lakebase/server/routers/api.py and add a GET /recommendations endpoint.
 ```
 
-### Agent Skills Framework
+### Agentic Framework
 
 ```
-Create a new YAML skill for sentiment analysis.
-Read @agent_skills/README.md for the framework conventions, then add the skill manifest.
+Build a multi-agent orchestrator using Databricks Foundation Models.
+Read @agentic-framework/skills/foundation-model-agent-loop/SKILL.md for the tool-calling pattern.
 ```
 
 If your IDE doesn't support `@` references, paste the file path or ask the agent to read it:
