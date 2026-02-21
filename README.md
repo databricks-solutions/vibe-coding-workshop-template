@@ -2,7 +2,7 @@
 
 > **Build end-to-end data products on Databricks with AI-assisted development**
 
-This template is a complete **data product builder** powered by vibe coding. Start from a raw customer schema or existing data, and build your way through the full Databricks stack — Databricks Apps with Lakebase, medallion architecture (Bronze, Silver, Gold), semantic layer, Genie Spaces, ML pipelines, and GenAI agents — all guided by 50 agent skills and your AI coding assistant.
+This template is a complete **data product builder** powered by vibe coding. Start from a raw customer schema or existing data, and build your way through the full Databricks stack — Databricks Apps with Lakebase, medallion architecture (Bronze, Silver, Gold), semantic layer, Genie Spaces, ML pipelines, and GenAI agents — all guided by 59 agent skills and your AI coding assistant.
 
 ---
 
@@ -98,24 +98,22 @@ vibe-coding-workshop-template/
 │   └── lakebase/
 │       └── README.md               #   Lakebase DDL/DML reference
 │
-├── data_product_accelerator/       # 50 Agent Skills for End-to-End Data Products
+├── data_product_accelerator/       # 59 Agent Skills for End-to-End Data Products
 │   ├── AGENTS.md                   #   Detailed skill routing table
 │   ├── QUICKSTART.md               #   One-prompt-per-stage guide (9 stages)
 │   ├── README.md                   #   Accelerator overview
 │   ├── context/                    #   Schema CSV inputs (starting point)
-│   │   ├── Wanderbricks_Schema.csv
-│   │   └── booking_app_schema.csv
-│   ├── skills/                     #   50 skills across 12 domains
+│   ├── skills/                     #   59 skills across 12 domains
 │   │   ├── admin/                  #     Skill creation, auditing (4)
 │   │   ├── bronze/                 #     Bronze layer + Faker data (2)
 │   │   ├── common/                 #     Cross-cutting shared skills (8)
 │   │   ├── exploration/            #     Ad-hoc notebooks (1)
 │   │   ├── genai-agents/           #     GenAI agent patterns (9)
-│   │   ├── gold/                   #     Gold design + implementation (9)
+│   │   ├── gold/                   #     Gold design, implementation, workers (14)
 │   │   ├── ml/                     #     MLflow pipelines (1)
 │   │   ├── monitoring/             #     Monitors, dashboards, alerts (5)
 │   │   ├── planning/               #     Project planning (1)
-│   │   ├── semantic-layer/         #     Metric Views, TVFs, Genie (6)
+│   │   ├── semantic-layer/         #     Metric Views, TVFs, Genie, optimization (10)
 │   │   ├── silver/                 #     DLT pipelines, DQ rules (3)
 │   │   └── skill-navigator/        #     Master routing system (1)
 │   └── docs/                       #   Framework design documentation
@@ -156,20 +154,20 @@ Raw Schema CSV or Existing Data
   └─► Databricks App       — FastAPI + Lakebase, deployed on Databricks Apps
 ```
 
-Each stage is driven by a single prompt to your AI coding assistant. The 50 agent skills in `data_product_accelerator/` encode production-tested patterns so you get governed, high-quality output at every step.
+Each stage is driven by a single prompt to your AI coding assistant. The 59 agent skills in `data_product_accelerator/` encode production-tested patterns so you get governed, high-quality output at every step.
 
 ---
 
-## Data Product Accelerator (50 Agent Skills)
+## Data Product Accelerator (59 Agent Skills)
 
-The `data_product_accelerator/` directory contains **50 agent skills** organized by domain that guide your AI assistant through the entire pipeline:
+The `data_product_accelerator/` directory contains **59 agent skills** organized by domain that guide your AI assistant through the entire pipeline:
 
 | Domain | Skills | Focus |
 |--------|--------|-------|
-| **Gold** | 9 | Dimensional modeling, ERDs, YAML schemas, MERGE scripts |
+| **Gold** | 14 | Dimensional modeling, design workers, pipeline workers, ERDs, MERGE scripts |
+| **Semantic Layer** | 10 | Metric Views, TVFs, Genie Spaces, optimization orchestrator + workers |
 | **GenAI Agents** | 9 | ResponsesAgent, evaluation, deployment |
 | **Common** | 8 | Asset Bundles, naming, constraints, imports |
-| **Semantic Layer** | 6 | Metric Views, TVFs, Genie Spaces |
 | **Monitoring** | 5 | Lakehouse Monitors, dashboards, SQL alerts |
 | **Admin** | 4 | Skill creation, auditing, docs |
 | **Silver** | 3 | DLT pipelines, expectations, DQX |
