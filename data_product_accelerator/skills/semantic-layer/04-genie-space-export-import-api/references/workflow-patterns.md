@@ -527,11 +527,11 @@ Include questions that test:
   "config": {
     "sample_questions": [
       {
-        "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "id": "a1b2c3d4e5f6789012345678abcdef01",
         "question": ["What is the total revenue this month?"]
       },
       {
-        "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "id": "b2c3d4e5f6789012345678abcdef02ab",
         "question": ["Which stores have the highest sales?"]
       }
     ]
@@ -556,7 +556,7 @@ Include questions that test:
   "instructions": {
     "text_instructions": [
       {
-        "id": "cccccccccccccccccccccccccccccccc",
+        "id": "c3d4e5f6789012345678abcdef03bc12",
         "content": [
           "You are a sales analytics assistant.\n",
           "Use the sales_metrics metric view for all queries.\n",
@@ -568,7 +568,7 @@ Include questions that test:
   "benchmarks": {
     "questions": [
       {
-        "id": "dddddddddddddddddddddddddddddddd",
+        "id": "d4e5f6789012345678abcdef04cd2345",
         "question": ["Total revenue this month"],
         "answer": [
           {

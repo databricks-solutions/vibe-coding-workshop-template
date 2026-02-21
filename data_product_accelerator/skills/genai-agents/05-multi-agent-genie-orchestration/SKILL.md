@@ -25,9 +25,9 @@ metadata:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
       paths:
-        - "databricks-skills/agent-bricks/SKILL.md"
+        - "databricks-skills/databricks-agent-bricks/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 
@@ -43,6 +43,30 @@ Production-grade patterns for orchestrating multiple Genie Spaces in a multi-age
 - Synthesizing results from multiple Genie Spaces
 - Building orchestration layers for complex data queries
 - Troubleshooting Genie Conversation API integration
+
+---
+
+## Upstream: Expanded MAS Agent Types
+
+The upstream `databricks-agent-bricks` now supports 5 agent types in Supervisor Agents (MAS). In addition to the original three (Knowledge Assistant via `ka_tile_id`, Genie Space via `genie_space_id`, Custom Endpoint via `endpoint_name`), two new types are available:
+
+- **UC Function** (`uc_function_name`): Invoke a Unity Catalog function directly. Format: `catalog.schema.function_name`. The agent service principal needs `EXECUTE` privilege on the function.
+- **External MCP Server** (`connection_name`): Connect to an external tool server via a UC HTTP Connection configured with `is_mcp_connection: 'true'`. The agent service principal needs `USE CONNECTION` privilege.
+
+Example with all 5 agent types:
+```python
+manage_mas(
+    action="create_or_update",
+    name="Enterprise Supervisor",
+    agents=[
+        {"name": "docs", "ka_tile_id": "...", "description": "Document Q&A"},
+        {"name": "analytics", "genie_space_id": "...", "description": "SQL analytics"},
+        {"name": "ml_model", "endpoint_name": "...", "description": "ML predictions"},
+        {"name": "enrichment", "uc_function_name": "catalog.schema.enrich", "description": "Data enrichment via UC function"},
+        {"name": "ticketing", "connection_name": "ticket_mcp", "description": "External ticketing via MCP server"},
+    ]
+)
+```
 
 ---
 

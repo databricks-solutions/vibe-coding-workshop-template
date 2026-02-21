@@ -1,0 +1,45 @@
+{
+  "space_id": "",
+  "domain": "",
+  "started_at": "",
+  "current_iteration": 0,
+  "max_iterations": 5,
+  "status": "in_progress",
+  "iterations": [
+    {
+      "iteration": 1,
+      "timestamp": "",
+      "model_id": "",
+      "mlflow_run_id": "",
+      "scores": {
+        "syntax_validity": 0.0,
+        "schema_accuracy": 0.0,
+        "logical_accuracy": 0.0,
+        "semantic_equivalence": 0.0,
+        "completeness": 0.0,
+        "result_correctness": 0.0,
+        "asset_routing": 0.0,
+        "repeatability": 0.0
+      },
+      "overall_accuracy": 0.0,
+      "failure_clusters": [],
+      "proposals_applied": [],
+      "proposals_deferred": [],
+      "regressions_detected": [],
+      "arbiter_corrections": [],
+      "next_action": ""
+    }
+  ],
+  "best_iteration": 0,
+  "best_overall_accuracy": 0.0,
+  "remaining_failures": [],
+  "convergence_reason": null,
+  "promoted_model_id": null,
+  "score_history": [],
+  "patch_history": [],
+  "pareto_frontier": [],
+  "current_patch_set": null,
+  "patched_objects": [],
+  "maturity_level": "L1",
+  "benchmark_corrections": []
+}

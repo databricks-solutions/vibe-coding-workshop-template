@@ -190,3 +190,111 @@ FROM (
   )
 );
 ```
+
+---
+
+## Accumulating Snapshot Validation
+
+```sql
+-- Validate milestone monotonicity (earlier milestones should precede later ones)
+SELECT 'Milestone Order' as validation,
+       CASE WHEN violations = 0 THEN 'PASS' ELSE 'FAIL' END as result,
+       violations as detail
+FROM (
+  SELECT COUNT(*) as violations
+  FROM {catalog}.{gold_schema}.{fact_table}
+  WHERE {earlier_milestone} IS NOT NULL
+    AND {later_milestone} IS NOT NULL
+    AND {earlier_milestone} > {later_milestone}
+);
+
+-- Validate lag/duration columns are consistent with milestones
+SELECT 'Lag Consistency' as validation,
+       CASE WHEN mismatches = 0 THEN 'PASS' ELSE 'FAIL' END as result
+FROM (
+  SELECT COUNT(*) as mismatches
+  FROM {catalog}.{gold_schema}.{fact_table}
+  WHERE {from_milestone} IS NOT NULL
+    AND {to_milestone} IS NOT NULL
+    AND {lag_column} != DATEDIFF({to_milestone}, {from_milestone})
+);
+```
+
+---
+
+## Factless Fact Validation
+
+```sql
+-- Validate no measure columns contain non-zero values
+-- (factless facts should only have FK keys + audit timestamps)
+SELECT 'No Measures' as validation,
+       CASE WHEN measure_count = 0 THEN 'PASS' ELSE 'FAIL' END as result
+FROM (
+  SELECT COUNT(*) as measure_count
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_CATALOG = '{catalog}'
+    AND TABLE_SCHEMA = '{gold_schema}'
+    AND TABLE_NAME = '{fact_table}'
+    AND DATA_TYPE IN ('DECIMAL', 'DOUBLE', 'FLOAT', 'INT', 'BIGINT')
+    AND COLUMN_NAME NOT LIKE '%_key'
+    AND COLUMN_NAME NOT LIKE '%_id'
+);
+
+-- Validate grain: no duplicate FK combinations
+SELECT 'Factless Grain' as validation,
+       CASE WHEN dups = 0 THEN 'PASS' ELSE 'FAIL' END as result
+FROM (
+  SELECT COUNT(*) as dups
+  FROM (
+    SELECT {pk_columns}, COUNT(*) as cnt
+    FROM {catalog}.{gold_schema}.{fact_table}
+    GROUP BY {pk_columns}
+    HAVING COUNT(*) > 1
+  )
+);
+```
+
+---
+
+## Unknown Member Row Validation
+
+```sql
+-- Verify unknown member exists in each dimension
+SELECT 'Unknown Member' as validation,
+       table_name,
+       CASE WHEN cnt > 0 THEN 'PASS' ELSE 'FAIL' END as result
+FROM (
+  SELECT '{dim_table}' as table_name,
+         COUNT(*) as cnt
+  FROM {catalog}.{gold_schema}.{dim_table}
+  WHERE {pk_column} = '-1'
+);
+
+-- Verify unknown member has no NULLs in NOT NULL columns
+SELECT 'Unknown No Nulls' as validation,
+       CASE WHEN null_count = 0 THEN 'PASS' ELSE 'FAIL' END as result
+FROM (
+  SELECT COUNT(*) as null_count
+  FROM {catalog}.{gold_schema}.{dim_table}
+  WHERE {pk_column} = '-1'
+    AND ({business_key} IS NULL OR {required_col} IS NULL)
+);
+```
+
+---
+
+## Role-Playing View Validation
+
+```sql
+-- Verify role-playing views exist and reference the physical table
+SHOW VIEWS IN {catalog}.{gold_schema} LIKE 'dim_%_date';
+
+-- Verify view returns same row count as physical table
+SELECT 'View Row Count' as validation,
+       CASE WHEN view_cnt = phys_cnt THEN 'PASS' ELSE 'FAIL' END as result
+FROM (
+  SELECT 
+    (SELECT COUNT(*) FROM {catalog}.{gold_schema}.{view_name}) as view_cnt,
+    (SELECT COUNT(*) FROM {catalog}.{gold_schema}.{physical_table}) as phys_cnt
+);
+```

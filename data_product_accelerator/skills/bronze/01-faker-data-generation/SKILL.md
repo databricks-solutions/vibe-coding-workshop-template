@@ -17,9 +17,9 @@ metadata:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
       paths:
-        - "databricks-skills/synthetic-data-generation/SKILL.md"
+        - "databricks-skills/databricks-synthetic-data-generation/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 # Faker Data Generation Patterns
@@ -27,6 +27,31 @@ metadata:
 ## Overview
 
 When generating synthetic data for Databricks Bronze layer tables, use Faker with **configurable data corruption** to test Silver layer data quality expectations.
+
+## Upstream: Synthetic Data Generation Workflow
+
+The upstream `databricks-synthetic-data-generation` skill in AI-Dev-Kit introduces a file-based workflow:
+
+### File-Based Execution
+1. Write Python code to a local file (e.g., `scripts/generate_data.py`)
+2. Execute on Databricks using the `run_python_file_on_databricks` MCP tool
+3. If execution fails, edit the local file and re-execute
+
+### Context Reuse
+The first execution auto-selects a running cluster and creates an execution context. Reuse `cluster_id` and `context_id` for follow-up calls (faster: ~1s vs ~15s).
+
+### Raw Data Only
+By default, generate raw transactional data only — no `total_x`, `sum_x`, `avg_x` fields. SDP pipelines compute aggregations downstream.
+
+### Volume-First Storage
+Save data to Volumes as parquet files, not directly to tables:
+```python
+VOLUME_PATH = f"/Volumes/{CATALOG}/{SCHEMA}/raw_data"
+spark.createDataFrame(df).write.mode("overwrite").parquet(f"{VOLUME_PATH}/table_name")
+```
+
+### Dynamic Date Ranges
+Generate data for the last ~6 months from today using `datetime.now() - timedelta(days=180)`.
 
 ## When to Use This Skill
 

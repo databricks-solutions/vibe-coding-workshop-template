@@ -2,9 +2,9 @@
 
 ## System Architecture
 
-The Data Product Accelerator uses a **skills-first architecture** where domain expertise lives in Agent Skills using the open [SKILL.md format](https://agentskills.io). This is a deliberate evolution: the original framework embedded all patterns in 46+ IDE-specific rules, which created context-window pressure and IDE lock-in. The restructured framework uses a single `AGENTS.md` entry point that routes to 50 Agent Skills, each following a progressive disclosure pattern.
+The Data Product Accelerator uses a **skills-first architecture** where domain expertise lives in Agent Skills using the open [SKILL.md format](https://agentskills.io). This is a deliberate evolution: the original framework embedded all patterns in 46+ IDE-specific rules, which created context-window pressure and IDE lock-in. The restructured framework uses a single `AGENTS.md` entry point that routes to 59 Agent Skills, each following a progressive disclosure pattern.
 
-The architecture has three layers: a **routing layer** (`AGENTS.md` — universal entry point), a **knowledge layer** (50 Agent Skills), and a **generation layer** (the output code, configurations, and documentation that the AI assistant produces).
+The architecture has three layers: a **routing layer** (`AGENTS.md` — universal entry point), a **knowledge layer** (59 Agent Skills), and a **generation layer** (the output code, configurations, and documentation that the AI assistant produces).
 
 ### Architecture Diagram
 
@@ -61,7 +61,7 @@ graph TB
 └────────────────────────────────┬────────────────────────────────────┘
                                  │ routes to
 ┌────────────────────────────────▼────────────────────────────────────┐
-│                  KNOWLEDGE LAYER (50 Agent Skills)                  │
+│                  KNOWLEDGE LAYER (59 Agent Skills)                  │
 │                                                                     │
 │  ┌───────────────────────────────────────────────────────────────┐  │
 │  │  ORCHESTRATORS (00-*)        WORKERS (01-*, 02-*, ...)       │  │
@@ -107,8 +107,8 @@ sequenceDiagram
 
     U->>R: "Design Gold layer from @data_product_accelerator/context/schema.csv"
     R->>O: Route to gold/00-gold-layer-design
-    O->>W: Read gold/08-mermaid-erd-patterns
-    O->>W: Read gold/02-yaml-driven-gold-setup
+    O->>W: Read gold/design-workers/05-erd-diagrams
+    O->>W: Read gold/pipeline-workers/01-yaml-table-setup
     O->>C: Read databricks-expert-agent
     O->>C: Read naming-tagging-standards
     O->>U: Generate ERDs, YAML schemas, documentation
@@ -151,7 +151,7 @@ project_root/
 ├── AGENTS.md                           # Universal entry point (routing + common skills index)
 ├── QUICKSTART.md                       # One-prompt-per-stage guide
 ├── README.md                           # Project overview
-├── skills/                             # 50 Agent Skills (open SKILL.md format)
+├── skills/                             # 59 Agent Skills (open SKILL.md format)
 │   ├── admin/                          # 4 utility skills
 │   ├── bronze/                         # 2 skills (00-orchestrator, 01-worker)
 │   ├── common/                         # 8 shared skills
@@ -161,7 +161,7 @@ project_root/
 │   ├── ml/                             # 1 orchestrator skill
 │   ├── monitoring/                     # 5 skills
 │   ├── planning/                       # 1 skill
-│   ├── semantic-layer/                 # 6 skills
+│   ├── semantic-layer/                 # 10 skills (incl. optimization orchestrator + 4 workers)
 │   ├── silver/                         # 3 skills
 │   └── skill-navigator/               # Navigator skill (full version)
 ├── context/

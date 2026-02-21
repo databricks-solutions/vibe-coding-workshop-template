@@ -13,9 +13,9 @@ metadata:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
       paths:
-        - "databricks-skills/asset-bundles/SKILL.md"
+        - "databricks-skills/databricks-asset-bundles/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 
@@ -244,6 +244,57 @@ resources:
 - **Example:** `master_setup_orchestrator`, `master_refresh_orchestrator`
 
 **Key Principle:** No notebook duplication. Each notebook appears in exactly ONE atomic job.
+
+## Upstream Updates (February 2026)
+
+Recent additions from the upstream `databricks-asset-bundles` skill in AI-Dev-Kit:
+
+### Dashboard `dataset_catalog` / `dataset_schema` (CLI v0.281.0+)
+
+Dashboards now support default catalog/schema for all datasets:
+```yaml
+resources:
+  dashboards:
+    my_dashboard:
+      display_name: "[${bundle.target}] My Dashboard"
+      file_path: ../src/dashboards/dashboard.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      dataset_catalog: ${var.catalog}
+      dataset_schema: ${var.schema}
+```
+
+### Apps Resources (CLI v0.239.0+)
+
+Apps have minimal DAB configuration. Environment variables go in `app.yaml` (source directory), NOT in `databricks.yml`:
+```yaml
+resources:
+  apps:
+    my_app:
+      name: my-app-${bundle.target}
+      description: "My application"
+      source_code_path: ../src/app
+```
+
+Generate from an existing app: `databricks bundle generate app --existing-app-name my-app --key my_app`
+
+Apps require `databricks bundle run <app_key>` to start after deployment.
+
+### Volume Resources
+
+Volumes use `grants` (not `permissions`):
+```yaml
+resources:
+  volumes:
+    my_volume:
+      catalog_name: ${var.catalog}
+      schema_name: ${var.schema}
+      name: "volume_name"
+      volume_type: "MANAGED"
+```
+
+### App Monitoring
+
+View application logs: `databricks apps logs <app-name> --profile <profile-name>`
 
 ## Path Resolution Rules
 

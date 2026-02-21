@@ -1,0 +1,40 @@
+# TVF Creation Job (Standalone)
+#
+# Creates Table-Valued Functions from a SQL file using sql_task.
+# Use this template for standalone TVF deployment. For end-to-end semantic layer
+# deployment with dependency ordering, use the combined semantic-layer-job-template.yml
+# from the orchestrator skill instead.
+#
+# Usage:
+#   databricks bundle deploy -t dev
+#   databricks bundle run tvf_creation_job -t dev
+#
+# Prerequisites:
+#   - Gold layer tables must exist
+#   - SQL file must use ${catalog} and ${gold_schema} parameter placeholders
+
+resources:
+  jobs:
+    tvf_creation_job:
+      name: "${bundle.target}-tvf-creation"
+
+      tags:
+        environment: "${bundle.target}"
+        layer: "semantic"
+        job_type: "tvf_creation"
+
+      tasks:
+        - task_key: create_table_valued_functions
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: "../../src/${var.project_name}_semantic/table_valued_functions.sql"
+            parameters:
+              catalog: "${var.catalog}"
+              gold_schema: "${var.gold_schema}"
+
+      email_notifications:
+        on_failure:
+          - "${var.notification_email}"
+
+      timeout_seconds: 1800

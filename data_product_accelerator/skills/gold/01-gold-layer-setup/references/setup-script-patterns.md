@@ -285,7 +285,7 @@ def main():
 
 ## Related Skills
 
-- `yaml-driven-gold-setup` — YAML schema structure and patterns
+- `01-yaml-table-setup` — YAML schema structure and patterns
 - `databricks-table-properties` — Standard TBLPROPERTIES
 - `schema-management-patterns` — Schema creation patterns
 - `unity-catalog-constraints` — PK/UNIQUE constraint patterns

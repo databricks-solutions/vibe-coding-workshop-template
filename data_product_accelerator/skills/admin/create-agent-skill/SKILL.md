@@ -163,6 +163,10 @@ my-skill/
 - Job configuration starters
 - Skeleton files to copy
 
+### Working Memory (Orchestrators Only)
+
+Orchestrator skills with 3+ phases must include a `## Working Memory Management` section. Workers must end with a `## [Domain] Notes to Carry Forward` section and a `## Next Step` section. See [Progressive Disclosure Patterns](references/progressive-disclosure.md) for Strategy 4 details.
+
 ---
 
 ## Naming and Organization

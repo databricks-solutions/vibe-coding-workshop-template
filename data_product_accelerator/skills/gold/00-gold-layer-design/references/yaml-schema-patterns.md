@@ -1,6 +1,6 @@
 # YAML Schema Patterns
 
-Extracted from `context/prompts/03a-gold-layer-design-prompt.md` Step 3. Use alongside the `yaml-driven-gold-setup` and `gold-layer-documentation` skills.
+Extracted from `context/prompts/03a-gold-layer-design-prompt.md` Step 3. Use alongside the `01-yaml-table-setup` and `06-table-documentation` skills.
 
 ---
 

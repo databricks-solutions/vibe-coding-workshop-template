@@ -128,4 +128,4 @@ All failures are logged as warnings so the script continues processing other FKs
 ## Related Skills
 
 - `unity-catalog-constraints` — Complete PK/FK constraint patterns
-- `yaml-driven-gold-setup` — YAML schema structure
+- `01-yaml-table-setup` — YAML schema structure

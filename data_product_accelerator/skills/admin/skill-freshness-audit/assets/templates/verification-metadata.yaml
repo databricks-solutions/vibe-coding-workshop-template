@@ -36,9 +36,9 @@ metadata:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
       paths:
-        - "databricks-skills/agent-bricks/SKILL.md"       # specific file(s) this skill derives from
+        - "databricks-skills/databricks-agent-bricks/SKILL.md"  # specific file(s) this skill derives from
       relationship: "extended"    # derived | extended | inspired | reference
-      last_synced: "2026-02-09"   # ISO date when skill was last synced with upstream
+      last_synced: "2026-02-19"   # ISO date when skill was last synced with upstream
       sync_commit: "abc1234"      # short hash of upstream commit at time of last sync
 
   # Relationship types:
@@ -67,9 +67,9 @@ metadata:
 #     - name: "ai-dev-kit"
 #       repo: "databricks-solutions/ai-dev-kit"
 #       paths:
-#         - "databricks-skills/agent-bricks/SKILL.md"
+#         - "databricks-skills/databricks-agent-bricks/SKILL.md"
 #       relationship: "extended"
-#       last_synced: "2026-02-09"
+#       last_synced: "2026-02-19"
 #       sync_commit: "a1b2c3d"
 
 # --- Example: Minimal for a stable skill (no upstream) ---

@@ -57,7 +57,7 @@ metadata:
     - "PERMISSION_DENIED"
     - "self-heal"
     - "autonomous"
-  last_verified: "2026-02-07"
+  last_verified: "2026-02-20"
   volatility: medium
   upstream_sources:
     - name: "ai-dev-kit"
@@ -66,8 +66,8 @@ metadata:
         - "databricks-skills/databricks-python-sdk/SKILL.md"
         - "databricks-skills/databricks-jobs/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"
-      sync_commit: "97a3637"
+      last_synced: "2026-02-20"
+      sync_commit: "latest"
 ---
 
 # Databricks Autonomous Operations
@@ -464,7 +464,7 @@ Post-Troubleshooting Self-Improvement:
 1. `references/error-solution-matrix.md` — error-to-fix mapping
 2. `common/databricks-autonomous-operations` — troubleshooting decision tree
 3. `common/databricks-asset-bundles` — if deployment-related
-4. Domain-specific skill (e.g., `gold/gold-layer-merge-patterns` for MERGE errors)
+4. Domain-specific skill (e.g., `gold/pipeline-workers/02-merge-patterns` for MERGE errors)
 5. New skill — only if all above are irrelevant (see `admin/self-improvement` justification checklist)
 
 ### Safety: Never Retry Destructive Operations

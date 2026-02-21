@@ -6,7 +6,7 @@ metadata:
   version: "3.0"
   domain: meta
   role: navigator
-  last_verified: "2026-02-07"
+  last_verified: "2026-02-21"
   volatility: low
   upstream_sources: []  # Internal routing
 ---
@@ -35,12 +35,13 @@ This framework uses a **Design-First** pipeline: design the target Gold model fr
 | 4 | Gold Implementation | `gold/01-gold-layer-setup` | Tables, merge scripts, FK constraints |
 | 5 | Planning | `planning/00-project-planning` | Plan semantic, observability, ML, GenAI phases |
 | 6 | Semantic Layer | `semantic-layer/00-semantic-layer-setup` | Metric Views, TVFs, Genie Spaces |
+| 6b | Genie Optimization | `semantic-layer/05-genie-optimization-orchestrator` (standalone) | Benchmark testing, accuracy/repeatability tuning |
 | 7 | Observability | `monitoring/00-observability-setup` | Monitors, dashboards, alerts |
 | 8 | ML | `ml/00-ml-pipeline-setup` | ML experiments, models, inference |
 | 9 | GenAI Agents | `genai-agents/00-genai-agents-setup` | Agents, evaluation, deployment |
 
 ```
-data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Observability (7) → ML (8) → GenAI (9)
+data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Genie Optimization (6b) → Observability (7) → ML (8) → GenAI (9)
 ```
 
 ---
@@ -125,6 +126,7 @@ domain-folder/
 ### Numbering Convention
 - `00-` = Orchestrator (start here for end-to-end workflows)
 - `01-`, `02-`, ... = Workers (specific patterns, loaded by orchestrator or standalone)
+- **Gold domain exception:** Workers are organized into `design-workers/` (Stage 1 design phase) and `pipeline-workers/` (Stage 4 implementation phase) subdirectories instead of numbered prefixes
 
 ### How to Navigate Within a Skill
 1. **Read SKILL.md first** (~1-2K tokens) — Contains overview, critical rules, and links
@@ -181,6 +183,7 @@ domain-folder/
 | "implement Gold", "Gold tables", "Gold merge scripts" | Gold | `gold/01-gold-layer-setup` (stage 4) |
 | "project plan", "architecture planning", "planning_mode: workshop" | Planning | `planning/00-project-planning` (stage 5) |
 | "semantic layer", "build Genie", "Metric Views and TVFs" | Semantic | `semantic-layer/00-semantic-layer-setup` (stage 6) |
+| "optimize Genie", "Genie accuracy", "benchmark", "judge evaluation", "control lever" | Semantic | `semantic-layer/05-genie-optimization-orchestrator` (stage 6b, standalone orchestrator) |
 | "observability", "monitoring setup", "dashboards and alerts" | Monitoring | `monitoring/00-observability-setup` (stage 7) |
 | "MLflow", "ML pipeline", "model training" | ML | `ml/00-ml-pipeline-setup` (stage 8) |
 | "GenAI agent", "build agent", "ResponsesAgent" | GenAI | `genai-agents/00-genai-agents-setup` (stage 9) |
@@ -192,18 +195,22 @@ domain-folder/
 | "Faker", "synthetic", "corruption" | Bronze | `bronze/01-faker-data-generation` |
 | "DLT", "expectations" | Silver | `silver/01-dlt-expectations-patterns` |
 | "DQX", "validation" | Silver | `silver/02-dqx-patterns` |
-| "Gold merge", "MERGE" | Gold | `gold/04-gold-layer-merge-patterns` |
-| "duplicate key" | Gold | `gold/05-gold-delta-merge-deduplication` |
-| "Gold documentation" | Gold | `gold/03-gold-layer-documentation` |
-| "ERD", "diagram" | Gold | `gold/08-mermaid-erd-patterns` |
-| "schema validation" | Gold | `gold/07-gold-layer-schema-validation` |
-| "fact grain" | Gold | `gold/06-fact-table-grain-validation` |
-| "YAML setup" | Gold | `gold/02-yaml-driven-gold-setup` |
+| "Gold merge", "MERGE" | Gold | `gold/pipeline-workers/02-merge-patterns` |
+| "duplicate key" | Gold | `gold/pipeline-workers/03-deduplication` |
+| "Gold documentation" | Gold | `gold/design-workers/06-table-documentation` |
+| "ERD", "diagram" | Gold | `gold/design-workers/05-erd-diagrams` |
+| "dimension pattern", "role-playing", "junk dimension", "hierarchy" | Gold | `gold/design-workers/02-dimension-patterns` |
+| "fact pattern", "factless", "accumulating snapshot", "measure additivity" | Gold | `gold/design-workers/03-fact-table-patterns` |
+| "conformed dimension", "bus matrix", "drill-across" | Gold | `gold/design-workers/04-conformed-dimensions` |
+| "design validation", "validate model" | Gold | `gold/design-workers/07-design-validation` |
+| "schema validation" | Gold | `gold/pipeline-workers/05-schema-validation` |
+| "fact grain" | Gold | `gold/pipeline-workers/04-grain-validation` |
+| "YAML setup" | Gold | `gold/pipeline-workers/01-yaml-table-setup` |
 | "metric view", "semantic" | Semantic | `semantic-layer/01-metric-views-patterns` |
 | "TVF", "function" | Semantic | `semantic-layer/02-databricks-table-valued-functions` |
 | "Genie Space", "Genie setup" | Semantic | `semantic-layer/03-genie-space-patterns` |
 | "Genie API", "export/import" | Semantic | `semantic-layer/04-genie-space-export-import-api` |
-| "optimize Genie", "Genie accuracy", "benchmark" | Semantic | `semantic-layer/05-genie-space-optimization` |
+| "optimize Genie", "Genie accuracy", "benchmark" | Semantic | `semantic-layer/05-genie-optimization-orchestrator` (standalone — stage 6b, not called by orchestrator) |
 | "monitoring", "Lakehouse" | Monitor | `monitoring/01-lakehouse-monitoring-comprehensive` |
 | "dashboard", "AI/BI" | Monitor | `monitoring/02-databricks-aibi-dashboards` |
 | "alert", "SQL alert" | Monitor | `monitoring/03-sql-alerting-patterns` |
@@ -263,6 +270,14 @@ Need validation → Run scripts/validate.py
 Need starter file → Copy assets/templates/template.yaml
 ```
 
+### Step 6: Working Memory Between Phases
+```
+When executing a multi-phase orchestrator, persist a brief summary note after
+each phase. Keep only the current phase's worker skill + previous phase's summary
+in working memory. Discard intermediate tool outputs. Each worker's
+"Notes to Carry Forward" section tells you what to pass to the next phase.
+```
+
 ---
 
 ## Context Budget Monitoring
@@ -317,13 +332,20 @@ skills/
 ├── gold/
 │   ├── 00-gold-layer-design/SKILL.md                            # ORCHESTRATOR: Gold design [stage 1 — entry point]
 │   ├── 01-gold-layer-setup/SKILL.md                      # ORCHESTRATOR: Gold implementation [stage 4]
-│   ├── 02-yaml-driven-gold-setup/SKILL.md                       # Worker: YAML-driven tables [stage 4]
-│   ├── 03-gold-layer-documentation/SKILL.md                      # Worker: Documentation [stage 1]
-│   ├── 04-gold-layer-merge-patterns/SKILL.md                     # Worker: MERGE operations [stage 4]
-│   ├── 05-gold-delta-merge-deduplication/SKILL.md               # Worker: Deduplication [stage 4]
-│   ├── 06-fact-table-grain-validation/SKILL.md                  # Worker: Grain validation [stage 1]
-│   ├── 07-gold-layer-schema-validation/SKILL.md                 # Worker: Schema validation [stage 4]
-│   └── 08-mermaid-erd-patterns/SKILL.md                         # Worker: ERD diagrams [stage 1]
+│   ├── design-workers/
+│   │   ├── 01-grain-definition/SKILL.md                          # Worker: Grain definition [stage 1]
+│   │   ├── 02-dimension-patterns/SKILL.md                        # Worker: Dimension design patterns [stage 1]
+│   │   ├── 03-fact-table-patterns/SKILL.md                       # Worker: Fact table design patterns [stage 1]
+│   │   ├── 04-conformed-dimensions/SKILL.md                      # Worker: Enterprise integration [stage 1]
+│   │   ├── 05-erd-diagrams/SKILL.md                              # Worker: ERD diagrams [stage 1]
+│   │   ├── 06-table-documentation/SKILL.md                       # Worker: Table documentation [stage 1]
+│   │   └── 07-design-validation/SKILL.md                         # Worker: Design validation [stage 1]
+│   └── pipeline-workers/
+│       ├── 01-yaml-table-setup/SKILL.md                          # Worker: YAML-driven tables [stage 4]
+│       ├── 02-merge-patterns/SKILL.md                            # Worker: MERGE operations [stage 4]
+│       ├── 03-deduplication/SKILL.md                             # Worker: Deduplication [stage 4]
+│       ├── 04-grain-validation/SKILL.md                            # Worker: Grain validation [stage 4]
+│       └── 05-schema-validation/SKILL.md                          # Worker: Schema validation [stage 4]
 │
 ├── planning/
 │   └── 00-project-planning/SKILL.md                     # ORCHESTRATOR: Planning [stage 5]
@@ -334,7 +356,8 @@ skills/
 │   ├── 02-databricks-table-valued-functions/SKILL.md            # Worker: TVFs for Genie [stage 6]
 │   ├── 03-genie-space-patterns/SKILL.md                         # Worker: Genie Space setup [stage 6]
 │   ├── 04-genie-space-export-import-api/SKILL.md                # Worker: Genie API [stage 6]
-│   └── 05-genie-space-optimization/SKILL.md                     # Worker: Genie optimization [stage 6]
+│   ├── 05-genie-optimization-orchestrator/SKILL.md              # Standalone: Genie optimization orchestrator [stage 6b]
+│   └── genie-optimization-workers/                              # 4 worker skills loaded on demand by orchestrator
 │
 ├── monitoring/
 │   ├── 00-observability-setup/SKILL.md                         # ORCHESTRATOR: Observability [stage 7]
@@ -360,6 +383,33 @@ skills/
 ├── exploration/
 │   └── 00-adhoc-exploration-notebooks/SKILL.md                  # Utility: Exploration [standalone]
 ```
+
+---
+
+## Post-Completion: Skill Usage Summary (MANDATORY)
+
+**After completing a routing or orchestration session, output a Skill Usage Summary reflecting what you ACTUALLY did — not a pre-written summary.**
+
+### What to Include
+
+1. Every skill `SKILL.md` or `references/` file you read (via the Read tool), in the order you read them
+2. Which routing step or phase you were in when you read it
+3. Whether it was an **Orchestrator**, **Worker**, **Common**, **Cross-domain**, or **Reference** file
+4. A one-line description of what you specifically used it for in this session
+
+### Format
+
+| # | Step / Phase | Skill / Reference Read | Type | What It Was Used For |
+|---|-------------|----------------------|------|---------------------|
+| 1 | Routing | `path/to/SKILL.md` | Orchestrator / Worker / Common / Reference | One-line description |
+
+### Summary Footer
+
+End with:
+- **Totals:** X orchestrator skills, Y worker skills, Z common skills, W reference files read
+- **Routing path:** Which orchestrator(s) were invoked and in what order
+- **Skipped:** List any skills from the routing table that were considered but not needed, and why
+- **Unplanned:** List any skills read that were outside the normal routing path (e.g., troubleshooting, edge cases)
 
 ---
 

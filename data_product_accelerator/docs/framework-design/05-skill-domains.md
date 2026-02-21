@@ -2,7 +2,7 @@
 
 ## Overview
 
-The framework's 50 Agent Skills are organized into 12 domain directories. Each domain corresponds to a layer of the Medallion Architecture, a platform capability, or an administrative function. This document provides the complete inventory of every skill in every domain.
+The framework's 59 Agent Skills are organized into 12 domain directories. Each domain corresponds to a layer of the Medallion Architecture, a platform capability, or an administrative function. This document provides the complete inventory of every skill in every domain.
 
 ## Domain Summary
 
@@ -13,7 +13,7 @@ The framework's 50 Agent Skills are organized into 12 domain directories. Each d
 | Silver | `silver/` | `00-silver-layer-setup` | 2 workers | 3 | Stage 3 |
 | Gold (Impl) | `gold/` | `01-gold-layer-setup` | (shared) | (shared) | Stage 4 |
 | Planning | `planning/` | `00-project-planning` | 0 | 1 | Stage 5 |
-| Semantic Layer | `semantic-layer/` | `00-semantic-layer-setup` | 5 workers | 6 | Stage 6 |
+| Semantic Layer | `semantic-layer/` | `00-semantic-layer-setup` | 4 workers + 1 optimization orchestrator + 4 optimization workers | 10 | Stage 6 (+ optional 6b) |
 | Monitoring | `monitoring/` | `00-observability-setup` | 4 workers | 5 | Stage 7 |
 | ML | `ml/` | `00-ml-pipeline-setup` | 0 | 1 | Stage 8 |
 | GenAI Agents | `genai-agents/` | `00-genai-agents-setup` | 8 workers | 9 | Stage 9 |
@@ -31,13 +31,18 @@ Two orchestrators (Design and Implementation) share 7 worker skills.
 |-------|------|-------------|
 | `00-gold-layer-design` | Orchestrator | Schema CSV → ERDs, YAML schemas, documentation (stage 1) |
 | `01-gold-layer-setup` | Orchestrator | YAML → tables, MERGE scripts, FK constraints (stage 4) |
-| `02-yaml-driven-gold-setup` | Worker | Dynamic Gold table creation from YAML at runtime |
-| `03-gold-layer-documentation` | Worker | Naming conventions, column descriptions, dual-purpose comments |
-| `04-gold-layer-merge-patterns` | Worker | Silver-to-Gold MERGE operations, SCD Type 1/2, column mapping |
-| `05-gold-delta-merge-deduplication` | Worker | Dedup-before-merge to prevent duplicate key errors |
-| `06-fact-table-grain-validation` | Worker | Transaction vs aggregated vs snapshot grain inference |
-| `07-gold-layer-schema-validation` | Worker | DataFrame columns vs target table schema validation |
-| `08-mermaid-erd-patterns` | Worker | Mermaid ERD syntax, master/domain/summary diagrams |
+| `01-grain-definition` | Design Worker | Fact table grain types, PK-grain decision tree |
+| `02-dimension-patterns` | Design Worker | Role-playing, junk, degenerate dimensions, hierarchy flattening |
+| `03-fact-table-patterns` | Design Worker | Measure additivity, factless facts, accumulating snapshots |
+| `04-conformed-dimensions` | Design Worker | Enterprise bus matrix, conformed dims, drill-across |
+| `05-erd-diagrams` | Design Worker | Mermaid ERD syntax, master/domain/summary diagrams |
+| `06-table-documentation` | Design Worker | Naming conventions, column descriptions, dual-purpose comments |
+| `07-design-validation` | Design Worker | YAML↔ERD↔Lineage cross-validation |
+| `01-yaml-table-setup` | Pipeline Worker | Dynamic Gold table creation from YAML at runtime |
+| `02-merge-patterns` | Pipeline Worker | Silver-to-Gold MERGE operations, SCD Type 1/2, column mapping |
+| `03-deduplication` | Pipeline Worker | Dedup-before-merge to prevent duplicate key errors |
+| `04-grain-validation` | Pipeline Worker | Pre-merge grain validation for fact tables |
+| `05-schema-validation` | Pipeline Worker | DataFrame columns vs target table schema validation |
 
 ---
 
@@ -58,7 +63,7 @@ Two orchestrators (Design and Implementation) share 7 worker skills.
 | `01-dlt-expectations-patterns` | Worker | DLT expectations with UC Delta table storage |
 | `02-dqx-patterns` | Worker | Advanced DQ diagnostics with failure tracking |
 
-Note: Some duplicate directory names exist (`00-silver-layer-creation`, `silver-layer-creation`) as legacy artifacts.
+Canonical Silver orchestrator path is `00-silver-layer-setup` (legacy `*-creation` naming is no longer used).
 
 ---
 
@@ -67,7 +72,6 @@ Note: Some duplicate directory names exist (`00-silver-layer-creation`, `silver-
 | Skill | Role | Description |
 |-------|------|-------------|
 | `00-project-planning` | Orchestrator | Multi-phase planning with YAML manifest generation |
-| `00-project-plan-methodology` | Orchestrator (alt) | Legacy/alternative planning methodology |
 
 ---
 
@@ -80,7 +84,11 @@ Note: Some duplicate directory names exist (`00-silver-layer-creation`, `silver-
 | `02-databricks-table-valued-functions` | Worker | TVFs for Genie (STRING params, null safety, v3.0 comments) |
 | `03-genie-space-patterns` | Worker | Genie Space setup, agent instructions, benchmark questions |
 | `04-genie-space-export-import-api` | Worker | Programmatic Genie Space deployment via REST API |
-| `05-genie-space-optimization` | Worker | Optimization loop targeting 95%+ accuracy |
+| `05-genie-optimization-orchestrator` | Orchestrator (standalone) | Routes to 4 workers for MLflow-driven optimization loop |
+| `genie-optimization-workers/01-genie-benchmark-generator` | Worker | Benchmark creation, GT validation, MLflow dataset sync |
+| `genie-optimization-workers/02-genie-benchmark-evaluator` | Worker | 3-layer judge architecture (8 judges + arbiter) |
+| `genie-optimization-workers/03-genie-metadata-optimizer` | Worker | GEPA/introspection, failure clustering, proposals |
+| `genie-optimization-workers/04-genie-optimization-applier` | Worker | 6 control levers, dual persistence, deployment |
 
 ---
 
@@ -113,7 +121,6 @@ The largest domain with the most workers.
 | Skill | Role | Description |
 |-------|------|-------------|
 | `00-genai-agents-setup` | Orchestrator | End-to-end agent implementation |
-| `00-genai-agent-implementation` | Orchestrator (alt) | Alternative entry point |
 | `01-responses-agent-patterns` | Worker | MLflow ResponsesAgent with streaming |
 | `02-mlflow-genai-evaluation` | Worker | LLM judges, custom scorers, thresholds |
 | `03-lakebase-memory-patterns` | Worker | Short-term (CheckpointSaver) + long-term (DatabricksStore) |
@@ -122,7 +129,7 @@ The largest domain with the most workers.
 | `06-deployment-automation` | Worker | Evaluation-then-promote CI/CD |
 | `07-production-monitoring` | Worker | Registered scorers, sampling, trace archival |
 | `08-mlflow-genai-foundation` | Worker | Core MLflow 3.0 GenAI patterns |
-| `08-genie-space-optimization` | Worker | Cross-domain optimization (shared with semantic-layer) |
+| `semantic-layer/05-genie-optimization-orchestrator` | Cross-domain | Genie optimization orchestrator (shared with semantic-layer, stage 6b) |
 
 ---
 

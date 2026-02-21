@@ -11,7 +11,7 @@ Complete error tables for all Databricks resource categories. Load this referenc
 | `ModuleNotFoundError: <module>` | Missing dependency in serverless env | Add `%pip install <module>` at top of notebook, or add to DAB environment spec `dependencies:` |
 | `UNRESOLVED_COLUMN: Column 'X' cannot be resolved` | Wrong column name | Check against Gold YAML schema: `gold_layer_design/yaml/{domain}/{table}.yaml` or run `DESCRIBE TABLE catalog.schema.table` |
 | `TABLE_OR_VIEW_NOT_FOUND: Table 'X' not found` | Table doesn't exist | Run setup job first (`gold_setup_job`, `bronze_setup_job`). Verify catalog.schema.table path matches DAB variables. |
-| `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE` | Duplicate business keys in Silver source | Deduplicate source DataFrame before MERGE. Reference `gold-delta-merge-deduplication` skill. Use `ROW_NUMBER()` partitioned by business key, ordered by timestamp DESC, take row 1. |
+| `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE` | Duplicate business keys in Silver source | Deduplicate source DataFrame before MERGE. Reference `gold/pipeline-workers/03-deduplication` skill. Use `ROW_NUMBER()` partitioned by business key, ordered by timestamp DESC, take row 1. |
 | `PermissionDenied` / `FORBIDDEN` | Insufficient Unity Catalog grants | Check grants: `SHOW GRANTS ON TABLE catalog.schema.table`. Grant required: `SELECT`, `MODIFY`, or `ALL PRIVILEGES`. |
 | `INTERNAL_ERROR` | Cluster/infrastructure issue | Retry once. If persistent: check cluster events (`databricks clusters events <ID>`), look for OOM, spot instance termination, or cloud provider issues. |
 | `MlflowException: signature` | Model signature mismatch | Fix `fe.log_model()` parameters. Verify input/output schemas match model expectations. |

@@ -19,6 +19,13 @@ The Data Product Accelerator is an **AI-assisted development system** for buildi
 | 06 | [Common Skills](06-common-skills.md) | 8 cross-cutting shared skills deep dive |
 | 07 | [Implementation Guide](07-implementation-guide.md) | Step-by-step workshop walkthrough from zero to production |
 | 08 | [Operations Guide](08-operations-guide.md) | Maintenance, skill freshness auditing, self-improvement, evolution |
+| 09 | [Parallel Execution Guide](09-parallel-execution-guide.md) | Dependency analysis, parallel vs serial steps, critical path optimization |
+| 10 | [Skill Navigation Visual Guide](10-skill-navigation-visual-guide.md) | Interactive animated visualization of agent routing, orchestrator/worker relationships, and context loading ([HTML animation](10-skill-navigation-visual-guide.html)) |
+| 11 | [Skill Hierarchy Tree](11-skill-hierarchy-tree.html) | Cascading tree visualization showing how the agent descends through the full skill hierarchy with collapsible branches |
+| 12 | [Semantic Layer Orchestrator Walkthrough](12-semantic-layer-orchestrator-walkthrough.md) | Visual step-by-step trace of how the semantic layer orchestrator progressively loads 4 worker skills, manages context handoffs, and builds Metric Views, TVFs, and Genie Spaces |
+| 13 | [Gold Design Orchestrator Walkthrough](13-gold-design-orchestrator-walkthrough.md) | Visual step-by-step trace of how the gold design orchestrator loads 7 design-worker skills across 10 phases, transforming a schema CSV into ERDs, YAML schemas, lineage, and business documentation |
+| 14 | [Silver Orchestrator Walkthrough](14-silver-orchestrator-walkthrough.md) | Visual step-by-step trace of how the silver orchestrator loads 2 worker skills and 6 common skills across 7 phases, building SDP/DLT pipelines with Delta table-based DQ rules and monitoring |
+| 15 | [Gold Pipeline Orchestrator Walkthrough](15-gold-pipeline-orchestrator-walkthrough.md) | Visual step-by-step trace of how the gold pipeline orchestrator loads 5 pipeline-worker skills across 6 phases, implementing YAML-driven tables, MERGE scripts, and Asset Bundle jobs |
 
 ## Appendices
 
@@ -43,7 +50,7 @@ The Data Product Accelerator is an **AI-assisted development system** for buildi
 │  └──────────────────────────────────┬───────────────────────────┘    │
 │                                     │ routes to                      │
 │  ┌──────────────────────────────────▼───────────────────────────┐    │
-│  │              skills/ (50 Agent Skills)               │    │
+│  │              skills/ (59 Agent Skills)               │    │
 │  │                                                               │    │
 │  │  ┌──────────────┐  ┌───────────────┐  ┌──────────────────┐  │    │
 │  │  │ Orchestrators │  │    Workers     │  │  Common Skills   │  │    │
@@ -91,7 +98,7 @@ The Data Product Accelerator is an **AI-assisted development system** for buildi
 | 1 | Extract, Don't Generate | Script table/column names from Gold YAML, never hardcode | [04-Agent Skills](04-agent-skills-system.md) |
 | 2 | Design-First Pipeline | Design Gold target model before building Bronze/Silver layers | [03-Pipeline](03-design-first-pipeline.md) |
 | 3 | Progressive Disclosure | SKILL.md (~2K) → references/ (2-8K) → scripts/ (on demand) | [04-Agent Skills](04-agent-skills-system.md) |
-| 4 | Skills-First Architecture | AGENTS.md entry point + 50 skills (not 46 rules) | [02-Architecture](02-architecture-overview.md) |
+| 4 | Skills-First Architecture | AGENTS.md entry point + 59 skills (not 46 rules) | [02-Architecture](02-architecture-overview.md) |
 | 5 | Plan-as-Contract | Planning emits YAML manifests consumed by downstream stages | [03-Pipeline](03-design-first-pipeline.md) |
 | 6 | Orchestrator-First Routing | Route to 00-* orchestrator, which loads worker skills as needed | [04-Agent Skills](04-agent-skills-system.md) |
 | 7 | Autonomous Operations | Deploy → Poll → Diagnose → Fix → Redeploy without human intervention | [06-Common Skills](06-common-skills.md) |

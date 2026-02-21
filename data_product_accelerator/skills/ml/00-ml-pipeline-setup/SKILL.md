@@ -26,10 +26,10 @@ metadata:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
       paths:
-        - "databricks-skills/model-serving/SKILL.md"
-        - "databricks-skills/vector-search/SKILL.md"
+        - "databricks-skills/databricks-model-serving/SKILL.md"
+        - "databricks-skills/databricks-vector-search/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 
@@ -118,6 +118,21 @@ Use this skill when:
 - Preventing common MLflow signature errors
 - Handling data quality issues (NaN, label binarization, single-class data)
 - Configuring serverless ML jobs correctly
+
+---
+
+## Working Memory Management
+
+This orchestrator covers Phase 0 (plan reading) plus multiple implementation sections (feature tables, training, inference, deployment). To maintain coherence without context pollution:
+
+**After each major section, persist a brief summary note** capturing:
+- **Phase 0 output:** Manifest found (yes/no), model count, feature table count, experiment names from manifest or discovery
+- **Feature tables output:** Feature table names and paths, primary key columns, NaN handling decisions
+- **Training output:** Experiment names, model URIs, MLflow signature details, label binarization strategy
+- **Inference output:** Batch inference notebook paths, `fe.score_batch` config, output table names
+- **Jobs output:** Job YAML file paths, environment config, `databricks.yml` sync status
+
+**What to keep in working memory:** Only the current section's reference skill, the model/feature inventory (from Phase 0), and the previous section's summary note. Discard intermediate outputs (full DataFrames, training logs, model artifacts) — they are in MLflow and reproducible.
 
 ---
 
@@ -569,6 +584,33 @@ Asset Bundle job template for batch inference with `fe.score_batch`. Includes pi
 
 **Next stage:** After completing ML setup, proceed to:
 - **`genai-agents/00-genai-agents-setup`** — Implement GenAI agents with ResponsesAgent, Genie Spaces, and evaluation
+
+---
+
+## Post-Completion: Skill Usage Summary (MANDATORY)
+
+**After completing all sections of this orchestrator, output a Skill Usage Summary reflecting what you ACTUALLY did — not a pre-written summary.**
+
+### What to Include
+
+1. Every skill `SKILL.md` or `references/` file you read (via the Read tool), in the order you read them
+2. Which section or step you were in when you read it (e.g., "Feature Tables", "Training", "Inference", "Jobs")
+3. Whether it was a **Common**, **Reference**, or **Template** file
+4. A one-line description of what you specifically used it for in this session
+
+### Format
+
+| # | Section | Skill / Reference Read | Type | What It Was Used For |
+|---|---------|----------------------|------|---------------------|
+| 1 | Section Name | `path/to/SKILL.md` | Common / Reference / Template | One-line description |
+
+### Summary Footer
+
+End with:
+- **Totals:** X common skills, Y reference files, Z templates read across N sections
+- **Models trained:** List each model name, type (classification/regression/anomaly), and algorithm
+- **Skipped:** List any skills from the dependency table above that you did NOT need to read, and why (e.g., "section not applicable", "user skipped", "no issues encountered")
+- **Unplanned:** List any skills you read that were NOT listed in the dependency table (e.g., for troubleshooting, edge cases, or user-requested detours)
 
 ---
 

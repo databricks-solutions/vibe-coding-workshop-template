@@ -19,7 +19,7 @@ metadata:
       paths:
         - "databricks-skills/databricks-genie/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 
@@ -95,40 +95,50 @@ payload = {
 }
 ```
 
-### 2. ID Generation
+### Section 4: ID Generation
 
-All IDs must be 32-character hex strings (UUID without dashes):
+**All IDs MUST be `uuid.uuid4().hex`** — a 32-character lowercase hex string with no dashes.
 
 ```python
 import uuid
 
-def generate_genie_id():
-    return uuid.uuid4().hex  # "01f0ad0d629b11879bb8c06e03b919f8"
+def generate_id() -> str:
+    """Generate a Genie Space compatible ID (32 hex chars, no dashes)."""
+    return uuid.uuid4().hex  # e.g., "a1b2c3d4e5f6789012345678abcdef01"
 ```
 
-**Required IDs:**
-- `config.sample_questions[].id`
-- `instructions.text_instructions[].id`
-- `instructions.sql_functions[].id`
-- `instructions.join_specs[].id`
-- `benchmarks.questions[].id`
+**Required ID fields** (every one must be a fresh `uuid.uuid4().hex`):
+- `space.id`
+- `space.tables[].id`
+- `space.sql_functions[].id`
+- `space.example_question_sqls[].id`
+- `space.materialized_views[].id`
 
-### 3. Array Format Requirements
-
-**CRITICAL:** All string fields that appear as arrays must be arrays, even for single values:
-
-```json
-{
-  "config": {
-    "sample_questions": [
-      {
-        "id": "...",
-        "question": ["What is revenue?"]  // ✅ Array, not string
-      }
-    ]
-  }
-}
+**❌ WRONG IDs (will cause import failures):**
+```python
+"genie_" + uuid.uuid4().hex[:24]    # ❌ Prefixed, wrong length
+"aaaa" * 8                           # ❌ Not random
+str(uuid.uuid4())                    # ❌ Contains dashes (36 chars)
+hashlib.md5(name.encode()).hexdigest()  # ❌ Deterministic, not UUID4
 ```
+
+**✅ CORRECT: Always use `uuid.uuid4().hex`** — nothing else.
+
+### Section 5: Array Format Requirements
+
+**ALL string-content fields in the Genie Space JSON MUST be single-element arrays**, not plain strings.
+
+| Field | ❌ Wrong | ✅ Correct |
+|-------|---------|-----------|
+| `question` | `"What is revenue?"` | `["What is revenue?"]` |
+| `content` (in answer) | `"SELECT ..."` | `["SELECT ..."]` |
+| `description` (tables) | `"Orders table"` | `["Orders table"]` |
+| `description` (MVs) | `"Revenue metrics"` | `["Revenue metrics"]` |
+| `description` (TVFs) | `"Date range query"` | `["Date range query"]` |
+
+**Rule:** If a field contains human-readable text or SQL, wrap it in a single-element array `["value"]`.
+
+**Exception:** `format` in answer objects is a plain string: `"SQL"` or `"INSTRUCTIONS"`.
 
 ### 4. Template Variable Substitution
 
@@ -213,6 +223,72 @@ genie_config['data_sources']['tables'] = [
 - ✅ `identifier` field (full 3-part function name) - REQUIRED
 - ❌ NO other fields (`name`, `signature`, `description`)
 
+### Section 8: Array Sorting Requirements
+
+**All arrays in the Genie Space JSON MUST be sorted.** The API validates array ordering and will reject payloads with unsorted arrays.
+
+**Sort keys by array:**
+
+| Array | Sort Key | Direction |
+|-------|----------|-----------|
+| `tables` | `table_name` | Ascending |
+| `materialized_views` | `materialized_view_name` | Ascending |
+| `sql_functions` | `function_name` | Ascending |
+| `example_question_sqls` | `question[0]` | Ascending |
+
+**Implementation:**
+```python
+def sort_all_arrays(space: dict) -> dict:
+    """Sort all arrays in Genie Space JSON by their respective sort keys."""
+    if "tables" in space:
+        space["tables"] = sorted(space["tables"], key=lambda x: x.get("table_name", ""))
+    if "materialized_views" in space:
+        space["materialized_views"] = sorted(space["materialized_views"], key=lambda x: x.get("materialized_view_name", ""))
+    if "sql_functions" in space:
+        space["sql_functions"] = sorted(space["sql_functions"], key=lambda x: x.get("function_name", ""))
+    if "example_question_sqls" in space:
+        space["example_question_sqls"] = sorted(
+            space["example_question_sqls"],
+            key=lambda x: x.get("question", [""])[0] if isinstance(x.get("question"), list) else x.get("question", "")
+        )
+    return space
+```
+
+**Always call `sort_all_arrays()` BEFORE submitting to the API.**
+
+### Section 9: Idempotent Deployment (Update-or-Create)
+
+To prevent duplicate Genie Spaces on re-deployment, implement an update-or-create pattern:
+
+1. **Store space IDs in `databricks.yml` variables:**
+```yaml
+variables:
+  genie_space_id_<space_name>:
+    description: "Existing Genie Space ID (empty for first deployment)"
+    default: ""
+```
+
+2. **Deployment logic:**
+```python
+space_id = dbutils.widgets.get("genie_space_id_<space_name>")
+
+if space_id:
+    # UPDATE existing space (PATCH without title to avoid " (updated)" suffix)
+    payload = {"serialized_space": json.dumps(space_json)}
+    # Do NOT include "title" in PATCH to avoid title mutation
+    response = requests.patch(f"{base_url}/api/2.0/genie/spaces/{space_id}", ...)
+else:
+    # CREATE new space
+    response = requests.post(f"{base_url}/api/2.0/genie/spaces", ...)
+    new_space_id = response.json()["space"]["id"]
+    print(f"Created new space: {new_space_id}")
+    print(f"Set variable: genie_space_id_<space_name> = {new_space_id}")
+```
+
+3. **⚠️ PATCH without title:** Including `title` in a PATCH request causes the API to append " (updated)" to the title. Omit `title` from PATCH payload to preserve the original name.
+
+4. **After first deployment:** Record the returned space IDs and set them as `databricks.yml` variable defaults for subsequent deployments.
+
 ## Common Errors & Quick Fixes
 
 | Error | Cause | Quick Fix |
@@ -222,6 +298,9 @@ genie_config['data_sources']['tables'] = [
 | `INTERNAL_ERROR: Failed to retrieve schema` | Missing `id` in sql_functions | Add `id` field (32 hex chars) |
 | `INVALID_PARAMETER_VALUE: Expected array` | `question` is string | Wrap in array: `["question"]` |
 | `Exceeded maximum number (50)` | Too many TVFs/benchmarks | Truncate to 50 in generation script |
+| `expected_sql` field not recognized | Used `expected_sql` instead of `answer` | Use `answer: [{format: "SQL", content: ["SELECT ..."]}]` |
+| `must be sorted` / array ordering error | Arrays not sorted by required key | Call `sort_all_arrays()` before submission |
+| Invalid ID format | ID is not 32-char hex, contains dashes, or is prefixed | Use `uuid.uuid4().hex` exclusively |
 
 See [Troubleshooting Guide](references/troubleshooting.md) for detailed fix scripts.
 
@@ -230,6 +309,13 @@ See [Troubleshooting Guide](references/troubleshooting.md) for detailed fix scri
 - **[API Reference](references/api-reference.md)**: Complete API endpoint documentation, request/response schemas, authentication details, Databricks CLI usage
 - **[Workflow Patterns](references/workflow-patterns.md)**: Detailed GenieSpaceExport schema (config, data_sources, instructions, benchmarks), ID generation, serialization patterns, variable substitution, asset inventory-driven generation, complete examples
 - **[Troubleshooting](references/troubleshooting.md)**: Common production errors with Python fix scripts, validation checklists, deployment checklist, error recovery patterns, field-level format requirements
+
+## Assets
+
+- **`assets/templates/genie-deployment-job-template.yml`** — Standalone Asset Bundle job using `notebook_task` for Genie Space deployment (for combined deployment, use the orchestrator's `semantic-layer-job-template.yml`)
+- **`assets/templates/deploy_genie_spaces.py`** — Databricks notebook template for Asset Bundle `notebook_task` deployment. Uses `dbutils.widgets.get()` for parameters. Copy to `src/{project}_semantic/deploy_genie_spaces.py` and customize.
+
+> **CLI vs Notebook:** `scripts/import_genie_space.py` is the CLI tool (uses `argparse`) for local/CI use. `assets/templates/deploy_genie_spaces.py` is the notebook template (uses `dbutils.widgets.get()`) for Asset Bundle `notebook_task` deployment.
 
 ## Scripts
 
@@ -284,8 +370,25 @@ See [Troubleshooting Guide](references/troubleshooting.md) for detailed fix scri
 - `metric-views-patterns` - Metric view YAML creation
 - `databricks-table-valued-functions` - TVF patterns for Genie
 
+## Genie API Notes to Carry Forward
+
+After completing Genie Space API deployment, carry these notes to the next worker:
+- **Deployed Space IDs:** Map of space name → space ID (32-char hex) for each deployed space
+- **Deployment method:** Whether spaces were created (POST) or updated (PATCH)
+- **Variable settings for re-deployment:** `genie_space_id_<name>` values to set in `databricks.yml` for idempotent future deployments
+- **Validation results:** Benchmark SQL validation pass/fail counts per space
+- **Cross-environment status:** Which environments (dev/staging/prod) have been deployed to
+
+## Next Step
+
+After API deployment is complete:
+- **If this is the first deployment:** Record space IDs and set them as `databricks.yml` variable defaults.
+- **If benchmarks need tuning:** Proceed to **`semantic-layer/05-genie-optimization-orchestrator/SKILL.md`** for benchmark testing and the 6-lever optimization loop.
+- **If deploying to additional environments:** Re-run the deploy notebook with target environment variables.
+
 ## Version History
 
+- **v2.0** (Feb 2026) — Array sorting requirements (Section 8); idempotent deployment pattern (Section 9); expanded array format table; strengthened ID generation guidance; 3 new common errors; deploy template major rewrite; benchmark SQL validation templates added; Notes to Carry Forward and Next Step for progressive disclosure
 - **v3.0** (January 2026) - Inventory-driven programmatic generation, template variables, 100% deployment success
 - **v2.0** (January 2026) - Production deployment patterns, format validation, 8 common error fixes
 - **v1.0** (January 2026) - Initial schema documentation and API patterns

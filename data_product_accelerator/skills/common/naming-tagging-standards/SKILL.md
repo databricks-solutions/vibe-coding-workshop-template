@@ -26,6 +26,16 @@ metadata:
 
 Enterprise-wide standards for Databricks asset naming, SQL comments, and cost/governance tagging.
 
+## Essential Rules (Retain in Working Memory)
+
+After reading this skill, retain these 5 rules and release the full content:
+
+1. **snake_case everywhere** — all object names: tables, columns, functions, schemas
+2. **`dim_`/`fact_` prefixes** — Gold tables prefixed by entity type; Bronze/Silver by layer
+3. **Dual-purpose COMMENT pattern** — `[Definition]. Business: [context]. Technical: [details].`
+4. **Mandatory tags** — `layer`, `domain`, `PII` (via `class.*` governed tags) on every table; `team`, `cost_center`, `environment` on every workflow
+5. **Budget policy tag** — all serverless resources must use approved budget policies
+
 ## Golden Rules
 
 | ID | Rule | Severity |

@@ -68,7 +68,7 @@ def load_column_mappings_from_yaml(meta: dict) -> dict:
     """
     mappings = {}
     for gold_col, lineage in meta.get("lineage", {}).items():
-        source_col = lineage.get("source_column", "")
+        source_col = lineage.get("silver_column") or lineage.get("source_column", "")
         if source_col and source_col != gold_col:
             mappings[gold_col] = source_col
     return mappings
@@ -460,9 +460,50 @@ def main():
 - SCD type comes from YAML `scd_type`
 - Only aggregation expressions are per-table hand-coded business logic
 
+---
+
+## Scripted Column Resolution
+
+Instead of generating per-table `.withColumn()` chains from YAML lineage (error-prone), use the `build_column_expressions()` function from `references/design-to-pipeline-bridge.md` to build PySpark column expressions programmatically.
+
+**Old approach (agent generates per-table, prone to column name errors):**
+```python
+updates_df = (
+    silver_df
+    .withColumn("company_retail_control_number", col("company_rcn"))
+    .withColumn("store_number", col("store_number"))
+    .withColumn("record_updated_timestamp", current_timestamp())
+    .select("store_key", "store_number", "company_retail_control_number", ...)
+)
+```
+
+**New approach (scripted from YAML, deterministic):**
+```python
+from design_to_pipeline_bridge import apply_automated_columns
+
+column_defs = yaml_config.get("columns", [])
+partial_df, manual_cols = apply_automated_columns(silver_df, meta, column_defs)
+
+# Only hand-code the columns that require business logic:
+# AGGREGATE_*, DERIVED_CALCULATION, HASH_MD5, HASH_SHA256
+for gold_name, lineage, _ in manual_cols:
+    transformation = lineage.get("transformation", "")
+    if transformation == "HASH_MD5":
+        # Build surrogate key from business key columns
+        partial_df = partial_df.withColumn(
+            gold_name,
+            md5(concat_ws("||", *[col(c) for c in meta["business_key"]]))
+        )
+    # ... other manual transformations
+```
+
+**Coverage:** `build_column_expressions()` automates DIRECT_COPY, RENAME, CAST, GENERATED, COALESCE, and DATE_TRUNC transformations (~70% of typical columns). Only AGGREGATE_*, DERIVED_CALCULATION, HASH_*, and LOOKUP transformations require hand-written code.
+
+See `references/design-to-pipeline-bridge.md` for the full implementation.
+
 ## Related Skills
 
-- `gold-layer-merge-patterns` — Complete SCD Type 1/2 and fact merge templates
-- `gold-delta-merge-deduplication` — Deduplication patterns
-- `fact-table-grain-validation` — Grain inference and validation
-- `gold-layer-schema-validation` — DataFrame-to-DDL validation
+- `pipeline-workers/02-merge-patterns` — Complete SCD Type 1/2 and fact merge templates
+- `pipeline-workers/03-deduplication` — Deduplication patterns
+- `pipeline-workers/04-grain-validation` — Grain inference and validation
+- `pipeline-workers/05-schema-validation` — DataFrame-to-DDL validation

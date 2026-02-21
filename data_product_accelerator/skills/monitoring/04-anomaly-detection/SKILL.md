@@ -22,12 +22,28 @@ metadata:
     - schema setup
   called_by:
     - observability-setup
-    - silver-layer-creation
-    - gold-layer-implementation
+    - silver-layer-setup
+    - gold-layer-setup
   standalone: true
-  last_verified: "2026-02-07"
+  last_verified: "2026-02-18"
   volatility: medium
-  upstream_sources: []  # Internal anomaly detection patterns
+  verification_sources:
+    - url: "https://databricks-sdk-py.readthedocs.io/en/latest/workspace/dataquality/data_quality.html"
+      check_for: "DataQualityAPI method signatures: create_monitor(monitor), delete_monitor(object_type, object_id), get_monitor(object_type, object_id), update_monitor(object_type, object_id, monitor, update_mask), list_monitor"
+    - url: "https://databricks-sdk-py.readthedocs.io/en/latest/dbdataclasses/dataquality.html"
+      check_for: "Monitor, AnomalyDetectionConfig field names (excluded_table_full_names), object_type/object_id semantics"
+    - url: "https://learn.microsoft.com/en-us/azure/databricks/data-quality-monitoring/anomaly-detection/"
+      check_for: "Anomaly detection overview, freshness/completeness concepts, enable/disable workflow"
+    - url: "https://learn.microsoft.com/en-us/azure/databricks/data-quality-monitoring/anomaly-detection/results"
+      check_for: "system.data_quality_monitoring.table_results schema, nested struct fields (freshness, completeness, downstream_impact)"
+  upstream_sources:
+    - name: "databricks-sdk-py"
+      repo: "databricks/databricks-sdk-py"
+      paths:
+        - "databricks/sdk/service/dataquality.py"
+      relationship: "reference"
+      last_synced: "2026-02-18"
+      sync_commit: "latest"
 ---
 
 ## Overview
@@ -191,7 +207,7 @@ For complete alert templates including custom email notifications, see `referenc
 
 ## Integration with Silver & Gold Layer Setup
 
-**This skill is automatically invoked by `silver-layer-creation` and `gold-layer-implementation` orchestrators.** Every new Silver or Gold schema should have anomaly detection enabled to provide baseline freshness/completeness monitoring from day one.
+**This skill is automatically invoked by `silver-layer-setup` and `gold-layer-setup` orchestrators.** Every new Silver or Gold schema should have anomaly detection enabled to provide baseline freshness/completeness monitoring from day one.
 
 ### Reusable Enable Function
 

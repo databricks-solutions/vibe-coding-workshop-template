@@ -1,0 +1,66 @@
+# GEPA Optimization Job
+#
+# Runs GEPA (Genie Evolution through Prompt Adaptation) L2 optimization
+# targeting Lever 6 (Genie Instructions + Example SQLs) ONLY.
+#
+# PREREQUISITE: Levers 1-5 must be exhausted first. Only invoke this job
+# when introspection-based optimization is complete and scores are still
+# below target.
+#
+# Usage:
+#   databricks bundle deploy -t dev
+#   databricks bundle run gepa_optimization_job -t dev
+#
+# Override parameters at runtime:
+#   databricks bundle run gepa_optimization_job -t dev \
+#     --params iteration=2,max_rounds=5
+#
+# Prerequisites:
+#   - Genie Space must exist and be accessible
+#   - golden-queries.yaml must be synced to workspace
+#   - MLflow experiment is created
+#   - gepa>=0.1.0 installed (added to environment dependencies below)
+
+resources:
+  jobs:
+    gepa_optimization_job:
+      name: "${bundle.target}-gepa-optimization"
+
+      tags:
+        environment: "${bundle.target}"
+        layer: "semantic"
+        job_type: "gepa_optimization"
+        lever: "6"
+
+      tasks:
+        - task_key: run_gepa
+          notebook_task:
+            notebook_path: "../../src/${var.project_name}_semantic/run_gepa_optimization.py"
+            base_parameters:
+              space_id: "${var.genie_space_id}"
+              experiment_name: "/Users/${var.user_email}/genie-optimization/${var.domain}"
+              iteration: "1"
+              benchmarks_yaml_path: "src/semantic/genie_configs/golden-queries.yaml"
+              domain: "${var.domain}"
+              catalog: "${var.catalog}"
+              gold_schema: "${var.gold_schema}"
+              warehouse_id: "${var.warehouse_id}"
+              max_rounds: "3"
+              model_id: ""
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "gepa>=0.1.0"
+              - "mlflow[databricks]>=3.4.0"
+              - "pyyaml>=6.0"
+              - "databricks-sdk>=0.40.0"
+
+      email_notifications:
+        on_failure:
+          - "${var.notification_email}"
+
+      timeout_seconds: 7200

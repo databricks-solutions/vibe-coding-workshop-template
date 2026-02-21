@@ -96,7 +96,7 @@ def load_column_mappings_from_yaml(meta: dict) -> dict:
     """
     mappings = {}
     for gold_col, lineage in meta.get("lineage", {}).items():
-        source_col = lineage.get("source_column", "")
+        source_col = lineage.get("silver_column") or lineage.get("source_column", "")
         if source_col and source_col != gold_col:
             mappings[gold_col] = source_col
     return mappings
@@ -127,6 +127,88 @@ def build_inventory(yaml_base: Path, domain: str = "all") -> dict:
             inventory[meta["table_name"]] = meta
 
     return inventory
+
+
+# =============================================================================
+# RUNTIME GUARDRAILS (fail-fast before any MERGE)
+# =============================================================================
+
+def validate_upstream_contracts(spark, catalog, source_schema, inventory):
+    """Validate all source columns referenced in YAML lineage exist upstream.
+
+    Fail-fast gate: aborts before any merge if source schema doesn't
+    match YAML lineage assumptions. Runs automatically — not skippable.
+    """
+    all_errors = []
+    for table_name, meta in inventory.items():
+        if not meta.get("source_tables"):
+            continue
+        for source_table in meta["source_tables"]:
+            fqn = f"{catalog}.{source_schema}.{source_table}"
+            try:
+                source_cols = {f.name for f in spark.table(fqn).schema.fields}
+            except Exception as e:
+                all_errors.append(f"{table_name}: source table {fqn} not readable: {e}")
+                continue
+            for gold_col, lineage in meta.get("lineage", {}).items():
+                s_table = lineage.get("silver_table") or lineage.get("source_table", "N/A")
+                s_col = lineage.get("silver_column") or lineage.get("source_column", "N/A")
+                if s_table != source_table or s_col == "N/A":
+                    continue
+                for single_col in [c.strip() for c in s_col.split(",")]:
+                    if single_col not in source_cols:
+                        all_errors.append(
+                            f"{table_name}.{gold_col}: source column '{single_col}' "
+                            f"not found in {fqn}. Available: {sorted(source_cols)}"
+                        )
+    if all_errors:
+        error_report = "\n  ".join(all_errors)
+        raise ValueError(
+            f"Upstream contract validation FAILED ({len(all_errors)} errors):\n  {error_report}\n\n"
+            f"Fix YAML lineage source column values to match actual source table schemas, "
+            f"then re-run."
+        )
+    print(f"✓ Upstream contract validation passed for {len(inventory)} tables")
+
+
+def validate_merge_schema(spark, updates_df, catalog, schema, table_name,
+                          raise_on_mismatch=True):
+    """Validate that DataFrame columns match target table DDL schema.
+
+    Catches target-side mismatches (missing/extra columns, type differences)
+    before the Delta MERGE executes.
+    """
+    target_fqn = f"{catalog}.{schema}.{table_name}"
+    target_schema = spark.table(target_fqn).schema
+    target_columns = {field.name: field.dataType for field in target_schema.fields}
+    source_columns = {field.name: field.dataType for field in updates_df.schema.fields}
+
+    missing_in_df = [c for c in target_columns if c not in source_columns]
+    extra_in_df = [c for c in source_columns if c not in target_columns]
+    type_mismatches = []
+    for col_name in set(target_columns) & set(source_columns):
+        if str(target_columns[col_name]) != str(source_columns[col_name]):
+            type_mismatches.append({
+                "column": col_name,
+                "target_type": str(target_columns[col_name]),
+                "source_type": str(source_columns[col_name]),
+            })
+
+    valid = not missing_in_df and not extra_in_df and not type_mismatches
+    if not valid and raise_on_mismatch:
+        parts = [f"Schema mismatch for {target_fqn}:"]
+        if missing_in_df:
+            parts.append(f"  Missing columns in DataFrame: {missing_in_df}")
+        if extra_in_df:
+            parts.append(f"  Extra columns in DataFrame: {extra_in_df}")
+        if type_mismatches:
+            parts.append(f"  Type mismatches: {type_mismatches}")
+        raise ValueError("\n".join(parts))
+
+    if valid:
+        print(f"  ✓ Schema validation passed for {table_name}")
+    return {"valid": valid, "missing_in_df": missing_in_df,
+            "extra_in_df": extra_in_df, "type_mismatches": type_mismatches}
 
 
 # =============================================================================
@@ -203,7 +285,10 @@ def merge_dimension_scd2(
         business_key, include_is_current=True
     )
 
-    # Step 6: MERGE into Gold
+    # Step 6: Validate schema against target DDL before MERGE
+    validate_merge_schema(spark, updates_df, catalog, gold_schema, table_name)
+
+    # Step 7: MERGE into Gold
     delta_gold = DeltaTable.forName(spark, gold_table)
     (
         delta_gold.alias("target")
@@ -287,7 +372,10 @@ def merge_fact_aggregated(
         if c not in pk_set and c not in audit_cols
     }
 
-    # Step 6: MERGE into Gold
+    # Step 6: Validate schema against target DDL before MERGE
+    validate_merge_schema(spark, result_df, catalog, gold_schema, table_name)
+
+    # Step 7: MERGE into Gold
     delta_gold = DeltaTable.forName(spark, gold_table)
     (
         delta_gold.alias("target")
@@ -376,7 +464,10 @@ def main():
         inventory = build_inventory(yaml_base)
         print(f"✓ Loaded {len(inventory)} table definitions from YAML")
 
-        # Step 2: Separate dimensions and facts (FROM YAML entity_type)
+        # Step 2: Fail-fast — validate upstream source contracts
+        validate_upstream_contracts(spark, catalog, silver_schema, inventory)
+
+        # Step 3: Separate dimensions and facts (FROM YAML entity_type)
         dimensions = {
             k: v for k, v in inventory.items()
             if v["entity_type"] == "dimension"
@@ -389,7 +480,7 @@ def main():
         print(f"  Dimensions: {list(dimensions.keys())}")
         print(f"  Facts: {list(facts.keys())}")
 
-        # Step 3: Merge dimensions FIRST (facts may reference dimensions)
+        # Step 4: Merge dimensions FIRST (facts may reference dimensions)
         for table_name, meta in dimensions.items():
             mappings = load_column_mappings_from_yaml(meta)
             if meta["scd_type"] == "scd2":
@@ -398,7 +489,7 @@ def main():
                 )
             # TODO: Add SCD Type 1 handler
 
-        # Step 4: Merge facts AFTER dimensions
+        # Step 5: Merge facts AFTER dimensions
         for table_name, meta in facts.items():
             agg_exprs = get_agg_expressions_for(table_name)
             derived_fns = get_derived_fns_for(table_name)

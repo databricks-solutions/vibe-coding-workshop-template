@@ -1,0 +1,44 @@
+# Genie Space Benchmark SQL Validation Job
+#
+# Validates all benchmark SQL queries in Genie Space JSON configs by executing
+# each with LIMIT 1 against the target catalog/schema. Run this BEFORE deploying
+# Genie Spaces to catch SQL errors early.
+#
+# Usage:
+#   databricks bundle run validate_genie_benchmarks -t dev
+#
+# Prerequisites:
+#   - Genie Space JSON config files in config_dir
+#   - validate_genie_benchmark_sql.py module accessible via bundle path
+#   - SQL Warehouse with access to target catalog/schema
+
+resources:
+  jobs:
+    validate_genie_benchmarks:
+      name: "${var.project_name}-validate-genie-benchmarks"
+      tags:
+        project: ${var.project_name}
+        layer: "semantic"
+        type: "validation"
+
+      tasks:
+        # Validate benchmark SQL in all Genie Space configs
+        - task_key: validate_benchmarks
+          notebook_task:
+            notebook_path: "../../src/${var.project_name}_semantic/validate_genie_spaces_notebook.py"
+            base_parameters:
+              catalog: "${var.catalog}"
+              gold_schema: "${var.gold_schema}"
+              config_dir: "src/${var.project_name}_semantic/genie_spaces"
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            client: "2"
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: gold_schema
+          default: ${var.gold_schema}

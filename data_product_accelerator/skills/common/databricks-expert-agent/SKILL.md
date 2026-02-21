@@ -19,6 +19,16 @@ You are a **Senior Databricks Solutions Architect Agent**. Your mission is to de
 
 **Default stance:** If requirements are ambiguous, proceed with **safe, documented defaults** and **explicit assumptions**. Avoid legacy or undocumented patterns.
 
+## Essential Rules (Retain in Working Memory)
+
+After reading this skill, retain these 5 rules and release the full content:
+
+1. **Extract, Don't Generate** — all table/column/function names from YAML or source files, never from memory
+2. **CLUSTER BY AUTO** — every managed table, every layer
+3. **CDF + Row Tracking** — `delta.enableChangeDataFeed` and `delta.enableRowTracking` on every table
+4. **Serverless + notebook_task** — every job uses `environments:` block, `notebook_task:`, `base_parameters:`
+5. **Comments + Tags on everything** — tables, columns, workflows, metric views, functions
+
 ## When to Use This Skill
 
 Use when working on Databricks projects requiring:

@@ -3,7 +3,7 @@ name: genie-space-patterns
 description: Patterns for setting up Databricks Genie Spaces with comprehensive agent instructions, data assets, and benchmark questions. Use when creating Genie Spaces, configuring agent behavior, selecting data assets, or validating benchmark questions. Includes mandatory 7-section deliverable structure, General Instructions (≤20 lines), data asset organization (Metric Views → TVFs → Tables), benchmark questions with exact SQL, Serverless warehouse mandate, table/column comment requirements for Genie SQL quality, pre-creation table inspection, Conversation API programmatic validation, follow-up vs new conversation patterns, and deployment checklists.
 metadata:
   author: prashanth subrahmanyam
-  version: "2.1"
+  version: "2.2"
   domain: semantic-layer
   role: worker
   pipeline_stage: 6
@@ -11,7 +11,7 @@ metadata:
   called_by:
     - semantic-layer-setup
   standalone: true
-  last_verified: "2026-02-07"
+  last_verified: "2026-02-20"
   volatility: medium
   upstream_sources:
     - name: "ai-dev-kit"
@@ -19,7 +19,7 @@ metadata:
       paths:
         - "databricks-skills/databricks-genie/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 
@@ -58,6 +58,24 @@ Use this skill when:
 
 **This skill** covers *what* goes into a Genie Space (instructions, assets, benchmarks).
 The **export/import API skill** covers *how* to deploy it programmatically.
+
+---
+
+## Upstream: Genie API Updates
+
+The upstream `databricks-genie` skill provides these MCP tools:
+
+| Tool | Purpose |
+|------|---------|
+| `list_genie` | List all Genie Spaces accessible to you |
+| `create_or_update_genie` | Create or update a Genie Space |
+| `get_genie` | Get Genie Space details |
+| `delete_genie` | Delete a Genie Space |
+| `find_genie_by_name` | Look up a Genie Space by name (when you don't have the space_id) |
+| `ask_genie` | Ask a question to a Genie Space, get SQL + results |
+| `ask_genie_followup` | Ask follow-up question in existing conversation |
+
+**IMPORTANT:** There is NO system table for Genie spaces (e.g., `system.ai.genie_spaces` does NOT exist). To find a Genie space by name, use the `find_genie_by_name` tool.
 
 ---
 
@@ -187,7 +205,7 @@ Serverless provides auto-scaling, instant startup, and cost-efficient idle timed
 - `COMMENT ON TABLE` with a business-friendly description
 - `COMMENT ON COLUMN` for every column, including dimension values and business context
 
-See [Gold Layer Documentation Skill](../../gold/gold-layer-documentation/SKILL.md) for comment standards.
+See [Table Documentation Skill](../../gold/design-workers/06-table-documentation/SKILL.md) for comment standards.
 
 **❌ WRONG:**
 ```sql
@@ -213,7 +231,23 @@ CREATE TABLE fact_sales (
 
 See [Configuration Guide](references/configuration-guide.md#pre-creation-table-inspection) for the full inspection checklist.
 
-### 12. Validate Programmatically via Conversation API
+### 12. Prompt User for Benchmark Questions Before Generating
+
+**Always ask the user for benchmark questions before generating synthetic ones.** User-provided questions reflect real business needs and catch domain-specific edge cases that synthetic generation misses.
+
+**Three outcomes:**
+- **User provides 10+:** Validate each one. Report any that can't be answered (missing table, ambiguous terms). Proceed with valid set.
+- **User provides 1-9:** Validate provided, report issues, augment with synthetic to reach 10-15 total. Show augmentation to user.
+- **User provides none:** Generate 10-15 synthetic benchmarks from asset metadata. Show to user for review.
+
+**If a user question can't be answered**, do NOT silently drop it. Inform the user with the specific reason:
+- "Table `X` is not a trusted asset in this space"
+- "No data available for churn analysis — available domains are: revenue, bookings, property performance"
+- "Term 'underperforming' is ambiguous — how should it be defined?"
+
+See [Benchmark Intake Workflow](references/benchmark-intake-workflow.md) for the full validation and generation pipeline.
+
+### 13. Validate Programmatically via Conversation API
 
 **After deployment, test benchmark questions programmatically using the Conversation API -- not just the UI.**
 
@@ -294,12 +328,64 @@ Add assets in order: Metric Views → TVFs → Tables. Document each with:
 
 See [Configuration Guide](references/configuration-guide.md#section-d-data-assets) for detailed patterns.
 
-### Step 4: Write Benchmark Questions
+### Step 4: Write Benchmark Questions (Interactive Intake)
+
+Benchmark questions validate that Genie routes correctly and generates accurate SQL. **Always prompt the user for their questions first before generating synthetic ones.**
+
+#### Three-Path Workflow
+
+| User Provides | Action |
+|--------------|--------|
+| **10+ questions** | Validate each against available assets. Report any that can't be answered (missing table, ambiguous terms, need more info). Proceed with valid set. |
+| **1-9 questions** | Validate provided questions. Report issues. Augment with synthetic benchmarks to reach 10-15 total. |
+| **No questions** | Generate 10-15 synthetic benchmarks from metric view measures, TVF signatures, and table schemas. Show to user for review. |
+
+#### Validation Rules for User-Submitted Questions
+
+For each submitted question, verify:
+
+| Check | What to Verify | If Failed, Tell the User |
+|-------|---------------|--------------------------|
+| **Asset coverage** | At least one MV/TVF/table can answer it | "No asset in this space can answer '{question}'. Available domains: {list}." |
+| **Table existence** | SQL only references trusted assets | "SQL references `{table}` which isn't a trusted asset." |
+| **MEASURE() columns** | Column names match actual MV columns | "MEASURE({col}) doesn't match any column. Available: {list}." |
+| **UC namespace** | SQL uses `${catalog}.${gold_schema}.{object}` | "SQL must use full 3-part UC namespace." |
+| **TVF parameters** | All required parameters present | "TVF `{name}` requires: {params}. Missing: {missing}." |
+| **Ambiguous terms** | Terms like "underperforming", "top" are defined | "What does '{term}' mean here? Revenue? Ratings? Bookings?" |
+
+**If a question cannot be answered** (missing table, no matching data), inform the user with the specific reason and suggest alternatives based on available assets.
+
+**If a question needs clarification** (ambiguous terms, missing time range), ask the user to clarify before including it.
+
+#### Synthetic Generation (When User Provides None or Few)
+
+Generate benchmarks from available asset metadata:
+1. **From Metric Views** — one aggregation question per measure, one grouped question per dimension
+2. **From TVFs** — one question per function matching its use case (ranking, time-series, detail)
+3. **From Tables** — list/detail questions for dimension tables (only if needed to fill gaps)
+4. **Category coverage** — ensure at least 4 categories: aggregation, ranking, time-series, comparison, list
+
+After generation, **show the synthetic benchmarks to the user** for review before proceeding.
+
+#### Augmentation (When User Provides Partial Set)
+
+When augmenting user-provided questions:
+1. **User questions always take priority** — never replace them
+2. **Fill category gaps first** — if user only provided aggregation questions, add ranking/time-series/list
+3. **Add synonym variations** — test Genie handles "total spend" vs "how much spent" vs "total costs"
+4. **Add date variations** — "this month" vs "last 30 days" vs "Q1 2026"
+5. **Cap at 15 total** — user questions + synthetic augmentation
+
+See [Benchmark Intake Workflow](references/benchmark-intake-workflow.md) for the full validation pipeline, generation patterns, and augmentation strategy.
+
+#### Output Format for Each Benchmark
 
 Every question must include:
 - Natural language question
 - Expected SQL (tested and working)
 - Expected result description
+
+**⚠️ JSON field name:** In the API-compatible JSON export, benchmark SQL goes in `answer: [{format: "SQL", content: ["SELECT ..."]}]` — **NOT** in a field called `expected_sql`. The term "Expected SQL" here refers to the content, not the JSON field name. See `genie-space-export-import-api` for the exact `BenchmarkQuestion` schema.
 
 See [Configuration Guide](references/configuration-guide.md#section-g-benchmark-questions) for format.
 
@@ -361,6 +447,14 @@ Common issues, debugging steps, and verification procedures:
 - Debugging procedures
 - Verification checklists
 
+### [Benchmark Intake Workflow](references/benchmark-intake-workflow.md)
+Interactive workflow for accepting, validating, and augmenting benchmark questions:
+- Three-path intake (full, partial, none)
+- Per-question validation pipeline (asset coverage, table existence, MEASURE() columns)
+- Synthetic generation from asset metadata
+- Augmentation strategy with category coverage
+- User feedback templates for issues and suggestions
+
 ### [Trusted Assets Guide](references/trusted-assets.md)
 Complete guide for organizing and documenting data assets:
 - Metric View documentation patterns
@@ -417,6 +511,10 @@ Before submitting ANY Genie Space document:
 ### Additional Quality Checks
 
 - [ ] General Instructions are EXACTLY 20 lines or less (not 21+)
+- [ ] User was prompted for benchmark questions before synthetic generation
+- [ ] User-submitted questions validated against available assets
+- [ ] Invalid user questions reported back with specific reasons (not silently dropped)
+- [ ] Benchmark suite has 10-15 questions with 4+ categories covered
 - [ ] Every benchmark question has copy-paste-ready SQL
 - [ ] SQL in benchmarks actually runs (tested)
 - [ ] MEASURE() uses actual column names (not display_name with backticks)
@@ -476,6 +574,20 @@ Before submitting ANY Genie Space document:
 
 ## Version History
 
+- **v2.3** (Feb 2026) — JSON field name clarification for benchmark SQL (answer vs expected_sql)
+- **v2.2** (Feb 20, 2026) - Interactive benchmark question intake
+  - Added Rule 12: Prompt user for benchmark questions before generating synthetic ones
+  - Added three-path benchmark intake workflow (full, partial, none)
+  - Added per-question validation pipeline (asset coverage, table existence, MEASURE() columns, ambiguity detection)
+  - Added synthetic benchmark generation from asset metadata (MVs, TVFs, tables)
+  - Added augmentation strategy for partial submissions with category coverage
+  - Added user feedback templates for invalid/needs-info questions
+  - New reference: `benchmark-intake-workflow.md`
+  - Updated Step 4 with interactive intake flow
+  - Updated validation checklist with benchmark intake checks
+  - Renumbered Rule 12→13 (Conversation API validation)
+  - **Key Learning:** User-provided questions catch domain-specific edge cases that synthetic generation misses; always ask first
+
 - **v2.1** (Feb 6, 2026) - Genie reference material integration
   - Added Rule 9: Serverless SQL Warehouse mandatory
   - Added Rule 10: Table/Column COMMENT requirements for Genie
@@ -501,3 +613,18 @@ Before submitting ANY Genie Space document:
   - 7-section mandatory structure
   - Benchmark questions with SQL requirement
   - Extended instructions template
+
+## Genie Space Notes to Carry Forward
+
+After completing Genie Space configuration, carry these notes to the next worker:
+- **Genie Space names and JSON paths:** List of all configured spaces with their JSON config file paths
+- **Asset assignments per space:** Which Metric Views, TVFs, and Gold Tables are assigned to each space
+- **Benchmark question counts:** Number of benchmark questions per space (minimum 10 required)
+- **Warehouse assignment:** SQL Warehouse ID assigned to each space
+- **Space IDs (if deployed):** Genie Space IDs returned from API creation (needed for idempotent re-deployment)
+- **Template variables used:** Confirm `${catalog}` and `${gold_schema}` are used for portability
+
+## Next Step
+
+After Genie Space JSON configs are generated, proceed to:
+**`semantic-layer/04-genie-space-export-import-api/SKILL.md`** — If deploying via REST API (recommended for cross-environment promotion). Otherwise, proceed to Phase 4 (Asset Bundle Configuration) in the orchestrator.

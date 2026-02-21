@@ -144,16 +144,16 @@ gold-layer-design/
 
 ## Workflow Overview
 1. Gather business requirements → Use this skill
-2. Create dimensional model → Calls `mermaid-erd-patterns`
-3. Define YAML schemas → Calls `yaml-driven-gold-setup`
-4. Document for LLMs → Calls `gold-layer-documentation`
-5. Validate design → Calls `gold-layer-schema-validation`
+2. Create dimensional model → Calls `05-erd-diagrams`
+3. Define YAML schemas → Calls `01-yaml-table-setup`
+4. Document for LLMs → Calls `06-table-documentation`
+5. Validate design → Calls `07-design-validation`
 
 ## Step 1: Business Requirements
 [Instructions + link to onboarding template]
 
 ## Step 2: Dimensional Model
-[Instructions + delegates to mermaid-erd-patterns skill]
+[Instructions + delegates to 05-erd-diagrams skill]
 ...
 ```
 

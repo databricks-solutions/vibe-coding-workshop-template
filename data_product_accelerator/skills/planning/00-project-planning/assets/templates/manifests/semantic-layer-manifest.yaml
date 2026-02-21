@@ -13,11 +13,12 @@
 #   1. Fill in the template below during Planning (stage 5)
 #   2. Save as: plans/manifests/semantic-layer-manifest.yaml
 #   3. The semantic-layer orchestrator reads this at Phase 0
-#   4. If this file doesn't exist, the orchestrator falls back to self-discovery
+#   4. This manifest is REQUIRED — the orchestrator will STOP if it is missing
 # =============================================================================
 
-version: 1
+version: 2
 manifest_type: semantic-layer
+planning_mode: acceleration  # or "workshop" — downstream orchestrators must not expand beyond listed artifacts
 generated_from:
   gold_yaml_dir: gold_layer_design/yaml/
   plan_addendums:
@@ -72,6 +73,8 @@ domains:
         business_questions:
           - "What is the total {metric} by {dimension}?"
           - "How does {metric} trend over time?"
+        use_case_refs:              # Links back to plans/use-case-catalog.md
+          - "UC-001"                # {Use case name}
 
     # -------------------------------------------------------------------------
     # Table-Valued Functions for this domain
@@ -93,6 +96,8 @@ domains:
         business_questions:
           - "Show {metric} summary for last 2 weeks"
           - "Daily {metric} breakdown for {date_range}"
+        use_case_refs:              # Links back to plans/use-case-catalog.md
+          - "UC-001"                # {Use case name}
 
       - name: "get_top_{domain}_contributors"
         description: "Returns top N contributors by {metric}"
@@ -112,6 +117,8 @@ domains:
         business_questions:
           - "Which {dimension} are the top contributors?"
           - "Top 5 {dimension} by {metric} this month"
+        use_case_refs:
+          - "UC-001"
 
     # -------------------------------------------------------------------------
     # Genie Spaces for this domain

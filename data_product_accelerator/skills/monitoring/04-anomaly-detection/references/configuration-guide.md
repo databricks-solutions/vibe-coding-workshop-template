@@ -72,8 +72,12 @@ monitor = w.data_quality.create_monitor(
 
 ```python
 # Update excluded tables list
-# update_monitor() requires a Monitor object and an update_mask string
+# update_monitor() requires object_type and object_id as separate positional
+# parameters, plus the Monitor object and update_mask string.
+# This differs from create_monitor(), which only takes a Monitor object.
 w.data_quality.update_monitor(
+    object_type="schema",
+    object_id=schema_id,
     monitor=Monitor(
         object_type="schema",
         object_id=schema_id,

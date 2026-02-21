@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Skill Navigation — Visual Guide</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242736;
+    --border: #2e3142;
+    --text: #e1e4ed;
+    --text-dim: #8b8fa3;
+    --accent: #4a90d9;
+    --gold: #f5a623;
+    --bronze: #cd853f;
+    --silver: #a8b4c2;
+    --green: #34c759;
+    --red: #ff6b6b;
+    --purple: #9370db;
+    --teal: #20b2aa;
+    --pink: #ff69b4;
+    --orange: #ff8c42;
+    --cyan: #00d4ff;
+    --agent-glow: #00d4ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    text-align: center;
+    padding: 32px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #14161f 0%, var(--bg) 100%);
+  }
+
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+
+  header p {
+    color: var(--text-dim);
+    font-size: 14px;
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(15, 17, 23, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .controls button {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .controls button:hover { background: #2f3347; border-color: var(--accent); }
+  .controls button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .step-label {
+    font-size: 13px;
+    color: var(--text-dim);
+    min-width: 280px;
+    text-align: center;
+    transition: color 0.3s;
+  }
+
+  .step-label.highlight { color: var(--cyan); font-weight: 600; }
+
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .speed-control input {
+    width: 80px;
+    accent-color: var(--accent);
+  }
+
+  .canvas {
+    padding: 40px 24px 60px;
+    max-width: 1400px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    padding-left: 4px;
+  }
+
+  /* --- Entry Row --- */
+  .entry-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 36px;
+  }
+
+  .arrow-right {
+    width: 40px;
+    height: 2px;
+    background: var(--border);
+    position: relative;
+    transition: background 0.5s;
+  }
+
+  .arrow-right::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: -4px;
+    border: 5px solid transparent;
+    border-left: 6px solid var(--border);
+    transition: border-left-color 0.5s;
+  }
+
+  .arrow-right.lit { background: var(--cyan); }
+  .arrow-right.lit::after { border-left-color: var(--cyan); }
+
+  /* --- Node --- */
+  .node {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 18px;
+    background: var(--surface);
+    text-align: center;
+    transition: all 0.5s ease;
+    min-width: 120px;
+  }
+
+  .node .label {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .node .sublabel {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .node.visited {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0, 212, 255, 0.15);
+  }
+
+  .node.active {
+    border-color: var(--cyan);
+    box-shadow: 0 0 24px rgba(0, 212, 255, 0.35), 0 0 48px rgba(0, 212, 255, 0.1);
+    transform: scale(1.04);
+  }
+
+  .node.active .label { color: var(--cyan); }
+
+  .node .pulse-ring {
+    display: none;
+    position: absolute;
+    top: -4px; left: -4px; right: -4px; bottom: -4px;
+    border: 2px solid var(--cyan);
+    border-radius: 14px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .node.active .pulse-ring { display: block; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(1.06); }
+  }
+
+  /* --- Pipeline Row --- */
+  .pipeline-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .stage-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .stage-node {
+    min-width: 130px;
+    border-radius: 10px;
+    padding: 10px 14px;
+    text-align: center;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    transition: all 0.5s ease;
+    position: relative;
+    cursor: default;
+  }
+
+  .stage-node .stage-num {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .stage-node .stage-name {
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .stage-node .stage-skill {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .stage-node.visited {
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.12);
+  }
+
+  .stage-node.active {
+    border-color: var(--cyan);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3), 0 0 40px rgba(0, 212, 255, 0.08);
+    transform: scale(1.05);
+  }
+
+  .stage-node.active .stage-name { color: var(--cyan); }
+
+  .stage-node .pulse-ring {
+    display: none;
+    position: absolute;
+    top: -4px; left: -4px; right: -4px; bottom: -4px;
+    border: 2px solid var(--cyan);
+    border-radius: 14px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .stage-node.active .pulse-ring { display: block; }
+
+  .stage-connector {
+    width: 24px;
+    height: 2px;
+    background: var(--border);
+    align-self: center;
+    margin-top: 18px;
+    position: relative;
+    transition: background 0.5s;
+  }
+
+  .stage-connector::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: -3px;
+    border: 4px solid transparent;
+    border-left: 5px solid var(--border);
+    transition: border-left-color 0.5s;
+  }
+
+  .stage-connector.lit { background: var(--cyan); }
+  .stage-connector.lit::after { border-left-color: var(--cyan); }
+
+  /* --- Manifest Fan-out --- */
+  .manifest-zone {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    margin: 24px 0 16px;
+    flex-wrap: wrap;
+  }
+
+  .manifest-arrow {
+    text-align: center;
+    font-size: 9px;
+    color: var(--text-dim);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    padding: 4px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: all 0.5s;
+    min-width: 100px;
+  }
+
+  .manifest-arrow.lit {
+    border-color: var(--gold);
+    color: var(--gold);
+    box-shadow: 0 0 10px rgba(245, 166, 35, 0.15);
+  }
+
+  /* --- Workers --- */
+  .workers-section {
+    margin: 32px 0;
+  }
+
+  .workers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .worker-group {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    background: var(--surface);
+    transition: all 0.5s;
+  }
+
+  .worker-group.visited {
+    border-color: rgba(0, 212, 255, 0.3);
+  }
+
+  .worker-group.active {
+    border-color: var(--cyan);
+    box-shadow: 0 0 16px rgba(0, 212, 255, 0.2);
+  }
+
+  .worker-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .worker-group-title .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .worker-pill {
+    display: inline-block;
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    margin: 2px;
+    transition: all 0.4s;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .worker-pill.visited {
+    border-color: rgba(0, 212, 255, 0.4);
+    color: var(--cyan);
+  }
+
+  .worker-pill.active {
+    border-color: var(--cyan);
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--cyan);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.2);
+  }
+
+  /* --- Common Skills --- */
+  .common-section {
+    margin: 32px 0;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .common-skills-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .common-pill {
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    transition: all 0.4s;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .common-pill.visited {
+    border-color: rgba(52, 199, 89, 0.4);
+    color: var(--green);
+  }
+
+  .common-pill.active {
+    border-color: var(--green);
+    background: rgba(52, 199, 89, 0.1);
+    color: var(--green);
+    box-shadow: 0 0 10px rgba(52, 199, 89, 0.2);
+  }
+
+  /* --- Admin Skills --- */
+  .admin-section {
+    margin: 32px 0;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .admin-pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    margin: 3px;
+    transition: all 0.4s;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  /* --- Tier Indicator --- */
+  .tier-bar {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 50;
+  }
+
+  .tier-segment {
+    width: 8px;
+    height: 40px;
+    border-radius: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    transition: all 0.5s;
+    position: relative;
+  }
+
+  .tier-segment.active { background: var(--cyan); border-color: var(--cyan); }
+  .tier-segment.t2.active { background: var(--accent); border-color: var(--accent); }
+  .tier-segment.t3.active { background: var(--gold); border-color: var(--gold); }
+  .tier-segment.t4.active { background: var(--orange); border-color: var(--orange); }
+
+  .tier-segment .tier-tooltip {
+    display: none;
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  .tier-segment.active .tier-tooltip { display: block; color: var(--text); }
+
+  /* --- Narration --- */
+  .narration {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px 24px;
+    background: rgba(15, 17, 23, 0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    text-align: center;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .narration-text {
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 800px;
+    transition: opacity 0.3s;
+  }
+
+  .narration-text .hl { color: var(--cyan); font-weight: 600; }
+  .narration-text .hl-gold { color: var(--gold); font-weight: 600; }
+  .narration-text .hl-green { color: var(--green); font-weight: 600; }
+
+  /* --- Legend --- */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 12px 0 0;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  /* --- Progress bar --- */
+  .progress-track {
+    height: 3px;
+    background: var(--surface2);
+    position: relative;
+    margin: 0 -24px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--accent));
+    width: 0%;
+    transition: width 0.5s ease;
+    border-radius: 0 2px 2px 0;
+  }
+
+  @media (max-width: 768px) {
+    .pipeline-row { gap: 4px; }
+    .stage-node { min-width: 100px; padding: 8px 10px; }
+    .stage-node .stage-skill { display: none; }
+    .tier-bar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Agent Skill Navigation</h1>
+  <p>Watch how the AI agent progressively navigates from AGENTS.md through the 9 core stages plus optional stage 6b, loading orchestrators, workers, and common skills on demand.</p>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--cyan)"></div> Active / Visited</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--green)"></div> Common Skill</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--gold)"></div> Manifest Handoff</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--surface2); border:1px solid var(--border)"></div> Not Yet Visited</div>
+  </div>
+</header>
+
+<div class="controls">
+  <button id="btn-play" class="active" onclick="togglePlay()">&#9654; Play</button>
+  <button id="btn-reset" onclick="resetAnimation()">&#8634; Reset</button>
+  <button id="btn-prev" onclick="prevStep()">&#9664; Prev</button>
+  <button id="btn-next" onclick="nextStep()">Next &#9654;</button>
+  <div class="step-label" id="step-label">Press Play to begin</div>
+  <div class="speed-control">
+    <label>Speed</label>
+    <input type="range" id="speed" min="1" max="5" value="3" step="1" oninput="updateSpeed()">
+    <span id="speed-label">1x</span>
+  </div>
+</div>
+
+<div class="canvas">
+
+  <!-- Entry Row -->
+  <div class="section-title">Entry Point &amp; Routing</div>
+  <div class="entry-row">
+    <div class="node" id="n-user">
+      <div class="pulse-ring"></div>
+      <div class="label">User Prompt</div>
+      <div class="sublabel">natural language</div>
+    </div>
+    <div class="arrow-right" id="a-entry1"></div>
+    <div class="node" id="n-agents">
+      <div class="pulse-ring"></div>
+      <div class="label">AGENTS.md</div>
+      <div class="sublabel">auto-loaded by IDE</div>
+    </div>
+    <div class="arrow-right" id="a-entry2"></div>
+    <div class="node" id="n-router">
+      <div class="pulse-ring"></div>
+      <div class="label">Keyword Router</div>
+      <div class="sublabel">match &rarr; orchestrator</div>
+    </div>
+    <div class="arrow-right" id="a-entry3"></div>
+    <div class="node" id="n-navigator">
+      <div class="pulse-ring"></div>
+      <div class="label">Skill Navigator</div>
+      <div class="sublabel">ambiguous fallback</div>
+    </div>
+  </div>
+
+  <!-- Pipeline Stages -->
+  <div class="section-title">Design-First Pipeline &mdash; 9 Stages + Optional 6b</div>
+  <div class="pipeline-row" id="pipeline">
+    <div class="stage-group">
+      <div class="stage-node" id="s1" style="border-left: 3px solid var(--purple)">
+        <div class="pulse-ring"></div>
+        <div class="stage-num" style="color:var(--purple)">Stage 1</div>
+        <div class="stage-name">Gold Design</div>
+        <div class="stage-skill">00-gold-layer-design</div>
+      </div>
+    </div>
+    <div class="stage-connector" id="sc-1-2"></div>
+    <div class="stage-group">
+      <div class="stage-node" id="s2" style="border-left: 3px solid var(--bronze)">
+        <div class="pulse-ring"></div>
+        <div class="stage-num" style="color:var(--bronze)">Stage 2</div>
+        <div class="stage-name">Bronze</div>
+        <div class="stage-skill">00-bronze-layer-setup</div>
+      </div>
+    </div>
+    <div class="stage-connector" id="sc-2-3"></div>
+    <div class="stage-group">
+      <div class="stage-node" id="s3" style="border-left: 3px solid var(--silver)">
+        <div class="pulse-ring"></div>
+        <div class="stage-num" style="color:var(--silver)">Stage 3</div>
+        <div class="stage-name">Silver</div>
+        <div class="stage-skill">00-silver-layer-setup</div>
+      </div>
+    </div>
+    <div class="stage-connector" id="sc-3-4"></div>
+    <div class="stage-group">
+      <div class="stage-node" id="s4" style="border-left: 3px solid var(--gold)">
+        <div class="pulse-ring"></div>
+        <div class="stage-num" style="color:var(--gold)">Stage 4</div>
+        <div class="stage-name">Gold Impl</div>
+        <div class="stage-skill">01-gold-layer-setup</div>
+      </div>
+    </div>
+    <div class="stage-connector" id="sc-4-5"></div>
+    <div class="stage-group">
+      <div class="stage-node" id="s5" style="border-left: 3px solid var(--teal)">
+        <div class="pulse-ring"></div>
+        <div class="stage-num" style="color:var(--teal)">Stage 5</div>
+        <div class="stage-name">Planning</div>
+        <div class="stage-skill">00-project-planning</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manifest Fan-out -->
+  <div class="section-title">Plan-as-Contract &mdash; Manifest Handoff</div>
+  <div class="manifest-zone">
+    <div class="manifest-arrow" id="m-sem">semantic-layer-manifest.yaml &darr;</div>
+    <div class="manifest-arrow" id="m-obs">observability-manifest.yaml &darr;</div>
+    <div class="manifest-arrow" id="m-ml">ml-manifest.yaml &darr;</div>
+    <div class="manifest-arrow" id="m-gen">genai-agents-manifest.yaml &darr;</div>
+  </div>
+
+  <div class="pipeline-row">
+    <div class="stage-group">
+      <div class="stage-node" id="s6" style="border-left: 3px solid var(--red)">
+        <div class="pulse-ring"></div>
+        <div class="stage-num" style="color:var(--red)">Stage 6</div>
+        <div class="stage-name">Semantic Layer</div>
+        <div class="stage-skill">00-semantic-layer-setup</div>
+      </div>
+    </div>
+    <div style="width:12px"></div>
+    <div class="stage-group">
+      <div class="stage-node" id="s6b" style="border-left: 3px solid var(--orange)">
+        <div class="pulse-ring"></div>
+        <div class="stage-num" style="color:var(--orange)">Stage 6b</div>
+        <div class="stage-name">Genie Opt</div>
+        <div class="stage-skill">05-genie-optimization-orchestrator</div>
+      </div>
+    </div>
+    <div style="width:12px"></div>
+    <div class="stage-group">
+      <div class="stage-node" id="s7" style="border-left: 3px solid var(--green)">
+        <div class="pulse-ring"></div>
+        <div class="stage-num" style="color:var(--green)">Stage 7</div>
+        <div class="stage-name">Observability</div>
+        <div class="stage-skill">00-observability-setup</div>
+      </div>
+    </div>
+    <div style="width:16px"></div>
+    <div class="stage-group">
+      <div class="stage-node" id="s8" style="border-left: 3px solid var(--pink)">
+        <div class="pulse-ring"></div>
+        <div class="stage-num" style="color:var(--pink)">Stage 8</div>
+        <div class="stage-name">ML Pipeline</div>
+        <div class="stage-skill">00-ml-pipeline-setup</div>
+      </div>
+    </div>
+    <div style="width:16px"></div>
+    <div class="stage-group">
+      <div class="stage-node" id="s9" style="border-left: 3px solid var(--purple)">
+        <div class="pulse-ring"></div>
+        <div class="stage-num" style="color:var(--purple)">Stage 9</div>
+        <div class="stage-name">GenAI Agents</div>
+        <div class="stage-skill">00-genai-agents-setup</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Workers Grid -->
+  <div class="workers-section">
+    <div class="section-title">Orchestrator &rarr; Worker Skills (loaded per-phase)</div>
+    <div class="workers-grid">
+      <div class="worker-group" id="wg-gold-design">
+        <div class="worker-group-title"><div class="dot" style="background:var(--purple)"></div> Gold Design Workers</div>
+        <div class="worker-pill" id="w-grain">01-grain-definition</div>
+        <div class="worker-pill" id="w-dim">02-dimension-patterns</div>
+        <div class="worker-pill" id="w-fact">03-fact-table-patterns</div>
+        <div class="worker-pill" id="w-conform">04-conformed-dimensions</div>
+        <div class="worker-pill" id="w-erd">05-erd-diagrams</div>
+        <div class="worker-pill" id="w-doc">06-table-documentation</div>
+        <div class="worker-pill" id="w-valid">07-design-validation</div>
+      </div>
+      <div class="worker-group" id="wg-bronze">
+        <div class="worker-group-title"><div class="dot" style="background:var(--bronze)"></div> Bronze Workers</div>
+        <div class="worker-pill" id="w-faker">01-faker-data-generation</div>
+      </div>
+      <div class="worker-group" id="wg-silver">
+        <div class="worker-group-title"><div class="dot" style="background:var(--silver)"></div> Silver Workers</div>
+        <div class="worker-pill" id="w-dlt">01-dlt-expectations</div>
+        <div class="worker-pill" id="w-dqx">02-dqx-patterns</div>
+      </div>
+      <div class="worker-group" id="wg-gold-impl">
+        <div class="worker-group-title"><div class="dot" style="background:var(--gold)"></div> Gold Impl Workers</div>
+        <div class="worker-pill" id="w-yaml">01-yaml-table-setup</div>
+        <div class="worker-pill" id="w-merge">02-merge-patterns</div>
+        <div class="worker-pill" id="w-dedup">03-deduplication</div>
+        <div class="worker-pill" id="w-grainv">04-grain-validation</div>
+        <div class="worker-pill" id="w-schemav">05-schema-validation</div>
+      </div>
+      <div class="worker-group" id="wg-semantic">
+        <div class="worker-group-title"><div class="dot" style="background:var(--red)"></div> Semantic Workers (Stage 6)</div>
+        <div class="worker-pill" id="w-metric">01-metric-views-patterns</div>
+        <div class="worker-pill" id="w-tvf">02-databricks-table-valued-functions</div>
+        <div class="worker-pill" id="w-genie">03-genie-space-patterns</div>
+        <div class="worker-pill" id="w-genieapi">04-genie-space-export-import-api</div>
+      </div>
+      <div class="worker-group" id="wg-genie-opt">
+        <div class="worker-group-title"><div class="dot" style="background:var(--orange)"></div> Genie Optimization Workers (Stage 6b)</div>
+        <div class="worker-pill" id="w-genie-bench">01-genie-benchmark-generator</div>
+        <div class="worker-pill" id="w-genie-eval">02-genie-benchmark-evaluator</div>
+        <div class="worker-pill" id="w-genie-meta">03-genie-metadata-optimizer</div>
+        <div class="worker-pill" id="w-genie-apply">04-genie-optimization-applier</div>
+      </div>
+      <div class="worker-group" id="wg-monitoring">
+        <div class="worker-group-title"><div class="dot" style="background:var(--green)"></div> Observability Workers</div>
+        <div class="worker-pill" id="w-lakemon">01-lakehouse-monitoring</div>
+        <div class="worker-pill" id="w-aibi">02-aibi-dashboards</div>
+        <div class="worker-pill" id="w-alert">03-sql-alerting</div>
+        <div class="worker-pill" id="w-anomaly">04-anomaly-detection</div>
+      </div>
+      <div class="worker-group" id="wg-genai">
+        <div class="worker-group-title"><div class="dot" style="background:var(--purple)"></div> GenAI Workers</div>
+        <div class="worker-pill" id="w-resp">01-responses-agent</div>
+        <div class="worker-pill" id="w-eval">02-mlflow-eval</div>
+        <div class="worker-pill" id="w-mem">03-lakebase-memory</div>
+        <div class="worker-pill" id="w-prompt">04-prompt-registry</div>
+        <div class="worker-pill" id="w-multi">05-multi-agent</div>
+        <div class="worker-pill" id="w-deploy">06-deployment</div>
+        <div class="worker-pill" id="w-prodmon">07-prod-monitoring</div>
+        <div class="worker-pill" id="w-found">08-mlflow-foundation</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Common Skills -->
+  <div class="common-section">
+    <div class="section-title" style="margin-top:0">Common Skills &mdash; Cross-Cutting (loaded on demand by any orchestrator)</div>
+    <div class="common-skills-row">
+      <div class="common-pill" id="c-expert">databricks-expert-agent</div>
+      <div class="common-pill" id="c-naming">naming-tagging-standards</div>
+      <div class="common-pill" id="c-bundles">databricks-asset-bundles</div>
+      <div class="common-pill" id="c-ops">autonomous-operations</div>
+      <div class="common-pill" id="c-imports">databricks-python-imports</div>
+      <div class="common-pill" id="c-tblprop">databricks-table-properties</div>
+      <div class="common-pill" id="c-schema">schema-management-patterns</div>
+      <div class="common-pill" id="c-uc">unity-catalog-constraints</div>
+    </div>
+  </div>
+
+  <!-- Admin Skills -->
+  <div class="admin-section">
+    <div class="section-title" style="margin-top:0">Admin / Utility Skills &mdash; Invoked on demand</div>
+    <div>
+      <div class="admin-pill">create-agent-skill</div>
+      <div class="admin-pill">self-improvement</div>
+      <div class="admin-pill">skill-freshness-audit</div>
+      <div class="admin-pill">documentation-organization</div>
+    </div>
+  </div>
+
+  <div style="height:80px"></div>
+</div>
+
+<!-- Tier indicator -->
+<div class="tier-bar">
+  <div class="tier-segment t1" id="tier1"><div class="tier-tooltip">Tier 1: AGENTS.md (~1K)</div></div>
+  <div class="tier-segment t2" id="tier2"><div class="tier-tooltip">Tier 2: Orchestrator (~2K)</div></div>
+  <div class="tier-segment t3" id="tier3"><div class="tier-tooltip">Tier 3: Worker (~2K ea)</div></div>
+  <div class="tier-segment t4" id="tier4"><div class="tier-tooltip">Tier 4: references/ (2-8K)</div></div>
+</div>
+
+<!-- Narration bar -->
+<div class="narration">
+  <div class="narration-text" id="narration">Press <strong>Play</strong> or step through with <strong>Next</strong> to see how the agent navigates skills.</div>
+</div>
+
+<script>
+const STEPS = [
+  {
+    activate: ['n-user'],
+    tiers: [false,false,false,false],
+    narration: 'The user sends a natural-language prompt to the IDE (Cursor, Claude Code, Windsurf, etc.).',
+    label: 'Step 1/24 — User Prompt'
+  },
+  {
+    activate: ['n-agents'],
+    lit: ['a-entry1'],
+    tiers: [true,false,false,false],
+    narration: '<span class="hl">AGENTS.md</span> is auto-loaded by the IDE. It contains the keyword routing table and common skills index.',
+    label: 'Step 2/24 — AGENTS.md Loaded'
+  },
+  {
+    activate: ['n-router'],
+    lit: ['a-entry2'],
+    tiers: [true,false,false,false],
+    narration: 'The agent matches keywords in the user prompt against the routing table to identify the target <span class="hl">orchestrator</span>.',
+    label: 'Step 3/24 — Keyword Routing'
+  },
+  {
+    activate: ['c-expert', 'c-naming'],
+    tiers: [true,false,false,false],
+    narration: 'Before any work begins, the agent always loads the two core common skills: <span class="hl-green">databricks-expert-agent</span> and <span class="hl-green">naming-tagging-standards</span>.',
+    label: 'Step 4/24 — Core Common Skills'
+  },
+  {
+    activate: ['s1'],
+    lit: ['sc-1-2'],
+    tiers: [true,true,false,false],
+    narration: '<span class="hl">Stage 1: Gold Design</span> orchestrator is loaded. It reads the customer schema CSV from context/ and begins dimensional modeling.',
+    label: 'Step 5/24 — Stage 1: Gold Design'
+  },
+  {
+    activate: ['wg-gold-design', 'w-grain', 'w-dim', 'w-fact', 'w-conform'],
+    tiers: [true,true,true,false],
+    narration: 'The orchestrator reads its <span class="hl">design workers</span> at Phase 2: grain-definition, dimension-patterns, fact-table-patterns, conformed-dimensions.',
+    label: 'Step 6/24 — Gold Design Workers (Phase 2)'
+  },
+  {
+    activate: ['w-erd'],
+    tiers: [true,true,true,true],
+    narration: 'At Phase 3, the orchestrator loads <span class="hl">05-erd-diagrams</span> and may drill into its <span class="hl-gold">references/</span> for detailed Mermaid syntax patterns (Tier 4).',
+    label: 'Step 7/24 — ERD Worker + References'
+  },
+  {
+    activate: ['w-doc', 'w-valid'],
+    tiers: [true,true,true,false],
+    narration: 'Phase 4: <span class="hl">table-documentation</span>. Phase 8: <span class="hl">design-validation</span> cross-checks YAML, ERD, and lineage. Gold Design is complete.',
+    label: 'Step 8/24 — Documentation + Validation'
+  },
+  {
+    activate: ['s2', 'c-bundles', 'c-tblprop', 'c-schema'],
+    lit: ['sc-1-2', 'sc-2-3'],
+    tiers: [true,true,false,false],
+    narration: '<span class="hl">Stage 2: Bronze</span> orchestrator loads. It pulls in common skills: <span class="hl-green">asset-bundles</span>, <span class="hl-green">table-properties</span>, <span class="hl-green">schema-management</span>.',
+    label: 'Step 9/24 — Stage 2: Bronze + Common Skills'
+  },
+  {
+    activate: ['wg-bronze', 'w-faker'],
+    tiers: [true,true,true,false],
+    narration: 'Bronze orchestrator dispatches to <span class="hl">01-faker-data-generation</span> worker to generate realistic test data with Faker.',
+    label: 'Step 10/24 — Faker Worker'
+  },
+  {
+    activate: ['s3', 'c-imports', 'c-uc'],
+    lit: ['sc-2-3', 'sc-3-4'],
+    tiers: [true,true,false,false],
+    narration: '<span class="hl">Stage 3: Silver</span> orchestrator loads. New common skills: <span class="hl-green">python-imports</span> and <span class="hl-green">unity-catalog-constraints</span>.',
+    label: 'Step 11/24 — Stage 3: Silver'
+  },
+  {
+    activate: ['wg-silver', 'w-dlt', 'w-dqx'],
+    tiers: [true,true,true,false],
+    narration: 'Silver orchestrator reads its workers: <span class="hl">DLT expectations</span> for data quality rules and <span class="hl">DQX patterns</span> for advanced validation.',
+    label: 'Step 12/24 — Silver Workers'
+  },
+  {
+    activate: ['s4', 'c-ops'],
+    lit: ['sc-3-4', 'sc-4-5'],
+    tiers: [true,true,false,false],
+    narration: '<span class="hl">Stage 4: Gold Implementation</span> loads. <span class="hl-green">autonomous-operations</span> is available for deploy/diagnose/fix loops.',
+    label: 'Step 13/24 — Stage 4: Gold Impl'
+  },
+  {
+    activate: ['wg-gold-impl', 'w-yaml', 'w-merge', 'w-dedup', 'w-grainv', 'w-schemav'],
+    tiers: [true,true,true,true],
+    narration: 'Gold Impl loads all 5 pipeline workers: <span class="hl">YAML setup</span>, <span class="hl">merge patterns</span>, <span class="hl">dedup</span>, <span class="hl">grain validation</span>, <span class="hl">schema validation</span>. References loaded for MERGE SQL.',
+    label: 'Step 14/24 — Gold Impl Workers'
+  },
+  {
+    activate: ['s5'],
+    lit: ['sc-4-5'],
+    tiers: [true,true,false,false],
+    narration: '<span class="hl">Stage 5: Planning</span> orchestrator reads the Gold YAML design outputs and generates <span class="hl-gold">4 YAML manifest files</span>.',
+    label: 'Step 15/24 — Stage 5: Planning'
+  },
+  {
+    activate: ['m-sem', 'm-obs', 'm-ml', 'm-gen'],
+    tiers: [true,true,false,false],
+    narration: 'Planning emits manifests into <span class="hl-gold">plans/manifests/</span>. Each downstream stage will consume exactly one manifest. This is the <span class="hl-gold">Plan-as-Contract</span> pattern.',
+    label: 'Step 16/24 — Manifest Emission'
+  },
+  {
+    activate: ['s6'],
+    tiers: [true,true,false,false],
+    narration: '<span class="hl">Stage 6: Semantic Layer</span> reads <span class="hl-gold">semantic-layer-manifest.yaml</span> at Phase 0, then builds Metric Views, TVFs, and Genie Spaces.',
+    label: 'Step 17/24 — Stage 6: Semantic Layer'
+  },
+  {
+    activate: ['wg-semantic', 'w-metric', 'w-tvf', 'w-genie', 'w-genieapi'],
+    tiers: [true,true,true,false],
+    narration: 'Semantic orchestrator dispatches to stage 6 workers: <span class="hl">metric-views-patterns</span> &rarr; <span class="hl">table-valued-functions</span> &rarr; <span class="hl">genie-space-patterns</span> &rarr; <span class="hl">genie-space-export-import-api</span>.',
+    label: 'Step 18/24 — Semantic Workers'
+  },
+  {
+    activate: ['s6b', 'wg-genie-opt', 'w-genie-bench', 'w-genie-eval', 'w-genie-meta', 'w-genie-apply'],
+    tiers: [true,true,true,true],
+    narration: '<span class="hl">Stage 6b: Genie Optimization</span> runs as a standalone orchestrator after Semantic deployment. It routes to 4 workers: benchmark generation, benchmark evaluation, metadata optimization, and optimization application.',
+    label: 'Step 19/24 — Genie Optimization (6b)'
+  },
+  {
+    activate: ['s7'],
+    tiers: [true,true,false,false],
+    narration: '<span class="hl">Stage 7: Observability</span> reads <span class="hl-gold">observability-manifest.yaml</span>, then builds monitors, dashboards, and alerts.',
+    label: 'Step 20/24 — Stage 7: Observability'
+  },
+  {
+    activate: ['wg-monitoring', 'w-lakemon', 'w-aibi', 'w-alert', 'w-anomaly'],
+    tiers: [true,true,true,false],
+    narration: 'Observability workers: <span class="hl">lakehouse-monitoring</span>, <span class="hl">AI/BI dashboards</span>, <span class="hl">SQL alerting</span>, and <span class="hl">anomaly-detection</span>.',
+    label: 'Step 21/24 — Observability Workers'
+  },
+  {
+    activate: ['s8'],
+    tiers: [true,true,false,false],
+    narration: '<span class="hl">Stage 8: ML Pipeline</span> reads <span class="hl-gold">ml-manifest.yaml</span>. Sets up MLflow experiments, model training, and inference pipelines.',
+    label: 'Step 22/24 — Stage 8: ML Pipeline'
+  },
+  {
+    activate: ['s9'],
+    tiers: [true,true,false,false],
+    narration: '<span class="hl">Stage 9: GenAI Agents</span> reads <span class="hl-gold">genai-agents-manifest.yaml</span>. Builds AI agents with the ResponsesAgent framework.',
+    label: 'Step 23/24 — Stage 9: GenAI Agents'
+  },
+  {
+    activate: ['wg-genai', 'w-resp', 'w-eval', 'w-mem', 'w-prompt', 'w-multi', 'w-deploy', 'w-prodmon', 'w-found'],
+    tiers: [true,true,true,true],
+    narration: 'GenAI orchestrator loads all 8 workers: <span class="hl">responses-agent</span> &rarr; <span class="hl">evaluation</span> &rarr; <span class="hl">memory</span> &rarr; <span class="hl">prompts</span> &rarr; <span class="hl">multi-agent</span> &rarr; <span class="hl">deployment</span> &rarr; <span class="hl">monitoring</span> &rarr; <span class="hl">foundation</span>. Pipeline complete.',
+    label: 'Step 24/24 — GenAI Workers — Complete'
+  },
+];
+
+let currentStep = -1;
+let playing = false;
+let timer = null;
+let speedMs = 2000;
+
+function getEl(id) { return document.getElementById(id); }
+
+function clearAll() {
+  document.querySelectorAll('.node, .stage-node').forEach(el => {
+    el.classList.remove('active', 'visited');
+  });
+  document.querySelectorAll('.arrow-right, .stage-connector').forEach(el => {
+    el.classList.remove('lit');
+  });
+  document.querySelectorAll('.worker-group').forEach(el => {
+    el.classList.remove('active', 'visited');
+  });
+  document.querySelectorAll('.worker-pill, .common-pill').forEach(el => {
+    el.classList.remove('active', 'visited');
+  });
+  document.querySelectorAll('.manifest-arrow').forEach(el => {
+    el.classList.remove('lit');
+  });
+  document.querySelectorAll('.tier-segment').forEach(el => {
+    el.classList.remove('active');
+  });
+}
+
+function applyStep(stepIndex) {
+  // First, downgrade all 'active' to 'visited'
+  document.querySelectorAll('.active').forEach(el => {
+    el.classList.remove('active');
+    el.classList.add('visited');
+  });
+
+  if (stepIndex < 0 || stepIndex >= STEPS.length) return;
+
+  const step = STEPS[stepIndex];
+
+  // Activate elements
+  if (step.activate) {
+    step.activate.forEach(id => {
+      const el = getEl(id);
+      if (el) {
+        el.classList.add('active');
+        el.classList.remove('visited');
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+    });
+  }
+
+  // Light up connectors
+  if (step.lit) {
+    step.lit.forEach(id => {
+      const el = getEl(id);
+      if (el) el.classList.add('lit');
+    });
+  }
+
+  // Tiers
+  const tierIds = ['tier1', 'tier2', 'tier3', 'tier4'];
+  step.tiers.forEach((on, i) => {
+    const el = getEl(tierIds[i]);
+    if (on) el.classList.add('active');
+    else el.classList.remove('active');
+  });
+
+  // Narration
+  getEl('narration').innerHTML = step.narration;
+  getEl('step-label').textContent = step.label;
+  getEl('step-label').classList.add('highlight');
+  setTimeout(() => getEl('step-label').classList.remove('highlight'), 800);
+}
+
+function nextStep() {
+  if (currentStep < STEPS.length - 1) {
+    currentStep++;
+    applyStep(currentStep);
+  } else {
+    stopPlay();
+  }
+}
+
+function prevStep() {
+  if (currentStep > 0) {
+    currentStep--;
+    clearAll();
+    // Replay all steps up to current
+    for (let i = 0; i <= currentStep; i++) {
+      // Downgrade previous active to visited
+      if (i < currentStep) {
+        const s = STEPS[i];
+        if (s.activate) {
+          s.activate.forEach(id => {
+            const el = getEl(id);
+            if (el) { el.classList.add('visited'); el.classList.remove('active'); }
+          });
+        }
+        if (s.lit) {
+          s.lit.forEach(id => { const el = getEl(id); if (el) el.classList.add('lit'); });
+        }
+      }
+    }
+    applyStep(currentStep);
+  }
+}
+
+function togglePlay() {
+  if (playing) {
+    stopPlay();
+  } else {
+    playing = true;
+    getEl('btn-play').textContent = '⏸ Pause';
+    getEl('btn-play').classList.add('active');
+    if (currentStep >= STEPS.length - 1) {
+      resetAnimation();
+    }
+    tick();
+  }
+}
+
+function stopPlay() {
+  playing = false;
+  clearTimeout(timer);
+  getEl('btn-play').textContent = '▶ Play';
+  getEl('btn-play').classList.remove('active');
+}
+
+function tick() {
+  if (!playing) return;
+  nextStep();
+  if (currentStep >= STEPS.length - 1) {
+    stopPlay();
+    return;
+  }
+  timer = setTimeout(tick, speedMs);
+}
+
+function resetAnimation() {
+  stopPlay();
+  currentStep = -1;
+  clearAll();
+  getEl('narration').innerHTML = 'Press <strong>Play</strong> or step through with <strong>Next</strong> to see how the agent navigates skills.';
+  getEl('step-label').textContent = 'Press Play to begin';
+}
+
+function updateSpeed() {
+  const val = parseInt(getEl('speed').value);
+  const speeds = { 1: 4000, 2: 3000, 3: 2000, 4: 1200, 5: 700 };
+  const labels = { 1: '0.5x', 2: '0.75x', 3: '1x', 4: '1.5x', 5: '2x' };
+  speedMs = speeds[val];
+  getEl('speed-label').textContent = labels[val];
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextStep(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prevStep(); }
+  if (e.key === 'r' || e.key === 'R') { resetAnimation(); }
+  if (e.key === 'p' || e.key === 'P') { togglePlay(); }
+});
+</script>
+
+</body>
+</html>

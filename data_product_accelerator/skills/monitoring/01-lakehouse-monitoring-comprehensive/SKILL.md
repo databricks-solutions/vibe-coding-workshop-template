@@ -22,9 +22,25 @@ metadata:
     - databricks-asset-bundles
     - sql-alerting-patterns
     - anomaly-detection
-  last_verified: "2026-02-07"
+  last_verified: "2026-02-18"
   volatility: medium
-  upstream_sources: []  # Internal monitoring patterns
+  verification_sources:
+    - url: "https://databricks-sdk-py.readthedocs.io/en/latest/workspace/dataquality/data_quality.html"
+      check_for: "DataQualityAPI method signatures: create_monitor(monitor), create_refresh(object_type, object_id, refresh), delete_monitor(object_type, object_id), get_monitor, list_refresh, cancel_refresh, update_monitor(object_type, object_id, monitor, update_mask)"
+    - url: "https://databricks-sdk-py.readthedocs.io/en/latest/dbdataclasses/dataquality.html"
+      check_for: "Monitor, DataProfilingConfig, DataProfilingCustomMetric, DataProfilingCustomMetricType, TimeSeriesConfig, SnapshotConfig, AggregationGranularity, RefreshState, Refresh field names and enum values"
+    - url: "https://learn.microsoft.com/en-us/azure/databricks/lakehouse-monitoring/custom-metrics"
+      check_for: "Custom metric syntax (AGGREGATE, DERIVED, DRIFT), output_data_type format, Jinja template rules"
+    - url: "https://docs.databricks.com/api/azure/workspace/dataquality/createmonitor"
+      check_for: "REST API request/response schema, monitor creation payload structure"
+  upstream_sources:
+    - name: "databricks-sdk-py"
+      repo: "databricks/databricks-sdk-py"
+      paths:
+        - "databricks/sdk/service/dataquality.py"
+      relationship: "reference"
+      last_synced: "2026-02-18"
+      sync_commit: "latest"
 ---
 
 # Lakehouse Monitoring Comprehensive

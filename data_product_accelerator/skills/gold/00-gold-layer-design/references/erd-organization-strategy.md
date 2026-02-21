@@ -1,6 +1,6 @@
 # ERD Organization Strategy
 
-Extracted from `context/prompts/03a-gold-layer-design-prompt.md` Step 2. Use alongside the `mermaid-erd-patterns` skill for complete ERD syntax reference.
+Extracted from `context/prompts/03a-gold-layer-design-prompt.md` Step 2. Use alongside the `05-erd-diagrams` skill for complete ERD syntax reference.
 
 ---
 
@@ -221,4 +221,4 @@ gold_layer_design/
 └── DESIGN_SUMMARY.md
 ```
 
-**See `mermaid-erd-patterns` skill for complete ERD syntax and formatting standards.**
+**See `05-erd-diagrams` skill for complete ERD syntax and formatting standards.**

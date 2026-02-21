@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Skill Hierarchy — Cascading Tree</title>
+<style>
+  :root {
+    --bg: #0d1017;
+    --surface: #151921;
+    --surface2: #1c2130;
+    --border: #2a2f3e;
+    --text: #e1e4ed;
+    --text-dim: #6b7280;
+    --text-muted: #4b5060;
+    --cyan: #00d4ff;
+    --cyan-dim: rgba(0,212,255,0.12);
+    --green: #34c759;
+    --green-dim: rgba(52,199,89,0.12);
+    --gold: #f5a623;
+    --gold-dim: rgba(245,166,35,0.12);
+    --purple: #9370db;
+    --purple-dim: rgba(147,112,219,0.12);
+    --bronze: #cd853f;
+    --bronze-dim: rgba(205,133,63,0.12);
+    --silver-c: #a8b4c2;
+    --silver-dim: rgba(168,180,194,0.12);
+    --red: #ff6b6b;
+    --red-dim: rgba(255,107,107,0.12);
+    --teal: #20b2aa;
+    --teal-dim: rgba(32,178,170,0.12);
+    --pink: #ff69b4;
+    --pink-dim: rgba(255,105,180,0.12);
+    --orange: #ff8c42;
+    --orange-dim: rgba(255,140,66,0.12);
+    --line: #2a2f3e;
+    --line-lit: var(--cyan);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: auto;
+  }
+
+  header {
+    padding: 28px 24px 14px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #10131a, var(--bg));
+    position: sticky;
+    top: 0;
+    z-index: 200;
+  }
+  header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; }
+  header p { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 24px;
+    position: sticky;
+    top: 72px;
+    z-index: 190;
+    background: rgba(13,16,23,0.94);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .controls button {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 7px 18px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .controls button:hover { background: #272c3d; border-color: var(--cyan); }
+  .controls button.active { background: var(--cyan); border-color: var(--cyan); color: #000; }
+
+  .step-info {
+    font-size: 12px;
+    color: var(--text-dim);
+    min-width: 200px;
+    text-align: center;
+  }
+  .step-info.hl { color: var(--cyan); font-weight: 600; }
+
+  .speed-ctl { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-dim); }
+  .speed-ctl input { width:70px; accent-color: var(--cyan); }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 8px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .legend-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--text-dim); }
+  .legend-dot { width:10px; height:10px; border-radius:3px; }
+
+  /* ===== TREE ===== */
+  .tree-wrap {
+    padding: 32px 24px 120px 48px;
+    min-width: 600px;
+  }
+
+  .tree ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .tree > ul { padding-left: 0; }
+
+  .tree li {
+    position: relative;
+    padding-left: 28px;
+  }
+
+  /* vertical + horizontal connector lines */
+  .tree li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: var(--line);
+    transition: background 0.5s;
+  }
+
+  .tree li::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 18px;
+    width: 22px;
+    height: 1px;
+    background: var(--line);
+    transition: background 0.5s;
+  }
+
+  .tree li:last-child::before {
+    height: 18px;
+  }
+
+  .tree li.lit::before,
+  .tree li.lit::after {
+    background: var(--cyan);
+  }
+
+  /* the node box */
+  .tnode {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    margin: 4px 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.4s ease;
+    position: relative;
+    max-width: 480px;
+  }
+
+  .tnode:hover { border-color: #3d4255; }
+
+  .tnode .icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+    flex-shrink: 0;
+    transition: all 0.4s;
+  }
+
+  .tnode .name {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: color 0.4s;
+  }
+
+  .tnode .tag {
+    font-size: 9px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .tnode .meta {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-left: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    white-space: nowrap;
+  }
+
+  .tnode .chevron {
+    font-size: 10px;
+    color: var(--text-muted);
+    transition: transform 0.3s;
+    flex-shrink: 0;
+  }
+
+  .tnode .chevron.open { transform: rotate(90deg); }
+
+  /* --- States --- */
+  .tnode.visited {
+    border-color: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan-dim);
+  }
+  .tnode.visited .name { color: var(--cyan); }
+
+  .tnode.active {
+    border-color: var(--cyan);
+    box-shadow: 0 0 20px rgba(0,212,255,0.25), 0 0 40px rgba(0,212,255,0.08);
+    transform: translateX(4px);
+  }
+  .tnode.active .name { color: var(--cyan); font-weight: 700; }
+
+  .tnode.active::before {
+    content: '';
+    position: absolute;
+    top: -3px; left: -3px; right: -3px; bottom: -3px;
+    border: 2px solid var(--cyan);
+    border-radius: 11px;
+    animation: ring-pulse 1.4s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes ring-pulse {
+    0%,100% { opacity:1; }
+    50% { opacity:0.3; }
+  }
+
+  /* Type-specific colors */
+  .type-entry .icon { background: var(--cyan-dim); color: var(--cyan); }
+  .type-entry .tag { background: var(--cyan-dim); color: var(--cyan); }
+  .type-entry.active, .type-entry.visited { border-color: var(--cyan); }
+
+  .type-orchestrator .icon { background: var(--purple-dim); color: var(--purple); }
+  .type-orchestrator .tag { background: var(--purple-dim); color: var(--purple); }
+
+  .type-worker .icon { background: var(--gold-dim); color: var(--gold); }
+  .type-worker .tag { background: var(--gold-dim); color: var(--gold); }
+
+  .type-common .icon { background: var(--green-dim); color: var(--green); }
+  .type-common .tag { background: var(--green-dim); color: var(--green); }
+  .type-common.active { border-color: var(--green); box-shadow: 0 0 20px rgba(52,199,89,0.2); }
+  .type-common.visited { border-color: var(--green); box-shadow: 0 0 6px rgba(52,199,89,0.1); }
+  .type-common.active .name { color: var(--green); }
+  .type-common.visited .name { color: var(--green); }
+
+  .type-manifest .icon { background: var(--gold-dim); color: var(--gold); }
+  .type-manifest .tag { background: var(--gold-dim); color: var(--gold); }
+  .type-manifest.active { border-color: var(--gold); box-shadow: 0 0 20px rgba(245,166,35,0.2); }
+  .type-manifest.visited { border-color: var(--gold); box-shadow: 0 0 6px rgba(245,166,35,0.1); }
+  .type-manifest.active .name { color: var(--gold); }
+  .type-manifest.visited .name { color: var(--gold); }
+
+  .type-ref .icon { background: var(--orange-dim); color: var(--orange); }
+  .type-ref .tag { background: var(--orange-dim); color: var(--orange); }
+  .type-ref.active { border-color: var(--orange); box-shadow: 0 0 20px rgba(255,140,66,0.2); }
+  .type-ref.visited { border-color: var(--orange); box-shadow: 0 0 6px rgba(255,140,66,0.1); }
+
+  .type-admin .icon { background: rgba(107,114,128,0.15); color: #6b7280; }
+  .type-admin .tag { background: rgba(107,114,128,0.15); color: #6b7280; }
+
+  /* Collapsed children */
+  .tree li.collapsed > ul {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.3s ease;
+  }
+
+  .tree li.expanded > ul {
+    max-height: 3000px;
+    opacity: 1;
+    transition: max-height 0.6s ease, opacity 0.4s ease 0.1s;
+  }
+
+  /* Narration */
+  .narration {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 14px 24px;
+    background: rgba(13,16,23,0.96);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    z-index: 200;
+    text-align: center;
+  }
+  .narration-text {
+    font-size: 13px;
+    line-height: 1.5;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .narration-text .hl { color: var(--cyan); font-weight: 600; }
+  .narration-text .hl-g { color: var(--green); font-weight: 600; }
+  .narration-text .hl-y { color: var(--gold); font-weight: 600; }
+  .narration-text .hl-o { color: var(--orange); font-weight: 600; }
+
+  /* Tier badge on the right */
+  .tier-badge {
+    position: fixed;
+    right: 20px;
+    bottom: 70px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    z-index: 200;
+    transition: all 0.4s;
+  }
+  .tier-badge.t1 { border-color: var(--cyan); color: var(--cyan); }
+  .tier-badge.t2 { border-color: var(--purple); color: var(--purple); }
+  .tier-badge.t3 { border-color: var(--gold); color: var(--gold); }
+  .tier-badge.t4 { border-color: var(--orange); color: var(--orange); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Agent Skill Hierarchy &mdash; Cascading Tree</h1>
+  <p>Watch the agent descend through the hierarchical skill tree, expanding branches as it navigates orchestrators, workers, common skills, and reference files across the 9 core stages plus optional stage 6b.</p>
+</header>
+
+<div class="controls">
+  <button id="btn-play" onclick="togglePlay()">&#9654; Play</button>
+  <button onclick="resetAll()">&#8634; Reset</button>
+  <button onclick="prevStep()">&#9664; Prev</button>
+  <button onclick="nextStep()">Next &#9654;</button>
+  <button onclick="expandAll()">Expand All</button>
+  <button onclick="collapseAll()">Collapse All</button>
+  <div class="step-info" id="step-info">Press Play to begin</div>
+  <div class="speed-ctl">
+    <label>Speed</label>
+    <input type="range" id="speed" min="1" max="5" value="3" oninput="updSpeed()">
+    <span id="spd-lbl">1x</span>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div> Entry / Active</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div> Orchestrator</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--gold)"></div> Worker / Manifest</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Common Skill</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div> Reference File (Tier 4)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#6b7280"></div> Admin / Utility</div>
+</div>
+
+<div class="tree-wrap">
+<div class="tree">
+<ul>
+
+<!-- ROOT: AGENTS.md -->
+<li id="r-root" class="collapsed">
+  <div class="tnode type-entry" id="n-root" onclick="toggle('r-root')">
+    <div class="icon">A</div>
+    <div class="name">AGENTS.md</div>
+    <div class="tag">entry point</div>
+    <div class="meta">auto-loaded by IDE</div>
+    <div class="chevron">&#9654;</div>
+  </div>
+  <ul>
+
+    <!-- Skill Navigator -->
+    <li id="r-nav" class="collapsed">
+      <div class="tnode type-entry" id="n-nav" onclick="toggle('r-nav')">
+        <div class="icon">N</div>
+        <div class="name">skill-navigator</div>
+        <div class="tag">router</div>
+        <div class="meta">keyword detection &rarr; orchestrator</div>
+        <div class="chevron">&#9654;</div>
+      </div>
+      <ul>
+
+        <!-- Always-on Common Skills -->
+        <li id="r-always" class="collapsed">
+          <div class="tnode type-common" id="n-always" onclick="toggle('r-always')">
+            <div class="icon">C</div>
+            <div class="name">Always-Loaded Common Skills</div>
+            <div class="tag">tier 1</div>
+            <div class="meta">~4K tokens</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-c-expert"><div class="tnode type-common" id="n-c-expert"><div class="icon">C</div><div class="name">databricks-expert-agent</div><div class="tag">common</div><div class="meta">stages 1-9</div></div></li>
+            <li id="r-c-naming"><div class="tnode type-common" id="n-c-naming"><div class="icon">C</div><div class="name">naming-tagging-standards</div><div class="tag">common</div><div class="meta">stages 1-9</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Stage 1: Gold Design -->
+        <li id="r-s1" class="collapsed">
+          <div class="tnode type-orchestrator" id="n-s1" onclick="toggle('r-s1')">
+            <div class="icon">1</div>
+            <div class="name">Stage 1: Gold Design</div>
+            <div class="tag">orchestrator</div>
+            <div class="meta">00-gold-layer-design</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-s1-input"><div class="tnode type-entry" id="n-s1-input"><div class="icon">&#9776;</div><div class="name">context/*.csv</div><div class="tag">input</div><div class="meta">customer schema</div></div></li>
+            <li id="r-s1-w1"><div class="tnode type-worker" id="n-s1-w1"><div class="icon">W</div><div class="name">01-grain-definition</div><div class="tag">worker</div><div class="meta">Phase 2</div></div></li>
+            <li id="r-s1-w2"><div class="tnode type-worker" id="n-s1-w2"><div class="icon">W</div><div class="name">02-dimension-patterns</div><div class="tag">worker</div><div class="meta">Phase 2</div></div></li>
+            <li id="r-s1-w3"><div class="tnode type-worker" id="n-s1-w3"><div class="icon">W</div><div class="name">03-fact-table-patterns</div><div class="tag">worker</div><div class="meta">Phase 2</div></div></li>
+            <li id="r-s1-w4"><div class="tnode type-worker" id="n-s1-w4"><div class="icon">W</div><div class="name">04-conformed-dimensions</div><div class="tag">worker</div><div class="meta">Phase 2</div></div></li>
+            <li id="r-s1-w5" class="collapsed">
+              <div class="tnode type-worker" id="n-s1-w5" onclick="toggle('r-s1-w5')">
+                <div class="icon">W</div>
+                <div class="name">05-erd-diagrams</div>
+                <div class="tag">worker</div>
+                <div class="meta">Phase 3</div>
+                <div class="chevron">&#9654;</div>
+              </div>
+              <ul>
+                <li id="r-s1-ref1"><div class="tnode type-ref" id="n-s1-ref1"><div class="icon">R</div><div class="name">references/erd-patterns.md</div><div class="tag">tier 4</div><div class="meta">~4K tokens</div></div></li>
+              </ul>
+            </li>
+            <li id="r-s1-w6"><div class="tnode type-worker" id="n-s1-w6"><div class="icon">W</div><div class="name">06-table-documentation</div><div class="tag">worker</div><div class="meta">Phase 4</div></div></li>
+            <li id="r-s1-w7"><div class="tnode type-worker" id="n-s1-w7"><div class="icon">W</div><div class="name">07-design-validation</div><div class="tag">worker</div><div class="meta">Phase 8</div></div></li>
+            <li id="r-s1-emit"><div class="tnode type-manifest" id="n-s1-emit"><div class="icon">&#8594;</div><div class="name">gold_layer_design/yaml/*.yaml</div><div class="tag">emits</div><div class="meta">YAML schemas + ERDs</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Stage 2: Bronze -->
+        <li id="r-s2" class="collapsed">
+          <div class="tnode type-orchestrator" id="n-s2" onclick="toggle('r-s2')">
+            <div class="icon">2</div>
+            <div class="name">Stage 2: Bronze</div>
+            <div class="tag">orchestrator</div>
+            <div class="meta">00-bronze-layer-setup</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-s2-c1"><div class="tnode type-common" id="n-s2-c1"><div class="icon">C</div><div class="name">databricks-asset-bundles</div><div class="tag">common</div></div></li>
+            <li id="r-s2-c2"><div class="tnode type-common" id="n-s2-c2"><div class="icon">C</div><div class="name">databricks-table-properties</div><div class="tag">common</div></div></li>
+            <li id="r-s2-c3"><div class="tnode type-common" id="n-s2-c3"><div class="icon">C</div><div class="name">schema-management-patterns</div><div class="tag">common</div></div></li>
+            <li id="r-s2-c4"><div class="tnode type-common" id="n-s2-c4"><div class="icon">C</div><div class="name">databricks-python-imports</div><div class="tag">common</div></div></li>
+            <li id="r-s2-c5"><div class="tnode type-common" id="n-s2-c5"><div class="icon">C</div><div class="name">databricks-autonomous-operations</div><div class="tag">common</div></div></li>
+            <li id="r-s2-w1"><div class="tnode type-worker" id="n-s2-w1"><div class="icon">W</div><div class="name">01-faker-data-generation</div><div class="tag">worker</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Stage 3: Silver -->
+        <li id="r-s3" class="collapsed">
+          <div class="tnode type-orchestrator" id="n-s3" onclick="toggle('r-s3')">
+            <div class="icon">3</div>
+            <div class="name">Stage 3: Silver</div>
+            <div class="tag">orchestrator</div>
+            <div class="meta">00-silver-layer-setup</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-s3-c1"><div class="tnode type-common" id="n-s3-c1"><div class="icon">C</div><div class="name">unity-catalog-constraints</div><div class="tag">common</div></div></li>
+            <li id="r-s3-w1"><div class="tnode type-worker" id="n-s3-w1"><div class="icon">W</div><div class="name">01-dlt-expectations-patterns</div><div class="tag">worker</div></div></li>
+            <li id="r-s3-w2"><div class="tnode type-worker" id="n-s3-w2"><div class="icon">W</div><div class="name">02-dqx-patterns</div><div class="tag">worker</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Stage 4: Gold Impl -->
+        <li id="r-s4" class="collapsed">
+          <div class="tnode type-orchestrator" id="n-s4" onclick="toggle('r-s4')">
+            <div class="icon">4</div>
+            <div class="name">Stage 4: Gold Implementation</div>
+            <div class="tag">orchestrator</div>
+            <div class="meta">01-gold-layer-setup</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-s4-w1"><div class="tnode type-worker" id="n-s4-w1"><div class="icon">W</div><div class="name">01-yaml-table-setup</div><div class="tag">worker</div></div></li>
+            <li id="r-s4-w2" class="collapsed">
+              <div class="tnode type-worker" id="n-s4-w2" onclick="toggle('r-s4-w2')">
+                <div class="icon">W</div>
+                <div class="name">02-merge-patterns</div>
+                <div class="tag">worker</div>
+                <div class="chevron">&#9654;</div>
+              </div>
+              <ul>
+                <li id="r-s4-ref1"><div class="tnode type-ref" id="n-s4-ref1"><div class="icon">R</div><div class="name">references/merge-sql-patterns.md</div><div class="tag">tier 4</div></div></li>
+              </ul>
+            </li>
+            <li id="r-s4-w3"><div class="tnode type-worker" id="n-s4-w3"><div class="icon">W</div><div class="name">03-deduplication</div><div class="tag">worker</div></div></li>
+            <li id="r-s4-w4"><div class="tnode type-worker" id="n-s4-w4"><div class="icon">W</div><div class="name">04-grain-validation</div><div class="tag">worker</div></div></li>
+            <li id="r-s4-w5"><div class="tnode type-worker" id="n-s4-w5"><div class="icon">W</div><div class="name">05-schema-validation</div><div class="tag">worker</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Stage 5: Planning -->
+        <li id="r-s5" class="collapsed">
+          <div class="tnode type-orchestrator" id="n-s5" onclick="toggle('r-s5')">
+            <div class="icon">5</div>
+            <div class="name">Stage 5: Planning</div>
+            <div class="tag">orchestrator</div>
+            <div class="meta">00-project-planning</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-s5-m1"><div class="tnode type-manifest" id="n-s5-m1"><div class="icon">&#8594;</div><div class="name">semantic-layer-manifest.yaml</div><div class="tag">emits</div></div></li>
+            <li id="r-s5-m2"><div class="tnode type-manifest" id="n-s5-m2"><div class="icon">&#8594;</div><div class="name">observability-manifest.yaml</div><div class="tag">emits</div></div></li>
+            <li id="r-s5-m3"><div class="tnode type-manifest" id="n-s5-m3"><div class="icon">&#8594;</div><div class="name">ml-manifest.yaml</div><div class="tag">emits</div></div></li>
+            <li id="r-s5-m4"><div class="tnode type-manifest" id="n-s5-m4"><div class="icon">&#8594;</div><div class="name">genai-agents-manifest.yaml</div><div class="tag">emits</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Stage 6: Semantic Layer -->
+        <li id="r-s6" class="collapsed">
+          <div class="tnode type-orchestrator" id="n-s6" onclick="toggle('r-s6')">
+            <div class="icon">6</div>
+            <div class="name">Stage 6: Semantic Layer</div>
+            <div class="tag">orchestrator</div>
+            <div class="meta">00-semantic-layer-setup</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-s6-m"><div class="tnode type-manifest" id="n-s6-m"><div class="icon">&#8592;</div><div class="name">consumes semantic-layer-manifest.yaml</div><div class="tag">phase 0</div></div></li>
+            <li id="r-s6-c1"><div class="tnode type-common" id="n-s6-c1"><div class="icon">C</div><div class="name">databricks-asset-bundles</div><div class="tag">common</div></div></li>
+            <li id="r-s6-c2"><div class="tnode type-common" id="n-s6-c2"><div class="icon">C</div><div class="name">databricks-python-imports</div><div class="tag">common</div></div></li>
+            <li id="r-s6-w1"><div class="tnode type-worker" id="n-s6-w1"><div class="icon">W</div><div class="name">01-metric-views-patterns</div><div class="tag">worker</div></div></li>
+            <li id="r-s6-w2"><div class="tnode type-worker" id="n-s6-w2"><div class="icon">W</div><div class="name">02-databricks-table-valued-functions</div><div class="tag">worker</div></div></li>
+            <li id="r-s6-w3"><div class="tnode type-worker" id="n-s6-w3"><div class="icon">W</div><div class="name">03-genie-space-patterns</div><div class="tag">worker</div></div></li>
+            <li id="r-s6-w4"><div class="tnode type-worker" id="n-s6-w4"><div class="icon">W</div><div class="name">04-genie-space-export-import-api</div><div class="tag">worker</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Stage 6b: Genie Optimization -->
+        <li id="r-s6b" class="collapsed">
+          <div class="tnode type-orchestrator" id="n-s6b" onclick="toggle('r-s6b')">
+            <div class="icon">6b</div>
+            <div class="name">Stage 6b: Genie Optimization</div>
+            <div class="tag">orchestrator</div>
+            <div class="meta">05-genie-optimization-orchestrator</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-s6b-w1"><div class="tnode type-worker" id="n-s6b-w1"><div class="icon">W</div><div class="name">01-genie-benchmark-generator</div><div class="tag">worker</div></div></li>
+            <li id="r-s6b-w2"><div class="tnode type-worker" id="n-s6b-w2"><div class="icon">W</div><div class="name">02-genie-benchmark-evaluator</div><div class="tag">worker</div></div></li>
+            <li id="r-s6b-w3"><div class="tnode type-worker" id="n-s6b-w3"><div class="icon">W</div><div class="name">03-genie-metadata-optimizer</div><div class="tag">worker</div></div></li>
+            <li id="r-s6b-w4"><div class="tnode type-worker" id="n-s6b-w4"><div class="icon">W</div><div class="name">04-genie-optimization-applier</div><div class="tag">worker</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Stage 7: Observability -->
+        <li id="r-s7" class="collapsed">
+          <div class="tnode type-orchestrator" id="n-s7" onclick="toggle('r-s7')">
+            <div class="icon">7</div>
+            <div class="name">Stage 7: Observability</div>
+            <div class="tag">orchestrator</div>
+            <div class="meta">00-observability-setup</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-s7-m"><div class="tnode type-manifest" id="n-s7-m"><div class="icon">&#8592;</div><div class="name">consumes observability-manifest.yaml</div><div class="tag">phase 0</div></div></li>
+            <li id="r-s7-w1"><div class="tnode type-worker" id="n-s7-w1"><div class="icon">W</div><div class="name">01-lakehouse-monitoring</div><div class="tag">worker</div></div></li>
+            <li id="r-s7-w2"><div class="tnode type-worker" id="n-s7-w2"><div class="icon">W</div><div class="name">02-aibi-dashboards</div><div class="tag">worker</div></div></li>
+            <li id="r-s7-w3"><div class="tnode type-worker" id="n-s7-w3"><div class="icon">W</div><div class="name">03-sql-alerting-patterns</div><div class="tag">worker</div></div></li>
+            <li id="r-s7-w4"><div class="tnode type-worker" id="n-s7-w4"><div class="icon">W</div><div class="name">04-anomaly-detection</div><div class="tag">worker</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Stage 8: ML -->
+        <li id="r-s8" class="collapsed">
+          <div class="tnode type-orchestrator" id="n-s8" onclick="toggle('r-s8')">
+            <div class="icon">8</div>
+            <div class="name">Stage 8: ML Pipeline</div>
+            <div class="tag">orchestrator</div>
+            <div class="meta">00-ml-pipeline-setup</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-s8-m"><div class="tnode type-manifest" id="n-s8-m"><div class="icon">&#8592;</div><div class="name">consumes ml-manifest.yaml</div><div class="tag">phase 0</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Stage 9: GenAI -->
+        <li id="r-s9" class="collapsed">
+          <div class="tnode type-orchestrator" id="n-s9" onclick="toggle('r-s9')">
+            <div class="icon">9</div>
+            <div class="name">Stage 9: GenAI Agents</div>
+            <div class="tag">orchestrator</div>
+            <div class="meta">00-genai-agents-setup</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-s9-m"><div class="tnode type-manifest" id="n-s9-m"><div class="icon">&#8592;</div><div class="name">consumes genai-agents-manifest.yaml</div><div class="tag">phase 0</div></div></li>
+            <li id="r-s9-c1"><div class="tnode type-common" id="n-s9-c1"><div class="icon">C</div><div class="name">databricks-asset-bundles</div><div class="tag">common</div></div></li>
+            <li id="r-s9-c2"><div class="tnode type-common" id="n-s9-c2"><div class="icon">C</div><div class="name">databricks-python-imports</div><div class="tag">common</div></div></li>
+            <li id="r-s9-w1"><div class="tnode type-worker" id="n-s9-w1"><div class="icon">W</div><div class="name">01-responses-agent-patterns</div><div class="tag">worker</div></div></li>
+            <li id="r-s9-w2"><div class="tnode type-worker" id="n-s9-w2"><div class="icon">W</div><div class="name">02-mlflow-genai-evaluation</div><div class="tag">worker</div></div></li>
+            <li id="r-s9-w3"><div class="tnode type-worker" id="n-s9-w3"><div class="icon">W</div><div class="name">03-lakebase-memory-patterns</div><div class="tag">worker</div></div></li>
+            <li id="r-s9-w4"><div class="tnode type-worker" id="n-s9-w4"><div class="icon">W</div><div class="name">04-prompt-registry-patterns</div><div class="tag">worker</div></div></li>
+            <li id="r-s9-w5"><div class="tnode type-worker" id="n-s9-w5"><div class="icon">W</div><div class="name">05-multi-agent-genie-orchestration</div><div class="tag">worker</div></div></li>
+            <li id="r-s9-w6"><div class="tnode type-worker" id="n-s9-w6"><div class="icon">W</div><div class="name">06-deployment-automation</div><div class="tag">worker</div></div></li>
+            <li id="r-s9-w7"><div class="tnode type-worker" id="n-s9-w7"><div class="icon">W</div><div class="name">07-production-monitoring</div><div class="tag">worker</div></div></li>
+            <li id="r-s9-w8" class="collapsed">
+              <div class="tnode type-worker" id="n-s9-w8" onclick="toggle('r-s9-w8')">
+                <div class="icon">W</div>
+                <div class="name">08-mlflow-genai-foundation</div>
+                <div class="tag">worker</div>
+                <div class="chevron">&#9654;</div>
+              </div>
+              <ul>
+                <li id="r-s9-ref1"><div class="tnode type-ref" id="n-s9-ref1"><div class="icon">R</div><div class="name">references/mlflow-genai-patterns.md</div><div class="tag">tier 4</div></div></li>
+              </ul>
+            </li>
+            <li id="r-s9-cross"><div class="tnode type-worker" id="n-s9-cross"><div class="icon">&#10147;</div><div class="name">semantic-layer/05-genie-optimization-orchestrator</div><div class="tag">cross-domain</div></div></li>
+          </ul>
+        </li>
+
+        <!-- Admin -->
+        <li id="r-admin" class="collapsed">
+          <div class="tnode type-admin" id="n-admin" onclick="toggle('r-admin')">
+            <div class="icon">&#9881;</div>
+            <div class="name">Admin / Utility Skills</div>
+            <div class="tag">on demand</div>
+            <div class="chevron">&#9654;</div>
+          </div>
+          <ul>
+            <li id="r-a1"><div class="tnode type-admin" id="n-a1"><div class="icon">A</div><div class="name">create-agent-skill</div><div class="tag">admin</div></div></li>
+            <li id="r-a2"><div class="tnode type-admin" id="n-a2"><div class="icon">A</div><div class="name">self-improvement</div><div class="tag">admin</div></div></li>
+            <li id="r-a3"><div class="tnode type-admin" id="n-a3"><div class="icon">A</div><div class="name">skill-freshness-audit</div><div class="tag">admin</div></div></li>
+            <li id="r-a4"><div class="tnode type-admin" id="n-a4"><div class="icon">A</div><div class="name">documentation-organization</div><div class="tag">admin</div></div></li>
+          </ul>
+        </li>
+
+      </ul>
+    </li>
+  </ul>
+</li>
+
+</ul>
+</div>
+</div>
+
+<div class="tier-badge" id="tier-badge">Tier 1: Entry</div>
+
+<div class="narration">
+  <div class="narration-text" id="narration">Press <strong>Play</strong> to watch the agent cascade through the skill tree, or use <strong>Next/Prev</strong> to step through manually.</div>
+</div>
+
+<script>
+function toggle(liId) {
+  const li = document.getElementById(liId);
+  if (!li) return;
+  const ch = li.querySelector('.chevron');
+  if (li.classList.contains('collapsed')) {
+    li.classList.remove('collapsed');
+    li.classList.add('expanded');
+    if (ch) ch.classList.add('open');
+  } else {
+    li.classList.remove('expanded');
+    li.classList.add('collapsed');
+    if (ch) ch.classList.remove('open');
+  }
+}
+
+function forceExpand(liId) {
+  const li = document.getElementById(liId);
+  if (!li) return;
+  li.classList.remove('collapsed');
+  li.classList.add('expanded');
+  const ch = li.querySelector(':scope > .tnode .chevron');
+  if (ch) ch.classList.add('open');
+}
+
+function activate(nodeId) {
+  const el = document.getElementById(nodeId);
+  if (!el) return;
+  el.classList.add('active');
+  el.classList.remove('visited');
+  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function litLine(liId) {
+  const li = document.getElementById(liId);
+  if (li) li.classList.add('lit');
+}
+
+function setTier(tier, label) {
+  const b = document.getElementById('tier-badge');
+  b.className = 'tier-badge t' + tier;
+  b.textContent = label;
+}
+
+const STEPS = [
+  {
+    expand: ['r-root'],
+    activate: ['n-root'],
+    lit: ['r-root'],
+    tier: [1, 'Tier 1: AGENTS.md'],
+    narration: 'The IDE auto-loads <span class="hl">AGENTS.md</span> — the universal entry point. This is always Tier 1 (~1K tokens).',
+    label: 'Step 1/31'
+  },
+  {
+    expand: ['r-nav'],
+    activate: ['n-nav'],
+    lit: ['r-nav'],
+    tier: [1, 'Tier 1: Routing'],
+    narration: 'The <span class="hl">Skill Navigator</span> matches user keywords against the routing table to find the right orchestrator.',
+    label: 'Step 2/31'
+  },
+  {
+    expand: ['r-always'],
+    activate: ['n-always'],
+    lit: ['r-always'],
+    tier: [1, 'Tier 1: Core Skills'],
+    narration: 'Before any domain work, the agent loads the two <span class="hl-g">always-on common skills</span>.',
+    label: 'Step 3/31'
+  },
+  {
+    activate: ['n-c-expert', 'n-c-naming'],
+    lit: ['r-c-expert', 'r-c-naming'],
+    tier: [1, 'Tier 1: ~4K tokens'],
+    narration: '<span class="hl-g">databricks-expert-agent</span> (core SA behavior) and <span class="hl-g">naming-tagging-standards</span> (enterprise naming). Loaded for every task.',
+    label: 'Step 4/31'
+  },
+  {
+    expand: ['r-s1'],
+    activate: ['n-s1'],
+    lit: ['r-s1'],
+    tier: [2, 'Tier 2: Orchestrator'],
+    narration: '<span class="hl">Stage 1: Gold Design</span> orchestrator SKILL.md is loaded (~2K tokens). It will now cascade into its workers.',
+    label: 'Step 5/31'
+  },
+  {
+    activate: ['n-s1-input'],
+    lit: ['r-s1-input'],
+    tier: [2, 'Tier 2: Schema Input'],
+    narration: 'The orchestrator reads the customer schema CSV from <span class="hl">context/*.csv</span> — this is the starting input for the entire pipeline.',
+    label: 'Step 6/31'
+  },
+  {
+    activate: ['n-s1-w1', 'n-s1-w2', 'n-s1-w3', 'n-s1-w4'],
+    lit: ['r-s1-w1', 'r-s1-w2', 'r-s1-w3', 'r-s1-w4'],
+    tier: [3, 'Tier 3: Workers'],
+    narration: 'Phase 2: Four design workers loaded — <span class="hl-y">grain-definition</span>, <span class="hl-y">dimension-patterns</span>, <span class="hl-y">fact-table-patterns</span>, <span class="hl-y">conformed-dimensions</span>.',
+    label: 'Step 7/31'
+  },
+  {
+    expand: ['r-s1-w5'],
+    activate: ['n-s1-w5'],
+    lit: ['r-s1-w5'],
+    tier: [3, 'Tier 3: ERD Worker'],
+    narration: 'Phase 3: <span class="hl-y">05-erd-diagrams</span> worker loaded. It has a references/ directory with detailed ERD patterns.',
+    label: 'Step 8/31'
+  },
+  {
+    activate: ['n-s1-ref1'],
+    lit: ['r-s1-ref1'],
+    tier: [4, 'Tier 4: References'],
+    narration: 'The agent drills into <span class="hl-o">references/erd-patterns.md</span> for Mermaid syntax — this is <span class="hl-o">Tier 4</span> deep-dive content (~4K tokens).',
+    label: 'Step 9/31'
+  },
+  {
+    activate: ['n-s1-w6', 'n-s1-w7'],
+    lit: ['r-s1-w6', 'r-s1-w7'],
+    tier: [3, 'Tier 3: Workers'],
+    narration: 'Phase 4: <span class="hl-y">table-documentation</span>. Phase 8: <span class="hl-y">design-validation</span> cross-checks all artifacts.',
+    label: 'Step 10/31'
+  },
+  {
+    activate: ['n-s1-emit'],
+    lit: ['r-s1-emit'],
+    tier: [2, 'Tier 2: Output'],
+    narration: 'Gold Design emits <span class="hl-y">YAML schemas, ERDs, lineage CSVs</span> into gold_layer_design/. These feed every downstream stage.',
+    label: 'Step 11/31'
+  },
+  {
+    expand: ['r-s2'],
+    activate: ['n-s2'],
+    lit: ['r-s2'],
+    tier: [2, 'Tier 2: Orchestrator'],
+    narration: '<span class="hl">Stage 2: Bronze</span> orchestrator loads. It first pulls in its common skill dependencies.',
+    label: 'Step 12/31'
+  },
+  {
+    activate: ['n-s2-c1', 'n-s2-c2', 'n-s2-c3', 'n-s2-c4', 'n-s2-c5'],
+    lit: ['r-s2-c1', 'r-s2-c2', 'r-s2-c3', 'r-s2-c4', 'r-s2-c5'],
+    tier: [3, 'Tier 3: Common Skills'],
+    narration: 'Five common skills loaded on demand: <span class="hl-g">asset-bundles</span>, <span class="hl-g">table-properties</span>, <span class="hl-g">schema-management</span>, <span class="hl-g">python-imports</span>, <span class="hl-g">autonomous-ops</span>.',
+    label: 'Step 13/31'
+  },
+  {
+    activate: ['n-s2-w1'],
+    lit: ['r-s2-w1'],
+    tier: [3, 'Tier 3: Worker'],
+    narration: 'Bronze dispatches to <span class="hl-y">01-faker-data-generation</span> to create realistic test data.',
+    label: 'Step 14/31'
+  },
+  {
+    expand: ['r-s3'],
+    activate: ['n-s3'],
+    lit: ['r-s3'],
+    tier: [2, 'Tier 2: Orchestrator'],
+    narration: '<span class="hl">Stage 3: Silver</span> orchestrator loads. It adds new common dependency: <span class="hl-g">unity-catalog-constraints</span>.',
+    label: 'Step 15/31'
+  },
+  {
+    activate: ['n-s3-c1', 'n-s3-w1', 'n-s3-w2'],
+    lit: ['r-s3-c1', 'r-s3-w1', 'r-s3-w2'],
+    tier: [3, 'Tier 3: Workers'],
+    narration: '<span class="hl-g">unity-catalog-constraints</span> + workers: <span class="hl-y">DLT expectations</span> and <span class="hl-y">DQX patterns</span> for data quality.',
+    label: 'Step 16/31'
+  },
+  {
+    expand: ['r-s4'],
+    activate: ['n-s4'],
+    lit: ['r-s4'],
+    tier: [2, 'Tier 2: Orchestrator'],
+    narration: '<span class="hl">Stage 4: Gold Implementation</span> — transforms YAML designs into production Delta tables.',
+    label: 'Step 17/31'
+  },
+  {
+    activate: ['n-s4-w1'],
+    lit: ['r-s4-w1'],
+    tier: [3, 'Tier 3: Worker'],
+    narration: '<span class="hl-y">01-yaml-table-setup</span> generates DDL from YAML schemas (the "Extract, Don\'t Generate" principle).',
+    label: 'Step 18/31'
+  },
+  {
+    expand: ['r-s4-w2'],
+    activate: ['n-s4-w2', 'n-s4-ref1'],
+    lit: ['r-s4-w2', 'r-s4-ref1'],
+    tier: [4, 'Tier 4: References'],
+    narration: '<span class="hl-y">02-merge-patterns</span> drills into <span class="hl-o">references/</span> for SCD Type 1/2, accumulating snapshots, factless fact MERGE SQL.',
+    label: 'Step 19/31'
+  },
+  {
+    activate: ['n-s4-w3', 'n-s4-w4', 'n-s4-w5'],
+    lit: ['r-s4-w3', 'r-s4-w4', 'r-s4-w5'],
+    tier: [3, 'Tier 3: Workers'],
+    narration: '<span class="hl-y">deduplication</span>, <span class="hl-y">grain-validation</span>, and <span class="hl-y">schema-validation</span> complete Gold Impl.',
+    label: 'Step 20/31'
+  },
+  {
+    expand: ['r-s5'],
+    activate: ['n-s5'],
+    lit: ['r-s5'],
+    tier: [2, 'Tier 2: Orchestrator'],
+    narration: '<span class="hl">Stage 5: Planning</span> reads Gold YAML outputs and generates implementation manifests for downstream stages.',
+    label: 'Step 21/31'
+  },
+  {
+    activate: ['n-s5-m1', 'n-s5-m2', 'n-s5-m3', 'n-s5-m4'],
+    lit: ['r-s5-m1', 'r-s5-m2', 'r-s5-m3', 'r-s5-m4'],
+    tier: [2, 'Tier 2: Manifests'],
+    narration: 'Planning emits <span class="hl-y">4 YAML manifests</span> into plans/manifests/. This is the <span class="hl-y">Plan-as-Contract</span> handoff — downstream stages consume one each.',
+    label: 'Step 22/31'
+  },
+  {
+    expand: ['r-s6'],
+    activate: ['n-s6', 'n-s6-m'],
+    lit: ['r-s6', 'r-s6-m'],
+    tier: [2, 'Tier 2: Orchestrator'],
+    narration: '<span class="hl">Stage 6: Semantic Layer</span> starts with Phase 0: reads <span class="hl-y">semantic-layer-manifest.yaml</span>.',
+    label: 'Step 23/31'
+  },
+  {
+    activate: ['n-s6-c1', 'n-s6-c2', 'n-s6-w1', 'n-s6-w2', 'n-s6-w3', 'n-s6-w4'],
+    lit: ['r-s6-c1', 'r-s6-c2', 'r-s6-w1', 'r-s6-w2', 'r-s6-w3', 'r-s6-w4'],
+    tier: [3, 'Tier 3: Workers'],
+    narration: 'Stage 6 loads common skills + 4 workers: <span class="hl-y">metric-views-patterns</span> &rarr; <span class="hl-y">table-valued-functions</span> &rarr; <span class="hl-y">genie-space-patterns</span> &rarr; <span class="hl-y">genie-space-export-import-api</span>.',
+    label: 'Step 24/31'
+  },
+  {
+    expand: ['r-s6b'],
+    activate: ['n-s6b', 'n-s6b-w1', 'n-s6b-w2', 'n-s6b-w3', 'n-s6b-w4'],
+    lit: ['r-s6b', 'r-s6b-w1', 'r-s6b-w2', 'r-s6b-w3', 'r-s6b-w4'],
+    tier: [3, 'Tier 3: Orchestrator + Workers'],
+    narration: '<span class="hl">Stage 6b: Genie Optimization</span> runs as a standalone orchestrator between Semantic and Observability, routing to 4 workers for benchmark generation, evaluation, metadata optimization, and change application.',
+    label: 'Step 25/31'
+  },
+  {
+    expand: ['r-s7'],
+    activate: ['n-s7', 'n-s7-m', 'n-s7-w1', 'n-s7-w2', 'n-s7-w3', 'n-s7-w4'],
+    lit: ['r-s7', 'r-s7-m', 'r-s7-w1', 'r-s7-w2', 'r-s7-w3', 'r-s7-w4'],
+    tier: [3, 'Tier 3: Workers'],
+    narration: '<span class="hl">Stage 7: Observability</span> — consumes manifest, loads workers: <span class="hl-y">lakehouse-monitoring</span>, <span class="hl-y">dashboards</span>, <span class="hl-y">alerting</span>, <span class="hl-y">anomaly-detection</span>.',
+    label: 'Step 26/31'
+  },
+  {
+    expand: ['r-s8'],
+    activate: ['n-s8', 'n-s8-m'],
+    lit: ['r-s8', 'r-s8-m'],
+    tier: [2, 'Tier 2: Orchestrator'],
+    narration: '<span class="hl">Stage 8: ML Pipeline</span> — consumes <span class="hl-y">ml-manifest.yaml</span>. Sets up MLflow experiments and models.',
+    label: 'Step 27/31'
+  },
+  {
+    expand: ['r-s9'],
+    activate: ['n-s9', 'n-s9-m'],
+    lit: ['r-s9', 'r-s9-m'],
+    tier: [2, 'Tier 2: Orchestrator'],
+    narration: '<span class="hl">Stage 9: GenAI Agents</span> — the deepest branch. Consumes manifest, then cascades through 8 workers + a cross-domain dependency.',
+    label: 'Step 28/31'
+  },
+  {
+    activate: ['n-s9-c1', 'n-s9-c2', 'n-s9-w1', 'n-s9-w2', 'n-s9-w3', 'n-s9-w4'],
+    lit: ['r-s9-c1', 'r-s9-c2', 'r-s9-w1', 'r-s9-w2', 'r-s9-w3', 'r-s9-w4'],
+    tier: [3, 'Tier 3: Workers'],
+    narration: 'Common skills + first 4 workers: <span class="hl-y">responses-agent</span>, <span class="hl-y">evaluation</span>, <span class="hl-y">lakebase-memory</span>, <span class="hl-y">prompt-registry</span>.',
+    label: 'Step 29/31'
+  },
+  {
+    expand: ['r-s9-w8'],
+    activate: ['n-s9-w5', 'n-s9-w6', 'n-s9-w7', 'n-s9-w8', 'n-s9-ref1', 'n-s9-cross'],
+    lit: ['r-s9-w5', 'r-s9-w6', 'r-s9-w7', 'r-s9-w8', 'r-s9-ref1', 'r-s9-cross'],
+    tier: [4, 'Tier 4: Deep Dive'],
+    narration: 'Remaining workers + <span class="hl-o">references/</span> deep-dive + <span class="hl-y">cross-domain</span> link to semantic-layer/genie-optimization.',
+    label: 'Step 30/31'
+  },
+  {
+    expand: ['r-admin'],
+    activate: ['n-admin', 'n-a1', 'n-a2', 'n-a3', 'n-a4'],
+    lit: ['r-admin', 'r-a1', 'r-a2', 'r-a3', 'r-a4'],
+    tier: [1, 'Complete'],
+    narration: 'Finally, <span class="hl">Admin skills</span> are available on demand — for skill creation, auditing, self-improvement, and documentation. <strong>Full tree traversal complete.</strong>',
+    label: 'Step 31/31 — Complete'
+  },
+];
+
+let curStep = -1;
+let playing = false;
+let timer = null;
+let speedMs = 2000;
+
+function clearAllStates() {
+  document.querySelectorAll('.tnode').forEach(el => el.classList.remove('active','visited'));
+  document.querySelectorAll('.tree li').forEach(el => el.classList.remove('lit'));
+  // collapse all
+  document.querySelectorAll('.tree li').forEach(el => {
+    if (el.querySelector(':scope > ul')) {
+      el.classList.remove('expanded');
+      li_collapsed(el);
+    }
+  });
+}
+
+function li_collapsed(li) {
+  li.classList.add('collapsed');
+  li.classList.remove('expanded');
+  const ch = li.querySelector(':scope > .tnode .chevron');
+  if (ch) ch.classList.remove('open');
+}
+
+function applyStep(idx) {
+  document.querySelectorAll('.tnode.active').forEach(el => {
+    el.classList.remove('active');
+    el.classList.add('visited');
+  });
+
+  if (idx < 0 || idx >= STEPS.length) return;
+  const s = STEPS[idx];
+
+  if (s.expand) s.expand.forEach(id => forceExpand(id));
+  if (s.lit) s.lit.forEach(id => litLine(id));
+  if (s.activate) s.activate.forEach(id => activate(id));
+  if (s.tier) setTier(s.tier[0], s.tier[1]);
+
+  document.getElementById('narration').innerHTML = s.narration;
+  const si = document.getElementById('step-info');
+  si.textContent = s.label;
+  si.classList.add('hl');
+  setTimeout(() => si.classList.remove('hl'), 600);
+}
+
+function nextStep() {
+  if (curStep < STEPS.length - 1) { curStep++; applyStep(curStep); }
+  else stopPlay();
+}
+
+function prevStep() {
+  if (curStep <= 0) return;
+  curStep--;
+  clearAllStates();
+  for (let i = 0; i <= curStep; i++) {
+    const s = STEPS[i];
+    if (s.expand) s.expand.forEach(id => forceExpand(id));
+    if (s.lit) s.lit.forEach(id => litLine(id));
+    if (i < curStep && s.activate) {
+      s.activate.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.classList.add('visited'); el.classList.remove('active'); }
+      });
+    }
+  }
+  applyStep(curStep);
+}
+
+function togglePlay() {
+  if (playing) { stopPlay(); } else {
+    playing = true;
+    document.getElementById('btn-play').textContent = '⏸ Pause';
+    document.getElementById('btn-play').classList.add('active');
+    if (curStep >= STEPS.length - 1) resetAll();
+    tick();
+  }
+}
+
+function stopPlay() {
+  playing = false;
+  clearTimeout(timer);
+  document.getElementById('btn-play').textContent = '▶ Play';
+  document.getElementById('btn-play').classList.remove('active');
+}
+
+function tick() {
+  if (!playing) return;
+  nextStep();
+  if (curStep >= STEPS.length - 1) { stopPlay(); return; }
+  timer = setTimeout(tick, speedMs);
+}
+
+function resetAll() {
+  stopPlay();
+  curStep = -1;
+  clearAllStates();
+  document.getElementById('narration').innerHTML = 'Press <strong>Play</strong> to watch the agent cascade through the skill tree, or use <strong>Next/Prev</strong> to step through manually.';
+  document.getElementById('step-info').textContent = 'Press Play to begin';
+  setTier(1, 'Tier 1: Entry');
+}
+
+function expandAll() {
+  document.querySelectorAll('.tree li.collapsed').forEach(li => {
+    li.classList.remove('collapsed');
+    li.classList.add('expanded');
+    const ch = li.querySelector(':scope > .tnode .chevron');
+    if (ch) ch.classList.add('open');
+  });
+}
+
+function collapseAll() {
+  document.querySelectorAll('.tree li.expanded').forEach(li => {
+    li_collapsed(li);
+  });
+}
+
+function updSpeed() {
+  const v = parseInt(document.getElementById('speed').value);
+  const sp = {1:4000,2:3000,3:2000,4:1200,5:700};
+  const lb = {1:'0.5x',2:'0.75x',3:'1x',4:'1.5x',5:'2x'};
+  speedMs = sp[v];
+  document.getElementById('spd-lbl').textContent = lb[v];
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key==='ArrowRight'||e.key===' ') { e.preventDefault(); nextStep(); }
+  if (e.key==='ArrowLeft') { e.preventDefault(); prevStep(); }
+  if (e.key==='r'||e.key==='R') resetAll();
+  if (e.key==='p'||e.key==='P') togglePlay();
+});
+</script>
+</body>
+</html>

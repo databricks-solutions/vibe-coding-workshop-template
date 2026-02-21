@@ -10,7 +10,7 @@ This guide covers the ongoing maintenance, evolution, and operational procedures
 
 | Check | Frequency | How | Expected Result |
 |-------|-----------|-----|-----------------|
-| Skill count | Weekly | `find data_product_accelerator/skills -name "SKILL.md" \| wc -l` | 50 skills present |
+| Skill count | Weekly | `find data_product_accelerator/skills -name "SKILL.md" \| wc -l` | 59 skills present |
 | Entry point | Weekly | `test -f AGENTS.md && echo "OK"` | AGENTS.md present |
 | Broken references | Monthly | Grep for dead links in SKILL.md files | 0 broken links |
 | Skill freshness | Monthly | Run `skill-freshness-audit` skill | All skills within verification window |
@@ -64,7 +64,7 @@ STALE SKILLS (action required):
     Action: Update streaming patterns in references/streaming-patterns.md
 
 CURRENT SKILLS (no action):
-  - gold/02-yaml-driven-gold-setup (last verified: 2026-01-15) ✓
+  - gold/pipeline-workers/01-yaml-table-setup (last verified: 2026-01-15) ✓
   ...
 ```
 

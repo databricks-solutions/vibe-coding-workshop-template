@@ -15,7 +15,7 @@ metadata:
       paths:
         - "databricks-skills/databricks-unity-catalog/SKILL.md"
       relationship: "derived"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 
@@ -128,7 +128,7 @@ CLUSTER BY AUTO  -- ✅ CORRECT: Let Delta choose optimal clustering
 ### Modern Pattern (RECOMMENDED for Gold Layer)
 **For Gold layer tables, use dual-purpose documentation without "LLM:" prefix.**
 
-See `data_product_accelerator/skills/gold/03-gold-layer-documentation/SKILL.md` for comprehensive Gold layer standards.
+See `data_product_accelerator/skills/gold/design-workers/06-table-documentation/SKILL.md` for comprehensive Gold layer standards.
 
 **Pattern:**
 ```

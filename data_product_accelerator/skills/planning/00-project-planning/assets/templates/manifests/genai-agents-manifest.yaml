@@ -55,6 +55,8 @@ agents:
     description: "Specialized agent for {domain} analytics and insights"
     genie_space: "{Domain} Intelligence"          # From semantic-layer-manifest
     genie_space_id: "{to_be_filled_after_deployment}"
+    use_case_refs:              # Links back to plans/use-case-catalog.md
+      - "UC-001"                # {Use case name}
     capabilities:
       - "Answer {domain} business questions via Genie"
       - "Provide {metric} analysis and trends"

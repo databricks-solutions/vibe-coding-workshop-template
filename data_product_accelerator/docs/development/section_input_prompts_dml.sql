@@ -1,8 +1,10 @@
 -- =============================================================================
--- Section Input Prompts DML — Steps 5-11
--- Updated to align with Data Product Accelerator v1.3.0 skills-first architecture
+-- Section Input Prompts DML — Steps 5-18
+-- Updated to align with Data Product Accelerator v2.0.0 skills-first architecture
 -- All references to deleted context/prompts/ and .cursor/rules/ have been
 -- replaced with the correct skills/ SKILL.md paths per QUICKSTART.md
+-- v2.0.0: Added Step 15 (Genie Space Optimization) with MLflow-driven
+--         3-layer judge architecture and 4 optimization worker skills
 -- =============================================================================
 
 -- Step 9: Table Metadata & Data Dictionary (Bronze Layer) - bypass_llm=TRUE
@@ -10,7 +12,15 @@ INSERT INTO ${catalog}.${schema}.section_input_prompts
 (input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
 VALUES
 (5, 'bronze_table_metadata',
-'Copy and paste this prompt to the AI:
+'Extract table schema metadata from Databricks and save as a CSV data dictionary.
+
+This will:
+
+- **Query information_schema.columns** — extract all table and column metadata from the Wanderbricks schema in samples catalog
+- **Convert results to CSV** — transform the JSON API response into a structured CSV file using Python
+- **Save as context/Wanderbricks_Schema.csv** — create the data dictionary that drives the entire Design-First Pipeline (all subsequent steps reference this CSV)
+
+Copy and paste this prompt to the AI:
 
 ```
 Run this SQL query and save results to CSV:
@@ -72,28 +82,21 @@ samples,wanderbricks,bookings,booking_id,0,...,LONG,...,Unique identifier of the
 'Table Metadata & Data Dictionary',
 'Extract table schema metadata from Databricks and save as CSV for data dictionary reference',
 8,
-'## Prerequisite
+'## 1️⃣ How To Apply
 
-**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
+Copy the prompt from the Prompt tab, start a new Agent chat in your IDE, paste it and press Enter.
 
-Ensure Databricks CLI is authenticated.
+**Prerequisite:** Run this in your cloned Template Repository (see Prerequisites in Step 0). Ensure Databricks CLI is authenticated.
 
----
-
-## Steps to Apply
-
-1. Copy the generated prompt using the copy button
-2. Paste it into Cursor or VS Code with Copilot
-3. The AI will execute the SQL query via Databricks CLI
-4. Schema metadata will be saved to context/Wanderbricks_Schema.csv
+**Steps:** Copy the prompt → paste into Cursor or VS Code with Copilot → AI executes SQL via Databricks CLI → CSV saved to context/Wanderbricks_Schema.csv.
 
 **Note:** This creates context/Wanderbricks_Schema.csv which documents the Bronze layer tables.
 
 ---
 
-## 🔧 What Happens Behind the Scenes
+## 2️⃣ What Are We Building?
 
-This step does **not** invoke an Agent Skill — it runs a direct SQL extraction via the Databricks CLI. The resulting CSV becomes the **starting input** for the entire Design-First Pipeline:
+This step extracts the **data dictionary** — a CSV file containing every table, column, data type, and comment from the source schema. This CSV becomes the starting input for the entire Design-First Pipeline:
 
 ```
 context/Wanderbricks_Schema.csv
@@ -103,16 +106,22 @@ context/Wanderbricks_Schema.csv
   → Gold Impl (Step 12)    — uses YAML schemas derived from this CSV
 ```
 
-Every subsequent skill references this CSV (or artifacts derived from it) to **extract** table names, column names, and data types — never generating them from scratch. This is the "Extract, Don''t Generate" principle.
+---
 
-### 🏅 Databricks Best Practices Applied
+## 3️⃣ Why Are We Building It This Way? (Databricks Best Practices)
 
 | Practice | How It''s Used Here |
 |----------|-------------------|
 | **Unity Catalog `information_schema`** | Queries `information_schema.columns` — the standard UC metadata catalog — instead of proprietary DESCRIBE commands |
 | **SQL Statement Execution API** | Uses the REST API (`/api/2.0/sql/statements`) for programmatic SQL execution — the production-grade approach for CI/CD |
 | **Data Dictionary as Governance Foundation** | The CSV captures table/column COMMENTs from UC, establishing metadata lineage from day one |
-| **Serverless SQL Warehouse** | Executes against a SQL warehouse (not a cluster) for cost-efficient, instant-start queries |',
+| **Serverless SQL Warehouse** | Executes against a SQL warehouse (not a cluster) for cost-efficient, instant-start queries |
+
+---
+
+## 4️⃣ What Happens Behind the Scenes?
+
+This step does **not** invoke an Agent Skill — it runs a direct SQL extraction via the Databricks CLI. Every subsequent skill references this CSV (or artifacts derived from it) to **extract** table names, column names, and data types — never generating them from scratch. This is the "Extract, Don''t Generate" principle.',
 '## Expected Deliverables
 
 - context/Wanderbricks_Schema.csv file created
@@ -131,12 +140,51 @@ VALUES
 
 Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
 
+This skill will orchestrate the following end-to-end design workflow:
+
+- **Parse the schema CSV** — read the source schema file, classify each table as a dimension, fact, or bridge, and infer foreign key relationships from column names and comments
+- **Design the dimensional model** — identify dimensions (with SCD Type 1/2 decisions), fact tables (with explicit grain definitions), and measures, then assign tables to business domains
+- **Create ERD diagrams** — generate Mermaid Entity-Relationship Diagrams organized by table count (master ERD always, plus domain and summary ERDs for larger schemas)
+- **Generate YAML schema files** — produce one YAML file per Gold table with column definitions, PK/FK constraints, table properties, lineage metadata, and dual-purpose descriptions (human + LLM readable)
+- **Document column-level lineage** — trace every Gold column back through Silver to Bronze with transformation type (DIRECT_COPY, AGGREGATION, DERIVATION, etc.) in both CSV and Markdown formats
+- **Create business documentation** — write a Business Onboarding Guide with domain context, real-world scenarios, and role-based getting-started guides
+- **Map source tables** — produce a Source Table Mapping CSV documenting which source tables are included, excluded, or planned with rationale for each
+- **Validate design consistency** — cross-check YAML schemas, ERD diagrams, and lineage CSV to ensure all columns, relationships, and constraints are consistent
+
 The orchestrator skill will automatically load its worker skills for merge patterns, deduplication, documentation standards, Mermaid ERDs, schema validation, grain validation, and YAML-driven setup.',
 'Static prompt - no LLM processing required. This prompt is copied directly to the AI coding assistant.',
 'Gold Layer Design (PRD-aligned)',
 'Design Gold layer using project skills with YAML definitions and Mermaid ERD',
 9,
-'## 📚 What is the Gold Layer?
+'## 1️⃣ How To Apply
+
+Copy the prompt from the **Prompt** tab, start a **new Agent chat** in your IDE, paste it, and press Enter.
+
+---
+
+### Prerequisite
+
+**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
+
+Ensure you have:
+- ✅ `context/Schema.csv` - Your source schema file (from Bronze/Silver)
+- ✅ `data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md` - The Gold layer design orchestrator skill
+
+---
+
+### Steps to Apply
+
+1. **Start new Agent thread** — Open Cursor and start a new Agent thread for clean context
+2. **Copy and paste the prompt** — Use the copy button, paste into Cursor; the AI will read your schema and the orchestrator skill (which automatically loads all worker skills)
+3. **Review generated design** — The AI creates `gold_layer_design/` with ERD diagrams, YAML schema files, and lineage documentation
+4. **Validate the design** — Check grain, SCD type, relationships, and lineage for each fact/dimension
+5. **Get stakeholder sign-off** — Share the ERD and design summary with business stakeholders before implementation
+
+---
+
+## 2️⃣ What Are We Building?
+
+### What is the Gold Layer?
 
 The Gold Layer is the **business-ready** analytics layer that transforms Silver data into dimensional models optimized for reporting, dashboards, and AI/ML consumption.
 
@@ -150,9 +198,7 @@ The Gold Layer is the **business-ready** analytics layer that transforms Silver 
 | **Documented Grain** | Prevents incorrect aggregations |
 | **Lineage Tracking** | Know where every column comes from |
 
----
-
-## 🏗️ Gold Layer Architecture
+### Gold Layer Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -185,53 +231,21 @@ The Gold Layer is the **business-ready** analytics layer that transforms Silver 
 
 ---
 
-## Prerequisite
+## 3️⃣ Why Are We Building It This Way? (Databricks Best Practices)
 
-**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
-
-Ensure you have:
-- ✅ `context/Schema.csv` - Your source schema file (from Bronze/Silver)
-- ✅ `data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md` - The Gold layer design orchestrator skill
-
----
-
-## Steps to Apply
-
-### Step 1: Start New Agent Thread
-
-Open Cursor and start a **new Agent thread** for clean context.
-
-### Step 2: Copy and Paste the Prompt
-
-1. **Copy the prompt** using the copy button
-2. **Paste it into Cursor**
-3. The AI will read your schema and the orchestrator skill, which automatically loads all worker skills
-
-### Step 3: Review Generated Design
-
-The AI will create the `gold_layer_design/` folder with:
-- ERD diagrams
-- YAML schema files
-- Lineage documentation
-
-### Step 4: Validate the Design
-
-Check these key elements:
-
-| Element | What to Verify |
-|---------|----------------|
-| **Grain** | Each fact table has explicit grain definition |
-| **SCD Type** | Each dimension has SCD1 or SCD2 specified |
-| **Relationships** | All FK relationships documented |
-| **Lineage** | Every column traces back to source |
-
-### Step 5: Get Stakeholder Sign-off
-
-Share the ERD and design summary with business stakeholders before proceeding to implementation.
+| Practice | How It''s Used Here |
+|----------|-------------------|
+| **YAML-Driven Dimensional Modeling** | Gold schemas defined as YAML files — reviewable, version-controlled, machine-readable. No embedded DDL strings in Python. |
+| **Star Schema with Surrogate Keys** | Dimensions use surrogate keys (BIGINT) as PRIMARY KEYs, not business keys. Facts reference surrogate PKs via FOREIGN KEY constraints. |
+| **SCD Type 1 / Type 2 Classification** | Every dimension is classified: SCD1 (overwrite, e.g., `dim_destination`) or SCD2 (versioned with `is_current`/`valid_from`/`valid_to`, e.g., `dim_property`). |
+| **Dual-Purpose COMMENTs** | Table and column COMMENTs serve both business users AND Genie/LLMs — written to be human-readable and machine-parseable simultaneously. |
+| **Mermaid ERDs for Documentation** | Entity-Relationship Diagrams use Mermaid syntax — renderable in Databricks notebooks, GitHub, and any Markdown viewer. |
+| **Column-Level Lineage** | Every Gold column traces back to its Silver source table and column with transformation type (DIRECT_COPY, AGGREGATION, DERIVATION). |
+| **Grain Documentation** | Every fact table has an explicit grain statement (e.g., "One row per booking transaction") — prevents incorrect aggregations and joins. |
 
 ---
 
-## 🔧 What Happens Behind the Scenes
+## 4️⃣ What Happens Behind the Scenes?
 
 This framework uses a **skills-first architecture** with an **orchestrator/worker pattern**:
 
@@ -239,6 +253,22 @@ This framework uses a **skills-first architecture** with an **orchestrator/worke
 2. The AI reads the orchestrator skill, which lists **mandatory dependencies** (worker skills + common skills)
 3. The AI automatically loads each worker skill as needed during the workflow
 4. You never need to reference individual worker skills — the orchestrator handles it
+
+### 9-Phase Workflow
+
+| Phase | What Happens | Key Output |
+|-------|-------------|------------|
+| **Phase 0** | Parse schema CSV, classify tables (dim/fact/bridge), infer FKs | Table inventory |
+| **Phase 1** | Gather project requirements (domain, use cases, stakeholders) | Project context |
+| **Phase 2** | Design dimensional model (dimensions, facts, grain, SCD types) | Model blueprint |
+| **Phase 3** | Create ERD diagrams using Mermaid syntax | `erd_master.md` + domain ERDs |
+| **Phase 4** | Generate YAML schema files with lineage and descriptions | `yaml/{domain}/{table}.yaml` |
+| **Phase 5** | Document column-level lineage (Bronze → Silver → Gold) | `COLUMN_LINEAGE.csv` |
+| **Phase 6** | Write Business Onboarding Guide with real-world scenarios | `BUSINESS_ONBOARDING_GUIDE.md` |
+| **Phase 7** | Map source tables with inclusion/exclusion rationale | `SOURCE_TABLE_MAPPING.csv` |
+| **Phase 8** | Validate design consistency (YAML ↔ ERD ↔ Lineage) | Validation report |
+
+### Orchestrator / Worker Pattern
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -266,33 +296,17 @@ This framework uses a **skills-first architecture** with an **orchestrator/worke
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## 📋 Worker Skills (Loaded Automatically by Orchestrator)
+### Worker Skills (Loaded Automatically by Orchestrator)
 
 | Worker Skill | Path | Purpose |
 |-----------|------|---------|
-| `02-yaml-driven-gold-setup` | `data_product_accelerator/skills/gold/02-*/SKILL.md` | YAML as single source of truth for schemas |
+| `01-yaml-table-setup` | `data_product_accelerator/skills/gold/pipeline-workers/01-yaml-table-setup/SKILL.md` | YAML as single source of truth for schemas |
 | `03-gold-layer-documentation` | `data_product_accelerator/skills/gold/03-*/SKILL.md` | Dual-purpose (business + technical) documentation standards |
-| `04-gold-layer-merge-patterns` | `data_product_accelerator/skills/gold/04-*/SKILL.md` | MERGE/upsert patterns for dimension and fact tables |
-| `05-gold-delta-merge-deduplication` | `data_product_accelerator/skills/gold/05-*/SKILL.md` | Handling duplicates in MERGE operations |
+| `02-merge-patterns` | `data_product_accelerator/skills/gold/pipeline-workers/02-merge-patterns/SKILL.md` | MERGE/upsert patterns for dimension and fact tables |
+| `03-deduplication` | `data_product_accelerator/skills/gold/pipeline-workers/03-deduplication/SKILL.md` | Handling duplicates in MERGE operations |
 | `06-fact-table-grain-validation` | `data_product_accelerator/skills/gold/06-*/SKILL.md` | Grain definition and validation patterns |
 | `07-gold-layer-schema-validation` | `data_product_accelerator/skills/gold/07-*/SKILL.md` | Schema validation before deployment |
-| `08-mermaid-erd-patterns` | `data_product_accelerator/skills/gold/08-*/SKILL.md` | ERD diagram syntax and organization |
-
----
-
-### 🏅 Databricks Best Practices Applied
-
-| Practice | How It''s Used Here |
-|----------|-------------------|
-| **YAML-Driven Dimensional Modeling** | Gold schemas defined as YAML files — reviewable, version-controlled, machine-readable. No embedded DDL strings in Python. |
-| **Star Schema with Surrogate Keys** | Dimensions use surrogate keys (BIGINT) as PRIMARY KEYs, not business keys. Facts reference surrogate PKs via FOREIGN KEY constraints. |
-| **SCD Type 1 / Type 2 Classification** | Every dimension is classified: SCD1 (overwrite, e.g., `dim_destination`) or SCD2 (versioned with `is_current`/`valid_from`/`valid_to`, e.g., `dim_property`). |
-| **Dual-Purpose COMMENTs** | Table and column COMMENTs serve both business users AND Genie/LLMs — written to be human-readable and machine-parseable simultaneously. |
-| **Mermaid ERDs for Documentation** | Entity-Relationship Diagrams use Mermaid syntax — renderable in Databricks notebooks, GitHub, and any Markdown viewer. |
-| **Column-Level Lineage** | Every Gold column traces back to its Silver source table and column with transformation type (DIRECT_COPY, AGGREGATION, DERIVATION). |
-| **Grain Documentation** | Every fact table has an explicit grain statement (e.g., "One row per booking transaction") — prevents incorrect aggregations and joins. |',
+| `08-mermaid-erd-patterns` | `data_product_accelerator/skills/gold/08-*/SKILL.md` | ERD diagram syntax and organization |',
 '## Expected Deliverables
 
 ### 📁 Generated Folder Structure
@@ -404,16 +418,54 @@ VALUES
 (7, 'bronze_layer_creation',
 'Set up the Bronze layer using @data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md with Approach C — copy data from the existing source tables in the samples.wanderbricks schema.
 
+This will involve the following steps:
+
+- **Clone 16 source tables** from the samples.wanderbricks schema into your target catalog''s Bronze schema
+- **Apply enterprise table properties** — enable Change Data Feed (CDF), Liquid Clustering (CLUSTER BY AUTO), auto-optimize, and auto-compact on every table
+- **Preserve source COMMENTs** — carry over all column-level documentation from the source schema
+- **Create Asset Bundle job** — generate a repeatable, version-controlled deployment job (databricks.yml + clone script)
+- **Deploy and run** — validate, deploy the bundle, and execute the clone job to populate Bronze tables
+
 Use default catalog as: <YOUR_CATALOG>',
 'Static prompt - no LLM processing required. This prompt is copied directly to the AI coding assistant.',
 'Bronze Layer Creation (Approach C)',
 'Create Bronze layer by copying sample data from samples.wanderbricks with Asset Bundle structure',
 10,
-'## 📚 What is the Bronze Layer?
+'## 1️⃣ How To Apply
+
+Copy the prompt above, start a **new Agent chat** in Cursor, paste it, and **update the catalog name** to your target catalog before submitting.
+
+### Prerequisite
+
+**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
+
+Ensure you have:
+- ✅ `data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md` - The Bronze layer setup skill
+- ✅ Access to `samples.wanderbricks` catalog in your Databricks workspace
+- ✅ Permissions to create tables in your target catalog
+
+### Steps to Apply
+
+**Step 1:** Start a new Agent thread in Cursor
+**Step 2:** Copy the prompt, paste it, update `<YOUR_CATALOG>` to your target catalog
+**Step 3:** Review generated code (Asset Bundle config, clone script, job definition)
+**Step 4:** Validate: `databricks bundle validate -t dev`
+**Step 5:** Deploy: `databricks bundle deploy -t dev`
+**Step 6:** Run: `databricks bundle run -t dev bronze_clone_job`
+**Step 7:** Verify in Databricks UI (SHOW TABLES, row counts, CDF enabled)
+
+**Note on placeholders:**
+- `{catalog}` = your target catalog name (e.g., `prashanth_catalog`)
+- `{bronze_schema}` = the Bronze schema created by the skill (typically `wanderbricks_bronze`)
+- Replace these when running verification queries after deployment
+
+---
+
+## 2️⃣ What Are We Building?
+
+### What is the Bronze Layer?
 
 The Bronze Layer is the **raw data landing zone** in the Medallion Architecture. It preserves source data exactly as received, enabling full traceability and reprocessing.
-
-### Why Bronze Matters
 
 | Principle | Benefit |
 |-----------|---------|
@@ -422,9 +474,7 @@ The Bronze Layer is the **raw data landing zone** in the Medallion Architecture.
 | **Schema Evolution** | Handle schema changes gracefully |
 | **Single Source** | One place for all raw data ingestion |
 
----
-
-## 🏗️ Bronze Layer in Medallion Architecture
+### Bronze Layer in Medallion Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -447,11 +497,7 @@ The Bronze Layer is the **raw data landing zone** in the Medallion Architecture.
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## 🔀 Three Approaches for Bronze Data
-
-This framework supports 3 approaches for Bronze data:
+### Three Approaches for Bronze Data
 
 | Approach | When to Use | What Happens |
 |----------|-------------|--------------|
@@ -459,154 +505,9 @@ This framework supports 3 approaches for Bronze data:
 | **B: Use Existing Bronze** | Customer already has Bronze layer | Skip this step, connect directly |
 | **C: Copy from External** | Sample data available (THIS WORKSHOP) | Clone tables from `samples.wanderbricks` |
 
-### 🎯 This Prompt Uses Approach C
+**This Prompt Uses Approach C** — we copy from `samples.wanderbricks` for real-world structure, immediate data availability, and focus on pipeline development.
 
-We copy sample data from `samples.wanderbricks` because:
-- ✅ Real-world data structure (vacation rentals domain)
-- ✅ Immediate data availability
-- ✅ No synthetic data generation needed
-- ✅ Focus on pipeline development, not data creation
-
----
-
-## Prerequisite
-
-**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
-
-Ensure you have:
-- ✅ `data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md` - The Bronze layer setup skill
-- ✅ Access to `samples.wanderbricks` catalog in your Databricks workspace
-- ✅ Permissions to create tables in your target catalog
-
----
-
-## Steps to Apply
-
-### Step 1: Start New Agent Thread
-
-Open Cursor and start a **new Agent thread** for clean context.
-
-### Step 2: Copy and Paste the Prompt
-
-1. **Copy the prompt** using the copy button
-2. **Paste it into Cursor**
-3. **Update the catalog name** to your target catalog
-
-### Step 3: Review Generated Code
-
-The AI will create:
-- Asset Bundle configuration (`databricks.yml`)
-- Clone script (`src/wanderbricks_bronze/clone_samples.py`)
-- Job definition (`resources/bronze/bronze_clone_job.yml`)
-
-### Step 4: Validate the Bundle
-
-```bash
-# Validate bundle configuration
-databricks bundle validate -t dev
-
-# Expected: No errors, all resources validated
-```
-
-### Step 5: Deploy the Bundle
-
-```bash
-# Deploy to Databricks workspace
-databricks bundle deploy -t dev
-
-# Expected: Job created successfully
-```
-
-### Step 6: Run the Bronze Clone Job
-
-```bash
-# Run the Bronze clone job
-databricks bundle run -t dev bronze_clone_job
-
-# Or trigger from Databricks UI:
-# Workflows → Jobs → [dev] Bronze Clone Job → Run Now
-```
-
-### Step 7: Verify in Databricks UI
-
-After job completes:
-
-```sql
--- List all Bronze tables
-SHOW TABLES IN {catalog}.{bronze_schema};
-
--- Check row counts
-SELECT COUNT(*) FROM {catalog}.{bronze_schema}.bookings;
-
--- Verify CDF is enabled
-DESCRIBE EXTENDED {catalog}.{bronze_schema}.bookings;
--- Look for: delta.enableChangeDataFeed = true
-```
-
----
-
-## 🔧 What Happens Behind the Scenes
-
-When you paste the prompt, the AI reads `@data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md` — the **Bronze orchestrator skill**. Behind the scenes:
-
-1. **Orchestrator reads approach** — detects "Approach C" and activates the clone-from-source workflow
-2. **Common skills auto-loaded** — the orchestrator''s mandatory dependencies include:
-   - `databricks-table-properties` — ensures CDF, liquid clustering, auto-optimize are set
-   - `databricks-asset-bundles` — generates proper `databricks.yml` and job YAML
-   - `naming-tagging-standards` — applies enterprise naming conventions and COMMENTs
-   - `schema-management-patterns` — handles `CREATE SCHEMA IF NOT EXISTS`
-   - `databricks-python-imports` — handles shared code modules between notebooks
-3. **Code generation** — the skill produces clone scripts that read from `samples.wanderbricks` and write to your catalog with all best practices applied
-4. **Deploy loop** — if deployment fails, the `databricks-autonomous-operations` skill kicks in for self-healing (deploy → poll → diagnose → fix → redeploy)
-
-### 🏅 Databricks Best Practices Applied
-
-| Practice | How It''s Used Here |
-|----------|-------------------|
-| **Change Data Feed (CDF)** | `delta.enableChangeDataFeed = true` on every Bronze table — enables Silver to read only changed rows instead of full table scans |
-| **Liquid Clustering** | `CLUSTER BY AUTO` — Databricks automatically chooses optimal clustering columns and reorganizes data layout over time |
-| **Auto-Optimize** | `delta.autoOptimize.optimizeWrite = true` + `autoCompact = true` — automatic small file compaction, no manual OPTIMIZE needed |
-| **Unity Catalog Governance** | All tables registered in Unity Catalog with proper catalog.schema.table naming, enabling lineage, access control, and discovery |
-| **Schema-on-Read with Evolution** | Bronze preserves raw source schema; downstream layers handle schema evolution gracefully |
-| **Databricks Asset Bundles (DAB)** | Infrastructure as Code — `databricks.yml` defines jobs, targets, and resources. Deploy with `databricks bundle deploy` for repeatable, CI/CD-ready deployments |
-| **Serverless Jobs** | Jobs run on serverless compute — no cluster management, instant startup, pay-per-use cost model |
-| **Enterprise Naming Standards** | Tables follow `{schema}.{table_name}` convention; COMMENTs applied to tables and columns for data discovery |
-
----
-
-## ⚠️ Important: Update Catalog Name
-
-The prompt uses `<YOUR_CATALOG>` as a placeholder.
-
-**You MUST replace this** with your target catalog name before pasting:
-
-```
-Use default catalog as: YOUR_CATALOG_NAME_HERE
-```
-
-**Note on placeholders in this guide:**
-- `{catalog}` = your target catalog name (e.g., `prashanth_catalog`)
-- `{bronze_schema}` = the Bronze schema created by the skill (typically `wanderbricks_bronze` — derived from the source schema name)
-- Replace these when running verification queries after deployment',
-'## Expected Deliverables
-
-### 📁 Generated Asset Bundle Structure
-
-```
-project_root/
-├── databricks.yml                      # Bundle configuration (updated)
-├── src/
-│   └── wanderbricks_bronze/
-│       ├── __init__.py
-│       └── clone_samples.py            # Code to copy sample data
-└── resources/
-    └── bronze/
-        └── bronze_clone_job.yml        # Job configuration
-```
-
----
-
-### 🔄 What the Clone Script Does
+### Bronze Clone Process
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -639,9 +540,7 @@ project_root/
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-### 📊 Table Properties (Best Practices Enabled)
+### Table Properties (Best Practices Enabled)
 
 | Property | Setting | Why It Matters |
 |----------|---------|----------------|
@@ -650,9 +549,7 @@ project_root/
 | **Auto Optimize** | ✅ `delta.autoOptimize.optimizeWrite = true` | Automatic file compaction |
 | **Auto Compact** | ✅ `delta.autoOptimize.autoCompact = true` | Reduces small files |
 
----
-
-### 📋 Tables Cloned from samples.wanderbricks (16 tables)
+### Tables Cloned from samples.wanderbricks (16 tables)
 
 | Table | Description | Columns |
 |-------|-------------|---------|
@@ -673,11 +570,7 @@ project_root/
 | `reviews` | Guest reviews | 9 |
 | `users` | Platform users (guests) | 8 |
 
----
-
-### ✅ Verification Queries
-
-After the job completes, run these queries to verify:
+### Verification Queries
 
 ```sql
 -- 1. List all Bronze tables
@@ -711,6 +604,52 @@ SELECT * FROM {catalog}.{bronze_schema}.bookings LIMIT 5;
 
 ---
 
+## 3️⃣ Why Are We Building It This Way? (Databricks Best Practices)
+
+| Practice | How It''s Used Here |
+|----------|-------------------|
+| **Change Data Feed (CDF)** | `delta.enableChangeDataFeed = true` on every Bronze table — enables Silver to read only changed rows instead of full table scans |
+| **Liquid Clustering** | `CLUSTER BY AUTO` — Databricks automatically chooses optimal clustering columns and reorganizes data layout over time |
+| **Auto-Optimize** | `delta.autoOptimize.optimizeWrite = true` + `autoCompact = true` — automatic small file compaction, no manual OPTIMIZE needed |
+| **Unity Catalog Governance** | All tables registered in Unity Catalog with proper catalog.schema.table naming, enabling lineage, access control, and discovery |
+| **Schema-on-Read with Evolution** | Bronze preserves raw source schema; downstream layers handle schema evolution gracefully |
+| **Databricks Asset Bundles (DAB)** | Infrastructure as Code — `databricks.yml` defines jobs, targets, and resources. Deploy with `databricks bundle deploy` for repeatable, CI/CD-ready deployments |
+| **Serverless Jobs** | Jobs run on serverless compute — no cluster management, instant startup, pay-per-use cost model |
+| **Enterprise Naming Standards** | Tables follow `{schema}.{table_name}` convention; COMMENTs applied to tables and columns for data discovery |
+
+---
+
+## 4️⃣ What Happens Behind the Scenes?
+
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md` — the **Bronze orchestrator skill**. Behind the scenes:
+
+1. **Orchestrator reads approach** — detects "Approach C" and activates the clone-from-source workflow
+2. **Common skills auto-loaded** — the orchestrator''s mandatory dependencies include:
+   - `databricks-table-properties` — ensures CDF, liquid clustering, auto-optimize are set
+   - `databricks-asset-bundles` — generates proper `databricks.yml` and job YAML
+   - `naming-tagging-standards` — applies enterprise naming conventions and COMMENTs
+   - `schema-management-patterns` — handles `CREATE SCHEMA IF NOT EXISTS`
+   - `databricks-python-imports` — handles shared code modules between notebooks
+3. **Code generation** — the skill produces clone scripts that read from `samples.wanderbricks` and write to your catalog with all best practices applied
+4. **Deploy loop** — if deployment fails, the `databricks-autonomous-operations` skill kicks in for self-healing (deploy → poll → diagnose → fix → redeploy)',
+'## Expected Deliverables
+
+### 📁 Generated Asset Bundle Structure
+
+```
+project_root/
+├── databricks.yml                      # Bundle configuration (updated)
+├── src/
+│   └── wanderbricks_bronze/
+│       ├── __init__.py
+│       └── clone_samples.py            # Code to copy sample data
+└── resources/
+    └── bronze/
+        └── bronze_clone_job.yml        # Job configuration
+```
+
+---
+
 ### ✅ Success Criteria Checklist
 
 **Bundle Deployment:**
@@ -738,6 +677,13 @@ VALUES
 (8, 'silver_layer_sdp',
 'Set up the Silver layer using @data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md
 
+This will involve the following steps:
+
+- **Generate SDP pipeline notebooks** — create Spark Declarative Pipeline notebooks with incremental ingestion from Bronze using Change Data Feed (CDF)
+- **Create centralized DQ rules table** — build a configurable data quality rules table with expectations (null checks, range validation, referential integrity)
+- **Create Asset Bundle** — generate bundle configuration for both the DQ rules setup job and the SDP pipeline
+- **Deploy and run in order** — deploy the bundle, run the DQ rules setup job FIRST (creates the rules table), then run the SDP pipeline (reads rules from the table)
+
 Ensure bundle is validated and deployed successfully, and silver layer jobs run with no errors.
 
 Validate the results in the UI to ensure the DQ rules show up in centralized delta table, and that the silver layer pipeline runs successfully with Expectations being checked.',
@@ -745,7 +691,96 @@ Validate the results in the UI to ensure the DQ rules show up in centralized del
 'Silver Layer Pipelines (SDP)',
 'Create Silver layer using Spark Declarative Pipelines with centralized data quality rules',
 11,
-'## 📚 What is the Silver Layer?
+'## 1️⃣ How To Apply
+
+Copy the prompt above, start a **new Agent chat** in Cursor, and paste it. The AI will read the Silver setup skill and generate the implementation.
+
+### Prerequisite
+
+**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
+
+Ensure you have:
+- ✅ Bronze layer created and populated (Step 10 complete)
+- ✅ `data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md` - The Silver layer setup skill (loads worker skills automatically)
+
+### Steps to Apply
+
+**Step 1: Generate Silver Layer Code**
+
+1. **Start a new Agent thread** in Cursor
+2. **Copy the prompt** using the copy button
+3. **Paste it into Cursor** and let the AI generate:
+   - SDP pipeline notebooks
+   - Data quality rules configuration
+   - Asset Bundle job definitions
+
+**Step 2: Validate the Bundle**
+
+```bash
+# Validate bundle configuration
+databricks bundle validate -t dev
+
+# Expected: No errors, all resources validated
+```
+
+**Step 3: Deploy the Bundle**
+
+```bash
+# Deploy to Databricks workspace
+databricks bundle deploy -t dev
+
+# Expected: Pipeline and jobs created successfully
+```
+
+**Step 4: Run DQ Rules Setup Job FIRST ⚠️**
+
+**CRITICAL: You must create the DQ rules table before running the pipeline — otherwise the pipeline fails with `Table or view not found: dq_rules`.**
+
+```bash
+# Run the DQ rules setup job (creates and populates dq_rules table)
+databricks bundle run -t dev silver_dq_setup_job
+
+# Verify the rules table was created:
+# SELECT * FROM {catalog}.{silver_schema}.dq_rules
+```
+
+**Step 5: Run the Silver DLT Pipeline**
+
+```bash
+# NOW run the DLT pipeline (it reads rules from the dq_rules table)
+databricks bundle run -t dev silver_dlt_pipeline
+
+# Or trigger from Databricks UI:
+# Workflows → DLT Pipelines → [dev] Silver Layer Pipeline → Start
+```
+
+**Step 6: Validate Results in UI**
+
+After pipeline completes, verify in Databricks UI:
+
+1. **Check DQ Rules Table:**
+   ```sql
+   SELECT * FROM {catalog}.{silver_schema}.dq_rules;
+   ```
+   ✅ Should show all configured quality rules
+
+2. **Check Pipeline Event Log:**
+   - Navigate to: Workflows → DLT Pipelines → Your Pipeline
+   - Click "Data Quality" tab
+   - ✅ Should show Expectations being evaluated
+
+3. **Check Silver Tables:**
+   ```sql
+   SHOW TABLES IN {catalog}.{silver_schema};
+   SELECT * FROM {catalog}.{silver_schema}.{table} LIMIT 10;
+   ```
+   ✅ Should show cleaned, validated data
+
+---
+
+## 2️⃣ What Are We Building?
+
+### What is the Silver Layer?
 
 The Silver Layer transforms raw Bronze data into **cleaned, validated, and enriched** data ready for Gold layer consumption.
 
@@ -774,113 +809,18 @@ Silver should **mirror the Bronze schema** with minimal changes — same column 
 | **Complete Lineage** | Full data lineage tracking in Unity Catalog |
 | **Photon Engine** | Vectorized query execution for faster processing |
 
----
+### Key Validation Points
 
-## Prerequisite
-
-**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
-
-Ensure you have:
-- ✅ Bronze layer created and populated (Step 10 complete)
-- ✅ `data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md` - The Silver layer setup skill (loads worker skills automatically)
-
----
-
-## Steps to Apply
-
-### Step 1: Generate Silver Layer Code
-
-1. **Start a new Agent thread** in Cursor
-2. **Copy the prompt** using the copy button
-3. **Paste it into Cursor** and let the AI generate:
-   - SDP pipeline notebooks
-   - Data quality rules configuration
-   - Asset Bundle job definitions
-
-### Step 2: Validate the Bundle
-
-```bash
-# Validate bundle configuration
-databricks bundle validate -t dev
-
-# Expected: No errors, all resources validated
-```
-
-### Step 3: Deploy the Bundle
-
-```bash
-# Deploy to Databricks workspace
-databricks bundle deploy -t dev
-
-# Expected: Pipeline and jobs created successfully
-```
-
-### Step 4: Run DQ Rules Setup Job FIRST ⚠️
-
-**CRITICAL: You must create the DQ rules table before running the pipeline — otherwise the pipeline fails with `Table or view not found: dq_rules`.**
-
-```bash
-# Run the DQ rules setup job (creates and populates dq_rules table)
-databricks bundle run -t dev silver_dq_setup_job
-
-# Verify the rules table was created:
-# SELECT * FROM {catalog}.{silver_schema}.dq_rules
-```
-
-### Step 5: Run the Silver DLT Pipeline
-
-```bash
-# NOW run the DLT pipeline (it reads rules from the dq_rules table)
-databricks bundle run -t dev silver_dlt_pipeline
-
-# Or trigger from Databricks UI:
-# Workflows → DLT Pipelines → [dev] Silver Layer Pipeline → Start
-```
-
-### Step 6: Validate Results in UI
-
-After pipeline completes, verify in Databricks UI:
-
-1. **Check DQ Rules Table:**
-   ```sql
-   SELECT * FROM {catalog}.{silver_schema}.dq_rules;
-   ```
-   ✅ Should show all configured quality rules
-
-2. **Check Pipeline Event Log:**
-   - Navigate to: Workflows → DLT Pipelines → Your Pipeline
-   - Click "Data Quality" tab
-   - ✅ Should show Expectations being evaluated
-
-3. **Check Silver Tables:**
-   ```sql
-   SHOW TABLES IN {catalog}.{silver_schema};
-   SELECT * FROM {catalog}.{silver_schema}.{table} LIMIT 10;
-   ```
-   ✅ Should show cleaned, validated data
+| What to Check | Where | Expected Result |
+|---------------|-------|-----------------|
+| DQ Rules loaded | `dq_rules` table | Rules visible in Delta table |
+| Expectations running | Pipeline event log | Pass/Warn/Fail counts shown |
+| Data quality | Silver tables | Clean, standardized data |
+| Incremental working | Pipeline metrics | Only new/changed rows processed |
 
 ---
 
-## 🔧 What Happens Behind the Scenes
-
-When you paste the prompt, the AI reads `@data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md` — the **Silver orchestrator skill**. Behind the scenes:
-
-1. **Orchestrator activates** — reads the Silver setup workflow with streaming ingestion and DQ rules
-2. **Worker skills auto-loaded:**
-   - `01-dlt-expectations-patterns` — creates portable DQ rules stored in Unity Catalog Delta tables (not hardcoded in notebooks)
-   - `02-dqx-patterns` — Databricks DQX framework for advanced validation with detailed failure diagnostics
-3. **Common skills auto-loaded (8 total):**
-   - `databricks-expert-agent` — core "Extract, Don''t Generate" principle
-   - `databricks-table-properties` — ensures proper TBLPROPERTIES (CDF, row tracking, auto-optimize)
-   - `databricks-asset-bundles` — generates DLT pipeline YAML and DQ setup job YAML
-   - `databricks-python-imports` — ensures `dq_rules_loader.py` is pure Python (no notebook header)
-   - `unity-catalog-constraints` — PK constraint on `dq_rules` table: `(table_name, rule_name)`
-   - `schema-management-patterns` — `CREATE SCHEMA IF NOT EXISTS` with governance metadata
-   - `naming-tagging-standards` — enterprise naming conventions and dual-purpose COMMENTs
-   - `databricks-autonomous-operations` — self-healing deploy loop if pipeline fails
-4. **Key innovation: Runtime-updateable DQ rules** — expectations are stored in a Delta table, not in code. You can update rules without redeploying the pipeline.
-
-### 🏅 Databricks Best Practices Applied
+## 3️⃣ Why Are We Building It This Way? (Databricks Best Practices)
 
 | Practice | How It''s Used Here |
 |----------|-------------------|
@@ -901,14 +841,24 @@ When you paste the prompt, the AI reads `@data_product_accelerator/skills/silver
 
 ---
 
-## 🔍 Key Validation Points
+## 4️⃣ What Happens Behind the Scenes?
 
-| What to Check | Where | Expected Result |
-|---------------|-------|-----------------|
-| DQ Rules loaded | `dq_rules` table | Rules visible in Delta table |
-| Expectations running | Pipeline event log | Pass/Warn/Fail counts shown |
-| Data quality | Silver tables | Clean, standardized data |
-| Incremental working | Pipeline metrics | Only new/changed rows processed |',
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md` — the **Silver orchestrator skill**. Behind the scenes:
+
+1. **Orchestrator activates** — reads the Silver setup workflow with streaming ingestion and DQ rules
+2. **Worker skills auto-loaded:**
+   - `01-dlt-expectations-patterns` — creates portable DQ rules stored in Unity Catalog Delta tables (not hardcoded in notebooks)
+   - `02-dqx-patterns` — Databricks DQX framework for advanced validation with detailed failure diagnostics
+3. **Common skills auto-loaded (8 total):**
+   - `databricks-expert-agent` — core "Extract, Don''t Generate" principle
+   - `databricks-table-properties` — ensures proper TBLPROPERTIES (CDF, row tracking, auto-optimize)
+   - `databricks-asset-bundles` — generates DLT pipeline YAML and DQ setup job YAML
+   - `databricks-python-imports` — ensures `dq_rules_loader.py` is pure Python (no notebook header)
+   - `unity-catalog-constraints` — PK constraint on `dq_rules` table: `(table_name, rule_name)`
+   - `schema-management-patterns` — `CREATE SCHEMA IF NOT EXISTS` with governance metadata
+   - `naming-tagging-standards` — enterprise naming conventions and dual-purpose COMMENTs
+   - `databricks-autonomous-operations` — self-healing deploy loop if pipeline fails
+4. **Key innovation: Runtime-updateable DQ rules** — expectations are stored in a Delta table, not in code. You can update rules without redeploying the pipeline.',
 '## Expected Deliverables
 
 ### 📁 Generated Files
@@ -1035,6 +985,14 @@ VALUES
 (9, 'gold_layer_pipeline',
 'Implement the Gold layer using @data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md
 
+This will involve the following steps:
+
+- **Read YAML schemas** — use the Gold layer design YAML files (from Step 9) as the single source of truth for all table definitions, columns, and constraints
+- **Create Gold tables** — generate CREATE TABLE DDL from YAML, add PRIMARY KEY constraints, then add FOREIGN KEY constraints (NOT ENFORCED) in dependency order
+- **Merge data from Silver** — deduplicate Silver records before MERGE, map columns using YAML lineage metadata, merge dimensions first (SCD1/SCD2) then facts (FK dependency order)
+- **Deploy 2-job architecture** — gold_setup_job (2 tasks: create tables + add FK constraints) and gold_merge_job (populate data from Silver)
+- **Validate results** — verify table creation, PK/FK constraints, row counts, SCD2 history, and fact-dimension joins
+
 Use the gold layer design YAML files as the target destination, and the silver layer tables as source.
 
 Limit pipelines to only 5 tables for purposes of this exercise:
@@ -1047,116 +1005,11 @@ Limit pipelines to only 5 tables for purposes of this exercise:
 'Gold Layer Pipeline (YAML-Driven)',
 'Build Gold layer by reading YAML schemas, creating tables with PK/FK constraints (NOT ENFORCED), and merging from Silver with deduplication',
 12,
-'## 📚 What is the Gold Layer Pipeline?
+'## 1️⃣ How To Apply
 
-The Gold Layer Pipeline **implements** the Gold Layer Design by:
-1. Reading YAML schema files (single source of truth)
-2. Creating dimension and fact tables with proper constraints
-3. Merging data incrementally from Silver layer
+Copy the prompt above, start a **new Agent chat** in Cursor, and paste it. The AI will read YAML files and generate implementation code.
 
-### Design vs Implementation
-
-| Step | What Happens | Output |
-|------|--------------|--------|
-| **Step 9: Design** | Define schemas, ERDs, lineage | `gold_layer_design/` folder |
-| **Step 12: Implementation** | Create tables, run merges | Populated Gold tables |
-
----
-
-## 🎯 Core Philosophy: Extract, Don''t Generate
-
-### Why This Matters
-
-**ALWAYS prefer scripting techniques to extract names from existing source files over generating them from scratch.**
-
-| Approach | Result |
-|----------|--------|
-| ❌ **Generate from scratch** | Hallucinations, typos, schema mismatches |
-| ✅ **Extract from YAML** | 100% accuracy, consistency, no hallucinations |
-
-### What "Extract" Means
-
-```python
-# ❌ WRONG: Hardcode table names (might be wrong!)
-tables = ["dim_property", "dim_destination", "fact_booking"]
-
-# ✅ CORRECT: Extract from YAML files
-import yaml
-from pathlib import Path
-
-def get_gold_table_names():
-    yaml_dir = Path("gold_layer_design/yaml")
-    tables = []
-    for yaml_file in yaml_dir.rglob("*.yaml"):
-        with open(yaml_file) as f:
-            config = yaml.safe_load(f)
-            tables.append(config[''table_name''])
-    return tables
-```
-
-**Benefits:**
-- ✅ 100% accuracy (names come from actual schemas)
-- ✅ No hallucinations (only existing entities referenced)
-- ✅ Consistency across layers
-- ✅ Immediate detection of schema changes
-
----
-
-## 🏗️ Gold Layer Pipeline Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      GOLD LAYER PIPELINE FLOW (2 Jobs)                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  INPUTS                          PROCESS                       OUTPUT      │
-│                                                                             │
-│  ┌─────────────────┐   ┌───────────────────────────────────────────────┐  │
-│  │ Gold Layer      │   │ gold_setup_job                                │  │
-│  │ Design YAML     │──▶│                                               │  │
-│  │ (Schema Source) │   │  Task 1: setup_tables.py                     │  │
-│  └─────────────────┘   │    • CREATE TABLE from YAML                  │  │
-│                         │    • ALTER TABLE ADD PRIMARY KEY              │  │
-│  ┌─────────────────┐   │         ↓ depends_on                         │  │
-│  │ COLUMN_LINEAGE  │   │  Task 2: add_fk_constraints.py               │  │
-│  │ .csv            │   │    • ALTER TABLE ADD FOREIGN KEY (NOT ENFORCED)│  │
-│  └─────────────────┘   └───────────────────────────────────────────────┘  │
-│                                          ↓                                 │
-│  ┌─────────────────┐   ┌───────────────────────────────────────────────┐  │
-│  │ Silver Layer    │   │ gold_merge_job                                │  │
-│  │ Tables          │──▶│                                               │  │
-│  │ (Data Source)   │   │  1. Deduplicate Silver (business_key)         │  │
-│  └─────────────────┘   │  2. Map columns (YAML lineage / CSV)         │  │
-│                         │  3. Merge dims first (SCD1/SCD2)             │  │
-│                         │  4. Merge facts last (FK order)              │  │
-│                         └───────────────────────────────────────────────┘  │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 🎯 Workshop Scope: 5 Tables
-
-For this exercise, we limit to **5 key tables**:
-
-| Table | Type | Description |
-|-------|------|-------------|
-| `dim_property` | Dimension (SCD2) | Vacation rental property details |
-| `dim_destination` | Dimension (SCD1) | Travel destinations/locations |
-| `dim_user` | Dimension (SCD2) | Platform users (guests) |
-| `dim_host` | Dimension (SCD2) | Property host profiles |
-| `fact_booking_detail` | Fact | Individual booking transactions |
-
-**Why 5 tables?**
-- ✅ Demonstrates all patterns (SCD1, SCD2, Fact)
-- ✅ Shows FK relationships (Fact → Dimensions)
-- ✅ Completes in reasonable time for workshop
-- ✅ Full pattern coverage without complexity overload
-
----
-
-## Prerequisite
+### Prerequisite
 
 **Run this in your cloned Template Repository** (see Prerequisites in Step 0).
 
@@ -1166,30 +1019,20 @@ Ensure you have:
 - ✅ Silver Layer populated (Step 11) with data in Silver tables
 - ✅ `data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md` — The Gold implementation orchestrator (auto-loads 7 worker + 8 common skills)
 
----
+### Steps to Apply
 
-## Steps to Apply
+**Step 1: Start New Agent Thread** — Open Cursor and start a new Agent thread for clean context.
 
-### Step 1: Start New Agent Thread
+**Step 2: Copy and Paste the Prompt** — Copy the prompt using the copy button, paste it into Cursor. The AI will read YAML files and generate implementation code.
 
-Open Cursor and start a **new Agent thread** for clean context.
-
-### Step 2: Copy and Paste the Prompt
-
-1. **Copy the prompt** using the copy button
-2. **Paste it into Cursor**
-3. The AI will read YAML files and generate implementation code
-
-### Step 3: Review Generated Code
-
-The AI will create:
+**Step 3: Review Generated Code** — The AI will create:
 - `setup_tables.py` — reads YAML → CREATE TABLE + PKs
 - `add_fk_constraints.py` — reads YAML → ALTER TABLE ADD FK (NOT ENFORCED)
 - `merge_gold_tables.py` — dedup Silver → map columns → MERGE (SCD1/SCD2/fact)
 - `gold_setup_job.yml` — 2-task job (setup → FK via `depends_on`)
 - `gold_merge_job.yml` — merge job (scheduled, PAUSED in dev)
 
-### Step 4: Validate the Bundle
+**Step 4: Validate the Bundle**
 
 ```bash
 # Validate bundle configuration
@@ -1198,7 +1041,7 @@ databricks bundle validate -t dev
 # Expected: No errors, all resources validated
 ```
 
-### Step 5: Deploy the Bundle
+**Step 5: Deploy the Bundle**
 
 ```bash
 # Deploy to Databricks workspace
@@ -1207,7 +1050,7 @@ databricks bundle deploy -t dev
 # Expected: Jobs created successfully
 ```
 
-### Step 6: Run the Gold Setup Job (Tables + PKs + FKs)
+**Step 6: Run the Gold Setup Job (Tables + PKs + FKs)**
 
 ```bash
 # Run Gold setup (creates tables, adds PKs, then adds FKs)
@@ -1221,7 +1064,7 @@ databricks bundle run -t dev gold_setup_job
 # NOT ENFORCED — they''re informational only, no data validation needed.
 ```
 
-### Step 7: Run the Gold Merge Job
+**Step 7: Run the Gold Merge Job**
 
 ```bash
 # Run Gold merge (populates tables from Silver)
@@ -1230,7 +1073,7 @@ databricks bundle run -t dev gold_merge_job
 # Merges dimensions FIRST (SCD1/SCD2), then facts (FK dependency order)
 ```
 
-### Step 8: Verify in Databricks UI
+**Step 8: Verify in Databricks UI**
 
 After all jobs complete:
 
@@ -1269,55 +1112,108 @@ LIMIT 5;
 
 ---
 
-## 🔧 What Happens Behind the Scenes
+## 2️⃣ What Are We Building?
 
-When you paste the prompt, the AI reads `@data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md` — the **Gold implementation orchestrator**. Behind the scenes:
+### 📚 What is the Gold Layer Pipeline?
 
-1. **YAML-driven approach** — the orchestrator reads your `gold_layer_design/yaml/` files (from Step 9) as the **single source of truth**. Table names, columns, types, PKs, FKs are all extracted from YAML — never generated from scratch.
-2. **Worker skills auto-loaded:**
-   - `02-yaml-driven-gold-setup` — reads YAML schemas and generates CREATE TABLE DDL
-   - `04-gold-layer-merge-patterns` — SCD Type 1/2 dimensions, fact table MERGE operations
-   - `05-gold-delta-merge-deduplication` — prevents DELTA_MULTIPLE_SOURCE_ROW_MATCHING errors
-   - `03-gold-layer-documentation` — dual-purpose COMMENTs for both business users and Genie
-   - `06-fact-table-grain-validation` — validates grain before populating
-   - `07-gold-layer-schema-validation` — validates schemas before deployment
-3. **Common skills auto-loaded (8 total):**
-   - `databricks-expert-agent` — core "Extract, Don''t Generate" principle applied to EVERY YAML read
-   - `databricks-asset-bundles` — generates 2 jobs (setup+FK combined, merge separate), `notebook_task` + `base_parameters`
-   - `databricks-table-properties` — Gold TBLPROPERTIES (CDF, row tracking, auto-optimize, `layer=gold`)
-   - `unity-catalog-constraints` — surrogate keys as PKs (NOT NULL), FK via ALTER TABLE (NOT ENFORCED)
-   - `schema-management-patterns` — `CREATE SCHEMA IF NOT EXISTS` with governance metadata
-   - `databricks-python-imports` — pure Python modules for shared config (avoids `sys.path` issues)
-   - `naming-tagging-standards` — enterprise naming and dual-purpose COMMENTs
-   - `databricks-autonomous-operations` — self-healing deploy loop if jobs fail
+The Gold Layer Pipeline **implements** the Gold Layer Design by:
+1. Reading YAML schema files (single source of truth)
+2. Creating dimension and fact tables with proper constraints
+3. Merging data incrementally from Silver layer
 
-**Key principle: "Extract, Don''t Generate"** — every table name, column name, and type comes from YAML. The AI never hallucinates schema elements.
+### Design vs Implementation
 
-### 🏅 Databricks Best Practices Applied
+| Step | What Happens | Output |
+|------|--------------|--------|
+| **Step 9: Design** | Define schemas, ERDs, lineage | `gold_layer_design/` folder |
+| **Step 12: Implementation** | Create tables, run merges | Populated Gold tables |
 
-| Practice | How It''s Used Here |
-|----------|-------------------|
-| **Surrogate Keys as PRIMARY KEYs** | Dimensions use surrogate BIGINT keys (not business keys) as PKs — informational constraints in Unity Catalog for BI tool discovery |
-| **FOREIGN KEY Constraints** | Fact tables declare FK relationships to dimensions — enables Genie, Power BI, and Tableau to auto-discover joins |
-| **SCD Type 1 (Overwrite)** | Reference dimensions like `dim_destination` use SCD1 — MERGE replaces old values with current values |
-| **SCD Type 2 (Versioned History)** | Tracking dimensions like `dim_property`, `dim_host` use SCD2 — `is_current`, `valid_from`, `valid_to` columns preserve history |
-| **Delta MERGE with Deduplication** | Pre-deduplicates source rows before MERGE to prevent `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE` errors. Dedup key = `business_key` from YAML. |
-| **2-Job Architecture** | `gold_setup_job` (2 tasks: create tables + add FKs) → `gold_merge_job` (populate data). FKs applied before data because constraints are NOT ENFORCED. |
-| **NOT ENFORCED Constraints** | UC PK/FK are informational — they help BI tools discover relationships and improve query planning, but don''t reject invalid data |
-| **Dual-Purpose COMMENTs** | Every table and column has a COMMENT serving both business users ("Property name for display") and technical users/Genie ("FK to dim_property.property_sk") |
-| **Row Tracking** | `delta.enableRowTracking = true` on every Gold table — required for downstream Materialized View incremental refresh |
-| **CLUSTER BY AUTO** | Gold tables use automatic liquid clustering — Databricks chooses optimal columns based on actual query patterns |
-| **Predictive Optimization Ready** | Gold tables are structured for Databricks Predictive Optimization — auto-OPTIMIZE, auto-VACUUM, auto-ANALYZE |
-| **YAML as Single Source of Truth** | Table schemas live in version-controlled YAML files, not in scattered SQL scripts — enables schema diff reviews in PRs |
-| **PyYAML + YAML Sync** | `pyyaml>=6.0` in job environment; YAML files synced in `databricks.yml` — without sync, `setup_tables.py` can''t find schemas in workspace |
-| **Variable Shadowing Prevention** | Never name variables `count`, `sum`, `min`, `max` — shadows PySpark functions. Use `spark_sum = F.sum`, `record_count = df.count()` |
-| **Column Mapping from Lineage** | Silver→Gold column renames extracted from YAML `lineage.source_column` or `COLUMN_LINEAGE.csv` — never guessed or assumed |
+### 🎯 Core Philosophy: Extract, Don''t Generate
 
----
+**ALWAYS prefer scripting techniques to extract names from existing source files over generating them from scratch.**
 
-## 🔑 Constraint Application Order
+| Approach | Result |
+|----------|--------|
+| ❌ **Generate from scratch** | Hallucinations, typos, schema mismatches |
+| ✅ **Extract from YAML** | 100% accuracy, consistency, no hallucinations |
 
-**Constraints and data are applied in this order:**
+### What "Extract" Means
+
+```python
+# ❌ WRONG: Hardcode table names (might be wrong!)
+tables = ["dim_property", "dim_destination", "fact_booking"]
+
+# ✅ CORRECT: Extract from YAML files
+import yaml
+from pathlib import Path
+
+def get_gold_table_names():
+    yaml_dir = Path("gold_layer_design/yaml")
+    tables = []
+    for yaml_file in yaml_dir.rglob("*.yaml"):
+        with open(yaml_file) as f:
+            config = yaml.safe_load(f)
+            tables.append(config[''table_name''])
+    return tables
+```
+
+**Benefits:**
+- ✅ 100% accuracy (names come from actual schemas)
+- ✅ No hallucinations (only existing entities referenced)
+- ✅ Consistency across layers
+- ✅ Immediate detection of schema changes
+
+### 🏗️ Gold Layer Pipeline Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      GOLD LAYER PIPELINE FLOW (2 Jobs)                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  INPUTS                          PROCESS                       OUTPUT      │
+│                                                                             │
+│  ┌─────────────────┐   ┌───────────────────────────────────────────────┐  │
+│  │ Gold Layer      │   │ gold_setup_job                                │  │
+│  │ Design YAML     │──▶│                                               │  │
+│  │ (Schema Source) │   │  Task 1: setup_tables.py                     │  │
+│  └─────────────────┘   │    • CREATE TABLE from YAML                  │  │
+│                         │    • ALTER TABLE ADD PRIMARY KEY              │  │
+│  ┌─────────────────┐   │         ↓ depends_on                         │  │
+│  │ COLUMN_LINEAGE  │   │  Task 2: add_fk_constraints.py               │  │
+│  │ .csv            │   │    • ALTER TABLE ADD FOREIGN KEY (NOT ENFORCED)│  │
+│  └─────────────────┘   └───────────────────────────────────────────────┘  │
+│                                          ↓                                 │
+│  ┌─────────────────┐   ┌───────────────────────────────────────────────┐  │
+│  │ Silver Layer    │   │ gold_merge_job                                │  │
+│  │ Tables          │──▶│                                               │  │
+│  │ (Data Source)   │   │  1. Deduplicate Silver (business_key)         │  │
+│  └─────────────────┘   │  2. Map columns (YAML lineage / CSV)         │  │
+│                         │  3. Merge dims first (SCD1/SCD2)             │  │
+│                         │  4. Merge facts last (FK order)              │  │
+│                         └───────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 🎯 Workshop Scope: 5 Tables
+
+For this exercise, we limit to **5 key tables**:
+
+| Table | Type | Description |
+|-------|------|-------------|
+| `dim_property` | Dimension (SCD2) | Vacation rental property details |
+| `dim_destination` | Dimension (SCD1) | Travel destinations/locations |
+| `dim_user` | Dimension (SCD2) | Platform users (guests) |
+| `dim_host` | Dimension (SCD2) | Property host profiles |
+| `fact_booking_detail` | Fact | Individual booking transactions |
+
+**Why 5 tables?**
+- ✅ Demonstrates all patterns (SCD1, SCD2, Fact)
+- ✅ Shows FK relationships (Fact → Dimensions)
+- ✅ Completes in reasonable time for workshop
+- ✅ Full pattern coverage without complexity overload
+
+### 🔑 Constraint Application Order
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -1348,7 +1244,55 @@ Unity Catalog constraints are **NOT ENFORCED** — they are **informational only
 - They DO improve query optimizer join planning
 - Data does NOT need to exist for constraints to be applied
 
-This is a key Databricks concept: PK/FK in Unity Catalog are for **metadata enrichment and BI tool discovery**, not data integrity enforcement.',
+This is a key Databricks concept: PK/FK in Unity Catalog are for **metadata enrichment and BI tool discovery**, not data integrity enforcement.
+
+---
+
+## 3️⃣ Why Are We Building It This Way? (Databricks Best Practices)
+
+| Practice | How It''s Used Here |
+|----------|-------------------|
+| **Surrogate Keys as PRIMARY KEYs** | Dimensions use surrogate BIGINT keys (not business keys) as PKs — informational constraints in Unity Catalog for BI tool discovery |
+| **FOREIGN KEY Constraints** | Fact tables declare FK relationships to dimensions — enables Genie, Power BI, and Tableau to auto-discover joins |
+| **SCD Type 1 (Overwrite)** | Reference dimensions like `dim_destination` use SCD1 — MERGE replaces old values with current values |
+| **SCD Type 2 (Versioned History)** | Tracking dimensions like `dim_property`, `dim_host` use SCD2 — `is_current`, `valid_from`, `valid_to` columns preserve history |
+| **Delta MERGE with Deduplication** | Pre-deduplicates source rows before MERGE to prevent `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE` errors. Dedup key = `business_key` from YAML. |
+| **2-Job Architecture** | `gold_setup_job` (2 tasks: create tables + add FKs) → `gold_merge_job` (populate data). FKs applied before data because constraints are NOT ENFORCED. |
+| **NOT ENFORCED Constraints** | UC PK/FK are informational — they help BI tools discover relationships and improve query planning, but don''t reject invalid data |
+| **Dual-Purpose COMMENTs** | Every table and column has a COMMENT serving both business users ("Property name for display") and technical users/Genie ("FK to dim_property.property_sk") |
+| **Row Tracking** | `delta.enableRowTracking = true` on every Gold table — required for downstream Materialized View incremental refresh |
+| **CLUSTER BY AUTO** | Gold tables use automatic liquid clustering — Databricks chooses optimal columns based on actual query patterns |
+| **Predictive Optimization Ready** | Gold tables are structured for Databricks Predictive Optimization — auto-OPTIMIZE, auto-VACUUM, auto-ANALYZE |
+| **YAML as Single Source of Truth** | Table schemas live in version-controlled YAML files, not in scattered SQL scripts — enables schema diff reviews in PRs |
+| **PyYAML + YAML Sync** | `pyyaml>=6.0` in job environment; YAML files synced in `databricks.yml` — without sync, `setup_tables.py` can''t find schemas in workspace |
+| **Variable Shadowing Prevention** | Never name variables `count`, `sum`, `min`, `max` — shadows PySpark functions. Use `spark_sum = F.sum`, `record_count = df.count()` |
+| **Column Mapping from Lineage** | Silver→Gold column renames extracted from YAML `lineage.source_column` or `COLUMN_LINEAGE.csv` — never guessed or assumed |
+
+---
+
+## 4️⃣ What Happens Behind the Scenes?
+
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md` — the **Gold implementation orchestrator**. Behind the scenes:
+
+1. **YAML-driven approach** — the orchestrator reads your `gold_layer_design/yaml/` files (from Step 9) as the **single source of truth**. Table names, columns, types, PKs, FKs are all extracted from YAML — never generated from scratch.
+2. **Worker skills auto-loaded:**
+   - `01-yaml-table-setup` — reads YAML schemas and generates CREATE TABLE DDL
+   - `02-merge-patterns` — SCD Type 1/2 dimensions, fact table MERGE operations
+   - `03-deduplication` — prevents DELTA_MULTIPLE_SOURCE_ROW_MATCHING errors
+   - `03-gold-layer-documentation` — dual-purpose COMMENTs for both business users and Genie
+   - `06-fact-table-grain-validation` — validates grain before populating
+   - `07-gold-layer-schema-validation` — validates schemas before deployment
+3. **Common skills auto-loaded (8 total):**
+   - `databricks-expert-agent` — core "Extract, Don''t Generate" principle applied to EVERY YAML read
+   - `databricks-asset-bundles` — generates 2 jobs (setup+FK combined, merge separate), `notebook_task` + `base_parameters`
+   - `databricks-table-properties` — Gold TBLPROPERTIES (CDF, row tracking, auto-optimize, `layer=gold`)
+   - `unity-catalog-constraints` — surrogate keys as PKs (NOT NULL), FK via ALTER TABLE (NOT ENFORCED)
+   - `schema-management-patterns` — `CREATE SCHEMA IF NOT EXISTS` with governance metadata
+   - `databricks-python-imports` — pure Python modules for shared config (avoids `sys.path` issues)
+   - `naming-tagging-standards` — enterprise naming and dual-purpose COMMENTs
+   - `databricks-autonomous-operations` — self-healing deploy loop if jobs fail
+
+**Key principle: "Extract, Don''t Generate"** — every table name, column name, and type comes from YAML. The AI never hallucinates schema elements.',
 '## Expected Deliverables
 
 ### 📁 Generated Asset Bundle Structure
@@ -1560,12 +1504,46 @@ VALUES
 (10, 'usecase_plan',
 'Perform project planning using @data_product_accelerator/skills/planning/00-project-planning/SKILL.md with planning_mode: workshop
 
+This will involve the following steps:
+
+- **Analyze Gold layer** — examine your completed Gold tables to identify natural business domains, key relationships, and analytical questions
+- **Generate use-case plans** — create structured plans organized as Phase 1 addendums (1.2 TVFs, 1.3 Metric Views, 1.4 Monitors, 1.5 Dashboards, 1.6 Genie Spaces, 1.7 Alerts, 1.1 ML Models)
+- **Produce YAML manifests** — generate 4 machine-readable manifest files (semantic-layer, observability, ML, GenAI agents) as contracts for downstream implementation stages
+- **Apply workshop mode caps** — enforce hard limits (3-5 TVFs, 1-2 Metric Views, 1 Genie Space) to keep the workshop focused on pattern variety over depth
+- **Define deployment order** — establish build sequence: TVFs → Metric Views → Genie Spaces → Dashboards → Monitors → Alerts → Agents
+
 If a PRD exists at @data_product_accelerator/docs/ui_design.md, reference it for business requirements, user personas, and workflows.',
 'Static prompt - no LLM processing required. This prompt is copied directly to the AI coding assistant.',
 'Create Use-Case Plan',
 'Generate implementation plans for operationalizing use cases with supporting artifacts',
 13,
-'## 📚 What is Use-Case Planning?
+'## 1️⃣ How To Apply
+
+Copy the prompt above, start a **new Agent chat** in Cursor, and paste it. The AI will analyze your Gold layer and create use case plans.
+
+### Prerequisite
+
+**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
+
+Ensure you have:
+- ✅ Gold Layer Design completed (Step 9)
+- ✅ Gold Layer Implementation completed (Step 12)
+- ✅ `data_product_accelerator/skills/planning/00-project-planning/SKILL.md` - The project planning skill
+- ✅ `docs/ui_design.md` - PRD with business requirements (optional, if available)
+
+### Steps to Apply
+
+1. **Start new Agent thread** — Open Cursor and start a new Agent thread for clean context
+2. **Copy and paste the prompt** — Use the copy button, paste into Cursor; the AI will analyze your Gold layer and create use case plans
+3. **Review generated plans** — Plans appear in `plans/` folder (Phase addendums, artifact specs, implementation priorities)
+4. **Prioritize use cases** — Identify highest-value use cases, assign P0/P1/P2, determine implementation order
+5. **Prepare for implementation** — Use plans to guide Step 14+ (implement artifacts based on plans)
+
+---
+
+## 2️⃣ What Are We Building?
+
+### 📚 What is Use-Case Planning?
 
 After building the Gold layer (data foundation), we now plan how to **operationalize** that data through various artifacts that serve different use cases.
 
@@ -1578,9 +1556,7 @@ After building the Gold layer (data foundation), we now plan how to **operationa
 | **Gold** | Business-ready data | ✅ Complete |
 | **Artifacts** | Operational use cases | 👉 **THIS STEP** |
 
----
-
-## 🎯 Why Plan Before Building?
+### 🎯 Why Plan Before Building?
 
 **The Goal:** Identify use cases FIRST, then create artifacts to realize them.
 
@@ -1602,9 +1578,7 @@ If a **Product Requirements Document (PRD)** exists at `docs/ui_design.md`, it p
 
 **PRD → Use Cases → Artifacts**
 
----
-
-## 🏗️ Agent Layer Architecture (How Artifacts Connect)
+### 🏗️ Agent Layer Architecture (How Artifacts Connect)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -1642,9 +1616,7 @@ If a **Product Requirements Document (PRD)** exists at `docs/ui_design.md`, it p
 
 > **Key principle:** Each layer consumes the layer below it. Agents never bypass Genie Spaces to query Gold directly. This provides abstraction, query optimization, and built-in guardrails.
 
----
-
-## 📋 Phase 1 Addendums (Artifact Categories)
+### 📋 Phase 1 Addendums (Artifact Categories)
 
 All analytics artifacts are organized as Phase 1 addendums:
 
@@ -1660,9 +1632,7 @@ All analytics artifacts are organized as Phase 1 addendums:
 
 > **Workshop default:** 1.2 TVFs, 1.3 Metric Views, and 1.6 Genie Spaces are included by default. Others included if requested.
 
----
-
-## 🔄 Planning Methodology
+### 🔄 Planning Methodology
 
 The planning skill organizes work into **3 phases**, with Phase 1 containing **7 addendums** for all analytics artifacts:
 
@@ -1708,97 +1678,7 @@ Phase 3: Frontend App (User interface — optional)
 
 > **Anti-pattern:** Creating 5+ generic domains (Cost, Performance, Quality, Reliability, Security) that don''t map to your actual Gold tables.
 
----
-
-## Prerequisite
-
-**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
-
-Ensure you have:
-- ✅ Gold Layer Design completed (Step 9)
-- ✅ Gold Layer Implementation completed (Step 12)
-- ✅ `data_product_accelerator/skills/planning/00-project-planning/SKILL.md` - The project planning skill
-- ✅ `docs/ui_design.md` - PRD with business requirements (optional, if available)
-
----
-
-## Steps to Apply
-
-### Step 1: Start New Agent Thread
-
-Open Cursor and start a **new Agent thread** for clean context.
-
-### Step 2: Copy and Paste the Prompt
-
-1. **Copy the prompt** using the copy button
-2. **Paste it into Cursor**
-3. The AI will analyze your Gold layer and create use case plans
-
-### Step 3: Review Generated Plans
-
-The AI will create plans in `plans/` folder:
-- Phase-specific addendums
-- Artifact specifications
-- Implementation priorities
-
-### Step 4: Prioritize Use Cases
-
-Review the generated plans and:
-- Identify highest-value use cases
-- Assign priorities (P0, P1, P2)
-- Determine implementation order
-
-### Step 5: Prepare for Implementation
-
-Use the plans to guide subsequent steps:
-- Step 14+: Implement artifacts based on plans
-
----
-
-## 🔧 What Happens Behind the Scenes
-
-When you paste the prompt, the AI reads `@data_product_accelerator/skills/planning/00-project-planning/SKILL.md` — the **Project Planning orchestrator**. Behind the scenes:
-
-1. **Workshop mode detection** — `planning_mode: workshop` activates the workshop profile, which produces a **minimal representative plan** (3-5 TVFs, 1-2 Metric Views, 1 Genie Space) designed for hands-on workshops. The first line of output confirms: `**Planning Mode:** Workshop (explicit opt-in — artifact caps active)`.
-2. **Interactive quick start** — the skill asks key decisions before generating plans:
-   - Which domains to include (derived from business questions and Gold table groupings)
-   - Which Phase 1 addendums to generate (1.1 ML through 1.7 Alerting)
-   - Whether to include Phase 2 (Agents) and Phase 3 (Frontend)
-   - Agent-to-Genie Space mapping strategy
-3. **Artifact Rationalization** — the skill applies rigorous rules to prevent artifact bloat:
-   - Every artifact must trace to a business question (no quota-filling)
-   - TVFs only where Metric Views can''t answer the question
-   - Genie Spaces sized by total asset count (25-asset hard limit per space)
-   - Domains consolidated when overlap exceeds 70% of Gold tables
-4. **YAML manifest contracts** — 4 machine-readable manifests generated for downstream stages:
-   - `semantic-layer-manifest.yaml` (TVFs + Metric Views + Genie Spaces)
-   - `observability-manifest.yaml` (Monitors + Dashboards + Alerts)
-   - `ml-manifest.yaml` and `genai-agents-manifest.yaml`
-5. **Common skills auto-loaded:**
-   - `databricks-expert-agent` — "Extract, Don''t Generate" applied to plan-to-implementation handoff
-   - `naming-tagging-standards` — enterprise naming conventions for all planned artifacts
-
-**Key concept: Agent Layer Architecture** — Agents (Phase 2) use Genie Spaces (Phase 1.6) as their query interface, NOT direct SQL. This means Genie Spaces must be deployed before agents can consume them.
-
-### 🏅 Databricks Best Practices Applied
-
-| Practice | How It''s Used Here |
-|----------|-------------------|
-| **Agent Domain Framework** | Domains derived from business questions and Gold table groupings (not forced to a fixed count). Each domain maps to a potential Genie Space. |
-| **Artifact Rationalization** | Every artifact must trace to a business question. TVFs only when Metric Views can''t answer. No quota-filling. Prevents artifact bloat. |
-| **Genie Space 25-Asset Limit** | Hard constraint: each Genie Space holds ≤ 25 data assets. Plan calculates total assets → determines space count. Under 10 assets = merge. |
-| **Deployment Order Discipline** | Build order enforced: Phase 1 addendums (1.2→1.3→1.6→1.5→1.4→1.7→1.1) → Phase 2 (Agents). Genie Spaces MUST exist before Agents can use them. |
-| **Agent Layer Architecture** | AI Agents (Phase 2) query data through Genie Spaces (Phase 1.6), never direct SQL. Provides abstraction, optimization, and guardrails. |
-| **Serverless-First Architecture** | Every artifact designed for serverless execution — SQL warehouses for queries, serverless jobs for ETL, serverless DLT for pipelines |
-| **Lakehouse Monitoring Integration** | Plans include monitor specifications leveraging Databricks Lakehouse Monitoring with custom business metrics (AGGREGATE, DERIVED, DRIFT) |
-| **AI/BI Dashboard Planning** | Dashboard specs designed for Databricks AI/BI (Lakeview) — native format with widget-query alignment and parameter configuration |
-| **Genie Space Optimization Targets** | Plans include benchmark questions with accuracy targets (95%+) and repeatability targets (90%+). General Instructions ≤ 20 lines. |
-| **YAML Manifests as Contracts** | 4 machine-readable manifests bridge planning and implementation. Downstream skills parse manifests (not prose). `planning_mode: workshop` prevents expansion. |
-| **Workshop Mode Hard Caps** | When `planning_mode: workshop` is active, artifact counts are capped (3-5 TVFs, 1-2 MVs, 1 Genie Space). Manifests propagate this ceiling to all downstream skills. |
-
----
-
-## 💡 Use Case Examples for Vacation Rentals
+### 💡 Use Case Examples for Vacation Rentals
 
 Based on the Wanderbricks Gold layer, typical use cases include:
 
@@ -1825,7 +1705,52 @@ Based on the Wanderbricks Gold layer, typical use cases include:
 ### Operational Monitoring
 - "Data freshness alerts?"
 - "Booking anomaly detection?"
-- "Revenue target tracking?"',
+- "Revenue target tracking?"
+
+---
+
+## 3️⃣ Why Are We Building It This Way? (Databricks Best Practices)
+
+| Practice | How It''s Used Here |
+|----------|-------------------|
+| **Agent Domain Framework** | Domains derived from business questions and Gold table groupings (not forced to a fixed count). Each domain maps to a potential Genie Space. |
+| **Artifact Rationalization** | Every artifact must trace to a business question. TVFs only when Metric Views can''t answer. No quota-filling. Prevents artifact bloat. |
+| **Genie Space 25-Asset Limit** | Hard constraint: each Genie Space holds ≤ 25 data assets. Plan calculates total assets → determines space count. Under 10 assets = merge. |
+| **Deployment Order Discipline** | Build order enforced: Phase 1 addendums (1.2→1.3→1.6→1.5→1.4→1.7→1.1) → Phase 2 (Agents). Genie Spaces MUST exist before Agents can use them. |
+| **Agent Layer Architecture** | AI Agents (Phase 2) query data through Genie Spaces (Phase 1.6), never direct SQL. Provides abstraction, optimization, and guardrails. |
+| **Serverless-First Architecture** | Every artifact designed for serverless execution — SQL warehouses for queries, serverless jobs for ETL, serverless DLT for pipelines |
+| **Lakehouse Monitoring Integration** | Plans include monitor specifications leveraging Databricks Lakehouse Monitoring with custom business metrics (AGGREGATE, DERIVED, DRIFT) |
+| **AI/BI Dashboard Planning** | Dashboard specs designed for Databricks AI/BI (Lakeview) — native format with widget-query alignment and parameter configuration |
+| **Genie Space Optimization Targets** | Plans include benchmark questions with accuracy targets (95%+) and repeatability targets (90%+). General Instructions ≤ 20 lines. |
+| **YAML Manifests as Contracts** | 4 machine-readable manifests bridge planning and implementation. Downstream skills parse manifests (not prose). `planning_mode: workshop` prevents expansion. |
+| **Workshop Mode Hard Caps** | When `planning_mode: workshop` is active, artifact counts are capped (3-5 TVFs, 1-2 MVs, 1 Genie Space). Manifests propagate this ceiling to all downstream skills. |
+
+---
+
+## 4️⃣ What Happens Behind the Scenes?
+
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/planning/00-project-planning/SKILL.md` — the **Project Planning orchestrator**. Behind the scenes:
+
+1. **Workshop mode detection** — `planning_mode: workshop` activates the workshop profile, which produces a **minimal representative plan** (3-5 TVFs, 1-2 Metric Views, 1 Genie Space) designed for hands-on workshops. The first line of output confirms: `**Planning Mode:** Workshop (explicit opt-in — artifact caps active)`.
+2. **Interactive quick start** — the skill asks key decisions before generating plans:
+   - Which domains to include (derived from business questions and Gold table groupings)
+   - Which Phase 1 addendums to generate (1.1 ML through 1.7 Alerting)
+   - Whether to include Phase 2 (Agents) and Phase 3 (Frontend)
+   - Agent-to-Genie Space mapping strategy
+3. **Artifact Rationalization** — the skill applies rigorous rules to prevent artifact bloat:
+   - Every artifact must trace to a business question (no quota-filling)
+   - TVFs only where Metric Views can''t answer the question
+   - Genie Spaces sized by total asset count (25-asset hard limit per space)
+   - Domains consolidated when overlap exceeds 70% of Gold tables
+4. **YAML manifest contracts** — 4 machine-readable manifests generated for downstream stages:
+   - `semantic-layer-manifest.yaml` (TVFs + Metric Views + Genie Spaces)
+   - `observability-manifest.yaml` (Monitors + Dashboards + Alerts)
+   - `ml-manifest.yaml` and `genai-agents-manifest.yaml`
+5. **Common skills auto-loaded:**
+   - `databricks-expert-agent` — "Extract, Don''t Generate" applied to plan-to-implementation handoff
+   - `naming-tagging-standards` — enterprise naming conventions for all planned artifacts
+
+**Key concept: Agent Layer Architecture** — Agents (Phase 2) use Genie Spaces (Phase 1.6) as their query interface, NOT direct SQL. This means Genie Spaces must be deployed before agents can consume them.',
 '## Expected Deliverables
 
 ### 📁 Generated Plan Files
@@ -1996,6 +1921,15 @@ VALUES
 (11, 'genie_space',
 'Set up the semantic layer using @data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md
 
+This will involve the following end-to-end workflow:
+
+- **Read plan manifests** — extract TVF, Metric View, and Genie Space specifications from the semantic-layer-manifest.yaml (from Step 13 planning)
+- **Create Metric Views** — build Metric Views using `WITH METRICS LANGUAGE YAML` syntax with dimensions, measures, 3-5 synonyms each, and format specifications
+- **Create Table-Valued Functions (TVFs)** — write parameterized SQL functions with STRING date params (non-negotiable for Genie), v3.0 bullet-point COMMENTs, and ROW_NUMBER for Top-N patterns
+- **Configure Genie Space** — set up natural language query interface with data assets (Metric Views → TVFs → Gold tables priority), General Instructions (≤20 lines), and ≥10 benchmark questions with exact expected SQL
+- **Create JSON exports** — export Genie Space configuration as JSON for CI/CD deployment across environments
+- **Optimize for accuracy** — run benchmark questions via Conversation API and tune 6 control levers until accuracy ≥95% and repeatability ≥90%
+
 Implement in this order:
 
 1. **Table-Valued Functions (TVFs)** — using plan at @data_product_accelerator/plans/phase1-addendum-1.2-tvfs.md
@@ -2008,7 +1942,69 @@ The orchestrator skill automatically loads worker skills for TVFs, Metric Views,
 'Build Genie Space [Metric Views/TVFs]',
 'Create semantic layer with TVFs, Metric Views, and Genie Space for natural language analytics',
 14,
-'## 📚 What is the Semantic Layer?
+'## 1️⃣ How To Apply
+
+Copy the prompt above, start a **new Agent chat** in Cursor, and paste it. The AI will process all 4 implementation steps in order.
+
+---
+
+### Prerequisite
+
+**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
+
+Ensure you have:
+- ✅ Gold Layer Implementation completed (Step 12) — with column COMMENTs on all tables
+- ✅ Use-Case Plan created (Step 13) — with `planning_mode: workshop`
+- ✅ Plan manifest exists: `plans/manifests/semantic-layer-manifest.yaml`
+- ✅ Plan addendum files exist:
+  - `plans/phase1-addendum-1.2-tvfs.md`
+  - `plans/phase1-addendum-1.3-metric-views.md`
+  - `plans/phase1-addendum-1.6-genie-spaces.md`
+- ✅ Gold YAML schemas available in `gold_layer_design/yaml/` (for schema validation)
+
+---
+
+### Steps to Apply
+
+**Step 1: Start New Agent Thread** — Open Cursor and start a new Agent thread for clean context.
+
+**Step 2: Copy and Paste the Prompt** — Copy the entire prompt using the copy button, paste it into Cursor. The AI will process all 4 implementation steps in order.
+
+**Step 3: Phase 0 — Plan Reading** — The AI will read `plans/manifests/semantic-layer-manifest.yaml` (implementation checklist), extract exact TVF names, Metric View specs, Genie Space configuration. If no manifest exists, fall back to self-discovery from Gold tables.
+
+**Step 4: Phase 1 — Metric Views** — The AI will read Metric View plan (`plans/phase1-addendum-1.3-metric-views.md`), create YAML definition files (dimensions, measures, synonyms, formats), create `create_metric_views.py` (reads YAML → `CREATE VIEW WITH METRICS LANGUAGE YAML`), create `metric_views_job.yml` for Asset Bundle deployment.
+
+**Step 5: Phase 2 — TVFs** — The AI will read TVF plan (`plans/phase1-addendum-1.2-tvfs.md`), validate Gold YAML schemas (confirm column names/types exist), create `table_valued_functions.sql` with v3.0 bullet-point COMMENTs, create `tvf_job.yml` (SQL task) for Asset Bundle deployment.
+
+**Step 6: Phase 3 — Genie Space** — The AI will read Genie Space plan (`plans/phase1-addendum-1.6-genie-spaces.md`), verify ALL Gold tables have column COMMENTs (prerequisite), configure: data assets (MVs → TVFs → tables), General Instructions (≤20 lines), create ≥10 benchmark questions with exact expected SQL.
+
+**Step 7: Deploy and Validate**
+
+```bash
+# Deploy all semantic layer jobs
+databricks bundle deploy -t dev
+databricks bundle run tvf_job -t dev
+databricks bundle run metric_views_job -t dev
+```
+
+```sql
+-- Test TVFs (note: STRING date params, not DATE)
+SELECT * FROM get_revenue_by_period(''2024-01-01'', ''2024-12-31'');
+SELECT * FROM get_top_properties_by_revenue(''2024-01-01'', ''2024-12-31'', 10);
+
+-- Verify Metric View created correctly
+SELECT table_name, table_type 
+FROM information_schema.tables 
+WHERE table_schema = ''{gold_schema}'' AND table_type = ''METRIC_VIEW'';
+```
+
+**Step 8: Phase 5 — Optimization Loop** — After Genie Space is created: run benchmark questions via Conversation API, check accuracy (target: ≥ 95%) and repeatability (target: ≥ 90%), apply 6 control levers if targets not met (UC metadata → Metric Views → TVFs → Monitoring → ML → Genie Instructions), re-test until targets achieved.
+
+---
+
+## 2️⃣ What Are We Building?
+
+### What is the Semantic Layer?
 
 The **Semantic Layer** sits between your Gold data and end users, providing:
 - **Natural language** access to data
@@ -2062,7 +2058,7 @@ The **Semantic Layer** sits between your Gold data and end users, providing:
 
 ---
 
-## 🎯 Why This Order Matters
+### Why This Order Matters
 
 | Phase | Artifact | Depends On | Enables | Non-Negotiable Rule |
 |-------|----------|------------|---------|---------------------|
@@ -2077,49 +2073,7 @@ The **Semantic Layer** sits between your Gold data and end users, providing:
 
 ---
 
-## 🔧 What Happens Behind the Scenes
-
-When you paste the prompt, the AI reads `@data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md` — the **Semantic Layer orchestrator**. Behind the scenes:
-
-1. **Phase 0: Read Plan** — the orchestrator first looks for `plans/manifests/semantic-layer-manifest.yaml`. If found, it uses this as the implementation checklist (every TVF, Metric View, and Genie Space pre-defined). If not found, it falls back to self-discovery from Gold tables.
-2. **5 Worker skills auto-loaded:**
-   - `01-metric-views-patterns` — `WITH METRICS LANGUAGE YAML` syntax, schema validation, join patterns (including snowflake schema)
-   - `02-databricks-table-valued-functions` — STRING parameters (non-negotiable), v3.0 bullet-point comments, Top-N via ROW_NUMBER, SCD2 handling
-   - `03-genie-space-patterns` — 7-section deliverable structure, General Instructions (≤20 lines), minimum 10 benchmark questions
-   - `04-genie-space-export-import-api` — REST API JSON schema for programmatic Genie Space deployment (CI/CD)
-   - `05-genie-space-optimization` — iterative 6-lever optimization loop targeting 95%+ accuracy, 90%+ repeatability
-3. **5 Common skills auto-loaded:**
-   - `databricks-expert-agent` — "Extract, Don''t Generate" applied to all schema references
-   - `databricks-asset-bundles` — SQL task jobs for TVF deployment, Python jobs for Metric Views
-   - `databricks-python-imports` — pure Python module patterns for Metric View creation scripts
-   - `naming-tagging-standards` — enterprise naming for all semantic layer artifacts
-   - `databricks-autonomous-operations` — self-healing deploy loop when jobs fail
-4. **Phase-ordered execution:** Metric Views → TVFs → Genie Space → API Export → Optimization. Each phase only begins after the previous completes.
-5. **Phase 5: Optimization Loop** — after Genie Space creation, the orchestrator runs benchmark questions via the Conversation API and tunes 6 control levers (UC metadata, Metric Views, TVFs, Monitoring tables, ML tables, Genie Instructions) until accuracy ≥95% and repeatability ≥90%.
-
-**Key principle:** The AI reads your plan manifest to **extract** specifications — it doesn''t generate them from scratch. This ensures the semantic layer matches your approved plan exactly.
-
-### 🏅 Databricks Best Practices Applied
-
-| Practice | How It''s Used Here |
-|----------|-------------------|
-| **Metric View `WITH METRICS LANGUAGE YAML`** | Metric views use Databricks'' native YAML syntax (`CREATE VIEW ... WITH METRICS LANGUAGE YAML AS $$ ... $$`) — NOT regular views with TBLPROPERTIES |
-| **TVFs with STRING Parameters** | All TVF date parameters use STRING type — non-negotiable for Genie compatibility. Genie passes dates as strings; DATE type breaks SQL generation. |
-| **v3.0 Bullet-Point Comments** | `• PURPOSE:`, `• BEST FOR:`, `• RETURNS:`, `• PARAMS:`, `• SYNTAX:` — Genie parses these structured bullets to decide when to invoke each TVF |
-| **Schema Validation Before SQL** | Always read Gold YAML schemas before writing TVF SQL. 100% of compilation errors are caused by referencing non-existent columns. |
-| **ROW_NUMBER for Top-N** | Never `LIMIT {param}` in TVFs (SQL compilation error). Use `ROW_NUMBER() OVER(...) + WHERE rank <= top_n` instead. |
-| **SCD2 Filter on Dimension Joins** | Every TVF joining dimensions must include `AND dim.is_current = true` — omitting this causes row duplication from historical SCD2 records |
-| **Genie Space General Instructions** | ≤20 lines of focused instructions telling Genie which tables to prefer, default time ranges, and disambiguation rules |
-| **Minimum 10 Benchmark Questions** | Each Genie Space requires ≥ 10 benchmark questions with exact expected SQL — enables automated accuracy testing via the Conversation API |
-| **Column Comments Required** | All Gold tables must have column COMMENTs BEFORE creating a Genie Space — Genie uses these to understand column semantics for SQL generation |
-| **Export/Import API for CI/CD** | Genie Space configuration exported as JSON — enables version-controlled deployment across dev/staging/prod environments |
-| **Optimization Loop (6 Levers)** | Iterative tuning: UC metadata → Metric Views → TVFs → Monitoring tables → ML tables → Genie Instructions, targeting 95%+ accuracy, 90%+ repeatability |
-| **Serverless SQL Warehouse** | Genie Spaces MUST use a Serverless SQL warehouse — required for natural language query execution. NEVER Classic or Pro. |
-| **Synonym-Rich Definitions** | 3-5 synonyms per dimension/measure (e.g., "revenue" → "earnings", "income", "amount") — dramatically improves Genie NL understanding |
-
----
-
-## 📋 The Three Semantic Components
+### The Three Semantic Components
 
 ### 1️⃣ Table-Valued Functions (TVFs)
 
@@ -2250,94 +2204,6 @@ SQL: SELECT MEASURE(total_revenue) FROM revenue_analytics_metrics
 
 ---
 
-## Prerequisite
-
-**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
-
-Ensure you have:
-- ✅ Gold Layer Implementation completed (Step 12) — with column COMMENTs on all tables
-- ✅ Use-Case Plan created (Step 13) — with `planning_mode: workshop`
-- ✅ Plan manifest exists: `plans/manifests/semantic-layer-manifest.yaml`
-- ✅ Plan addendum files exist:
-  - `plans/phase1-addendum-1.2-tvfs.md`
-  - `plans/phase1-addendum-1.3-metric-views.md`
-  - `plans/phase1-addendum-1.6-genie-spaces.md`
-- ✅ Gold YAML schemas available in `gold_layer_design/yaml/` (for schema validation)
-
----
-
-## Steps to Apply
-
-### Step 1: Start New Agent Thread
-
-Open Cursor and start a **new Agent thread** for clean context.
-
-### Step 2: Copy and Paste the Prompt
-
-1. **Copy the entire prompt** using the copy button
-2. **Paste it into Cursor**
-3. The AI will process all 4 implementation steps in order
-
-### Step 3: Phase 0 — Plan Reading
-
-The AI will:
-1. Read `plans/manifests/semantic-layer-manifest.yaml` (implementation checklist)
-2. Extract exact TVF names, Metric View specs, Genie Space configuration
-3. If no manifest exists, fall back to self-discovery from Gold tables
-
-### Step 4: Phase 1 — Metric Views
-
-The AI will:
-1. Read Metric View plan (`plans/phase1-addendum-1.3-metric-views.md`)
-2. Create YAML definition files (dimensions, measures, synonyms, formats)
-3. Create `create_metric_views.py` (reads YAML → `CREATE VIEW WITH METRICS LANGUAGE YAML`)
-4. Create `metric_views_job.yml` for Asset Bundle deployment
-
-### Step 5: Phase 2 — TVFs
-
-The AI will:
-1. Read TVF plan (`plans/phase1-addendum-1.2-tvfs.md`)
-2. Validate Gold YAML schemas (confirm column names/types exist)
-3. Create `table_valued_functions.sql` with v3.0 bullet-point COMMENTs
-4. Create `tvf_job.yml` (SQL task) for Asset Bundle deployment
-
-### Step 6: Phase 3 — Genie Space
-
-The AI will:
-1. Read Genie Space plan (`plans/phase1-addendum-1.6-genie-spaces.md`)
-2. Verify ALL Gold tables have column COMMENTs (prerequisite)
-3. Configure: data assets (MVs → TVFs → tables), General Instructions (≤20 lines)
-4. Create ≥10 benchmark questions with exact expected SQL
-
-### Step 7: Deploy and Validate
-
-```bash
-# Deploy all semantic layer jobs
-databricks bundle deploy -t dev
-databricks bundle run tvf_job -t dev
-databricks bundle run metric_views_job -t dev
-```
-
-```sql
--- Test TVFs (note: STRING date params, not DATE)
-SELECT * FROM get_revenue_by_period(''2024-01-01'', ''2024-12-31'');
-SELECT * FROM get_top_properties_by_revenue(''2024-01-01'', ''2024-12-31'', 10);
-
--- Verify Metric View created correctly
-SELECT table_name, table_type 
-FROM information_schema.tables 
-WHERE table_schema = ''{gold_schema}'' AND table_type = ''METRIC_VIEW'';
-```
-
-### Step 8: Phase 5 — Optimization Loop
-
-After Genie Space is created:
-1. Run benchmark questions via Conversation API
-2. Check accuracy (target: ≥ 95%) and repeatability (target: ≥ 90%)
-3. Apply 6 control levers if targets not met:
-   - UC metadata → Metric Views → TVFs → Monitoring → ML → Genie Instructions
-4. Re-test until targets achieved
-
 ---
 
 ## 💡 TVF Design Best Practices
@@ -2449,7 +2315,51 @@ SQL: SELECT destination, MEASURE(booking_count) FROM revenue_analytics_metrics G
 -- ... (minimum 10 total)
 ```
 
-> **Why exact SQL?** Benchmark SQL enables automated testing via the Conversation API — you can programmatically verify Genie generates correct queries.',
+> **Why exact SQL?** Benchmark SQL enables automated testing via the Conversation API — you can programmatically verify Genie generates correct queries.
+
+---
+
+## 3️⃣ Why Are We Building It This Way? (Databricks Best Practices)
+
+| Practice | How It''s Used Here |
+|----------|-------------------|
+| **Metric View `WITH METRICS LANGUAGE YAML`** | Metric views use Databricks'' native YAML syntax (`CREATE VIEW ... WITH METRICS LANGUAGE YAML AS $$ ... $$`) — NOT regular views with TBLPROPERTIES |
+| **TVFs with STRING Parameters** | All TVF date parameters use STRING type — non-negotiable for Genie compatibility. Genie passes dates as strings; DATE type breaks SQL generation. |
+| **v3.0 Bullet-Point Comments** | `• PURPOSE:`, `• BEST FOR:`, `• RETURNS:`, `• PARAMS:`, `• SYNTAX:` — Genie parses these structured bullets to decide when to invoke each TVF |
+| **Schema Validation Before SQL** | Always read Gold YAML schemas before writing TVF SQL. 100% of compilation errors are caused by referencing non-existent columns. |
+| **ROW_NUMBER for Top-N** | Never `LIMIT {param}` in TVFs (SQL compilation error). Use `ROW_NUMBER() OVER(...) + WHERE rank <= top_n` instead. |
+| **SCD2 Filter on Dimension Joins** | Every TVF joining dimensions must include `AND dim.is_current = true` — omitting this causes row duplication from historical SCD2 records |
+| **Genie Space General Instructions** | ≤20 lines of focused instructions telling Genie which tables to prefer, default time ranges, and disambiguation rules |
+| **Minimum 10 Benchmark Questions** | Each Genie Space requires ≥ 10 benchmark questions with exact expected SQL — enables automated accuracy testing via the Conversation API |
+| **Column Comments Required** | All Gold tables must have column COMMENTs BEFORE creating a Genie Space — Genie uses these to understand column semantics for SQL generation |
+| **Export/Import API for CI/CD** | Genie Space configuration exported as JSON — enables version-controlled deployment across dev/staging/prod environments |
+| **Optimization Loop (6 Levers)** | Iterative tuning: UC metadata → Metric Views → TVFs → Monitoring tables → ML tables → Genie Instructions, targeting 95%+ accuracy, 90%+ repeatability |
+| **Serverless SQL Warehouse** | Genie Spaces MUST use a Serverless SQL warehouse — required for natural language query execution. NEVER Classic or Pro. |
+| **Synonym-Rich Definitions** | 3-5 synonyms per dimension/measure (e.g., "revenue" → "earnings", "income", "amount") — dramatically improves Genie NL understanding |
+
+---
+
+## 4️⃣ What Happens Behind the Scenes?
+
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md` — the **Semantic Layer orchestrator**. Behind the scenes:
+
+1. **Phase 0: Read Plan** — the orchestrator first looks for `plans/manifests/semantic-layer-manifest.yaml`. If found, it uses this as the implementation checklist (every TVF, Metric View, and Genie Space pre-defined). If not found, it falls back to self-discovery from Gold tables.
+2. **5 Worker skills auto-loaded:**
+   - `01-metric-views-patterns` — `WITH METRICS LANGUAGE YAML` syntax, schema validation, join patterns (including snowflake schema)
+   - `02-databricks-table-valued-functions` — STRING parameters (non-negotiable), v3.0 bullet-point comments, Top-N via ROW_NUMBER, SCD2 handling
+   - `03-genie-space-patterns` — 7-section deliverable structure, General Instructions (≤20 lines), minimum 10 benchmark questions
+   - `04-genie-space-export-import-api` — REST API JSON schema for programmatic Genie Space deployment (CI/CD)
+   - `05-genie-space-optimization` — iterative 6-lever optimization loop targeting 95%+ accuracy, 90%+ repeatability
+3. **5 Common skills auto-loaded:**
+   - `databricks-expert-agent` — "Extract, Don''t Generate" applied to all schema references
+   - `databricks-asset-bundles` — SQL task jobs for TVF deployment, Python jobs for Metric Views
+   - `databricks-python-imports` — pure Python module patterns for Metric View creation scripts
+   - `naming-tagging-standards` — enterprise naming for all semantic layer artifacts
+   - `databricks-autonomous-operations` — self-healing deploy loop when jobs fail
+4. **Phase-ordered execution:** Metric Views → TVFs → Genie Space → API Export → Optimization. Each phase only begins after the previous completes.
+5. **Phase 5: Optimization Loop** — after Genie Space creation, the orchestrator runs benchmark questions via the Conversation API and tunes 6 control levers (UC metadata, Metric Views, TVFs, Monitoring tables, ML tables, Genie Instructions) until accuracy ≥95% and repeatability ≥90%.
+
+**Key principle:** The AI reads your plan manifest to **extract** specifications — it doesn''t generate them from scratch. This ensures the semantic layer matches your approved plan exactly.',
 '## Expected Deliverables
 
 ### 📁 Semantic Layer Files Created
@@ -2574,12 +2484,238 @@ spark.sql(create_sql)
 - [ ] `databricks bundle deploy -t dev` succeeds',
 true, 1, true, current_timestamp(), current_timestamp(), current_user());
 
+-- Step 15: Genie Space Optimization (MLflow-Driven Introspective AI Architecture) - bypass_LLM = TRUE
+INSERT INTO ${catalog}.${schema}.section_input_prompts 
+(input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
+VALUES
+(15, 'genie_optimization',
+'Optimize the Genie Space using @data_product_accelerator/skills/semantic-layer/05-genie-optimization-orchestrator/SKILL.md
+
+This will involve the following optimization loop:
+
+- **Generate benchmarks** — create domain-relevant questions with expected SQL, validate ground truth via warehouse execution, sync to MLflow Evaluation Dataset
+- **Evaluate with 8 judges** — run each benchmark against the live Genie Space (12-second rate limit), score with 3-layer judge architecture: Layer 1 (syntax, schema, logic, semantics, completeness, routing), Layer 2 (result correctness via DataFrame comparison), Layer 3 (arbiter for disagreements with auto-correction)
+- **Introspect and optimize** — cluster failures by systemic root cause, generate metadata proposals mapped to 6 control levers with predicted impact, optionally use GEPA optimize_anything for metadata evolution
+- **Apply 6 control levers in priority order** — (1) UC table/column COMMENTs, (2) Metric View metadata, (3) TVF COMMENTs, (4) Monitoring tables, (5) ML tables, (6) Genie Instructions (~4000 char limit, last resort)
+- **Dual-persist every change** — apply fixes via BOTH API (immediate) AND repository files (persists across deployments)
+- **Re-evaluate and iterate** — run evaluation job again, compare iterations, loop until accuracy ≥95% or max 5 iterations with plateau detection
+- **Deploy and document** — bundle deploy optimized space, generate optimization report with before/after metrics logged to MLflow',
+'Static prompt - no LLM processing required. This prompt is copied directly to the AI coding assistant.',
+'Genie Space Optimization',
+'MLflow-driven optimization of Genie Space accuracy using 3-layer judge architecture, introspection, and 6 control levers',
+15,
+'## 1️⃣ How To Apply
+
+Copy the prompt above, start a **new Agent chat** in Cursor, and paste it. The optimization orchestrator will route to 4 worker skills on demand.
+
+---
+
+### Prerequisite
+
+**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
+
+Ensure you have:
+- ✅ Semantic Layer completed (Step 14) — Genie Space deployed with TVFs, Metric Views, and benchmark questions
+- ✅ Genie Space accessible via Conversation API (space ID known)
+- ✅ Databricks CLI authenticated (`databricks auth login`)
+- ✅ MLflow configured for Databricks tracking (automatic if using Databricks workspace)
+- ✅ Foundation Model API endpoint available (e.g., `databricks-claude-sonnet-4-6`) for LLM judges
+
+---
+
+### Steps to Apply
+
+**Step 1: Start New Agent Thread** — Open Cursor and start a new Agent thread for clean context.
+
+**Step 2: Copy and Paste the Prompt** — Copy the entire prompt using the copy button, paste it into Cursor. The AI will load the optimization orchestrator skill.
+
+**Step 3: Benchmark Generation** — The AI will load the `genie-benchmark-generator` worker to:
+- Interactively collect benchmark questions (three-path intake: 10+, 1-9, or 0 questions)
+- Generate synthetic benchmarks from Metric Views, TVFs, and Gold tables if needed
+- Validate every ground truth SQL by executing it on the warehouse (max 3 retry attempts)
+- Hash result sets for later comparison
+- Sync validated benchmarks to MLflow Evaluation Dataset and `golden-queries.yaml`
+
+**Step 4: Evaluation** — The AI will load the `genie-benchmark-evaluator` worker to:
+- Create an MLflow experiment and register judge prompts
+- Query each benchmark against the live Genie Space (respecting 12-second rate limit)
+- Score responses using 8 judges across 3 layers:
+  - **Layer 1** — syntax_validity (code), schema_accuracy (LLM), logical_accuracy (LLM), semantic_equivalence (LLM), completeness (LLM), asset_routing (code)
+  - **Layer 2** — result_correctness: execute both Genie and GT SQL, compare DataFrames
+  - **Layer 3** — arbiter (LLM): runs only if Layer 2 disagrees, determines which SQL is truly correct
+- Log all metrics, parameters, and artifacts to MLflow
+
+**Step 5: Introspection & Optimization** — If accuracy < 95%, the AI will load the `genie-metadata-optimizer` worker to:
+- Cluster failures by systemic root cause (affecting ≥2 questions)
+- Generate metadata change proposals mapped to specific control levers
+- Predict impact of each proposal
+- Optionally use GEPA optimize_anything for metadata evolution (Tier 1) or structured LLM introspection (Tier 2)
+
+**Step 6: Apply Changes** — The AI will load the `genie-optimization-applier` worker to:
+- Apply proposals using 6 control levers in priority order
+- Dual-persist every change (API for immediate effect + repo files for CI/CD persistence)
+- Wait 30 seconds for propagation
+
+**Step 7: Re-Evaluate and Iterate** — Loop back to Step 4 until accuracy ≥95% or max 5 iterations with plateau detection.
+
+**Step 8: Deploy and Document** — After convergence:
+- Bundle deploy the optimized Genie Space
+- Generate optimization report with before/after metrics
+- All iterations logged as MLflow experiment runs for reproducibility
+
+---
+
+## 2️⃣ What Are We Building?
+
+### Introspective AI Architecture for Genie Optimization
+
+This step implements a **closed-loop optimization system** that uses MLflow to systematically improve Genie Space accuracy. Instead of manual trial-and-error, the agent:
+
+1. **Measures** — quantifies accuracy across 8 quality dimensions with LLM judges
+2. **Diagnoses** — clusters failures to identify systemic root causes
+3. **Prescribes** — maps root causes to specific metadata changes (6 control levers)
+4. **Applies** — makes changes with dual persistence (API + repository)
+5. **Verifies** — re-evaluates to confirm improvements and detect regressions
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    GENIE OPTIMIZATION ARCHITECTURE                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────────────┐     Orchestrator routes to workers on demand     │
+│  │  05-genie-optimization│                                                  │
+│  │  -orchestrator        │──────────────────────────────────────────────┐   │
+│  └──────────────────────┘                                              │   │
+│           │                                                             │   │
+│     ┌─────┼─────────┬───────────────┬───────────────┐                  │   │
+│     ▼     ▼         ▼               ▼               ▼                  │   │
+│  ┌──────┐ ┌──────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │   │
+│  │ 01   │ │ 02   │ │ 03       │ │ 04       │ │ MLflow   │            │   │
+│  │Bench-│ │Eval- │ │Meta-     │ │Applier   │ │Experiment│            │   │
+│  │mark  │ │uator │ │data      │ │          │ │          │            │   │
+│  │Gen   │ │      │ │Optimizer │ │          │ │          │            │   │
+│  └──────┘ └──────┘ └──────────┘ └──────────┘ └──────────┘            │   │
+│                                                                        │   │
+│  Loop: Generate → Evaluate → Optimize → Apply → Re-Evaluate           │   │
+│  Max 5 iterations with plateau detection                               │   │
+│                                                                        │   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 3-Layer Judge Architecture
+
+| Layer | Judges | Type | Purpose |
+|-------|--------|------|---------|
+| **Layer 1** | syntax_validity | Code | SQL parses without errors |
+| | schema_accuracy | LLM | Tables and columns exist in schema |
+| | logical_accuracy | LLM | SQL logic matches question intent |
+| | semantic_equivalence | LLM | Genie SQL is semantically equivalent to GT SQL |
+| | completeness | LLM | All requested dimensions and measures included |
+| | asset_routing | Code | Correct asset type selected (MV/TVF/TABLE) |
+| **Layer 2** | result_correctness | Code | Execute both SQLs, compare DataFrames |
+| **Layer 3** | arbiter | LLM | Resolves disagreements; can auto-correct benchmarks |
+
+### 6 Control Levers (Priority Order)
+
+| # | Lever | Scope | When to Use |
+|---|-------|-------|-------------|
+| 1 | UC table/column COMMENTs | Upstream metadata | Wrong columns selected or asset confusion |
+| 2 | Metric View metadata | Semantic metadata | Incorrect aggregation or measure definition |
+| 3 | TVF COMMENTs | Function metadata | Genie not selecting the right TVF |
+| 4 | Monitoring tables | Data assets | Dashboard metrics not matching |
+| 5 | ML tables | Data assets | Prediction tables not discoverable |
+| 6 | Genie Instructions | Genie config | Last resort (~4000 char limit) |',
+'## Expected Deliverables
+
+### 📊 MLflow Experiment Results
+
+After each optimization iteration, an MLflow run is logged with:
+
+**Parameters:**
+- `space_id` — Genie Space being optimized
+- `iteration` — Loop iteration number (1-5)
+- `benchmark_count` — Number of questions evaluated
+- `domain` — Business domain identifier
+
+**Metrics (per judge):**
+- `syntax_validity/mean` — Fraction of syntactically valid SQL
+- `schema_accuracy/mean` — Fraction using correct schema elements
+- `logical_accuracy/mean` — Fraction with correct logic
+- `semantic_equivalence/mean` — Fraction semantically matching GT
+- `completeness/mean` — Fraction with all requested elements
+- `asset_routing/mean` — Fraction routing to correct asset type
+- `result_correctness/mean` — Fraction producing matching results
+- `overall_accuracy` — Weighted aggregate score
+- `thresholds_passed` — 1.0 if ≥ 95%, else 0.0
+
+**Artifacts:**
+- `eval_results.json` — Full per-question judge breakdown
+- `failures.json` — Failed questions with root causes
+- `optimization_report.md` — Before/after summary with levers applied
+
+---
+
+### 📈 Optimization Report
+
+After convergence, the optimization report includes:
+
+| Section | Contents |
+|---------|----------|
+| Executive Summary | Before/after accuracy, iterations needed, time taken |
+| Per-Question Results | Each benchmark question with pass/fail and judge scores |
+| Control Levers Applied | Which levers were used, what was changed, predicted vs actual impact |
+| MLflow Experiment | Link to experiment with all iteration runs |
+| Recommendations | Remaining issues and suggested next steps |
+
+---
+
+### ✅ Success Criteria Checklist
+
+**Benchmark Generation:**
+- [ ] ≥10 benchmark questions per domain
+- [ ] Every question has `expected_sql` that executes successfully
+- [ ] Every question has `expected_asset` (MV/TVF/TABLE)
+- [ ] Ground truth SQL validated via warehouse execution
+- [ ] Benchmarks synced to MLflow Evaluation Dataset
+
+**Evaluation:**
+- [ ] MLflow experiment created with all iterations logged
+- [ ] 8 judges producing valid scores per question
+- [ ] 12-second rate limit respected between Genie API calls
+- [ ] Arbiter invoked for disagreements (Layer 3)
+
+**Optimization:**
+- [ ] Failures clustered by systemic root cause
+- [ ] Proposals mapped to specific control levers
+- [ ] Dual persistence applied (API + repo files)
+
+**Convergence:**
+- [ ] Overall accuracy ≥ 95% achieved OR
+- [ ] Max 5 iterations reached with plateau detection
+- [ ] No regressions on previously passing questions
+
+**Documentation:**
+- [ ] Optimization report generated with before/after metrics
+- [ ] All MLflow runs accessible with full judge scores
+- [ ] `golden-queries.yaml` updated with validated benchmarks',
+true, 1, true, current_timestamp(), current_timestamp(), current_user());
+
 -- Step 16: Build AI/BI Dashboard - bypass_LLM = TRUE
 INSERT INTO ${catalog}.${schema}.section_input_prompts 
 (input_id, section_tag, input_template, system_prompt, section_title, section_description, order_number, how_to_apply, expected_output, bypass_llm, version, is_active, inserted_at, updated_at, created_by)
 VALUES
 (12, 'aibi_dashboard',
 'Build an AI/BI (Lakeview) Dashboard using @data_product_accelerator/skills/monitoring/02-databricks-aibi-dashboards/SKILL.md
+
+This will involve the following end-to-end workflow:
+
+- **Build Lakeview dashboard** — create a complete `.lvdash.json` configuration with KPI counters, charts, data tables, and filters for business self-service analytics
+- **Use 6-column grid layout** — position all widgets on a 6-column grid (NOT 12!) with correct widget versions (KPIs=v2, Charts=v3, Tables=v1, Filters=v2)
+- **Query Metric Views** — write dataset queries using `MEASURE()` function against Metric Views with `${catalog}.${gold_schema}` variable substitution
+- **Validate SQL and widget alignment** — run pre-deployment validation ensuring every widget `fieldName` matches its SQL alias exactly (90% reduction in dev loop time)
+- **Deploy via UPDATE-or-CREATE** — use Workspace Import API with `overwrite: true` to preserve dashboard URLs and viewer permissions
 
 Reference the dashboard plan at @data_product_accelerator/plans/phase1-addendum-1.1-dashboards.md
 
@@ -2602,8 +2738,62 @@ Build the dashboard in this order:
 'Static prompt - no LLM processing required. This prompt is copied directly to the AI coding assistant.',
 'Build AI/BI Dashboard',
 'Create an AI/BI (Lakeview) dashboard with KPI counters, charts, filters, and automated deployment from Gold layer data',
-16,
-'## 📊 What is an AI/BI (Lakeview) Dashboard?
+14,
+'## 1️⃣ How To Apply
+
+**Copy the prompt above**, start a **new Agent thread** in Cursor, and **paste it**. The AI will build the dashboard in phases.
+
+---
+
+### Prerequisites
+
+**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
+
+Ensure you have:
+- ✅ Gold Layer Implementation completed (Step 12) — with column COMMENTs
+- ✅ Semantic Layer completed (Step 14) — Metric Views for dashboard queries
+- ✅ Use-Case Plan created (Step 13) — with dashboard requirements
+- ✅ Plan file exists: `plans/phase1-addendum-1.1-dashboards.md`
+- ✅ Gold YAML schemas available for column name validation
+
+---
+
+### Steps to Apply
+
+**Step 1:** Start new Agent thread — Open Cursor and start a **new Agent thread** for clean context.
+
+**Step 2:** Copy and paste the prompt — Copy the entire prompt using the copy button, paste it into Cursor. The AI will build the dashboard in phases.
+
+**Step 3:** Plan Reading — The AI will read dashboard plan (`plans/phase1-addendum-1.1-dashboards.md`), extract KPI requirements, chart types, filter dimensions, and identify data sources (Metric Views preferred over raw Gold tables).
+
+**Step 4:** Dataset Creation — The AI will create SQL queries for each widget (using `${catalog}` substitution), use `MEASURE()` function for Metric View queries, include "All" option for filter datasets, and handle NULLs with `COALESCE()` and SCD2 with `is_current = true`.
+
+**Step 5:** Widget and Layout Creation — The AI will build KPI counters (version 2) for top-line metrics, build charts (version 3) for trends and comparisons, build data tables (version 1) for drill-down, and position using 6-column grid (widths 1-6, NOT 12!).
+
+**Step 6:** Parameter and Filter Configuration — The AI will add DATE parameters with static defaults (not DATETIME), create Global Filters page (`PAGE_TYPE_GLOBAL_FILTERS`), and link filter widgets to dataset parameters.
+
+**Step 7:** Validate and Deploy
+
+```bash
+# Pre-deployment validation
+python scripts/validate_dashboard_queries.py
+python scripts/validate_widget_encodings.py
+
+# Deploy via Asset Bundle or API
+databricks bundle deploy -t dev
+```
+
+```sql
+-- Verify Gold tables have COMMENTs (prerequisite for good queries)
+SELECT table_name, comment FROM information_schema.tables 
+WHERE table_schema = ''{gold_schema}'' AND comment IS NOT NULL;
+```
+
+---
+
+## 2️⃣ What Are We Building?
+
+### What is an AI/BI (Lakeview) Dashboard?
 
 **AI/BI Dashboards** (formerly Lakeview) provide **visual, self-service analytics** for business users — no SQL required. They are built from JSON configuration files that define datasets, widgets, pages, and parameters.
 
@@ -2665,7 +2855,7 @@ Build the dashboard in this order:
 
 ---
 
-## 🎯 Key Concepts
+### Key Concepts
 
 | Concept | What It Means | Why It Matters |
 |---------|--------------|----------------|
@@ -2680,48 +2870,9 @@ Build the dashboard in this order:
 
 ---
 
-## 🔧 What Happens Behind the Scenes
+### Dashboard Components
 
-When you paste the prompt, the AI reads `@data_product_accelerator/skills/monitoring/02-databricks-aibi-dashboards/SKILL.md` — the **AI/BI Dashboard worker skill**. Behind the scenes:
-
-1. **Plan reading** — the skill reads your dashboard plan (`plans/phase1-addendum-1.1-dashboards.md`) to extract: KPIs, charts, filters, layout requirements
-2. **Dashboard skill loaded** — provides complete JSON templates, widget specs, grid layout rules, query patterns, validation scripts, and deployment workflows
-3. **5 Common skills auto-loaded:**
-   - `databricks-expert-agent` — "Extract, Don''t Generate" for table/column names
-   - `databricks-asset-bundles` — dashboard resource deployment
-   - `databricks-python-imports` — deployment script module patterns
-   - `naming-tagging-standards` — dashboard and file naming conventions
-   - `databricks-autonomous-operations` — self-healing deploy loop
-4. **Query pattern selection:** Metric Views → Gold tables → Monitoring tables (priority order)
-5. **Pre-deployment validation** — SQL validation + widget-encoding alignment check before import (catches 90% of errors before deploy)
-6. **UPDATE-or-CREATE deployment** — Workspace Import API with `overwrite: true` preserves URLs and permissions
-
-**Key principle:** The AI reads your plan to **extract** KPI/chart requirements. Dashboard queries use `${catalog}` and `${gold_schema}` variable substitution — never hardcoded schemas.
-
-> **Note:** For the full observability stack (Lakehouse Monitoring + Dashboards + SQL Alerts), use the orchestrator at `@data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md`. This step focuses specifically on the dashboard.
-
-### 🏅 Databricks Best Practices Applied
-
-| Practice | How It''s Used Here |
-|----------|-------------------|
-| **6-Column Grid (NOT 12!)** | Widget widths use 1-6 columns. `width: 6` = full width, `width: 3` = half. This is the #1 cause of layout issues — most platforms use 12 columns, Lakeview uses 6. |
-| **Widget Version Specs** | KPI Counters = version 2, Charts (bar/line/pie/area) = version 3, Tables = version 1, Filters = version 2. Wrong version causes rendering failures. |
-| **Widget-Query Column Alignment** | Every widget `fieldName` MUST exactly match the SQL alias in its dataset query. Mismatch = "no fields to visualize" error. |
-| **Raw Number Formatting** | Queries return raw numbers (e.g., `0.85` for 85%). Widgets apply formatting (`number-percent`, `number-currency`, `number-plain`). NEVER use `FORMAT_NUMBER()` or string concatenation. |
-| **DATE Parameters (Not DATETIME)** | Dashboard parameters use `DATE` type with static default values. `DATETIME` with dynamic expressions like `now-30d/d` does NOT work. |
-| **Variable Substitution** | All queries use `${catalog}.${gold_schema}` — never hardcoded catalog/schema. Substitution done in Python at deployment time. |
-| **Global Filters Page** | Every dashboard includes a `PAGE_TYPE_GLOBAL_FILTERS` page for cross-dashboard date range and dimension filtering. |
-| **Metric View Queries** | Dashboards query Metric Views using `MEASURE()` function for consistent metric definitions. Metric Views are preferred over raw Gold tables. |
-| **UPDATE-or-CREATE Deployment** | Workspace Import API with `overwrite: true` — single code path for create and update. Preserves dashboard URLs and viewer permissions. |
-| **Pre-Deployment SQL Validation** | All dataset queries validated with `SELECT ... LIMIT 1` before dashboard import. Catches UNRESOLVED_COLUMN, TABLE_NOT_FOUND, UNBOUND_PARAMETER errors. |
-| **SCD2 Handling in Queries** | Dimension queries use `QUALIFY ROW_NUMBER() OVER(PARTITION BY id ORDER BY change_time DESC) = 1` or `WHERE is_current = true` |
-| **"All" Option for Filters** | Filter datasets include `SELECT ''All'' UNION ALL SELECT DISTINCT ...` so users can clear filters |
-
----
-
-## 📋 Dashboard Components
-
-### Widget Type Reference
+#### Widget Type Reference
 
 | Widget Type | Version | Use Case | Grid Size |
 |-------------|---------|----------|-----------|
@@ -2733,7 +2884,7 @@ When you paste the prompt, the AI reads `@data_product_accelerator/skills/monito
 | **Data Table** | v1 | Detailed drill-down data | width: 6, height: 6+ |
 | **Filter** | v2 | Single-select / multi-select / date range | width: 2, height: 2 |
 
-### Chart Scale Rules (Encoding Requirements)
+#### Chart Scale Rules (Encoding Requirements)
 
 ```
 Pie Charts:   color.scale = categorical, angle.scale = quantitative
@@ -2744,7 +2895,7 @@ Area Charts:  x.scale = temporal, y.scale = quantitative, y.stack = "zero"
 
 > **Missing `scale` in encodings** is the #2 cause of "unable to render visualization" errors.
 
-### Standard Dashboard Layout
+#### Standard Dashboard Layout (6-Column Grid)
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -2784,83 +2935,9 @@ Area Charts:  x.scale = temporal, y.scale = quantitative, y.stack = "zero"
 
 ---
 
-## Prerequisite
+### Query Pattern Best Practices
 
-**Run this in your cloned Template Repository** (see Prerequisites in Step 0).
-
-Ensure you have:
-- ✅ Gold Layer Implementation completed (Step 12) — with column COMMENTs
-- ✅ Semantic Layer completed (Step 14) — Metric Views for dashboard queries
-- ✅ Use-Case Plan created (Step 13) — with dashboard requirements
-- ✅ Plan file exists: `plans/phase1-addendum-1.1-dashboards.md`
-- ✅ Gold YAML schemas available for column name validation
-
----
-
-## Steps to Apply
-
-### Step 1: Start New Agent Thread
-
-Open Cursor and start a **new Agent thread** for clean context.
-
-### Step 2: Copy and Paste the Prompt
-
-1. **Copy the entire prompt** using the copy button
-2. **Paste it into Cursor**
-3. The AI will build the dashboard in phases
-
-### Step 3: Plan Reading
-
-The AI will:
-1. Read dashboard plan (`plans/phase1-addendum-1.1-dashboards.md`)
-2. Extract KPI requirements, chart types, filter dimensions
-3. Identify data sources (Metric Views preferred over raw Gold tables)
-
-### Step 4: Dataset Creation
-
-The AI will:
-1. Create SQL queries for each widget (using `${catalog}` substitution)
-2. Use `MEASURE()` function for Metric View queries
-3. Include "All" option for filter datasets
-4. Handle NULLs with `COALESCE()` and SCD2 with `is_current = true`
-
-### Step 5: Widget and Layout Creation
-
-The AI will:
-1. Build KPI counters (version 2) for top-line metrics
-2. Build charts (version 3) for trends and comparisons
-3. Build data tables (version 1) for drill-down
-4. Position using 6-column grid (widths 1-6, NOT 12!)
-
-### Step 6: Parameter and Filter Configuration
-
-The AI will:
-1. Add DATE parameters with static defaults (not DATETIME)
-2. Create Global Filters page (`PAGE_TYPE_GLOBAL_FILTERS`)
-3. Link filter widgets to dataset parameters
-
-### Step 7: Validate and Deploy
-
-```bash
-# Pre-deployment validation
-python scripts/validate_dashboard_queries.py
-python scripts/validate_widget_encodings.py
-
-# Deploy via Asset Bundle or API
-databricks bundle deploy -t dev
-```
-
-```sql
--- Verify Gold tables have COMMENTs (prerequisite for good queries)
-SELECT table_name, comment FROM information_schema.tables 
-WHERE table_schema = ''{gold_schema}'' AND comment IS NOT NULL;
-```
-
----
-
-## 💡 Query Pattern Best Practices
-
-### Use Metric Views (Preferred)
+#### Use Metric Views (Preferred)
 
 ```sql
 -- ✅ PREFERRED: Query Metric View with MEASURE()
@@ -2874,7 +2951,7 @@ GROUP BY destination
 ORDER BY revenue DESC
 ```
 
-### Direct Gold Table Query (Fallback)
+#### Direct Gold Table Query (Fallback)
 
 ```sql
 -- When no Metric View exists for the data
@@ -2890,7 +2967,7 @@ GROUP BY d.destination_name
 ORDER BY revenue DESC
 ```
 
-### Number Formatting Rules
+#### Number Formatting Rules
 
 | Return This | Widget Displays | Format Type |
 |-------------|-----------------|-------------|
@@ -2898,7 +2975,48 @@ ORDER BY revenue DESC
 | `1234.56` | `$1,234.56` | `number-currency` |
 | `1234` | `1,234` | `number-plain` |
 
-> **NEVER** use `FORMAT_NUMBER()`, `CONCAT(''$'', ...)`, or `CONCAT(..., ''%'')` in queries. Return raw numbers; let widgets format them.',
+> **NEVER** use `FORMAT_NUMBER()`, `CONCAT(''$'', ...)`, or `CONCAT(..., ''%'')` in queries. Return raw numbers; let widgets format them.
+
+---
+
+## 3️⃣ Why Are We Building It This Way? (Databricks Best Practices)
+
+| Practice | How It''s Used Here |
+|----------|-------------------|
+| **6-Column Grid (NOT 12!)** | Widget widths use 1-6 columns. `width: 6` = full width, `width: 3` = half. This is the #1 cause of layout issues — most platforms use 12 columns, Lakeview uses 6. |
+| **Widget Version Specs** | KPI Counters = version 2, Charts (bar/line/pie/area) = version 3, Tables = version 1, Filters = version 2. Wrong version causes rendering failures. |
+| **Widget-Query Column Alignment** | Every widget `fieldName` MUST exactly match the SQL alias in its dataset query. Mismatch = "no fields to visualize" error. |
+| **Raw Number Formatting** | Queries return raw numbers (e.g., `0.85` for 85%). Widgets apply formatting (`number-percent`, `number-currency`, `number-plain`). NEVER use `FORMAT_NUMBER()` or string concatenation. |
+| **DATE Parameters (Not DATETIME)** | Dashboard parameters use `DATE` type with static default values. `DATETIME` with dynamic expressions like `now-30d/d` does NOT work. |
+| **Variable Substitution** | All queries use `${catalog}.${gold_schema}` — never hardcoded catalog/schema. Substitution done in Python at deployment time. |
+| **Global Filters Page** | Every dashboard includes a `PAGE_TYPE_GLOBAL_FILTERS` page for cross-dashboard date range and dimension filtering. |
+| **Metric View Queries** | Dashboards query Metric Views using `MEASURE()` function for consistent metric definitions. Metric Views are preferred over raw Gold tables. |
+| **UPDATE-or-CREATE Deployment** | Workspace Import API with `overwrite: true` — single code path for create and update. Preserves dashboard URLs and viewer permissions. |
+| **Pre-Deployment SQL Validation** | All dataset queries validated with `SELECT ... LIMIT 1` before dashboard import. Catches UNRESOLVED_COLUMN, TABLE_NOT_FOUND, UNBOUND_PARAMETER errors. |
+| **SCD2 Handling in Queries** | Dimension queries use `QUALIFY ROW_NUMBER() OVER(PARTITION BY id ORDER BY change_time DESC) = 1` or `WHERE is_current = true` |
+| **"All" Option for Filters** | Filter datasets include `SELECT ''All'' UNION ALL SELECT DISTINCT ...` so users can clear filters |
+
+---
+
+## 4️⃣ What Happens Behind the Scenes?
+
+When you paste the prompt, the AI reads `@data_product_accelerator/skills/monitoring/02-databricks-aibi-dashboards/SKILL.md` — the **AI/BI Dashboard worker skill**. Behind the scenes:
+
+1. **Plan reading** — the skill reads your dashboard plan (`plans/phase1-addendum-1.1-dashboards.md`) to extract: KPIs, charts, filters, layout requirements
+2. **Dashboard skill loaded** — provides complete JSON templates, widget specs, grid layout rules, query patterns, validation scripts, and deployment workflows
+3. **5 Common skills auto-loaded:**
+   - `databricks-expert-agent` — "Extract, Don''t Generate" for table/column names
+   - `databricks-asset-bundles` — dashboard resource deployment
+   - `databricks-python-imports` — deployment script module patterns
+   - `naming-tagging-standards` — dashboard and file naming conventions
+   - `databricks-autonomous-operations` — self-healing deploy loop
+4. **Query pattern selection:** Metric Views → Gold tables → Monitoring tables (priority order)
+5. **Pre-deployment validation** — SQL validation + widget-encoding alignment check before import (catches 90% of errors before deploy)
+6. **UPDATE-or-CREATE deployment** — Workspace Import API with `overwrite: true` preserves URLs and permissions
+
+**Key principle:** The AI reads your plan to **extract** KPI/chart requirements. Dashboard queries use `${catalog}` and `${gold_schema}` variable substitution — never hardcoded schemas.
+
+> **Note:** For the full observability stack (Lakehouse Monitoring + Dashboards + SQL Alerts), use the orchestrator at `@data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md`. This step focuses specifically on the dashboard.',
 '## Expected Deliverables
 
 ### 📁 Dashboard Files Created
@@ -3079,6 +3197,13 @@ VALUES
 'Build, deploy, and test the complete application using @data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md for self-healing deployment and @data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md for DAB validation.
 
 After deployment succeeds, document the entire repository using @data_product_accelerator/skills/admin/documentation-organization/SKILL.md in Framework Documentation Authoring mode.
+
+This will involve the following end-to-end workflow:
+
+- **Analyze project structure** — identify existing deploy scripts, build configurations, DAB config (databricks.yml), and environment settings
+- **Run self-healing deploy loop** — validate bundle, deploy, poll with exponential backoff (30s → 60s → 120s), diagnose failures at the task level, apply fixes, and redeploy (max 3 iterations before escalation)
+- **Verify all tasks and application health** — confirm all job tasks succeeded, app URL is accessible, API health endpoint returns 200 OK, and data flows through all pipeline layers
+- **Document the entire repository** — generate comprehensive documentation under docs/ using Framework Documentation Authoring mode (architecture overview, component deep dives, deployment guide, operations guide, troubleshooting guide)
 
 ---
 
@@ -3280,7 +3405,117 @@ This generates comprehensive project documentation under `docs/{project-name}-de
 'Redeploy & Test Application',
 'Use project deploy scripts and DAB to build, deploy, and test the complete application with self-healing operations and full repository documentation',
 18,
-'## 🔄 What is Redeploy and Test?
+'## 1️⃣ How To Apply
+
+Copy the deployment prompt from the input_template above, start a new chat with your AI coding assistant, and paste it. The assistant will follow the self-healing deploy loop and documentation workflow.
+
+### Prerequisite
+
+**Run this in your cloned Template Repository** (see Prerequisites in Step 0). These prompts assume you are working in that codebase with a coding assistant (Cursor or Copilot) enabled.
+
+**Before this step, you should have completed:**
+- Bronze, Silver, and Gold layer setup (tables populated)
+- Semantic layer (Metric Views, TVFs, Genie Space)
+- Any application code (frontend/backend)
+- DAB configuration (`databricks.yml`)
+
+### Steps to Apply
+
+**Step 1: Analyze Project**
+```
+@codebase What deploy scripts and configurations exist? How do I build and deploy?
+```
+
+**Step 2: Build Application**
+```bash
+npm install && npm run build  # or equivalent for your project
+pip install -r requirements.txt  # if Python backend
+```
+
+**Step 3: Validate Bundle (Pre-Deploy)**
+```bash
+databricks bundle validate -t dev
+# Catches ~80% of errors — fix any issues before proceeding
+```
+
+**Step 4: Deploy Using Project Scripts**
+```bash
+./deploy.sh  # or your project''''s deploy script
+# Or: databricks bundle deploy -t dev
+```
+
+**Step 5: Deploy DAB Artifacts**
+```bash
+databricks bundle deploy -t dev
+databricks bundle run <job_name> -t dev
+# Extract RUN_ID from the output URL
+```
+
+**Step 6: Poll with Exponential Backoff**
+```bash
+# Poll: 30s -> 60s -> 120s intervals
+databricks jobs get-run <RUN_ID> --output json | jq -r ''.state.life_cycle_state''
+# When TERMINATED: check .state.result_state
+```
+
+**Step 7: On Failure — Diagnose and Fix**
+```bash
+# Get failed tasks (use TASK run_id, not parent)
+databricks jobs get-run <RUN_ID> --output json \
+  | jq ''.tasks[] | select(.state.result_state == "FAILED") | {task: .task_key, run_id: .run_id}''
+
+# Get task output
+databricks jobs get-run-output <TASK_RUN_ID> --output json \
+  | jq -r ''.notebook_output.result // .error // "No output"''
+
+# Fix -> Redeploy -> Re-poll (max 3 iterations)
+```
+
+**Step 8: Verify All Tasks and Application Health**
+```bash
+# Verify all tasks succeeded
+databricks jobs get-run <RUN_ID> --output json \
+  | jq ''.tasks[] | {task: .task_key, result: .state.result_state}''
+
+# Check app health
+curl -s https://<app-url>/api/health
+databricks apps get <app-name> --output json | jq .app_status
+```
+
+**Step 9: Run Testing Checklist**
+- Application health (URL accessible, health endpoint OK)
+- Frontend functionality (UI loads, navigation, forms, data display)
+- Backend functionality (API endpoints, database, auth)
+- Data pipelines (Bronze, Silver, Gold, dashboards, Genie)
+
+**Step 10: Document the Entire Repository**
+After deployment succeeds, paste this prompt in a **new AI assistant thread**:
+
+```
+Document this entire repository using @data_product_accelerator/skills/admin/documentation-organization/SKILL.md
+
+Use Framework Documentation Authoring mode to create a complete docs/ set:
+- Architecture overview with diagrams
+- Component deep dives for each major module
+- Deployment guide
+- Operations guide (health checks, monitoring, alerting)
+- Troubleshooting guide (common errors and solutions)
+
+Also run organizational enforcement:
+- Audit root directory for stray .md files
+- Move any misplaced docs to correct docs/ subdirectory
+- Validate all naming uses kebab-case
+```
+
+This triggers the documentation-organization skill''''s **Mode 2: Framework Documentation Authoring** which:
+1. Gathers requirements (framework name, audience, tech stack, components)
+2. Generates numbered docs under `docs/{project-name}-design/`
+3. Fills templates (index, introduction, architecture, components, implementation, operations, troubleshooting)
+4. Validates against the 43-item quality checklist
+
+---
+
+## 2️⃣ What Are We Building?
 
 **Redeploy & Test** is not "deploy and pray" — it is a **systematic, self-healing operational loop** powered by the autonomous operations skill. Every deployment follows a disciplined cycle: validate, deploy, poll, diagnose, fix, and verify. After deployment succeeds, the **entire repository** is documented comprehensively.
 
@@ -3301,9 +3536,7 @@ This generates comprehensive project documentation under `docs/{project-name}-de
 | **Task-Level Diagnostics** | Get output from failed tasks, not just the parent job |
 | **Documentation as Final Step** | Every project gets architecture, operations, and troubleshooting docs |
 
----
-
-## 🏗️ Self-Healing Deployment Architecture
+### Self-Healing Deployment Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -3345,9 +3578,7 @@ This generates comprehensive project documentation under `docs/{project-name}-de
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## 📖 Key Concepts
+### Key Concepts
 
 | Concept | Why It Matters |
 |---------|----------------|
@@ -3362,117 +3593,47 @@ This generates comprehensive project documentation under `docs/{project-name}-de
 | **Root Directory Hygiene** | Only README.md, QUICKSTART.md, CHANGELOG.md allowed in root; all other docs in `docs/` |
 | **43-Item Quality Checklist** | Validates organization, naming, structure, content, usability, and maintenance of all documentation |
 
----
+### Error Troubleshooting Quick Reference
 
-## Prerequisite
+If deployment or jobs fail, check this table first:
 
-**Run this in your cloned Template Repository** (see Prerequisites in Step 0). These prompts assume you are working in that codebase with a coding assistant (Cursor or Copilot) enabled.
-
-**Before this step, you should have completed:**
-- Bronze, Silver, and Gold layer setup (tables populated)
-- Semantic layer (Metric Views, TVFs, Genie Space)
-- Any application code (frontend/backend)
-- DAB configuration (`databricks.yml`)
-
----
-
-## Steps to Apply
-
-### Step 1: Analyze Project
-```
-@codebase What deploy scripts and configurations exist? How do I build and deploy?
-```
-
-### Step 2: Build Application
-```bash
-npm install && npm run build  # or equivalent for your project
-pip install -r requirements.txt  # if Python backend
-```
-
-### Step 3: Validate Bundle (Pre-Deploy)
-```bash
-databricks bundle validate -t dev
-# Catches ~80% of errors — fix any issues before proceeding
-```
-
-### Step 4: Deploy Using Project Scripts
-```bash
-./deploy.sh  # or your project''''s deploy script
-# Or: databricks bundle deploy -t dev
-```
-
-### Step 5: Deploy DAB Artifacts
-```bash
-databricks bundle deploy -t dev
-databricks bundle run <job_name> -t dev
-# Extract RUN_ID from the output URL
-```
-
-### Step 6: Poll with Exponential Backoff
-```bash
-# Poll: 30s -> 60s -> 120s intervals
-databricks jobs get-run <RUN_ID> --output json | jq -r ''.state.life_cycle_state''
-# When TERMINATED: check .state.result_state
-```
-
-### Step 7: On Failure — Diagnose and Fix
-```bash
-# Get failed tasks (use TASK run_id, not parent)
-databricks jobs get-run <RUN_ID> --output json \
-  | jq ''.tasks[] | select(.state.result_state == "FAILED") | {task: .task_key, run_id: .run_id}''
-
-# Get task output
-databricks jobs get-run-output <TASK_RUN_ID> --output json \
-  | jq -r ''.notebook_output.result // .error // "No output"''
-
-# Fix -> Redeploy -> Re-poll (max 3 iterations)
-```
-
-### Step 8: Verify All Tasks and Application Health
-```bash
-# Verify all tasks succeeded
-databricks jobs get-run <RUN_ID> --output json \
-  | jq ''.tasks[] | {task: .task_key, result: .state.result_state}''
-
-# Check app health
-curl -s https://<app-url>/api/health
-databricks apps get <app-name> --output json | jq .app_status
-```
-
-### Step 9: Run Testing Checklist
-- Application health (URL accessible, health endpoint OK)
-- Frontend functionality (UI loads, navigation, forms, data display)
-- Backend functionality (API endpoints, database, auth)
-- Data pipelines (Bronze, Silver, Gold, dashboards, Genie)
-
-### Step 10: Document the Entire Repository
-After deployment succeeds, paste this prompt in a **new AI assistant thread**:
-
-```
-Document this entire repository using @data_product_accelerator/skills/admin/documentation-organization/SKILL.md
-
-Use Framework Documentation Authoring mode to create a complete docs/ set:
-- Architecture overview with diagrams
-- Component deep dives for each major module
-- Deployment guide
-- Operations guide (health checks, monitoring, alerting)
-- Troubleshooting guide (common errors and solutions)
-
-Also run organizational enforcement:
-- Audit root directory for stray .md files
-- Move any misplaced docs to correct docs/ subdirectory
-- Validate all naming uses kebab-case
-```
-
-This triggers the documentation-organization skill''''s **Mode 2: Framework Documentation Authoring** which:
-1. Gathers requirements (framework name, audience, tech stack, components)
-2. Generates numbered docs under `docs/{project-name}-design/`
-3. Fills templates (index, introduction, architecture, components, implementation, operations, troubleshooting)
-4. Validates against the 43-item quality checklist
+| Error | Quick Fix |
+|-------|-----------|
+| `ModuleNotFoundError` | Add to `%pip install` or DAB environment spec |
+| `TABLE_OR_VIEW_NOT_FOUND` | Run setup job first; check 3-part catalog.schema.table path |
+| `DELTA_MULTIPLE_SOURCE_ROW_MATCHING` | Deduplicate source before MERGE |
+| `Invalid access token (403)` | `databricks auth login --host <url> --profile <name>` |
+| `ResourceAlreadyExists` | Delete + recreate (monitors, alerts) |
+| `python_task not recognized` | Use `notebook_task` with `notebook_path` |
+| `PARSE_SYNTAX_ERROR` | Read failing SQL file, fix syntax, redeploy |
+| `Parameter not found` | Use `base_parameters` dict, not CLI-style `parameters` |
+| `run_job_task` vs `job_task` | Use `run_job_task` (not `job_task`) |
+| Genie `INTERNAL_ERROR` | Deploy semantic layer (TVFs + Metric Views) first |
 
 ---
 
-## 🔧 What Happens Behind the Scenes
+## 3️⃣ Why Are We Building It This Way? (Databricks Best Practices)
+
+| Practice | How It''''s Used Here |
+|----------|-------------------|
+| **Self-Healing Deploy Loop** | Max 3 iterations of deploy-diagnose-fix before escalation to user |
+| **Exponential Backoff Polling** | 30s -> 60s -> 120s intervals prevent API rate limiting and reduce noise |
+| **Task-Level Diagnostics** | Uses **task** `run_id` (not parent job `run_id`) for `get-run-output` — critical for multi-task jobs |
+| **Structured Notebook Exit** | JSON output from `dbutils.notebook.exit()` enables machine-parseable result retrieval |
+| **Pre-Deploy Validation** | `databricks bundle validate` catches ~80% of errors before any deployment attempt |
+| **Dependency-Aware Ordering** | Follows Bronze -> Gold -> Semantic -> Monitoring -> Genie deployment order |
+| **Partial Success Handling** | >=90% task success = OK; debug individual failures without rerunning everything |
+| **CLI jq Patterns** | Structured JSON parsing for job state, failed tasks, and task output |
+| **App Health Verification** | `/api/health` endpoint check + app logs review after deployment |
+| **Never Retry Destructive Ops** | No auto-retry of `bundle destroy`, `DROP TABLE`, `DELETE` monitors/alerts |
+| **Full Repository Documentation** | Post-deployment prompt triggers Framework Documentation Authoring for entire repo |
+| **Numbered Documentation Set** | `docs/{project-name}-design/` with `00-index.md` through `NN-operations-guide.md` |
+| **Root Directory Hygiene** | Only README/QUICKSTART/CHANGELOG in root; all other docs in `docs/` hierarchy |
+| **Quality Checklist Validation** | 43-item checklist covering organization, naming, structure, content, usability |
+
+---
+
+## 4️⃣ What Happens Behind the Scenes?
 
 When you paste the deployment prompt, the AI reads `@data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md` — the **autonomous operations skill**. Behind the scenes:
 
@@ -3506,47 +3667,7 @@ After deployment succeeds, the user runs a **separate prompt** that triggers the
 3. **Quality Validation** — runs 43-item checklist (organization, naming, structure, content, usability, maintenance, special cases)
 4. **Organizational Enforcement** — audits root for stray `.md` files, enforces `kebab-case` naming, routes misplaced docs to correct `docs/` subdirectory
 
-### 🏅 Databricks Best Practices Applied
-
-| Practice | How It''''s Used Here |
-|----------|-------------------|
-| **Self-Healing Deploy Loop** | Max 3 iterations of deploy-diagnose-fix before escalation to user |
-| **Exponential Backoff Polling** | 30s -> 60s -> 120s intervals prevent API rate limiting and reduce noise |
-| **Task-Level Diagnostics** | Uses **task** `run_id` (not parent job `run_id`) for `get-run-output` — critical for multi-task jobs |
-| **Structured Notebook Exit** | JSON output from `dbutils.notebook.exit()` enables machine-parseable result retrieval |
-| **Pre-Deploy Validation** | `databricks bundle validate` catches ~80% of errors before any deployment attempt |
-| **Dependency-Aware Ordering** | Follows Bronze -> Gold -> Semantic -> Monitoring -> Genie deployment order |
-| **Partial Success Handling** | >=90% task success = OK; debug individual failures without rerunning everything |
-| **CLI jq Patterns** | Structured JSON parsing for job state, failed tasks, and task output |
-| **App Health Verification** | `/api/health` endpoint check + app logs review after deployment |
-| **Never Retry Destructive Ops** | No auto-retry of `bundle destroy`, `DROP TABLE`, `DELETE` monitors/alerts |
-| **Full Repository Documentation** | Post-deployment prompt triggers Framework Documentation Authoring for entire repo |
-| **Numbered Documentation Set** | `docs/{project-name}-design/` with `00-index.md` through `NN-operations-guide.md` |
-| **Root Directory Hygiene** | Only README/QUICKSTART/CHANGELOG in root; all other docs in `docs/` hierarchy |
-| **Quality Checklist Validation** | 43-item checklist covering organization, naming, structure, content, usability |
-
----
-
-## ⚠️ Error Troubleshooting Quick Reference
-
-If deployment or jobs fail, check this table first:
-
-| Error | Quick Fix |
-|-------|-----------|
-| `ModuleNotFoundError` | Add to `%pip install` or DAB environment spec |
-| `TABLE_OR_VIEW_NOT_FOUND` | Run setup job first; check 3-part catalog.schema.table path |
-| `DELTA_MULTIPLE_SOURCE_ROW_MATCHING` | Deduplicate source before MERGE |
-| `Invalid access token (403)` | `databricks auth login --host <url> --profile <name>` |
-| `ResourceAlreadyExists` | Delete + recreate (monitors, alerts) |
-| `python_task not recognized` | Use `notebook_task` with `notebook_path` |
-| `PARSE_SYNTAX_ERROR` | Read failing SQL file, fix syntax, redeploy |
-| `Parameter not found` | Use `base_parameters` dict, not CLI-style `parameters` |
-| `run_job_task` vs `job_task` | Use `run_job_task` (not `job_task`) |
-| Genie `INTERNAL_ERROR` | Deploy semantic layer (TVFs + Metric Views) first |
-
----
-
-## 📂 Post-Deployment: Document the Entire Repository
+### Post-Deployment: Document the Entire Repository
 
 After deployment succeeds, run the documentation-organization skill to create comprehensive project documentation.
 

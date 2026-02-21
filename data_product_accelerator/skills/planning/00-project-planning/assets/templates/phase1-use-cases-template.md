@@ -62,6 +62,12 @@
 
 ---
 
+## Use Case Catalog
+
+See [Use Case Catalog](./use-case-catalog.md) for the consolidated view of all use cases with business questions and artifact-to-question traceability.
+
+---
+
 ## Implementation Order
 
 ### Week 1: Foundation

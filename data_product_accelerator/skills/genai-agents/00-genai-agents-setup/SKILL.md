@@ -7,7 +7,7 @@ description: >
   (responses-agent-patterns, mlflow-genai-evaluation, lakebase-memory-patterns,
   prompt-registry-patterns, multi-agent-genie-orchestration, deployment-automation,
   production-monitoring, mlflow-genai-foundation) plus cross-domain dependency on
-  semantic-layer/genie-space-optimization.
+  semantic-layer/genie-optimization-orchestrator.
   Use when implementing AI agents on Databricks, creating multi-agent systems with
   Genie Spaces, setting up agent evaluation pipelines, deploying agents to Model Serving,
   or troubleshooting agent implementation errors.
@@ -30,7 +30,7 @@ metadata:
     - production-monitoring
     - mlflow-genai-foundation
   cross_domain_dependencies:
-    - semantic-layer/05-genie-space-optimization
+    - semantic-layer/05-genie-optimization-orchestrator
   common_dependencies:
     - databricks-asset-bundles
     - databricks-expert-agent
@@ -49,16 +49,16 @@ metadata:
     - deployment-automation
     - production-monitoring
     - mlflow-genai-foundation
-    - semantic-layer/genie-space-optimization
+    - semantic-layer/genie-optimization-orchestrator
   last_verified: "2026-02-07"
   volatility: high
   upstream_sources:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
       paths:
-        - "databricks-skills/agent-bricks/SKILL.md"
+        - "databricks-skills/databricks-agent-bricks/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 
@@ -118,6 +118,25 @@ User Query
 | Monitoring | MLflow Registered Scorers | Continuous production quality |
 | Deployment | MLflow Deployment Jobs | Auto-trigger on model version |
 | Authentication | OBO + Automatic Auth Passthrough | User-level data governance |
+
+---
+
+## Working Memory Management
+
+This orchestrator spans 9 phases (Phase 0-8) — one of the longest in the pipeline. To maintain coherence without context pollution:
+
+**After each phase, persist a brief summary note** capturing:
+- **Phase 0 output:** Manifest found (yes/no), agent count, Genie Space IDs from manifest, tool definitions
+- **Phase 1 output:** ResponsesAgent class path, tracing config, base agent working
+- **Phase 2 output:** Genie Space tool IDs, data access verified, query routing decisions
+- **Phase 3 output:** Lakebase table names (conversations, preferences), memory config
+- **Phase 4 output:** Prompt template paths, system prompt derivation from Genie Space instructions
+- **Phase 5 output:** Evaluation dataset table path, scorer names, baseline metrics
+- **Phase 6 output:** Model Serving endpoint name, OBO auth config, deployment job paths
+- **Phase 7 output:** Production monitor names, alert thresholds, drift detection config
+- **Phase 8 output:** Genie Space optimization results, benchmark accuracy improvements
+
+**What to keep in working memory:** Only the current phase's context, the agent inventory (from Phase 0), and the previous phase's summary note. Discard intermediate outputs (full evaluation DataFrames, raw trace logs, complete prompt texts) — they are in MLflow and on disk.
 
 ---
 
@@ -291,7 +310,7 @@ else:
 
 ### Phase 8: Genie Optimization
 
-**Load skill:** `@data_product_accelerator/skills/semantic-layer/05-genie-space-optimization/SKILL.md` (cross-domain)
+**Load skill:** `@data_product_accelerator/skills/semantic-layer/05-genie-optimization-orchestrator/SKILL.md` (cross-domain)
 
 **Goal:** Improve Genie Space accuracy and repeatability.
 
@@ -379,7 +398,34 @@ See `references/implementation-checklist.md` for the complete consolidated check
 ### Cross-Domain Dependencies
 | Skill | Domain | Purpose |
 |---|---|---|
-| `semantic-layer/05-genie-space-optimization` | Semantic Layer | Accuracy testing, control levers, dual persistence |
+| `semantic-layer/05-genie-optimization-orchestrator` | Semantic Layer | Accuracy testing, control levers, dual persistence |
+
+### Upstream Agent Bricks (databricks-agent-bricks)
+
+This skill extends the upstream `databricks-agent-bricks` skill from ai-dev-kit. The following capabilities are available.
+
+#### Agent Types in Supervisor Agents (MAS)
+
+The upstream `databricks-agent-bricks` skill supports 5 agent types in Supervisor Agents:
+
+| Agent Type | Parameter | Description |
+|---|---|---|
+| Knowledge Assistant | `ka_tile_id` | Document Q&A via RAG from PDFs in Volumes |
+| Genie Space | `genie_space_id` | Natural language to SQL |
+| Custom Endpoint | `endpoint_name` | Model serving endpoint for custom agents |
+| UC Function | `uc_function_name` | Unity Catalog function (format: `catalog.schema.function_name`). Agent service principal needs `EXECUTE` privilege. |
+| External MCP Server | `connection_name` | UC HTTP Connection with `is_mcp_connection: 'true'`. Agent service principal needs `USE CONNECTION` privilege. |
+
+Provide exactly one of: `ka_tile_id`, `genie_space_id`, `endpoint_name`, `uc_function_name`, or `connection_name` per agent.
+
+#### New Actions
+
+- `find_by_name` action for both `manage_ka` and `manage_mas` tools — looks up an existing KA or Supervisor Agent by name when you don't have the tile_id
+
+#### MCP Tools
+
+- `manage_ka`: Manage Knowledge Assistants (create_or_update, get, find_by_name, delete)
+- `manage_mas`: Manage Supervisor Agents (create_or_update, get, find_by_name, delete)
 
 ---
 
@@ -393,6 +439,32 @@ See `references/implementation-checklist.md` for the complete consolidated check
 - Observability (Monitoring, Dashboards, Alerts)
 - ML models and experiments
 - GenAI agents with evaluation and deployment
+
+---
+
+## Post-Completion: Skill Usage Summary (MANDATORY)
+
+**After completing all phases of this orchestrator, output a Skill Usage Summary reflecting what you ACTUALLY did — not a pre-written summary.**
+
+### What to Include
+
+1. Every skill `SKILL.md` or `references/` file you read (via the Read tool), in the order you read them
+2. Which phase you were in when you read it
+3. Whether it was a **Worker**, **Common**, **Cross-domain**, or **Reference** file
+4. A one-line description of what you specifically used it for in this session
+
+### Format
+
+| # | Phase | Skill / Reference Read | Type | What It Was Used For |
+|---|-------|----------------------|------|---------------------|
+| 1 | Phase N | `path/to/SKILL.md` | Worker / Common / Cross-domain / Reference | One-line description |
+
+### Summary Footer
+
+End with:
+- **Totals:** X worker skills, Y common skills, Z cross-domain skills, W reference files read across N phases
+- **Skipped:** List any skills from the dependency table above that you did NOT need to read, and why (e.g., "phase not applicable", "user skipped", "no issues encountered")
+- **Unplanned:** List any skills you read that were NOT listed in the dependency table (e.g., for troubleshooting, edge cases, or user-requested detours)
 
 ---
 

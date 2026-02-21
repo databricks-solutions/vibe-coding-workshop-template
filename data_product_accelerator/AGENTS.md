@@ -15,7 +15,7 @@ This module (`data_product_accelerator/`) contains the framework — skills, doc
 repo-root/                           <-- workspace root / agent CWD
 ├── data_product_accelerator/        <-- framework (skills, docs, context)
 │   ├── AGENTS.md
-│   ├── skills/                      <-- 50 agent skills (read-only)
+│   ├── skills/                      <-- 59 agent skills (read-only)
 │   ├── context/                     <-- customer schema CSV (input)
 │   └── docs/                        <-- framework documentation
 │
@@ -35,7 +35,7 @@ repo-root/                           <-- workspace root / agent CWD
 ## Design-First Pipeline
 
 ```
-data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Observability (7) → ML (8) → GenAI (9)
+data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Genie Optimization (6b) → Observability (7) → ML (8) → GenAI (9)
 ```
 
 **New project?** Start at stage 1: place schema CSV in `data_product_accelerator/context/`, then read `data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md`.
@@ -51,6 +51,7 @@ data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Si
 | "Gold tables", "merge scripts", "Gold setup" | 4 | `data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md` |
 | "project plan", "architecture plan", "planning", "planning_mode: workshop" | 5 | `data_product_accelerator/skills/planning/00-project-planning/SKILL.md` |
 | "metric view", "TVF", "Genie Space", "semantic layer" | 6 | `data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md` |
+| "optimize Genie", "Genie accuracy", "benchmark", "judge evaluation", "control lever" | 6b | `data_product_accelerator/skills/semantic-layer/05-genie-optimization-orchestrator/SKILL.md` |
 | "monitoring", "dashboard", "alert", "observability" | 7 | `data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md` |
 | "MLflow", "ML model", "training", "inference" | 8 | `data_product_accelerator/skills/ml/00-ml-pipeline-setup/SKILL.md` |
 | "GenAI agent", "ResponsesAgent", "AI agent" | 9 | `data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md` |
@@ -66,6 +67,7 @@ data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Si
 | "TBLPROPERTIES", "CDF", "auto-optimize", "table properties" | `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` |
 | "CREATE SCHEMA", "schema setup", "predictive optimization" | `data_product_accelerator/skills/common/schema-management-patterns/SKILL.md` |
 | "PRIMARY KEY", "FOREIGN KEY", "constraint", "PK/FK" | `data_product_accelerator/skills/common/unity-catalog-constraints/SKILL.md` |
+| "Genie optimization", "8 judges", "GEPA", "metadata optimization", "dual persistence" | `data_product_accelerator/skills/semantic-layer/05-genie-optimization-orchestrator/SKILL.md` |
 | "audit skills", "check freshness", "stale skills", "verify skills" | `data_product_accelerator/skills/admin/skill-freshness-audit/SKILL.md` |
 
 ## Key Rule
@@ -109,7 +111,7 @@ For full agent behavior, read: `data_product_accelerator/skills/common/databrick
 
 ## Skills Location
 
-All 50 Agent Skills are in `data_product_accelerator/skills/` using the open [SKILL.md format](https://agentskills.io). Each skill directory contains:
+All 59 Agent Skills are in `data_product_accelerator/skills/` using the open [SKILL.md format](https://agentskills.io). Each skill directory contains:
 
 ```
 skill-name/
@@ -121,7 +123,8 @@ skill-name/
 
 Skills follow an **orchestrator/worker** pattern:
 - `00-` prefix = **Orchestrator** (manages end-to-end workflows for a pipeline stage)
-- `01-`, `02-`, ... = **Workers** (specific patterns, called by orchestrators or used standalone)
+- `01-` prefix or named directories = **Workers** (specific patterns, called by orchestrators or used standalone)
+- Gold workers are organized into `design-workers/` and `pipeline-workers/` subdirectories for clear separation
 
 ## IDE Compatibility
 

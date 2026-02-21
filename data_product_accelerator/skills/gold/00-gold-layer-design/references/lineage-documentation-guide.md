@@ -179,3 +179,20 @@ Use `scripts/generate_lineage_csv.py` to generate and validate.
 # Lineage reveals: check_in_date uses DATE_TRUNC with .cast("date")
 # Fix: date_trunc("day", col("check_in_timestamp")).cast("date")
 ```
+
+---
+
+## Lineage Accuracy: Silver Column Verification
+
+The `silver_table` and `silver_column` values in YAML lineage are assumptions made during design based on Bronze schema naming conventions. These assumptions may be wrong if the Silver layer renames or transforms columns.
+
+**Rule:** `silver_column` values must match **actual Silver table column names**, not Bronze column names. If Silver renames `company_rcn` to `company_retail_control_number`, the YAML lineage must reference the Silver name.
+
+**Verification:** After the Silver layer is deployed, run the Silver cross-reference script from `00-gold-layer-design/SKILL.md` or the full Phase 0 contract validation from `01-gold-layer-setup/references/design-to-pipeline-bridge.md`.
+
+**Common Mistakes:**
+- Copying Bronze column name into `silver_column` without checking if Silver renamed it
+- Assuming Silver DLT passes all columns through unchanged (Silver may add derived columns, rename for clarity, or change types)
+- Not updating YAML lineage after Silver schema changes
+
+**Prevention:** Always verify `silver_column` values against `DESCRIBE {catalog}.{silver_schema}.{silver_table}` before finalizing YAML designs.

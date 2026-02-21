@@ -1,6 +1,6 @@
 ---
 name: gold-layer-setup
-description: End-to-end orchestrator for implementing Gold layer tables, merge scripts, FK constraints, and Asset Bundle jobs from YAML schema definitions. Guides users through YAML-driven table creation, Silver-to-Gold MERGE operations (SCD Type 1/2 dimensions, aggregated/transaction facts), foreign key constraint application, Asset Bundle job configuration, and post-deployment validation. Orchestrates mandatory dependencies on Gold skills (yaml-driven-gold-setup, gold-layer-schema-validation, gold-layer-merge-patterns, gold-layer-documentation, gold-delta-merge-deduplication, fact-table-grain-validation, mermaid-erd-patterns) and common skills (databricks-asset-bundles, databricks-table-properties, databricks-python-imports, schema-management-patterns, unity-catalog-constraints, databricks-expert-agent). Use when implementing Gold layer from YAML designs, creating table setup scripts, writing merge scripts, deploying Gold layer jobs, or troubleshooting Gold layer implementation errors.
+description: End-to-end orchestrator for implementing Gold layer tables, merge scripts, FK constraints, and Asset Bundle jobs from YAML schema definitions. Guides users through Silver contract validation, YAML-driven table creation, Silver-to-Gold MERGE operations (SCD Type 1/2 dimensions, aggregated/transaction facts, accumulating snapshots, factless facts, periodic snapshots, junk dimensions), foreign key constraint application, Asset Bundle job configuration, and post-deployment validation. Orchestrates pipeline-workers (01-yaml-table-setup, 02-merge-patterns, 03-deduplication, 04-grain-validation, 05-schema-validation) and common skills (databricks-asset-bundles, databricks-table-properties, databricks-python-imports, schema-management-patterns, unity-catalog-constraints, databricks-expert-agent). Use when implementing Gold layer from YAML designs, creating table setup scripts, writing merge scripts, deploying Gold layer jobs, or troubleshooting Gold layer implementation errors.
 license: Apache-2.0
 metadata:
   author: prashanth subrahmanyam
@@ -12,13 +12,11 @@ metadata:
   next_stages:
     - project-planning
   workers:
-    - yaml-driven-gold-setup
-    - gold-layer-schema-validation
-    - gold-layer-merge-patterns
-    - gold-layer-documentation
-    - gold-delta-merge-deduplication
-    - fact-table-grain-validation
-    - mermaid-erd-patterns
+    - pipeline-workers/01-yaml-table-setup
+    - pipeline-workers/02-merge-patterns
+    - pipeline-workers/03-deduplication
+    - pipeline-workers/04-grain-validation
+    - pipeline-workers/05-schema-validation
   common_dependencies:
     - databricks-asset-bundles
     - databricks-table-properties
@@ -29,13 +27,11 @@ metadata:
     - naming-tagging-standards
     - databricks-autonomous-operations
   dependencies:
-    - yaml-driven-gold-setup
-    - gold-layer-schema-validation
-    - gold-layer-merge-patterns
-    - gold-layer-documentation
-    - gold-delta-merge-deduplication
-    - fact-table-grain-validation
-    - mermaid-erd-patterns
+    - pipeline-workers/01-yaml-table-setup
+    - pipeline-workers/02-merge-patterns
+    - pipeline-workers/03-deduplication
+    - pipeline-workers/04-grain-validation
+    - pipeline-workers/05-schema-validation
     - databricks-asset-bundles
     - databricks-table-properties
     - databricks-python-imports
@@ -77,13 +73,11 @@ This skill orchestrates the complete Gold layer implementation process, transfor
 
 | Skill | Read At | Purpose |
 |-------|---------|---------|
-| `yaml-driven-gold-setup` | Phase 1 | YAML-to-DDL patterns, setup script structure |
-| `gold-layer-documentation` | Phase 1 | Dual-purpose descriptions, table properties |
-| `gold-layer-merge-patterns` | Phase 2 | SCD Type 1/2, fact aggregation, column mapping |
-| `gold-delta-merge-deduplication` | Phase 2 | Deduplication before MERGE (mandatory) |
-| `fact-table-grain-validation` | Phase 2 | Grain inference from PK, pre-merge validation |
-| `gold-layer-schema-validation` | Phase 2 | DataFrame-to-DDL schema validation |
-| `mermaid-erd-patterns` | Phase 5 | Cross-reference created tables against ERD |
+| `pipeline-workers/01-yaml-table-setup` | Phase 1 | YAML-to-DDL patterns, setup script structure |
+| `pipeline-workers/02-merge-patterns` | Phase 2 | SCD Type 1/2, fact aggregation, column mapping |
+| `pipeline-workers/03-deduplication` | Phase 2 | Deduplication before MERGE (mandatory) |
+| `pipeline-workers/04-grain-validation` | Phase 2 | Grain inference from PK, pre-merge validation |
+| `pipeline-workers/05-schema-validation` | Phase 2 | DataFrame-to-DDL schema validation |
 
 ### Common Skills
 
@@ -95,7 +89,7 @@ This skill orchestrates the complete Gold layer implementation process, transfor
 | `schema-management-patterns` | Phase 1 | CREATE SCHEMA IF NOT EXISTS |
 | `databricks-python-imports` | Phase 2 | Pure Python modules, avoid sys.path issues |
 | `databricks-expert-agent` | All | Schema extraction over generation principle |
-| `databricks-autonomous-operations` | Phase 4+ | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs fail |
+| `databricks-autonomous-operations` | Phase 4+ (if user-triggered) | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs fail |
 
 ### 🔴 Non-Negotiable Defaults (Applied to EVERY Gold Table and Job)
 
@@ -110,131 +104,13 @@ These defaults are ALWAYS applied. There are NO exceptions, NO overrides, NO alt
 | **Row Tracking** | `'delta.enableRowTracking' = 'true'` | Every table's TBLPROPERTIES | ❌ NEVER omit (breaks downstream MV refresh) |
 | **notebook_task** | `notebook_task:` with `base_parameters:` | Every task in job YAML | ❌ NEVER use `python_task:` or CLI-style `parameters:` |
 
-```sql
--- ✅ CORRECT: Every Gold table DDL MUST include
-CREATE OR REPLACE TABLE {catalog}.{schema}.{table_name} (
-    ...
-)
-USING DELTA
-CLUSTER BY AUTO          -- 🔴 MANDATORY
-TBLPROPERTIES (
-    'delta.enableChangeDataFeed' = 'true',     -- 🔴 MANDATORY
-    'delta.enableRowTracking' = 'true',        -- 🔴 MANDATORY
-    'delta.autoOptimize.autoCompact' = 'true',
-    'delta.autoOptimize.optimizeWrite' = 'true',
-    'layer' = 'gold'
-)
-```
-
-```yaml
-# ✅ CORRECT: Every Gold job MUST include
-environments:
-  - environment_key: "default"
-    spec:
-      environment_version: "4"   # 🔴 MANDATORY
-tasks:
-  - task_key: setup_tables
-    environment_key: default     # 🔴 MANDATORY on every task
-    notebook_task:               # 🔴 MANDATORY (never python_task)
-      notebook_path: ../src/setup_tables.py
-      base_parameters:           # 🔴 MANDATORY (never CLI-style parameters)
-        catalog: ${var.catalog}
-```
+See [Setup Script Patterns](references/setup-script-patterns.md) for DDL template and [Asset Bundle Job Patterns](references/asset-bundle-job-patterns.md) for job YAML template.
 
 ### 🔴 YAML Extraction Over Generation (Merge Scripts Included)
 
-**EVERY value below MUST be extracted from Gold YAML files or COLUMN_LINEAGE.csv. NEVER generate, guess, or hardcode.**
+**EVERY value below MUST be extracted from Gold YAML files or COLUMN_LINEAGE.csv. NEVER generate, guess, or hardcode.** Table names, column names/types, PKs, FKs, business keys, grain types, SCD types, source Silver tables, and column mappings — ALL come from YAML. The ONLY things coded by hand are aggregation expressions and derived column formulas (business logic).
 
-The `gold/00-gold-layer-design` skill produces YAML schemas in `gold_layer_design/yaml/{domain}/*.yaml` and lineage in `COLUMN_LINEAGE.csv`. These are the **single source of truth** for ALL implementation code — including merge scripts.
-
-| What to Extract | YAML Location | Used In | ❌ NEVER Do This |
-|----------------|---------------|---------|------------------|
-| **Gold table name** | `table_name:` | Merge target, DDL | ❌ NEVER hardcode `"dim_store"` or `"fact_sales_daily"` |
-| **Gold column names** | `columns[].name` | `.select()` list, `whenMatchedUpdate` | ❌ NEVER type column names from memory |
-| **Column types** | `columns[].type` | Schema validation, cast operations | ❌ NEVER guess types |
-| **Primary key columns** | `primary_key.columns[]` | MERGE condition, grain validation | ❌ NEVER hardcode MERGE ON clause |
-| **Business key** | `business_key.columns[]` | Deduplication key | ❌ NEVER hardcode `.dropDuplicates(["store_number"])` |
-| **Foreign keys** | `foreign_keys[]` | FK constraints, dimension ordering | ❌ NEVER hardcode FK references |
-| **SCD type** | `table_properties.scd_type` | SCD1 vs SCD2 merge pattern | ❌ NEVER assume SCD type |
-| **Grain type** | `table_properties.grain` | Transaction vs aggregated merge | ❌ NEVER assume grain |
-| **Source Silver table** | `lineage.source_table` or `COLUMN_LINEAGE.csv` | Silver source reference | ❌ NEVER guess Silver table names |
-| **Column mappings** | `columns[].lineage.source_column` or `COLUMN_LINEAGE.csv` | `.withColumn("gold", col("silver"))` renames | ❌ NEVER guess Silver→Gold renames |
-| **Domain** | `domain:` or directory name | Domain-ordered processing | ❌ NEVER hardcode domain lists |
-
-**Extraction Pattern for Merge Scripts:**
-
-```python
-# ✅ CORRECT: Extract metadata from YAML BEFORE writing merge logic
-import yaml
-from pathlib import Path
-
-def load_table_metadata(yaml_path: Path) -> dict:
-    """Extract ALL merge-relevant metadata from a single YAML file."""
-    with open(yaml_path) as f:
-        config = yaml.safe_load(f)
-    return {
-        "table_name": config["table_name"],
-        "columns": [c["name"] for c in config.get("columns", [])],
-        "column_types": {c["name"]: c["type"] for c in config.get("columns", [])},
-        "pk_columns": config.get("primary_key", {}).get("columns", []),
-        "business_key": config.get("business_key", {}).get("columns", []),
-        "foreign_keys": config.get("foreign_keys", []),
-        "scd_type": config.get("table_properties", {}).get("scd_type", ""),
-        "grain": config.get("table_properties", {}).get("grain", ""),
-        "entity_type": config.get("table_properties", {}).get("entity_type", ""),
-        "lineage": {
-            c["name"]: c.get("lineage", {})
-            for c in config.get("columns", [])
-            if c.get("lineage")
-        },
-    }
-
-# ✅ CORRECT: Use extracted metadata to build merge logic
-meta = load_table_metadata(Path("gold_layer_design/yaml/sales/fact_sales_daily.yaml"))
-pk_columns = meta["pk_columns"]          # → ["store_number", "upc_code", "transaction_date"]
-gold_columns = meta["columns"]           # → ["store_number", "upc_code", ..., "net_revenue"]
-merge_condition = " AND ".join(          # → "target.store_number = source.store_number AND ..."
-    f"target.{c} = source.{c}" for c in pk_columns
-)
-```
-
-```python
-# ❌ WRONG: Hardcoding values that exist in YAML
-gold_table = "fact_sales_daily"                              # ❌ Hardcoded
-merge_condition = "target.store_number = source.store_number # ❌ Hardcoded
-    AND target.upc_code = source.upc_code"
-select_cols = ["store_number", "upc_code", "net_revenue"]    # ❌ Hardcoded
-```
-
-**Column Mapping Extraction from COLUMN_LINEAGE.csv:**
-
-```python
-import csv
-
-def load_column_mappings(lineage_csv: Path, gold_table: str) -> dict:
-    """Extract Silver→Gold column mappings from design-phase lineage CSV."""
-    mappings = {}
-    with open(lineage_csv) as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row["gold_table"] == gold_table:
-                silver_col = row["silver_column"]
-                gold_col = row["gold_column"]
-                if silver_col != gold_col:
-                    mappings[gold_col] = silver_col  # gold_name: silver_source
-    return mappings
-
-# ✅ CORRECT: Apply extracted mappings
-mappings = load_column_mappings(Path("gold_layer_design/COLUMN_LINEAGE.csv"), "dim_store")
-for gold_col, silver_col in mappings.items():
-    df = df.withColumn(gold_col, col(silver_col))
-```
-
-**What CAN be coded (not extracted):**
-- Aggregation expressions (business logic: `spark_sum(when(...))`)
-- Derived column formulas (business rules: `when(col("close_date").isNotNull(), "Closed")`)
-- SCD Type 2 column generation (`md5(concat_ws(...))`)
-- Timestamp columns (`current_timestamp()`)
+See [Merge Script Patterns](references/merge-script-patterns.md) for the complete extraction helpers: `load_table_metadata()`, `build_inventory()`, `load_column_mappings_from_yaml()`, `build_merge_condition()`, and correct vs. incorrect usage examples.
 
 ## Quick Start (3-4 hours)
 
@@ -251,20 +127,20 @@ for gold_col, silver_col in mappings.items():
 **Setup Scripts:**
 - [ ] `src/{project}_gold/setup_tables.py` — Generic YAML-driven table creation
 - [ ] `src/{project}_gold/add_fk_constraints.py` — FK constraint application
-- [ ] Verify: `databricks bundle run gold_setup_job -t dev`
+- [ ] (User-triggered) Verify: `databricks bundle run gold_setup_job -t dev`
 
 **Merge Scripts:**
 - [ ] `src/{project}_gold/merge_gold_tables.py` — Silver-to-Gold MERGE
 - [ ] Dimension merges (SCD Type 1 or 2) with deduplication
 - [ ] Fact merges with aggregation and grain validation
-- [ ] Verify: `databricks bundle run gold_merge_job -t dev`
+- [ ] (User-triggered) Verify: `databricks bundle run gold_merge_job -t dev`
 
 **Asset Bundle Jobs:**
 - [ ] `resources/gold/gold_setup_job.yml` — Setup + FK constraints (two tasks)
 - [ ] `resources/gold/gold_merge_job.yml` — Periodic merge with schedule
 - [ ] YAML files synced in `databricks.yml`
 
-### Fast Track
+### Deployment Commands (run when ready — NOT auto-executed by this skill)
 
 ```bash
 # 1. Deploy setup job (creates tables from YAML)
@@ -280,15 +156,52 @@ databricks bundle run gold_merge_job -t dev
 
 ---
 
+## Working Memory Management
+
+This orchestrator spans 5+ phases. To maintain coherence without context pollution, follow this note-taking discipline:
+
+**After each phase, persist a brief summary note** (e.g., in a scratch file or conversation notes) capturing:
+- **Phase 0 output:** Silver contract pass/fail per table, any YAML fixes made, resolution report location
+- **Phase 1 output:** Table inventory dict, YAML base path, count of tables created, any FK failures
+- **Phase 2 output:** Merge function inventory (which tables use SCD1 vs SCD2, aggregated vs transaction), any column mapping issues
+- **Phase 3 output:** Job YAML file paths, databricks.yml sync status
+- **Phase 4 output (if user-triggered):** Deployment results, validation failures to investigate
+
+**What to keep in working memory:** Only the current phase's worker skill, the table inventory dict, and the previous phase's summary note. Discard intermediate tool outputs (DDL strings, full DataFrames, raw validation SQL results) — they are reproducible from YAML.
+
+**What to offload to references:** Each pipeline-worker skill has `Pipeline Notes to Carry Forward` and `Next Step` sections. Read them to know what to pass to the next phase. The worker skills form a chain: `01 → 02 → 03 → 04 → 05`.
+
+---
+
 ## Step-by-Step Workflow
+
+### Phase 0: Upstream Contract Validation (15 min)
+
+**MANDATORY: Execute before proceeding to any implementation phase.**
+
+**Reference:** `data_product_accelerator/skills/gold/01-gold-layer-setup/references/design-to-pipeline-bridge.md` — Full validation logic documentation
+
+**Purpose:** Validate that all source column names and types referenced in YAML lineage actually exist in the deployed upstream tables. This catches column name mismatches BEFORE any code is written, eliminating the most common source of iteration.
+
+**Steps:**
+1. Execute `scripts/validate_upstream_contracts.py` with the project's `catalog` and `source_schema` widget parameters (or run `run_phase0_validation()` inline from the script)
+2. Capture and paste the full printed output — it produces a PASS/FAIL report per Gold table
+3. If ANY table shows FAILED, fix YAML lineage `silver_column` values in `gold_layer_design/yaml/` to match actual source columns, then re-run the script
+
+**Gate:** ALL contracts must show PASSED in the script output before proceeding to Phase 1.
+
+**Backup guardrail:** The merge template (`scripts/merge_gold_tables_template.py`) also embeds `validate_upstream_contracts()` as a fail-fast check in `main()`. Even if Phase 0 is skipped, the merge job will abort with a clear error before any MERGE executes.
+
+**Output:** Column resolution reports for all Gold tables, confirming source→Gold mappings are correct.
+
+---
 
 ### Phase 1: YAML-Driven Table Creation (30 min)
 
 **MANDATORY: Read each skill below using the Read tool BEFORE writing any code for this phase:**
 
-1. `data_product_accelerator/skills/gold/yaml-driven-gold-setup/SKILL.md` — YAML-to-DDL patterns, `find_yaml_base()`, `build_create_table_ddl()`
-2. `data_product_accelerator/skills/gold/gold-layer-documentation/SKILL.md` — Dual-purpose column descriptions, naming conventions
-3. `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` — Standard TBLPROPERTIES by layer
+1. `data_product_accelerator/skills/gold/pipeline-workers/01-yaml-table-setup/SKILL.md` — YAML-to-DDL patterns, `find_yaml_base()`, `build_create_table_ddl()`
+2. `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` — Standard TBLPROPERTIES by layer
 4. `data_product_accelerator/skills/common/unity-catalog-constraints/SKILL.md` — PK/FK `ALTER TABLE` patterns, NOT NULL requirements
 5. `data_product_accelerator/skills/common/schema-management-patterns/SKILL.md` — `CREATE SCHEMA IF NOT EXISTS` pattern
 
@@ -316,15 +229,37 @@ See `scripts/add_fk_constraints_template.py` for starter template.
 
 ---
 
+### Phase 1b: Advanced Setup Patterns (Optional)
+
+**Read if applicable:** `references/setup-advanced-patterns.md`
+
+These patterns extend Phase 1 based on design decisions from `design-workers/02-dimension-patterns`:
+
+**Role-Playing Dimension Views:** If any dimension has `dimension_pattern: role_playing` in YAML, create alias views after table creation. Example: `dim_date` → `dim_order_date`, `dim_ship_date`, `dim_delivery_date`.
+
+**Unknown Member Row Insertion:** Insert a `-1` key "Unknown" member row in every dimension table AFTER PKs are applied but BEFORE FK constraints. This prevents NULL foreign keys for late-arriving facts.
+
+**Execution Order:**
+1. Create tables (Phase 1)
+2. Apply PK constraints (Phase 1)
+3. Create role-playing views (Phase 1b)
+4. Insert unknown member rows (Phase 1b)
+5. Apply FK constraints (Phase 1)
+6. Run merge scripts (Phase 2)
+
+---
+
 ### Phase 2: MERGE Script Implementation (2 hours)
 
 **MANDATORY: Read each skill below using the Read tool BEFORE writing any merge code:**
 
-1. `data_product_accelerator/skills/gold/gold-layer-merge-patterns/SKILL.md` — SCD Type 1/2, fact aggregation, column mapping, `spark_sum` alias
-2. `data_product_accelerator/skills/gold/gold-delta-merge-deduplication/SKILL.md` — Deduplication before MERGE (ALWAYS required, prevents `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE`)
-3. `data_product_accelerator/skills/gold/fact-table-grain-validation/SKILL.md` — Grain inference from PK, transaction vs aggregated patterns
-4. `data_product_accelerator/skills/gold/gold-layer-schema-validation/SKILL.md` — `validate_merge_schema()`, DataFrame-to-DDL checks
+1. `data_product_accelerator/skills/gold/pipeline-workers/02-merge-patterns/SKILL.md` — SCD Type 1/2, fact aggregation, column mapping, `spark_sum` alias
+2. `data_product_accelerator/skills/gold/pipeline-workers/03-deduplication/SKILL.md` — Deduplication before MERGE (ALWAYS required, prevents `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE`)
+3. `data_product_accelerator/skills/gold/pipeline-workers/04-grain-validation/SKILL.md` — Grain inference from PK, transaction vs aggregated patterns
+4. `data_product_accelerator/skills/gold/pipeline-workers/05-schema-validation/SKILL.md` — `validate_merge_schema()`, DataFrame-to-DDL checks
 5. `data_product_accelerator/skills/common/databricks-python-imports/SKILL.md` — Pure Python modules, avoid `sys.path` issues in serverless
+6. `data_product_accelerator/skills/gold/01-gold-layer-setup/references/advanced-merge-patterns.md` — Accumulating snapshot, factless fact, periodic snapshot, junk dimension patterns
+7. `data_product_accelerator/skills/gold/01-gold-layer-setup/references/design-to-pipeline-bridge.md` — Silver contract validation, lineage-driven column builder, scripted column resolution
 
 **Activities:**
 
@@ -333,15 +268,16 @@ See `scripts/add_fk_constraints_template.py` for starter template.
 2. Load `COLUMN_LINEAGE.csv` using `load_column_mappings()` for Silver→Gold renames
 3. For each table: extract `table_name`, `pk_columns`, `business_key`, `scd_type`, `grain`, `columns`, `lineage`
 4. Build a table inventory dict keyed by table name — this drives ALL merge functions
-5. Verify Silver source tables exist: `spark.table(silver_table)` before coding any merge logic
+5. Verify source tables exist: `spark.table(source_table)` before coding any merge logic
+6. Use `build_column_expressions()` from `references/design-to-pipeline-bridge.md` for DIRECT_COPY/RENAME/CAST/GENERATED columns instead of writing `.withColumn()` calls manually — this automates ~70% of column mappings deterministically from YAML lineage
 
 **Step 1 — Create merge functions using extracted metadata:**
-1. Create `merge_gold_tables.py` with separate functions per table
+1. Create `merge_gold_tables.py` with separate functions per table (start from `scripts/merge_gold_tables_template.py` which includes embedded `validate_upstream_contracts()` and `validate_merge_schema()` guardrails)
 2. Implement dimension merges (SCD Type 1 or Type 2 — read `scd_type` from YAML)
 3. Implement fact merges (aggregation to match grain — read `grain` from YAML)
 4. Add deduplication before every MERGE (MANDATORY — use `business_key` from YAML)
-5. Add explicit column mapping (use `lineage.source_column` from YAML or `COLUMN_LINEAGE.csv`)
-6. Add schema validation before merge (compare DataFrame columns against YAML `columns[]`)
+5. Add explicit column mapping (use `lineage.silver_column` from YAML or `COLUMN_LINEAGE.csv`)
+6. Add schema validation before merge (`validate_merge_schema()` is already in the template — keep it)
 7. Add grain validation for fact tables (use `pk_columns` from YAML)
 8. Merge dimensions FIRST, then facts (dependency order from YAML `foreign_keys`)
 
@@ -356,6 +292,11 @@ See `scripts/add_fk_constraints_template.py` for starter template.
 7. **Validate schema** — Compare DataFrame columns against `meta["columns"]`
 8. **Build MERGE condition** — `" AND ".join(f"target.{c} = source.{c}" for c in meta["business_key"])` (from YAML)
 
+**Design Pattern Awareness (Dimensions):** Check YAML `dimension_pattern` for advanced patterns:
+- `role_playing` → Views already created in Phase 1b, no special merge logic needed
+- `junk` → Use `assets/templates/junk-dimension-populate.py` instead of standard SCD merge
+- Standard dimensions → Use SCD Type 1 or 2 merge based on `scd_type`
+
 **For Each Fact Table:**
 
 1. **Extract metadata** — `meta = load_table_metadata(yaml_path)` → get `pk_columns`, `grain`, `columns`
@@ -366,6 +307,14 @@ See `scripts/add_fk_constraints_template.py` for starter template.
 6. **Select explicitly** — `.select(meta["columns"])` — column list FROM YAML
 7. **Validate schema** — Compare DataFrame columns against `meta["columns"]`
 8. **Build MERGE condition** — `" AND ".join(f"target.{c} = source.{c}" for c in meta["pk_columns"])` (from YAML)
+
+**Design Pattern Awareness (Facts):** Check YAML `grain_type` for advanced patterns:
+- `accumulating_snapshot` → Use `assets/templates/accumulating-snapshot-merge.py` (milestone progression)
+- `factless` → Use `assets/templates/factless-fact-merge.py` (INSERT only, no aggregation)
+- `periodic_snapshot` → Use `assets/templates/periodic-snapshot-merge.py` (full period replacement)
+- Standard transaction/aggregated → Use standard fact aggregation merge
+
+See `references/advanced-merge-patterns.md` for pattern selection table and details.
 
 **Critical Rules (from dependency skills):**
 - ALWAYS deduplicate Silver before MERGE (prevents `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE`)
@@ -411,7 +360,17 @@ See `assets/templates/gold-setup-job-template.yml` and `assets/templates/gold-me
 
 ---
 
-### Phase 4: Deployment and Testing (30 min)
+### 🛑 STOP — Artifact Creation Complete
+
+**Phases 0–3 are complete.** All scripts (`setup_tables.py`, `add_fk_constraints.py`, `merge_gold_tables.py`) and job YAMLs have been created. **Do NOT proceed to Phase 4 unless the user explicitly requests deployment.**
+
+Report what was created and ask the user if they want to deploy, run, and validate.
+
+---
+
+### Phase 4: Deployment and Testing (30 min) — USER-TRIGGERED ONLY
+
+> **This phase is executed ONLY when the user explicitly requests deployment.** Do not auto-execute.
 
 **Activities:**
 1. Deploy: `databricks bundle deploy -t dev`
@@ -426,54 +385,27 @@ See `references/validation-queries.md` for complete validation SQL.
 
 ---
 
-### Phase 4b: Enable Anomaly Detection on Gold Schema (5 min)
+### Phase 4b: Enable Anomaly Detection on Gold Schema (5 min) — USER-TRIGGERED ONLY
+
+> **This phase is executed ONLY when the user explicitly requests it.** Do not auto-execute.
 
 **MANDATORY: Read this skill using the Read tool:**
 
 1. `data_product_accelerator/skills/monitoring/04-anomaly-detection/SKILL.md` — Schema-level freshness/completeness monitoring
 
-**Why:** Every Gold schema should have anomaly detection enabled from day one. Gold tables are the primary consumer-facing layer — stale or incomplete data here directly impacts dashboards, Genie Spaces, and business decisions.
+**Why:** Gold tables are the primary consumer-facing layer — stale or incomplete data directly impacts dashboards and Genie Spaces.
 
-**Steps:**
-1. Enable anomaly detection on the Gold schema after all tables are created
-2. No exclusions needed — all Gold tables should be monitored
-
-```python
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.dataquality import Monitor, AnomalyDetectionConfig
-
-w = WorkspaceClient()
-
-# Get Gold schema UUID
-schema_info = w.schemas.get(full_name=f"{catalog}.{gold_schema}")
-schema_id = schema_info.schema_id
-
-# Enable anomaly detection on Gold schema (monitor ALL tables)
-try:
-    w.data_quality.create_monitor(
-        monitor=Monitor(
-            object_type="schema",
-            object_id=schema_id,
-            anomaly_detection_config=AnomalyDetectionConfig()
-        )
-    )
-    print(f"✓ Anomaly detection enabled on {catalog}.{gold_schema}")
-except Exception as e:
-    if "already exists" in str(e).lower():
-        print(f"✓ Already enabled (skipping)")
-    else:
-        print(f"⚠️ Non-blocking: {e}")
-```
-
-**Note:** This is non-blocking — if anomaly detection fails to enable, the Gold layer deployment continues. Retry later via `monitoring/04-anomaly-detection/scripts/enable_anomaly_detection.py`.
+**Steps:** Enable schema-level anomaly detection on the Gold schema after all tables are created. No exclusions needed — all Gold tables should be monitored. Read the monitoring skill for the SDK code pattern. This is non-blocking — if it fails, the deployment continues.
 
 ---
 
-### Phase 5: Post-Implementation Validation (30 min)
+### Phase 5: Post-Implementation Validation (30 min) — USER-TRIGGERED ONLY
+
+> **This phase is executed ONLY when the user explicitly requests validation.** Do not auto-execute.
 
 **MANDATORY: Read this skill using the Read tool to cross-reference created tables against ERD:**
 
-1. `data_product_accelerator/skills/gold/mermaid-erd-patterns/SKILL.md` — Verify all ERD entities have corresponding tables, all relationships match FK constraints
+1. `data_product_accelerator/skills/gold/design-workers/05-erd-diagrams/SKILL.md` — Verify all ERD entities have corresponding tables, all relationships match FK constraints
 
 **Activities:**
 1. ERD cross-reference — Compare created tables against `erd_master.md` to confirm nothing was missed
@@ -483,6 +415,8 @@ except Exception as e:
 5. SCD Type 2 — Exactly one `is_current = true` per business key
 6. Data quality — Record counts, NULL checks, range validations
 7. Audit timestamps — `record_created_timestamp` and `record_updated_timestamp` populated
+8. Conformance validation — Conformed dimensions have identical schemas across domains (if applicable)
+9. Advanced pattern validation — Accumulating snapshot milestones progress, factless facts have no measures, periodic snapshots have one row per entity-period
 
 See `references/validation-queries.md` for complete SQL queries.
 
@@ -508,89 +442,30 @@ project_root/
         └── gold_merge_job.yml                  # Phase 3: Merge job
 ```
 
-## Key Implementation Principles
+## Key Principles & Troubleshooting
 
-1. **YAML as Source of Truth** — `setup_tables.py` AND `merge_gold_tables.py` both read YAML at runtime. Schema changes = YAML edits only. No embedded DDL strings, no hardcoded column lists.
-2. **Extract, Don't Generate** — EVERY table name, column name, PK, FK, business key, grain type, SCD type, and column mapping MUST be extracted from Gold YAML or `COLUMN_LINEAGE.csv`. The ONLY things coded by hand are aggregation expressions and derived column formulas (business logic).
-3. **Deduplication Always** — Every MERGE must deduplicate Silver first. No exceptions. Dedup key = `business_key` from YAML.
-4. **Explicit Column Mapping from Lineage** — Never assume Silver names match Gold. Extract renames from YAML `lineage.source_column` or `COLUMN_LINEAGE.csv`.
-5. **Schema Validation Before Merge** — Compare DataFrame columns against YAML `columns[]` list before every Delta MERGE.
-6. **Grain Validation for Facts** — Read `grain` and `pk_columns` from YAML. Composite PK = aggregated. Single PK = transaction. Always validate before merge.
-7. **FK Constraints After PKs** — Foreign keys in a SEPARATE script that reads `foreign_keys[]` from YAML. Runs AFTER all tables and their PKs exist.
-8. **Merge Condition from PK** — Build MERGE ON clause programmatically from `primary_key.columns[]` in YAML. Never hardcode MERGE conditions.
+**Core rule:** YAML is the single source of truth — extract everything, generate nothing. Deduplicate always. Validate schema and grain before every merge.
 
-## Common Issues Quick Reference
+See [Implementation Checklist](references/implementation-checklist.md) for the 8 key principles and phase-by-phase validation checklists.
 
-| Issue | Error | Solution | Skill Reference |
-|-------|-------|----------|-----------------|
-| YAML not found | `FileNotFoundError` | Add to `databricks.yml` sync | `databricks-asset-bundles` |
-| PyYAML missing | `ModuleNotFoundError` | Add `pyyaml>=6.0` to environment | `databricks-asset-bundles` |
-| Duplicate key MERGE | `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE` | Deduplicate before merge | `gold-delta-merge-deduplication` |
-| Column not found | `UNRESOLVED_COLUMN` | Add explicit column mapping | `gold-layer-schema-validation` |
-| Grain duplicates | Multiple rows per PK | Fix aggregation to match PK | `fact-table-grain-validation` |
-| Variable shadows function | `'int' object is not callable` | Rename variable (e.g., `count` to `record_count`) | `gold-layer-merge-patterns` |
-| FK constraint fails | `Table/column not found` | Run FK script AFTER setup script | `unity-catalog-constraints` |
-
-See `references/common-issues.md` for detailed solutions.
+See [Common Issues](references/common-issues.md) for error diagnosis (YAML not found, duplicate key MERGE, `UNRESOLVED_COLUMN`, grain duplicates, Silver column mismatch, FK failures).
 
 ## Validation Checklist
 
-### Setup Phase
-- [ ] YAML files exist in `gold_layer_design/yaml/`
-- [ ] YAML files synced in `databricks.yml`
-- [ ] `setup_tables.py` reads YAML dynamically (no hardcoded DDL)
-- [ ] PyYAML dependency in job environment
-- [ ] Schema created with `CREATE SCHEMA IF NOT EXISTS`
-- [ ] Predictive Optimization enabled
-- [ ] Tables created with `CLUSTER BY AUTO`
-- [ ] Standard TBLPROPERTIES applied (CDF, row tracking, etc.)
-- [ ] PKs added via `ALTER TABLE` after creation
-- [ ] FK constraints in separate script, runs after setup
-
-### YAML Extraction Phase (BEFORE Writing Merge Code)
-- [ ] `load_table_metadata()` helper included in merge script
-- [ ] `build_inventory()` called in `main()` to load ALL table metadata from YAML
-- [ ] `load_column_mappings_from_yaml()` or `load_column_mappings_from_csv()` used for renames
-- [ ] `build_merge_condition()` used to construct MERGE ON clause from YAML PKs
-- [ ] NO hardcoded table names — all come from `meta["table_name"]`
-- [ ] NO hardcoded column lists — `.select(meta["columns"])` from YAML
-- [ ] NO hardcoded MERGE conditions — built from `meta["pk_columns"]`
-- [ ] NO hardcoded dedup keys — come from `meta["business_key"]`
-- [ ] NO hardcoded grain columns — come from `meta["pk_columns"]`
-- [ ] NO hardcoded Silver table names — come from `meta["source_tables"]`
-- [ ] ONLY hand-coded items: aggregation expressions and derived column formulas
-
-### Merge Phase
-- [ ] Deduplication before EVERY merge (mandatory, key from YAML `business_key`)
-- [ ] Deduplication key matches MERGE condition key (both from YAML)
-- [ ] Column mappings extracted from YAML lineage or `COLUMN_LINEAGE.csv` (not guessed)
-- [ ] No variable names shadow PySpark functions
-- [ ] Schema validation: DataFrame columns match YAML `columns[]` before merge
-- [ ] Grain validation for fact tables using YAML `pk_columns`
-- [ ] Dimensions merged BEFORE facts (order from YAML `entity_type`)
-- [ ] SCD Type 2 includes `is_current` filter (determined by YAML `scd_type`)
-- [ ] Aggregated facts use `.groupBy(meta["pk_columns"])` from YAML
-- [ ] `whenMatchedUpdate` columns built from YAML (not hardcoded set)
-- [ ] Error handling with try/except and debug logging
-
-### Deployment Phase
-- [ ] Asset Bundle jobs use `notebook_task` (not `python_task`)
-- [ ] Parameters use `base_parameters` dict
-- [ ] FK task `depends_on` setup task
-- [ ] Merge job has schedule (PAUSED in dev)
-- [ ] Tags applied (environment, layer, job_type)
-- [ ] Anomaly detection enabled on Gold schema (Phase 4b)
+See [Implementation Checklist](references/implementation-checklist.md) for complete phase-by-phase checklists covering Setup, YAML Extraction, Merge, Deployment, Silver Contract Validation, and Advanced Patterns.
 
 ## Time Estimates
 
 | Phase | Duration | Activities |
 |-------|----------|------------|
+| Phase 0: Silver contract | 15 min | Silver introspection, contract validation, resolution reports |
 | Phase 1: Setup scripts | 30 min | setup_tables.py + add_fk_constraints.py |
+| Phase 1b: Advanced setup | 15 min | Role-playing views, unknown member rows (if applicable) |
 | Phase 2: Merge scripts | 2 hours | Dimension + fact merges with validation |
 | Phase 3: Asset Bundle | 30 min | Job YAML files + databricks.yml sync |
-| Phase 4: Deployment | 30 min | Deploy, run, verify |
-| Phase 5: Validation | 30 min | Schema, grain, FK, SCD2 checks |
-| **Total** | **3-4 hours** | For 3-5 tables |
+| Phase 4: Deployment (user-triggered) | 30 min | Deploy, run, verify |
+| Phase 5: Validation (user-triggered) | 30 min | Schema, grain, FK, SCD2 checks |
+| **Total** | **2.5-3.5 hours** (artifact creation) + **1 hour** (if user-triggered deployment/validation) | For 3-5 tables |
 
 ## Next Steps After Implementation
 
@@ -615,6 +490,36 @@ After Gold layer implementation is complete and validated:
 - **[Asset Bundle Job Patterns](references/asset-bundle-job-patterns.md)** — gold_setup_job.yml, gold_merge_job.yml, databricks.yml sync
 - **[Validation Queries](references/validation-queries.md)** — Schema, grain, FK integrity, SCD Type 2 validation SQL
 - **[Common Issues](references/common-issues.md)** — YAML not found, PyYAML missing, duplicate key MERGE, column mismatch, grain duplicates
+- **[Advanced Merge Patterns](references/advanced-merge-patterns.md)** — Accumulating snapshot, factless fact, periodic snapshot, junk dimension merge patterns
+- **[Advanced Setup Patterns](references/setup-advanced-patterns.md)** — Role-playing dimension views, unknown member row insertion
+- **[Design-to-Pipeline Bridge](references/design-to-pipeline-bridge.md)** — Silver contract validation, lineage-driven column builder, type compatibility, resolution reports
+- **[Implementation Checklist](references/implementation-checklist.md)** — Key principles, phase-by-phase validation checklists, advanced pattern checks
+
+## Post-Completion: Skill Usage Summary (MANDATORY)
+
+**After completing all phases of this orchestrator, output a Skill Usage Summary reflecting what you ACTUALLY did — not a pre-written summary.**
+
+### What to Include
+
+1. Every skill `SKILL.md` or `references/` file you read (via the Read tool), in the order you read them
+2. Which phase you were in when you read it
+3. Whether it was a **Worker**, **Common**, **Cross-domain**, or **Reference** file
+4. A one-line description of what you specifically used it for in this session
+
+### Format
+
+| # | Phase | Skill / Reference Read | Type | What It Was Used For |
+|---|-------|----------------------|------|---------------------|
+| 1 | Phase N | `path/to/SKILL.md` | Worker / Common / Cross-domain / Reference | One-line description |
+
+### Summary Footer
+
+End with:
+- **Totals:** X worker skills, Y common skills, Z reference files read across N phases
+- **Skipped:** List any skills from the dependency table above that you did NOT need to read, and why (e.g., "phase not applicable", "user skipped", "no issues encountered")
+- **Unplanned:** List any skills you read that were NOT listed in the dependency table (e.g., for troubleshooting, edge cases, or user-requested detours)
+
+---
 
 ## External References
 

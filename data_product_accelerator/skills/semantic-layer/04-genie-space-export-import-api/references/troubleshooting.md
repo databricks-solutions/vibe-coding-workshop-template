@@ -161,6 +161,56 @@ if isinstance(data["instructions"]["text_instructions"][0], str):
 
 ---
 
+## Error 9: `expected_sql` Field Not Recognized
+
+**Symptom:** API returns field validation error for benchmark questions.
+
+**Cause:** Used `expected_sql` as a JSON field name instead of the correct `answer` structure.
+
+**Fix:**
+```json
+// ❌ WRONG
+{"expected_sql": "SELECT ..."}
+
+// ✅ CORRECT
+{"answer": [{"format": "SQL", "content": ["SELECT SUM(revenue) FROM ..."]}]}
+```
+
+The field must be `answer` containing an array of objects with `format` ("SQL" or "INSTRUCTIONS") and `content` (single-element array).
+
+---
+
+## Error 10: Arrays Not Sorted
+
+**Symptom:** API rejects payload with ordering/sorting error.
+
+**Cause:** Arrays in the Genie Space JSON are not sorted by their required key.
+
+**Fix:** Sort all arrays before submission:
+- `tables` → sort by `table_name`
+- `materialized_views` → sort by `materialized_view_name`
+- `sql_functions` → sort by `function_name`
+- `example_question_sqls` → sort by `question[0]`
+
+Use the `sort_all_arrays()` function from the deploy template.
+
+---
+
+## Error 11: Invalid Genie Space IDs
+
+**Symptom:** API rejects payload with ID format error, or import silently fails.
+
+**Cause:** IDs are not 32-character lowercase hex strings (UUID4 without dashes).
+
+**Common wrong patterns:**
+- `"genie_" + uuid.uuid4().hex[:24]` — prefixed and truncated
+- `str(uuid.uuid4())` — 36 chars with dashes
+- `"aaaa" * 8` — not random
+
+**Fix:** Always use `uuid.uuid4().hex` exclusively. All ID fields (`space.id`, `tables[].id`, `sql_functions[].id`, `example_question_sqls[].id`, `materialized_views[].id`) must use this format.
+
+---
+
 ## Validation Checklist
 
 ### Structure Validation (MANDATORY)
@@ -169,6 +219,7 @@ if isinstance(data["instructions"]["text_instructions"][0], str):
 - [ ] All IDs are 32-character hex strings (no dashes)
 - [ ] All string arrays (question, content, sql) are arrays even for single values
 - [ ] All identifiers use full 3-part UC names (`catalog.schema.object`)
+- [ ] All arrays sorted by required keys (tables by table_name, sql_functions by function_name, etc.)
 
 ### config.sample_questions (CRITICAL)
 
@@ -211,6 +262,14 @@ if isinstance(data["instructions"]["text_instructions"][0], str):
 - [ ] Each question has `answer` array with one element
 - [ ] Each answer has `format: "SQL"`
 - [ ] Each answer has `content` (array of strings split by lines)
+
+#### Array Sorting
+
+- [ ] `tables` sorted by `table_name`
+- [ ] `materialized_views` sorted by `materialized_view_name`
+- [ ] `sql_functions` sorted by `function_name`
+- [ ] `example_question_sqls` sorted by `question[0]`
+- [ ] Sorting applied BEFORE variable substitution (sort keys must be final values)
 
 ---
 

@@ -1,0 +1,71 @@
+# Genie Space Evaluation Job
+#
+# Runs benchmark evaluation against a Genie Space, executing code-based judges
+# and logging all results to an MLflow experiment. Each job run produces one
+# MLflow experiment run with metrics, artifacts, and traces.
+#
+# The agent triggers this job, polls for completion, then reads MLflow results
+# to decide whether to apply metadata changes or stop optimizing.
+#
+# Usage:
+#   databricks bundle deploy -t dev
+#   databricks bundle run genie_evaluation_job -t dev
+#
+# Override iteration at runtime:
+#   databricks bundle run genie_evaluation_job -t dev \
+#     --params iteration=2
+#
+# Prerequisites:
+#   - Genie Space must exist and be accessible
+#   - golden-queries.yaml must be synced to workspace
+#   - MLflow experiment is created (notebook handles this)
+#
+# CRITICAL: Add YAML sync to databricks.yml:
+#   sync:
+#     include:
+#       - "src/semantic/genie_configs/**/*.yaml"
+
+resources:
+  jobs:
+    genie_evaluation_job:
+      name: "${bundle.target}-genie-evaluation"
+
+      tags:
+        environment: "${bundle.target}"
+        layer: "semantic"
+        job_type: "genie_evaluation"
+
+      tasks:
+        - task_key: run_evaluation
+          notebook_task:
+            notebook_path: "../../src/${var.project_name}_semantic/run_genie_evaluation.py"
+            # CRITICAL: Use base_parameters (NOT a top-level 'parameters' block).
+            # The 'parameters' block with {{job.parameters.X}} causes silent
+            # INTERNAL_ERROR for notebook_task. Always use base_parameters + ${var.X}.
+            base_parameters:
+              space_id: "${var.genie_space_id}"
+              experiment_name: "/Users/${var.user_email}/genie-optimization/${var.domain}"
+              iteration: "1"
+              benchmarks_yaml_path: "src/semantic/genie_configs/golden-queries.yaml"
+              domain: "${var.domain}"
+              warehouse_id: "${var.warehouse_id}"
+              catalog: "${var.catalog}"
+              gold_schema: "${var.gold_schema}"
+              model_id: ""
+              dataset_mode: "uc"
+              uc_schema: "${var.catalog}.${var.gold_schema}"
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "mlflow[databricks]>=3.4.0"
+              - "pyyaml>=6.0"
+
+      email_notifications:
+        on_failure:
+          - "${var.notification_email}"
+
+      timeout_seconds: 3600

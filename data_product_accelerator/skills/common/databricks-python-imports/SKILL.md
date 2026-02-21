@@ -15,7 +15,7 @@ metadata:
       paths:
         - "databricks-skills/databricks-config/SKILL.md"
       relationship: "reference"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 # Databricks Python Imports and Code Sharing

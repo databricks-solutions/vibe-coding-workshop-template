@@ -1,0 +1,85 @@
+# Semantic Layer Deployment Job (Combined)
+#
+# Single job with 3 tasks and depends_on chains for platform-enforced execution ordering:
+#   1. create_metric_views (notebook_task) — no dependencies
+#   2. create_table_valued_functions (notebook_task) — depends on metric views
+#   3. deploy_genie_spaces (notebook_task) — depends on both MVs and TVFs
+#
+# Usage:
+#   databricks bundle deploy -t dev
+#   databricks bundle run semantic_layer_job -t dev
+#
+# Prerequisites:
+#   - Gold layer tables must exist (run gold_setup_job first)
+#   - Metric View YAML files and Genie Space JSON configs must be synced
+#
+# CRITICAL: Add sync to databricks.yml:
+#   sync:
+#     include:
+#       - "src/semantic/metric_views/**/*.yaml"
+#       - "src/semantic/genie_configs/**/*.json"
+
+resources:
+  jobs:
+    semantic_layer_job:
+      name: "${bundle.target}-semantic-layer-deployment"
+
+      tags:
+        environment: "${bundle.target}"
+        layer: "semantic"
+        job_type: "semantic_layer"
+
+      tasks:
+        # Task 1: Create Metric Views from YAML definitions
+        - task_key: create_metric_views
+          notebook_task:
+            notebook_path: "../../src/${var.project_name}_semantic/create_metric_views.py"
+            base_parameters:
+              catalog: "${var.catalog}"
+              gold_schema: "${var.gold_schema}"
+              yaml_dir: "src/semantic/metric_views"
+          environment_key: default
+
+        # Task 2: Create Table-Valued Functions (depends on MVs for validation ordering)
+        - task_key: create_table_valued_functions
+          depends_on:
+            - task_key: create_metric_views
+          notebook_task:
+            notebook_path: "../../src/${var.project_name}_semantic/create_tvfs.py"
+            base_parameters:
+              catalog: "${var.catalog}"
+              gold_schema: "${var.gold_schema}"
+          environment_key: default
+          # ⚠️ sql_task CANNOT substitute ${catalog}/${gold_schema} in DDL identifiers.
+          # Use notebook_task with Python string substitution instead.
+
+        # Task 3: Deploy Genie Spaces via REST API (depends on both MVs and TVFs)
+        - task_key: deploy_genie_spaces
+          depends_on:
+            - task_key: create_metric_views
+            - task_key: create_table_valued_functions
+          notebook_task:
+            notebook_path: "../../src/${var.project_name}_semantic/deploy_genie_spaces.py"
+            base_parameters:
+              catalog: "${var.catalog}"
+              gold_schema: "${var.gold_schema}"
+              config_dir: "src/semantic/genie_configs"
+              warehouse_id: "${var.warehouse_id}"
+              # Per-space IDs for idempotent update-or-create pattern
+              # Uncomment and populate after first deployment:
+              # genie_space_id_<space_name>: "${var.genie_space_id_<space_name>}"
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "pyyaml>=6.0"
+              - "requests>=2.28"
+
+      email_notifications:
+        on_failure:
+          - "${var.notification_email}"
+
+      timeout_seconds: 3600

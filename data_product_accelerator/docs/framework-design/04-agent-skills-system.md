@@ -4,7 +4,7 @@
 
 Agent Skills are the primary knowledge mechanism in the Data Product Accelerator. Each skill is a structured directory containing a `SKILL.md` file (the entry point), `references/` files (detailed patterns), `scripts/` (executable utilities), and `assets/templates/` (starter files). Skills follow the [AgentSkills.io specification](https://agentskills.io) and are designed for progressive disclosure — the AI assistant reads only what it needs, keeping context usage efficient.
 
-The skills system replaces the original 46-rule cursor architecture with a more scalable pattern: a single `AGENTS.md` entry point + 50 Agent Skills.
+The skills system replaces the original 46-rule cursor architecture with a more scalable pattern: a single `AGENTS.md` entry point + 59 Agent Skills.
 
 ## Skill Types
 
@@ -32,7 +32,7 @@ Workers provide domain-specific patterns for a single concern. They can be used 
 | Responsibility | Specific patterns (e.g., MERGE operations, ERD syntax, deduplication) |
 | Count | 30+ |
 
-**Example:** `gold/05-gold-delta-merge-deduplication/SKILL.md` — Provides the dedup-before-merge pattern that prevents `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE` errors.
+**Example:** `gold/pipeline-workers/03-deduplication/SKILL.md` — Provides the dedup-before-merge pattern that prevents `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE` errors.
 
 ### Common/Shared Skills
 

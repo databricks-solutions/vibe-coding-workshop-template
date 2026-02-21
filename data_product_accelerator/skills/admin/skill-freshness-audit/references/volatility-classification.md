@@ -27,7 +27,7 @@ These skills reference APIs or features that change frequently. Prioritize these
 | `genai-agents-setup` | genai-agents | `genai-agents/00-genai-agents-setup` | Orchestrator for all GenAI — depends on volatile workers |
 | `metric-views-patterns` | semantic-layer | `semantic-layer/01-metric-views-patterns` | Metric Views spec actively evolving |
 | `genie-space-export-import-api` | semantic-layer | `semantic-layer/04-genie-space-export-import-api` | Genie API schema changes |
-| `genie-space-optimization` | semantic-layer | `semantic-layer/05-genie-space-optimization` | Conversation API + control levers evolving |
+| `genie-optimization-orchestrator` | semantic-layer | `semantic-layer/05-genie-optimization-orchestrator` | Conversation API + control levers evolving |
 | `ml-pipeline-setup` | ml | `ml/00-ml-pipeline-setup` | MLflow 3.x, LoggedModel, Feature Store APIs |
 | `mlflow-mlmodels-patterns` | ml | `ml/mlflow-mlmodels-patterns` | Legacy mirror — MLflow APIs changing |
 
@@ -69,13 +69,18 @@ These skills contain patterns and conventions that rarely change. Audit semi-ann
 | `faker-data-generation` | bronze | `bronze/01-faker-data-generation` | Faker library stable |
 | `gold-layer-design` | gold | `gold/00-gold-layer-design` | Dimensional modeling principles stable |
 | `gold-layer-setup` | gold | `gold/01-gold-layer-setup` | Gold implementation patterns stable |
-| `yaml-driven-gold-setup` | gold | `gold/02-yaml-driven-gold-setup` | YAML-driven DDL is internal convention |
-| `gold-layer-documentation` | gold | `gold/03-gold-layer-documentation` | Documentation conventions stable |
-| `gold-layer-merge-patterns` | gold | `gold/04-gold-layer-merge-patterns` | MERGE SQL syntax very stable |
-| `gold-delta-merge-deduplication` | gold | `gold/05-gold-delta-merge-deduplication` | Deduplication pattern stable |
-| `fact-table-grain-validation` | gold | `gold/06-fact-table-grain-validation` | Grain validation logic is internal |
-| `gold-layer-schema-validation` | gold | `gold/07-gold-layer-schema-validation` | Schema validation logic is internal |
-| `mermaid-erd-patterns` | gold | `gold/08-mermaid-erd-patterns` | Mermaid syntax very stable |
+| `01-yaml-table-setup` | gold | `gold/pipeline-workers/01-yaml-table-setup` | YAML-driven DDL is internal convention |
+| `06-table-documentation` | gold | `gold/design-workers/06-table-documentation` | Documentation conventions stable |
+| `02-merge-patterns` | gold | `gold/pipeline-workers/02-merge-patterns` | MERGE SQL syntax very stable |
+| `03-deduplication` | gold | `gold/pipeline-workers/03-deduplication` | Deduplication pattern stable |
+| `01-grain-definition` | gold | `gold/design-workers/01-grain-definition` | Grain definition logic is internal |
+| `02-dimension-patterns` | gold | `gold/design-workers/02-dimension-patterns` | Dimension design patterns are internal |
+| `03-fact-table-patterns` | gold | `gold/design-workers/03-fact-table-patterns` | Fact table patterns are internal |
+| `04-conformed-dimensions` | gold | `gold/design-workers/04-conformed-dimensions` | Conformed dimension patterns are internal |
+| `04-grain-validation` | gold | `gold/pipeline-workers/04-grain-validation` | Grain validation logic is internal |
+| `07-design-validation` | gold | `gold/design-workers/07-design-validation` | Design validation logic is internal |
+| `05-schema-validation` | gold | `gold/pipeline-workers/05-schema-validation` | Schema validation logic is internal |
+| `05-erd-diagrams` | gold | `gold/design-workers/05-erd-diagrams` | Mermaid syntax very stable |
 | `project-planning` | planning | `planning/00-project-planning` | Planning methodology is internal |
 | `adhoc-exploration-notebooks` | exploration | `exploration/00-adhoc-exploration-notebooks` | Notebook patterns stable |
 | `databricks-expert-agent` | common | `common/databricks-expert-agent` | Core philosophy, not API-dependent |
@@ -84,7 +89,6 @@ These skills contain patterns and conventions that rarely change. Audit semi-ann
 | `self-improvement` | admin | `admin/self-improvement` | Internal workflow |
 | `documentation-organization` | admin | `admin/documentation-organization` | Internal convention |
 | `skill-freshness-audit` | admin | `admin/skill-freshness-audit` | This skill — meta-stable |
-| `cursor-rule-to-skill` | admin | `cursor-rule-to-skill` | Internal conversion patterns |
 | `skill-navigator` | meta | `skill-navigator` | Internal routing |
 
 ---
@@ -95,7 +99,7 @@ These skills contain patterns and conventions that rarely change. Audit semi-ann
 |---|---|---|
 | **High** | 14 | 23% |
 | **Medium** | 17 | 27% |
-| **Low** | 21 | 34% |
-| **Total Classified** | 52 | — |
+| **Low** | 23 | 35% |
+| **Total Classified** | 54 | — |
 
 > **Note:** Some legacy/duplicate skills (non-numbered versions in gold/, silver/, ml/, semantic-layer/) are not classified separately — they share volatility with their numbered counterparts.

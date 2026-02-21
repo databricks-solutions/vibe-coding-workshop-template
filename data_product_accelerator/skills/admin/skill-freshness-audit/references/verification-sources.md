@@ -119,7 +119,7 @@ Maps every skill to the official documentation URLs used to verify its patterns 
 | https://docs.databricks.com/api/workspace/genie/listspaces | List Spaces API |
 | https://docs.databricks.com/genie/ | Genie overview, new features |
 
-### `semantic-layer/05-genie-space-optimization`
+### `semantic-layer/05-genie-optimization-orchestrator`
 | URL | Check For |
 |---|---|
 | https://docs.databricks.com/api/workspace/genie | Conversation API schema |
@@ -139,9 +139,11 @@ Maps every skill to the official documentation URLs used to verify its patterns 
 ### `monitoring/01-lakehouse-monitoring-comprehensive`
 | URL | Check For |
 |---|---|
-| https://docs.databricks.com/api/azure/workspace/dataquality/createmonitor | Monitor creation schema |
+| https://databricks-sdk-py.readthedocs.io/en/latest/workspace/dataquality/data_quality.html | DataQualityAPI method signatures: create_monitor(monitor), create_refresh(object_type, object_id, refresh), delete_monitor, get_monitor, list_refresh, cancel_refresh, update_monitor(object_type, object_id, monitor, update_mask) |
+| https://databricks-sdk-py.readthedocs.io/en/latest/dbdataclasses/dataquality.html | Monitor, DataProfilingConfig, DataProfilingCustomMetric, DataProfilingCustomMetricType, TimeSeriesConfig, SnapshotConfig, AggregationGranularity, RefreshState field names and enum values |
+| https://docs.databricks.com/api/azure/workspace/dataquality/createmonitor | REST API request/response schema |
 | https://learn.microsoft.com/en-us/azure/databricks/lakehouse-monitoring/ | Monitoring overview |
-| https://learn.microsoft.com/en-us/azure/databricks/lakehouse-monitoring/custom-metrics | Custom metric syntax |
+| https://learn.microsoft.com/en-us/azure/databricks/lakehouse-monitoring/custom-metrics | Custom metric syntax (AGGREGATE, DERIVED, DRIFT), output_data_type format |
 | https://learn.microsoft.com/en-us/azure/databricks/lakehouse-monitoring/create-monitor-api | API reference |
 
 ### `monitoring/02-databricks-aibi-dashboards`
@@ -157,8 +159,10 @@ Maps every skill to the official documentation URLs used to verify its patterns 
 ### `monitoring/04-anomaly-detection`
 | URL | Check For |
 |---|---|
-| https://learn.microsoft.com/en-us/azure/databricks/data-quality-monitoring/anomaly-detection/ | Anomaly detection API |
-| https://learn.microsoft.com/en-us/azure/databricks/data-quality-monitoring/anomaly-detection/results | Results schema |
+| https://databricks-sdk-py.readthedocs.io/en/latest/workspace/dataquality/data_quality.html | DataQualityAPI method signatures: create_monitor(monitor), delete_monitor(object_type, object_id), get_monitor, update_monitor(object_type, object_id, monitor, update_mask), list_monitor (unimplemented) |
+| https://databricks-sdk-py.readthedocs.io/en/latest/dbdataclasses/dataquality.html | Monitor, AnomalyDetectionConfig field names (excluded_table_full_names), object_type/object_id semantics |
+| https://learn.microsoft.com/en-us/azure/databricks/data-quality-monitoring/anomaly-detection/ | Anomaly detection overview, freshness/completeness concepts |
+| https://learn.microsoft.com/en-us/azure/databricks/data-quality-monitoring/anomaly-detection/results | system.data_quality_monitoring.table_results schema, nested struct fields |
 | https://learn.microsoft.com/en-us/azure/databricks/data-quality-monitoring/anomaly-detection/alerts | Alert integration |
 
 ---
@@ -217,19 +221,34 @@ Maps every skill to the official documentation URLs used to verify its patterns 
 | https://docs.databricks.com/data-governance/unity-catalog/constraints.html | Constraint syntax |
 | https://docs.databricks.com/dev-tools/bundles/ | Asset Bundle patterns |
 
-### `gold/02-yaml-driven-gold-setup`
+### `gold/pipeline-workers/01-yaml-table-setup`
 | URL | Check For |
 |---|---|
 | https://docs.databricks.com/dev-tools/bundles/settings.html#sync | Bundle sync settings |
 | https://docs.databricks.com/tables/constraints.html | Constraint syntax |
 
-### `gold/03-gold-layer-documentation`
+### `gold/design-workers/06-table-documentation`
 | URL | Check For |
 |---|---|
 | https://docs.databricks.com/lakehouse-architecture/medallion.html | Medallion architecture |
 | https://docs.databricks.com/tables/constraints.html#declare-primary-key-and-foreign-key-relationships | PK/FK syntax |
 
-### `gold/08-mermaid-erd-patterns`
+### `gold/design-workers/02-dimension-patterns`
+| URL | Check For |
+|---|---|
+| https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/ | Dimension design patterns |
+
+### `gold/design-workers/03-fact-table-patterns`
+| URL | Check For |
+|---|---|
+| https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/ | Fact table design patterns |
+
+### `gold/design-workers/04-conformed-dimensions`
+| URL | Check For |
+|---|---|
+| https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/ | Conformed dimensions, bus matrix |
+
+### `gold/design-workers/05-erd-diagrams`
 | URL | Check For |
 |---|---|
 | https://docs.databricks.com/sql/language-manual/sql-ref-datatypes.html | Data types |
@@ -288,14 +307,13 @@ These skills are self-contained and don't reference external APIs that change:
 | `admin/self-improvement` | Internal workflow |
 | `admin/documentation-organization` | Internal convention |
 | `admin/skill-freshness-audit` | This skill (self-referential) |
-| `cursor-rule-to-skill` | Internal conversion patterns |
 | `skill-navigator` | Internal routing |
 | `common/databricks-expert-agent` | Philosophy/principles, not API-dependent |
 | `common/databricks-python-imports` | Stable Python import patterns |
 | `common/naming-tagging-standards` | Internal convention |
-| `gold/04-gold-layer-merge-patterns` | Stable MERGE SQL patterns |
-| `gold/05-gold-delta-merge-deduplication` | Stable deduplication patterns |
-| `gold/06-fact-table-grain-validation` | Stable grain validation logic |
-| `gold/07-gold-layer-schema-validation` | Stable schema validation logic |
+| `gold/pipeline-workers/02-merge-patterns` | Stable MERGE SQL patterns |
+| `gold/pipeline-workers/03-deduplication` | Stable deduplication patterns |
+| `gold/pipeline-workers/04-grain-validation` | Stable grain validation logic |
+| `gold/pipeline-workers/05-schema-validation` | Stable schema validation logic |
 | `exploration/00-adhoc-exploration-notebooks` | Stable notebook patterns |
 | `planning/00-project-planning` | Internal planning methodology |

@@ -15,7 +15,7 @@ metadata:
       paths:
         - "databricks-skills/databricks-unity-catalog/SKILL.md"
       relationship: "derived"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 

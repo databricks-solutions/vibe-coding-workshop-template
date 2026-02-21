@@ -69,7 +69,7 @@ The architecture is **skills-first**: instead of embedding patterns in cursor ru
 |---|---------------|----------------|----------|
 | 1 | Design-First | Design Gold target model before building Bronze/Silver layers | [03-Pipeline](03-design-first-pipeline.md) |
 | 2 | Extract, Don't Generate | Script names from Gold YAML; never hardcode table/column names | [04-Agent Skills](04-agent-skills-system.md) |
-| 3 | Skills-First | AGENTS.md entry point + 50 skills (not 46 monolithic rules) | [02-Architecture](02-architecture-overview.md) |
+| 3 | Skills-First | AGENTS.md entry point + 59 skills (not 46 monolithic rules) | [02-Architecture](02-architecture-overview.md) |
 | 4 | Progressive Disclosure | SKILL.md → references/ → scripts/ → assets/ | [04-Agent Skills](04-agent-skills-system.md) |
 | 5 | Orchestrator-First Routing | Always start with 00-* orchestrator, which loads workers | [04-Agent Skills](04-agent-skills-system.md) |
 | 6 | Plan-as-Contract | Planning emits YAML manifests consumed downstream | [03-Pipeline](03-design-first-pipeline.md) |
@@ -107,7 +107,7 @@ Skills are referenced using their domain path: `data_product_accelerator/skills/
 
 ### Diagrams
 
-Architecture and data flow diagrams use Mermaid syntax or ASCII art for portability. ERD diagrams follow the patterns defined in the `gold/08-mermaid-erd-patterns` skill.
+Architecture and data flow diagrams use Mermaid syntax or ASCII art for portability. ERD diagrams follow the patterns defined in the `gold/design-workers/05-erd-diagrams` skill.
 
 ### Configuration
 

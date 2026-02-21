@@ -142,6 +142,130 @@ This is a complete worked example demonstrating the project plan methodology app
 4. Which customers are at risk of churning?
 5. What are the booking patterns for repeat customers?
 
+## Use Case Catalog (Excerpt)
+
+Three representative use case cards demonstrating the format. A full Wanderbricks catalog would contain one card per distinct business problem across all 5 domains.
+
+### UC-001: Revenue Trend Analysis
+
+**Domain:** 💰 Revenue
+**Business Problem:** Finance and revenue managers need to track booking revenue performance over time, compare destinations, and detect declining trends before they impact quarterly targets.
+
+**Business Questions This Use Case Answers:**
+1. What was total booking revenue last month?
+2. Which destinations generated the most revenue this quarter?
+3. How does revenue compare to the same period last year?
+4. What is the average daily rate (ADR) trend over the past 90 days?
+5. Are there any destinations with a revenue decline > 15% week-over-week?
+
+**Gold Tables:** `fact_booking_daily`, `dim_destination`, `dim_property`, `dim_date`
+
+**Implementing Artifacts:**
+
+| Artifact Type | Name | Which Questions It Answers |
+|--------------|------|---------------------------|
+| TVF | `get_revenue_trend` | Q1, Q2, Q3 |
+| TVF | `get_booking_summary` | Q1, Q4 |
+| Metric View | `revenue_analytics_metrics` | Q1, Q2, Q4 |
+| Dashboard | Revenue Performance Dashboard | Q1-Q5 (visual) |
+| Alert | `REV-001-CRIT` Revenue Drop >20% WoW | Q5 (proactive) |
+| ML Model | Revenue Forecaster | Q3 (predictive YoY) |
+
+**Stakeholders:** Finance team, Revenue managers, Executives
+**Success Criteria:** All 5 questions answerable via Genie Space with >=95% SQL accuracy
+
+---
+
+### UC-002: Booking Conversion Funnel
+
+**Domain:** 📊 Engagement
+**Business Problem:** Marketing and product teams need to understand where potential guests drop off between viewing a property and completing a booking, so they can optimize the conversion path and marketing spend.
+
+**Business Questions This Use Case Answers:**
+1. What is our overall view-to-booking conversion rate?
+2. Where are users dropping off in the booking funnel?
+3. Which properties have the highest engagement but lowest conversion?
+4. What is the average time from first property view to completed booking?
+5. Which marketing channels drive the highest-converting traffic?
+
+**Gold Tables:** `fact_property_engagement`, `dim_property`, `dim_user`
+
+**Implementing Artifacts:**
+
+| Artifact Type | Name | Which Questions It Answers |
+|--------------|------|---------------------------|
+| TVF | `get_conversion_funnel` | Q1, Q2 |
+| TVF | `get_engagement_metrics` | Q3, Q4 |
+| Metric View | `engagement_analytics_metrics` | Q1, Q3, Q5 |
+| Dashboard | Engagement & Conversion Dashboard | Q1-Q5 (visual) |
+| Monitor | Engagement Data Quality Monitor | (data reliability) |
+| ML Model | Conversion Predictor | Q3 (predictive) |
+
+**Stakeholders:** Marketing team, Product managers, Growth analysts
+**Success Criteria:** All 5 questions answerable via Genie Space with >=95% SQL accuracy
+
+---
+
+### UC-003: Customer Churn Risk
+
+**Domain:** 🎯 Customer
+**Business Problem:** Retention teams need to identify customers at risk of not rebooking so they can proactively intervene with targeted offers, improving customer lifetime value and reducing acquisition costs.
+
+**Business Questions This Use Case Answers:**
+1. Which customers are at risk of churning (no booking in 90+ days)?
+2. What is the average customer lifetime value by segment?
+3. What are the booking patterns for repeat vs. one-time customers?
+4. How does churn rate vary by acquisition channel?
+
+**Gold Tables:** `dim_user`, `fact_booking_detail`, `dim_destination`
+
+**Implementing Artifacts:**
+
+| Artifact Type | Name | Which Questions It Answers |
+|--------------|------|---------------------------|
+| TVF | `get_customer_ltv` | Q2, Q3 |
+| TVF | `get_customer_segments` | Q1, Q3 |
+| Metric View | `customer_analytics_metrics` | Q2, Q4 |
+| Dashboard | Customer Analytics Dashboard | Q1-Q4 (visual) |
+| Alert | `CUST-001-WARN` Churn rate spike | Q1 (proactive) |
+| ML Model | Customer LTV Predictor | Q2 (predictive) |
+| ML Model | Customer Segmentation | Q1, Q3 (clustering) |
+
+**Stakeholders:** Retention team, Marketing, Customer success
+**Success Criteria:** All 4 questions answerable via Genie Space with >=95% SQL accuracy; churn predictions achieve >=80% precision
+
+---
+
+## Coverage Summary (Wanderbricks Excerpt)
+
+| Metric | Count |
+|--------|-------|
+| Total Use Cases | 3 (excerpt — full catalog would cover all 5 domains) |
+| Total Business Questions | 14 |
+| Total Artifact Mappings | 19 |
+| Questions with >= 1 Artifact | 14/14 (100%) |
+| Artifacts with >= 1 Question | 18/19 (95%) |
+| Orphan Questions | 0 |
+| Orphan Artifacts | 1 — Engagement Data Quality Monitor (serves data reliability, not a specific question) |
+
+**Validation script output:**
+```
+$ python scripts/validate_use_case_coverage.py plans/use-case-catalog.md
+
+Use Case Coverage Report
+========================================
+Use cases:      3
+Questions:      14
+Artifact maps:  19
+Coverage:       100% (14/14 questions have >= 1 artifact)
+
+PASS: All questions have implementing artifacts.
+PASS: All use cases have 3-5 business questions.
+WARN: UC-002: artifact "Engagement Data Quality Monitor" has no question references
+```
+
+---
+
 ## Agent Architecture Flow Example
 
 ```

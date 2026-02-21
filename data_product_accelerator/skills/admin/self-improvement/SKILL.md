@@ -380,10 +380,10 @@ metadata:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
       paths:
-        - "databricks-skills/agent-bricks/SKILL.md"
+        - "databricks-skills/databricks-agent-bricks/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"    # ← Update to today's date
-      sync_commit: "97a3637"       # ← Update to latest upstream commit
+      last_synced: "2026-02-19"    # ← Update to today's date
+      sync_commit: "latest"        # ← Update to latest upstream commit
 ```
 
 ### Key Principles

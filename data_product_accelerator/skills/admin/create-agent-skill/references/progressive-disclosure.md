@@ -88,6 +88,23 @@ python scripts/validate.py --config path/to/config.yaml
 Expected output: `✅ All checks passed` or specific error messages.
 ```
 
+### Strategy 4: Working Memory Management (Orchestrators)
+
+Orchestrator skills spanning 3+ phases should include a `## Working Memory Management` section instructing the agent on note-taking discipline:
+
+- **What to persist after each phase** — a brief summary note with key outputs and decisions
+- **What to keep in working memory** — only the current phase's worker skill, the primary metadata object (e.g., table inventory dict), and the previous phase's summary note
+- **What to discard** — intermediate tool outputs (DDL strings, full DataFrames, raw SQL results) that are reproducible from source files
+- **How workers chain** — via "Notes to Carry Forward" and "Next Step" sections at the end of each worker skill
+
+**Worker skill requirements:**
+- Every worker must end with a `## [Domain] Notes to Carry Forward` section listing what the next worker needs
+- Every worker must end with a `## Next Step` section pointing to the next worker in the chain
+
+**Reference implementation:** `gold/01-gold-layer-setup/SKILL.md` (Working Memory Management section)
+
+**Common skills (always-loaded)** should include a `## Essential Rules (Retain in Working Memory)` section — a condensed 5-rule summary that agents can retain after releasing the full skill content.
+
 ## Guidelines
 
 ### Keep in SKILL.md
@@ -126,3 +143,6 @@ After splitting a skill:
 - [ ] Navigation from SKILL.md to references is explicit (links, not just mentions)
 - [ ] Scripts have usage instructions in SKILL.md
 - [ ] Templates have "how to customize" notes in SKILL.md
+- [ ] Orchestrators with 3+ phases have a `## Working Memory Management` section
+- [ ] All workers have "Notes to Carry Forward" and "Next Step" sections
+- [ ] Always-loaded common skills have an "Essential Rules (Retain in Working Memory)" summary

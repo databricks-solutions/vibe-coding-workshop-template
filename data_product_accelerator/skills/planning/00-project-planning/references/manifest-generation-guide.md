@@ -85,6 +85,8 @@ plans/manifests/
 1. A Gold layer table (from `gold_layer_design/yaml/`)
 2. A business question or use case (from the plan addendum)
 
+**Use case cross-referencing:** For each artifact entry in a manifest, include a `use_case_refs` list containing the UC# identifiers from `plans/use-case-catalog.md` that the artifact implements. This creates a reverse link from manifests back to the use case catalog, enabling traceability from implementation contracts all the way to business problems.
+
 ### Step 4: Validate Manifests
 
 Before handing off to downstream orchestrators:
@@ -216,3 +218,5 @@ Before handing off manifests to downstream orchestrators:
 - [ ] Summary counts match actual counts in the manifest
 - [ ] Business questions are specific and testable
 - [ ] Domain names are consistent across all 4 manifests
+- [ ] All artifacts have `use_case_refs` linking back to the use case catalog
+- [ ] Every UC# referenced in manifests exists in `plans/use-case-catalog.md`

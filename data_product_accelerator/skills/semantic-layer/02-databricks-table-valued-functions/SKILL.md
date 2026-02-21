@@ -64,8 +64,11 @@ Use this skill when:
 **Goal:** Create 10-15 pre-built, parameterized SQL queries for common business questions.
 
 **What You'll Create:**
-1. `table_valued_functions.sql` — SQL file with 10-15 TVF definitions
-2. `tvf_job.yml` — Asset Bundle job (SQL task) for deployment
+1. `table_valued_functions.sql` — SQL file with 10-15 TVF definitions using `${catalog}` and `${gold_schema}` template variables
+2. `create_tvfs.py` — Python notebook that reads the SQL file, substitutes `${catalog}` / `${gold_schema}` variables, splits into individual statements, and executes each via `spark.sql()`
+3. `tvf_job.yml` — Asset Bundle job using `notebook_task` (NOT `sql_task` — see warning below)
+
+**⚠️ Why `notebook_task` instead of `sql_task`?** TVF DDL uses `${catalog}.${gold_schema}` in identifiers (schema-qualified function names). `sql_task.parameters` are SQL bind parameters (`:param`) that cannot substitute identifiers — only values in `WHERE` clauses. A Python notebook performs string substitution before executing the SQL.
 
 **Fast Track:**
 ```sql
@@ -406,7 +409,7 @@ See `references/genie-integration.md` for comment format details and Genie misus
 See `scripts/validate_tvfs.sql` for ready-to-run validation queries.
 
 ### Phase 5: Deployment
-- [ ] Add to Asset Bundle job (`sql_task` with `warehouse_id`)
+- [ ] Add to Asset Bundle job (`notebook_task` — NOT `sql_task`, which cannot substitute identifiers in DDL)
 - [ ] Deploy: `databricks bundle deploy -t dev`
 - [ ] Run: `databricks bundle run gold_setup_job -t dev`
 - [ ] Test in Genie Space (if applicable)
@@ -451,6 +454,7 @@ See `references/tvf-patterns.md` (Asset Bundle Deployment section) for job YAML 
 
 - **`assets/templates/tvf-template.sql`** — Starter SQL template for new TVFs with v3.0 comment format
 - **`assets/templates/tvf-requirements-template.md`** — Requirements gathering template (fill in before coding)
+- **`assets/templates/tvf-creation-job-template.yml`** — Standalone Asset Bundle job for TVF deployment. **⚠️ Uses `notebook_task` (NOT `sql_task`)** because TVF DDL requires `${catalog}.${gold_schema}` identifier substitution which `sql_task` bind parameters cannot do. For combined deployment, use the orchestrator's `semantic-layer-job-template.yml`.
 
 ## Scripts
 
@@ -467,8 +471,23 @@ See `references/tvf-patterns.md` (Asset Bundle Deployment section) for job YAML 
 - `metric-views-patterns` - Metric view YAML structure
 - `genie-space-patterns` - Genie Space setup
 
+## TVF Notes to Carry Forward
+
+After completing TVF creation, carry these notes to the next worker:
+- **TVF names and paths:** List of all created TVFs with their SQL file paths
+- **Parameter signatures:** For each TVF, list parameters (all STRING) with descriptions
+- **Domain assignments:** Which Gold tables each TVF queries, grouped by domain
+- **Genie-relevant TVFs:** Which TVFs are designed for Genie use (date-range filters, lookup queries)
+- **Validation status:** Which TVFs passed test queries, any unresolved issues
+
+## Next Step
+
+After TVFs are deployed and validated, proceed to:
+**`semantic-layer/03-genie-space-patterns/SKILL.md`** — Configure Genie Spaces using the Metric Views (from Phase 1) and TVFs (from this phase) as trusted assets.
+
 ## Version History
 
+- **v2.1** (Feb 2026) — Corrected deployment from sql_task to notebook_task; added explanation of sql_task parameter limitation for DDL identifier substitution; added Notes to Carry Forward and Next Step for progressive disclosure
 - **v2.0** (Feb 2026) - Merged comprehensive TVF creation workflow: Quick Start, requirements gathering template, 5 complete examples, planning guide with domain-specific examples, implementation workflow (5 phases), Asset Bundle deployment patterns, validation queries, common business naming patterns
 - **v1.3** (Dec 16, 2025) - Standardized TVF comment format v3.0 for Genie optimization
 - **v1.2** (Dec 15, 2025) - Critical bug prevention: Cartesian product in aggregations

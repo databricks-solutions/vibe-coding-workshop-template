@@ -37,6 +37,24 @@ w = WorkspaceClient()  # Works automatically with notebook context
 
 ---
 
+## Databricks Connect (Spark Operations)
+
+Use `databricks-connect` for running Spark code locally against a Databricks cluster.
+
+```python
+from databricks.connect import DatabricksSession
+
+spark = DatabricksSession.builder.getOrCreate()          # Auto-detects DEFAULT profile
+spark = DatabricksSession.builder.profile("MY_PROFILE").getOrCreate()  # Named profile
+
+df = spark.sql("SELECT * FROM catalog.schema.table")
+df.show()
+```
+
+**IMPORTANT:** Do NOT set `.master("local[*]")` — this conflicts with Databricks Connect and causes failures.
+
+---
+
 ## Clusters
 
 ```python
@@ -178,6 +196,18 @@ for schema in w.schemas.list(catalog_name="main"): print(schema.name)
 w.files.upload(file_path="/Volumes/main/default/vol/data.csv", contents=open("f.csv", "rb"))
 with w.files.download(file_path="/Volumes/main/default/vol/data.csv") as f: content = f.read()
 for entry in w.files.list_directory_contents("/Volumes/main/default/vol/"): print(entry.name)
+
+# Parallel upload/download for large files
+w.files.upload_from(
+    file_path="/Volumes/main/default/vol/large.parquet",
+    source_path="/local/path/large.parquet",
+    use_parallel=True
+)
+w.files.download_to(
+    file_path="/Volumes/main/default/vol/large.parquet",
+    destination="/local/output/",
+    use_parallel=True
+)
 ```
 
 ---
@@ -289,6 +319,18 @@ secret = w.secrets.get_secret(scope="my-scope", key="api-key")
 
 ---
 
+## DBUtils
+
+```python
+dbutils = w.dbutils
+files = dbutils.fs.ls("/")
+dbutils.fs.cp("dbfs:/source", "dbfs:/dest")
+dbutils.fs.rm("dbfs:/path", recurse=True)
+value = dbutils.secrets.get(scope="my-scope", key="my-key")
+```
+
+---
+
 ## Common Patterns
 
 ### Async Applications (FastAPI, etc.)
@@ -305,6 +347,14 @@ async def get_clusters():
 from datetime import timedelta
 cluster = w.clusters.create_and_wait(cluster_name="...", timeout=timedelta(minutes=30))
 # Or manual: wait = w.clusters.create(...); cluster = wait.result()
+
+# With progress callback
+def progress(cluster):
+    print(f"State: {cluster.state}")
+
+cluster = w.clusters.wait_get_cluster_running(
+    cluster_id="...", timeout=timedelta(minutes=30), callback=progress
+)
 ```
 
 ### Error Handling
@@ -323,6 +373,29 @@ response = w.api_client.do(method="POST", path="/api/2.0/jobs/run-now", body={"j
 ```
 
 ---
+
+## SDK Documentation Architecture
+
+The SDK docs follow a predictable URL pattern — useful for looking up APIs:
+
+```
+Base: https://databricks-sdk-py.readthedocs.io/en/latest/
+Workspace APIs:  /workspace/{category}/{service}.html
+Account APIs:    /account/{category}/{service}.html
+```
+
+| Category | Services |
+|----------|----------|
+| `compute` | clusters, cluster_policies, command_execution, instance_pools, libraries |
+| `catalog` | catalogs, schemas, tables, volumes, functions, storage_credentials, external_locations |
+| `jobs` | jobs |
+| `sql` | warehouses, statement_execution, queries, alerts, dashboards |
+| `serving` | serving_endpoints |
+| `vectorsearch` | vector_search_indexes, vector_search_endpoints |
+| `pipelines` | pipelines |
+| `workspace` | repos, secrets, workspace, git_credentials |
+| `files` | files, dbfs |
+| `ml` | experiments, model_registry |
 
 ## SDK Documentation URLs
 

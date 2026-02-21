@@ -22,6 +22,7 @@ metadata:
     - databricks-expert-agent
     - naming-tagging-standards
   emits:
+    - plans/use-case-catalog.md
     - plans/manifests/semantic-layer-manifest.yaml
     - plans/manifests/observability-manifest.yaml
     - plans/manifests/ml-manifest.yaml
@@ -110,6 +111,19 @@ Use this skill when:
 | Agent Architecture | Agents use Genie Spaces (recommended) or Direct SQL | __________ |
 | Agent-Genie Mapping | 1:1, consolidated, or unified (based on asset volume) | __________ |
 
+## Working Memory Management
+
+This orchestrator spans 3 phases. To maintain coherence without context pollution:
+
+**After each phase, persist a brief summary note** capturing:
+- **Phase 1:** Domain list with Gold table mappings, addendum selections, business questions per domain, artifact count estimates
+- **Phase 2:** Plan document file paths, cross-references verified, total artifact counts by type
+- **Phase 3:** Manifest file paths (semantic-layer, observability, ml, genai-agents), validation results, summary counts
+
+**What to keep in working memory:** Current phase's template, domain list + artifact inventory, and previous phase's summary. Discard intermediate outputs — they are on disk. Read templates from `assets/templates/` and references just-in-time, not upfront.
+
+---
+
 ## Step-by-Step Workflow
 
 ### Phase 1: Requirements Gathering
@@ -169,19 +183,40 @@ List 5-10 key questions per domain that the solution must answer:
 4. {Question 4}
 5. {Question 5}
 
+#### Use Case Catalog
+
+After defining business questions and selecting addendums, consolidate into a **Use Case Catalog** — one entry per distinct analytical or operational problem the solution will address. Each use case ties business questions to the Gold tables and artifacts that solve them. Use `assets/templates/use-case-catalog-template.md` for the full format.
+
+| UC# | Use Case Name | Domain | Gold Tables | Artifact Types | Example Question |
+|-----|--------------|--------|-------------|---------------|-----------------|
+| UC-001 | {Descriptive Name} | {Domain} | `fact_*`, `dim_*` | TVF, MV, Dashboard | "{Natural language question}?" |
+| UC-002 | ... | ... | ... | ... | ... |
+
+**Use Case Catalog Rules:**
+- Every use case MUST include 3-5 business questions phrased in natural language
+- Every business question from the domain sections above MUST map to at least one use case
+- Every artifact in the addendum summaries MUST trace back to at least one use case question
+- Questions should be phrased as stakeholders would ask them (these become Genie benchmark candidates)
+- Group related questions into a single use case when they share the same Gold tables and grain
+
+See [Worked Example: Wanderbricks](references/worked-example-wanderbricks.md) for 3 fully worked-out use case cards.
+
+**Stakeholder Checkpoint:** After generating the use case catalog, pause and present the Use Case Summary table to the user for confirmation before proceeding to addendum generation. If the user requests changes, update the catalog and domain questions before continuing.
+
 ### Phase 2: Plan Document Generation
 
 Create plan documents using templates in the following order:
 
 1. **README** — `assets/templates/plans-readme-template.md` (plan index)
 2. **Prerequisites** — `assets/templates/prerequisites-template.md` (data layer summary)
-3. **Phase 1 Master** — `assets/templates/phase1-use-cases-template.md` (analytics artifacts)
-4. **Addendums** (selected in Phase 1):
+3. **Use Case Catalog** — `assets/templates/use-case-catalog-template.md` (consolidated use case definitions)
+4. **Phase 1 Master** — `assets/templates/phase1-use-cases-template.md` (analytics artifacts)
+5. **Addendums** (selected in Phase 1):
    - TVFs — `assets/templates/phase1-tvfs-template.md`
    - Alerting — `assets/templates/phase1-alerting-template.md`
    - Genie Spaces — `assets/templates/phase1-genie-spaces-template.md`
-5. **Phase 2** — `assets/templates/phase2-agent-framework-template.md` (AI agents)
-6. **Phase 3** — `assets/templates/phase3-frontend-template.md` (user interface)
+6. **Phase 2** — `assets/templates/phase2-agent-framework-template.md` (AI agents)
+7. **Phase 3** — `assets/templates/phase3-frontend-template.md` (user interface)
 
 ### Phase 3: Manifest Generation (Plan-as-Contract)
 
@@ -203,20 +238,23 @@ After creating plan documents, generate **machine-readable YAML manifests** that
    - `plans/manifests/observability-manifest.yaml` — Monitors, Dashboards, Alerts
    - `plans/manifests/ml-manifest.yaml` — Feature Tables, Models, Experiments
    - `plans/manifests/genai-agents-manifest.yaml` — Agents, Tools, Eval Datasets
-4. Validate all table/column references exist in Gold YAML
-5. Verify summary counts match actual artifact counts
-6. Commit manifests alongside plan documents
+4. For each artifact in a manifest, add `use_case_refs` listing the UC# it implements (from `plans/use-case-catalog.md`)
+5. Validate all table/column references exist in Gold YAML
+6. Verify summary counts match actual artifact counts
+7. Run `python scripts/validate_use_case_coverage.py plans/use-case-catalog.md` to verify coverage
+8. Commit manifests alongside plan documents
 
 **Key principle:** Every artifact in a manifest MUST trace back to (a) a Gold layer table and (b) a business question from the plan addendum.
 
 **Output Structure:**
 ```
 plans/
+├── use-case-catalog.md                    # Consolidated use case definitions
 ├── manifests/
-│   ├── semantic-layer-manifest.yaml    # → consumed by semantic-layer/00-*
-│   ├── observability-manifest.yaml     # → consumed by monitoring/00-*
-│   ├── ml-manifest.yaml                # → consumed by ml/00-*
-│   └── genai-agents-manifest.yaml      # → consumed by genai-agents/00-*
+│   ├── semantic-layer-manifest.yaml       # → consumed by semantic-layer/00-*
+│   ├── observability-manifest.yaml        # → consumed by monitoring/00-*
+│   ├── ml-manifest.yaml                   # → consumed by ml/00-*
+│   └── genai-agents-manifest.yaml         # → consumed by genai-agents/00-*
 ```
 
 **Downstream consumption:** Each downstream orchestrator (stages 6-9) has a **Phase 0: Read Plan** step that reads its manifest. If the manifest doesn't exist (e.g., user skipped Planning), the orchestrator falls back to self-discovery from Gold tables.
@@ -230,6 +268,7 @@ plans/
 ```
 plans/
 ├── README.md                              # Index and overview
+├── use-case-catalog.md                    # Consolidated use case definitions
 ├── prerequisites.md                       # Bronze/Silver/Gold summary (optional)
 ├── phase1-use-cases.md                    # Analytics artifacts (master)
 │   ├── phase1-addendum-1.1-ml-models.md
@@ -326,246 +365,43 @@ For detailed architecture, design patterns, "Why Genie Spaces" comparison, and t
 
 ## Artifact Rationalization Framework
 
-### Core Principle: Business Problems First, Not Artifact Counts
+**MANDATORY: Read** `references/rationalization-framework.md` for complete sizing guides, decision matrices, and naming conventions.
 
-**Every artifact must trace to a specific business question that justifies its existence.** Do not create TVFs, Metric Views, or Genie Spaces to fill a quota. Create them because a stakeholder needs an answer that cannot be obtained any other way.
+**Core Principle:** Every artifact must trace to a specific business question. Do not create artifacts to fill quotas.
 
-### Genie Space Capacity Planning
-
-**Hard constraint: Each Genie Space supports up to 25 data assets** (tables, views, metric views, and functions combined).
-
-```
-Step 1: Count your queryable assets
-  total_assets = Gold_tables + Metric_Views + TVFs + ML_prediction_tables
-
-Step 2: Determine Genie Space count
-  IF total_assets ≤ 25  → 1 unified Genie Space (no domain split needed)
-  IF total_assets ≤ 50  → 2-3 spaces (group related domains)
-  IF total_assets > 50  → consider domain-specific spaces (but rarely > 4-5)
-
-Step 3: Validate each space
-  - Each space should have 10-25 assets (under 10 = too thin, consider merging)
-  - Assets within a space should be semantically cohesive
-  - Genie's NL-to-SQL quality DEGRADES with too many unrelated assets
-```
-
-**Decision matrix:**
-
-| Total Queryable Assets | Recommended Spaces | Rationale |
-|------------------------|-------------------|-----------|
-| ≤ 15 | 1 unified | All assets fit comfortably; Genie context stays focused |
-| 16-25 | 1-2 | One may suffice; split only if domains are truly distinct |
-| 26-50 | 2-3 | Group related domains; keep each space ≤ 25 |
-| 51-75 | 3-4 | Domain-specific; ensure each space has ≥ 10 assets |
-| 75+ | 4-6 max | Large projects only; more spaces = more maintenance |
-
-### TVF Rationalization
-
-**Create a TVF only when ALL of these are true:**
-
-1. A business question requires **parameterized filtering** (date ranges, entity filters)
-2. The answer requires **multi-table joins or aggregations** beyond a simple `WHERE` clause
-3. The same query pattern is needed **repeatedly** (not a one-off analysis)
-4. The question **cannot be answered** by a Metric View query alone
-
-**Do NOT create a TVF when:**
-- A direct `SELECT` from a Gold table with a `WHERE` clause suffices
-- A Metric View already answers the question (use `MEASURE()` syntax instead)
-- The TVF would duplicate a Metric View's measures with different filters
-- The TVF serves only one dashboard widget and nothing else
-
-**Right-sizing guide:**
-
-| Gold Table Count | Typical TVF Count | Reasoning |
-|-----------------|-------------------|-----------|
-| 5-10 tables | 5-15 TVFs | ~1-2 TVFs per table for parameterized access |
-| 11-20 tables | 10-25 TVFs | Complex joins justify more functions |
-| 20+ tables | 15-35 TVFs | Large models; audit for duplication regularly |
-
-### Metric View Rationalization
-
-**One metric view per distinct analytical grain**, not per domain:
-
-- If two domains share the same fact table → one metric view with dimensions for both
-- A metric view with only 1-2 measures is rarely justified — fold into a broader view
-- Metric Views with joins should cover a full analytical perspective (e.g., "bookings with destination and property details"), not narrow slices
-
-**Right-sizing guide:**
-
-| Fact Table Count | Typical Metric Views | Reasoning |
-|-----------------|---------------------|-----------|
-| 1-3 facts | 1-3 views | One per fact, with dimension joins |
-| 4-6 facts | 3-5 views | Some facts may share a view if similar grain |
-| 7+ facts | 4-8 views | Consolidate where grains align |
-
-### Domain Rationalization
-
-**Domains emerge from business problems, not arbitrary counts.**
-
-- Start by listing business questions stakeholders actually ask
-- Group questions by the Gold tables they touch
-- If two "domains" share >70% of their Gold tables → merge them
-- If a "domain" has fewer than 3 distinct business questions → merge it into a neighbor
-- Consider Genie Space limits: each domain implies a potential Genie Space
-
-**Practical domain count:**
-
-| Gold Table Count | Typical Domains | Reasoning |
-|-----------------|----------------|-----------|
-| 5-10 tables | 2-3 domains | Small models don't need 5+ domains |
-| 11-20 tables | 3-4 domains | Natural groupings emerge from star schema |
-| 20+ tables | 4-6 domains | Large models may justify more, but audit overlap |
-
-### Artifact Naming Conventions
-
-| Artifact | Pattern | Example |
-|----------|---------|---------|
-| TVF | `get_{domain}_{metric}` | `get_{domain}_by_{dimension}` |
-| Metric View | `{domain}_analytics_metrics` | `{domain}_analytics_metrics` |
-| Dashboard | `{Domain} {Purpose} Dashboard` | `{Domain} Performance Dashboard` |
-| Alert | `{DOMAIN}-NNN-SEVERITY` | `{DOM}-001-CRIT` |
-| ML Model | `{Purpose} {Type}` | `{Metric} Forecaster` |
-| Monitor | `{table} Monitor` | `{Domain} Data Quality Monitor` |
-| Genie Space | `{Domain} {Purpose}` | `{Domain} Intelligence` |
-| AI Agent | `{Domain} Agent` | `{Domain} Agent` |
+**Critical constraints (always enforce, even without reading the reference):**
+- Genie Spaces: **max 25 assets per space**; 10-25 per space is optimal; <10 = merge spaces
+- TVFs: **only** when Metric Views cannot answer the question (requires parameterized multi-table logic)
+- Metric Views: one per distinct analytical grain, not per domain
+- Domains: emerge from business questions (min 3 questions per domain); merge if >70% Gold table overlap
+- Naming: `get_{domain}_{metric}` for TVFs, `{domain}_analytics_metrics` for Metric Views
 
 ## SQL Query Standards
 
-### Gold Layer Reference Pattern
+**ALWAYS use Gold layer tables, NEVER system tables directly.** Reference pattern: `${catalog}.${gold_schema}.table_name`
 
-**ALWAYS use Gold layer tables, NEVER system tables directly.**
-
-```sql
--- WRONG: Direct system table reference
-FROM system.billing.usage
-
--- CORRECT: Gold layer reference with variables
-FROM ${catalog}.${gold_schema}.fact_usage
-```
-
-### Standard Variable References
-
-```sql
--- Catalog and schema (from parameters)
-${catalog}.${gold_schema}.table_name
-
--- Date parameters (STRING type for Genie compatibility)
-WHERE usage_date BETWEEN CAST(start_date AS DATE) AND CAST(end_date AS DATE)
-
--- SCD Type 2 dimension joins
-LEFT JOIN dim_{entity} d 
-    ON f.{entity}_id = d.{entity}_id 
-    AND d.is_current = TRUE
-```
+- Date parameters: `STRING` type (Genie compatible), cast at query time: `CAST(start_date AS DATE)`
+- SCD Type 2 joins: `LEFT JOIN dim_{entity} d ON f.{entity}_id = d.{entity}_id AND d.is_current = TRUE`
 
 ## Documentation Quality Standards
 
-### LLM-Friendly Comments
+**LLM-Friendly Comments** — All artifacts must include: what it does, when to use it, example questions it answers. Pattern: `COMMENT 'LLM: Returns top N {metric}... Example questions: "What are the top 10...?"'`
 
-All artifacts must have comments that help LLMs (Genie, AI/BI) understand:
-- What the artifact does
-- When to use it
-- Example questions it answers
-
-```sql
-COMMENT 'LLM: Returns top N {metric} contributors by {dimension} for a date range.
-Use this for {use_case_1}, {use_case_2}, and identifying {insight_type}.
-Parameters: start_date, end_date (YYYY-MM-DD format), optional top_n (default 10).
-Example questions: "What are the top 10 {metric} drivers?" or "Which {dimension} had most {metric}?"'
-```
-
-### Summary Tables
-
-Every addendum must include:
-1. **Overview table** — All artifacts with agent domain, dependencies, status
-2. **By-domain sections** — Artifacts grouped by agent domain
-3. **Count summary** — Total artifacts by type and domain
-4. **Success criteria** — Measurable targets
+**Summary Tables** — Every addendum must include: overview table (all artifacts with domain, dependencies, status), by-domain sections, count summary, and success criteria.
 
 ## Common Mistakes to Avoid
 
-### DON'T: Mix system tables and Gold tables
-
-```sql
--- BAD: Direct system table
-FROM system.billing.usage u
-JOIN ${catalog}.${gold_schema}.dim_workspace w ...
-```
-
-### DON'T: Forget Agent Domain classification
-
-```markdown
-## get_slow_queries (BAD - no domain)
-
-## {Domain}: get_slow_queries (GOOD)
-```
-
-### DON'T: Create artifacts without cross-addendum updates
-
-When adding a TVF, also consider:
-- Does it need a Metric View counterpart?
-- Should there be an Alert?
-- Is it Dashboard-worthy?
-
-### DON'T: Use DATE parameters in TVFs (Genie incompatible)
-
-```sql
--- BAD
-start_date DATE
-
--- GOOD
-start_date STRING COMMENT 'Format: YYYY-MM-DD'
-```
-
-### DON'T: Deploy agents before Genie Spaces
-
-**Genie Spaces MUST be deployed BEFORE agents can use them.**
-
-### DON'T: Create Genie Spaces that exceed the 25-asset limit
-
-```
-# BAD: Stuffing 30+ assets degrades NL-to-SQL quality
-Genie Space with 15 Gold tables + 20 TVFs + 5 Metric Views = 40 assets ❌
-
-# GOOD: Split by domain cohesion, keep each under 25
-Space A: 8 tables + 10 TVFs + 2 MVs = 20 assets ✅
-Space B: 7 tables + 10 TVFs + 3 MVs = 20 assets ✅
-```
-
-### DON'T: Create one Genie Space per domain when assets are thin
-
-```
-# BAD: 5 Genie Spaces with 4 assets each = wasted maintenance
-Domain A Space: 2 tables + 1 TVF + 1 MV = 4 assets ❌ (too thin)
-
-# GOOD: Consolidate thin domains into fewer spaces
-Combined Space: 10 tables + 5 TVFs + 3 MVs = 18 assets ✅
-```
-
-### DON'T: Create TVFs that duplicate Metric View capabilities
-
-```sql
--- BAD: TVF that just wraps what a Metric View already does
-CREATE FUNCTION get_total_bookings(start_date STRING, end_date STRING)
--- When a Metric View already has: MEASURE(total_bookings) with date dimension
-
--- GOOD: TVF adds value Metric Views can't provide
-CREATE FUNCTION get_booking_comparison(period_a_start STRING, period_a_end STRING,
-                                       period_b_start STRING, period_b_end STRING)
--- Multi-period comparison requires parameterized logic beyond MEASURE()
-```
-
-### DON'T: Force a fixed domain count
-
-```
-# BAD: "We need 5 domains" → inventing domains to fill quota
-Domain 1: Revenue ✅ (real need)
-Domain 2: Operations ✅ (real need)  
-Domain 3: "Miscellaneous" ❌ (forced)
-
-# GOOD: Let business questions determine domains naturally
-2-3 well-defined domains > 5-6 poorly-defined ones
-```
+| Mistake | Correct Approach |
+|---------|-----------------|
+| Querying `system.*` tables directly | Always use Gold layer: `${catalog}.${gold_schema}.fact_*` |
+| Omitting Agent Domain on artifacts | Every artifact must be tagged: `## {Domain}: get_{metric}` |
+| Adding a TVF without cross-addendum check | Also consider: Metric View counterpart? Alert? Dashboard? |
+| Using `DATE` type in TVF parameters | Use `STRING COMMENT 'Format: YYYY-MM-DD'` (Genie compatible) |
+| Deploying agents before Genie Spaces | Genie Spaces MUST be deployed first — agents consume them |
+| Genie Space with 25+ assets | Split by domain cohesion; each space 10-25 assets |
+| One Genie Space per domain when assets are thin | Consolidate thin domains (<10 assets) into fewer spaces |
+| TVF that duplicates a Metric View | TVFs only when multi-period/multi-table parameterized logic is needed |
+| Forcing a fixed domain count | Let business questions determine domains — 2-3 focused > 5-6 thin |
 
 ## Reference Files
 
@@ -581,6 +417,7 @@ Domain 3: "Miscellaneous" ❌ (forced)
 ### Plan Templates
 - **[Project Plan Template](assets/templates/project-plan-template.md)** — Generic phase template with SQL standards
 - **[Prerequisites Template](assets/templates/prerequisites-template.md)** — Data layer summary (Bronze/Silver/Gold)
+- **[Use Case Catalog Template](assets/templates/use-case-catalog-template.md)** — Consolidated use case definitions with business questions
 - **[Phase 1 Use Cases Template](assets/templates/phase1-use-cases-template.md)** — Master analytics artifacts
 - **[Phase 1 TVFs Template](assets/templates/phase1-tvfs-template.md)** — Table-Valued Functions addendum
 - **[Phase 1 Alerting Template](assets/templates/phase1-alerting-template.md)** — Alerting framework addendum
@@ -618,6 +455,13 @@ Domain 3: "Miscellaneous" ❌ (forced)
 - [ ] Related artifacts cross-reference each other
 - [ ] Dependencies are documented
 
+### Use Case Traceability
+- [ ] Use case catalog exists with one entry per distinct business problem
+- [ ] Every use case includes 3-5 business questions in natural language
+- [ ] Every business question from domain sections maps to at least one use case
+- [ ] Every artifact in addendum summaries traces back to at least one use case question
+- [ ] Use case catalog cross-references addendum documents
+
 ### Completeness
 - [ ] Domains derived from business questions (not forced to a fixed count)
 - [ ] Every TVF traces to a business question that Metric Views cannot answer
@@ -645,33 +489,16 @@ Domain 3: "Miscellaneous" ❌ (forced)
 
 ## Key Learnings
 
-1. Agent Domain framework provides consistent organization across all artifacts
-2. Gold layer references (not system tables) ensure consistency
-3. User requirements often span multiple addendums — update all
-4. Dashboard JSON files are rich sources of SQL patterns
-5. LLM-friendly comments are critical for Genie/AI/BI integration
-6. Summary tables help maintain accuracy across large plans
-7. Planning starts after data layers are complete — focus on consumption artifacts
-8. Agents should NOT write SQL directly — use Genie Spaces as abstraction
-9. Genie Spaces provide natural language understanding that agents leverage
-10. Each specialized agent has a dedicated Genie Space (1:1 mapping)
-11. Orchestrator agent uses Unified Genie Space for intent classification
-12. Genie Spaces must be deployed BEFORE agents can be developed
-13. Multi-agent workflows require correlation and synthesis in Orchestrator
-14. Three-level testing ensures each layer works before next is built
-15. General Instructions in Genie Spaces become agent system prompts
-16. Abstraction Layer: Agents don't need SQL syntax or schema knowledge
-17. Schema Evolution: Data model changes don't break agent implementations
-18. Query Optimization: Genie Spaces handle SQL optimization automatically
-19. Guardrails: Genie Spaces provide built-in query safety checks
-20. Testing Framework: Benchmark questions test both Genie and Agent accuracy
-21. System prompt derivation from Genie Space instructions keeps prompts concise (≤20 lines)
-22. Three agent-Genie design patterns: 1:1 Mapping, Orchestrator+Unified, Hierarchical
-23. Genie Spaces have a 25-asset hard limit — plan space count from total asset volume, not domain count
-24. TVFs should only exist when Metric Views cannot answer the business question
-25. Domains emerge from business questions and Gold table groupings, not arbitrary counts
-26. Fewer well-focused Genie Spaces outperform many thin ones — Genie NL quality degrades with too many unrelated assets
-27. Rationalize before creating: count assets first, then decide space boundaries
+1. **Agent Domain framework** provides consistent organization across all artifacts — every artifact gets a domain tag
+2. **Gold layer references only** — never query `system.*` tables directly; use `${catalog}.${gold_schema}.*`
+3. **Cross-addendum updates** — user requirements span multiple addendums; update all affected documents
+4. **LLM-friendly comments** are critical for Genie/AI/BI integration — include example questions
+5. **Agents use Genie Spaces as abstraction** — agents don't write SQL; Genie handles NL-to-SQL translation, optimization, and guardrails
+6. **1:1 Agent-to-Genie mapping** recommended; Orchestrator agent uses Unified Genie Space for intent classification
+7. **Deploy Genie Spaces before agents** — three-level testing: assets → Genie → Agents
+8. **Genie Space 25-asset hard limit** — plan space count from total asset volume, not domain count; fewer focused spaces > many thin ones
+9. **Rationalize before creating** — every artifact must trace to a business question; TVFs only when Metric Views can't answer
+10. **Domains emerge from data** — business questions and Gold table groupings determine natural domain boundaries
 
 ## References
 
@@ -696,10 +523,7 @@ Domain 3: "Miscellaneous" ❌ (forced)
 - [genie-space-patterns](../../semantic-layer/03-genie-space-patterns/SKILL.md) — Genie Space setup for agents
 
 ### Agent Framework Technologies
-- [LangChain](https://python.langchain.com/) — Agent framework
-- [LangGraph](https://langchain-ai.github.io/langgraph/) — Multi-agent workflows
-
----
+- [LangChain](https://python.langchain.com/) | [LangGraph](https://langchain-ai.github.io/langgraph/)
 
 ## Pipeline Progression
 
@@ -707,3 +531,30 @@ Domain 3: "Miscellaneous" ❌ (forced)
 
 **Next stage:** After completing the project plan for remaining phases, proceed to:
 - **`semantic-layer/00-semantic-layer-setup`** — Build Metric Views, TVFs, and Genie Spaces on top of Gold
+
+---
+
+## Post-Completion: Skill Usage Summary (MANDATORY)
+
+**After completing all phases of this orchestrator, output a Skill Usage Summary reflecting what you ACTUALLY did — not a pre-written summary.**
+
+### What to Include
+
+1. Every skill `SKILL.md` or `references/` file you read (via the Read tool), in the order you read them
+2. Which phase you were in when you read it
+3. Whether it was a **Common**, **Reference**, or **Template** file
+4. A one-line description of what you specifically used it for in this session
+
+### Format
+
+| # | Phase | Skill / Reference Read | Type | What It Was Used For |
+|---|-------|----------------------|------|---------------------|
+| 1 | Phase N | `path/to/SKILL.md` | Common / Reference / Template | One-line description |
+
+### Summary Footer
+
+End with:
+- **Totals:** X common skills, Y reference files, Z templates read across N phases
+- **Manifests emitted:** List each manifest file generated and its artifact count
+- **Skipped:** List any expected references or templates that you did NOT need to read, and why
+- **Unplanned:** List any skills you read that were NOT listed in the dependency table (e.g., for troubleshooting, edge cases, or user-requested detours)

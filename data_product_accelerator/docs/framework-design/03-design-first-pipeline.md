@@ -29,7 +29,7 @@ context/*.csv
 |-------|-------|
 | **Orchestrator** | `gold/00-gold-layer-design` |
 | **Input** | `context/{ProjectName}_Schema.csv` |
-| **Workers Used** | `gold/08-mermaid-erd-patterns`, `gold/02-yaml-driven-gold-setup`, `gold/03-gold-layer-documentation`, `gold/06-fact-table-grain-validation`, `gold/07-gold-layer-schema-validation`, `gold/04-gold-layer-merge-patterns` |
+| **Workers Used** | `gold/design-workers/01-grain-definition`, `gold/design-workers/02-dimension-patterns`, `gold/design-workers/03-fact-table-patterns`, `gold/design-workers/04-conformed-dimensions`, `gold/design-workers/05-erd-diagrams`, `gold/design-workers/06-table-documentation`, `gold/design-workers/07-design-validation`, `gold/pipeline-workers/01-yaml-table-setup`, `gold/pipeline-workers/02-merge-patterns` |
 | **Duration** | 2-3 hours |
 
 **What it does:**
@@ -101,7 +101,7 @@ Set up the Silver layer using @data_product_accelerator/skills/silver/00-silver-
 |-------|-------|
 | **Orchestrator** | `gold/01-gold-layer-setup` |
 | **Input** | Gold YAML schemas (from stage 1) + Silver tables (from stage 3) |
-| **Workers Used** | `gold/02-yaml-driven-gold-setup`, `gold/04-gold-layer-merge-patterns`, `gold/05-gold-delta-merge-deduplication`, `gold/06-fact-table-grain-validation`, `gold/07-gold-layer-schema-validation`, `gold/03-gold-layer-documentation`, `gold/08-mermaid-erd-patterns` |
+| **Workers Used** | `gold/pipeline-workers/01-yaml-table-setup`, `gold/pipeline-workers/02-merge-patterns`, `gold/pipeline-workers/03-deduplication`, `gold/pipeline-workers/04-grain-validation`, `gold/pipeline-workers/05-schema-validation`, `gold/design-workers/06-table-documentation`, `gold/design-workers/05-erd-diagrams` |
 | **Duration** | 3-4 hours |
 
 **What it does:**
@@ -163,7 +163,7 @@ Perform project planning using @data_product_accelerator/skills/planning/00-proj
 |-------|-------|
 | **Orchestrator** | `semantic-layer/00-semantic-layer-setup` |
 | **Input** | Semantic layer manifest + Gold tables |
-| **Workers Used** | `semantic-layer/01-metric-views-patterns`, `02-databricks-table-valued-functions`, `03-genie-space-patterns`, `04-genie-space-export-import-api`, `05-genie-space-optimization` |
+| **Workers Used** | `semantic-layer/01-metric-views-patterns`, `02-databricks-table-valued-functions`, `03-genie-space-patterns`, `04-genie-space-export-import-api`. Genie optimization is standalone via `05-genie-optimization-orchestrator` (routes to 4 workers in `genie-optimization-workers/`) |
 | **Duration** | 3-5 hours |
 
 **What it does:**
@@ -255,7 +255,7 @@ Set up GenAI agents using @data_product_accelerator/skills/genai-agents/00-genai
 - **The skill does the thinking.** You don't need to specify details — the orchestrator reads its worker skills, common skills, and existing artifacts automatically.
 - **If something fails,** the `databricks-autonomous-operations` common skill kicks in (Deploy → Poll → Diagnose → Fix → Redeploy).
 - **Stages 6-9 are optional.** A functional data platform exists after stage 4.
-- **Stages 6-9 can run in any order** (they're independent of each other).
+- **Stages 6, 7, and 8 can run in parallel** (they consume different manifests from stage 5). Stage 9 depends on stage 6 (Genie Spaces for multi-agent orchestration). See [09-Parallel Execution Guide](09-parallel-execution-guide.md) for the full dependency analysis.
 
 ## References
 

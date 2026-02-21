@@ -6,7 +6,7 @@ This document contains detailed domain index summaries for the skill navigation 
 
 **Design-First Pipeline:**
 ```
-context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Observability (7) → ML (8) → GenAI (9)
+context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Genie Optimization (6b) → Observability (7) → ML (8) → GenAI (9)
 ```
 
 **Input Convention:** Customer schema CSV lives in `context/` directory (e.g., `context/Wanderbricks_Schema.csv`). This is the single starting input that feeds the entire pipeline.
@@ -84,7 +84,7 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 
 ## Gold Layer Index (Stages 1 & 4)
 
-**Skills in domain:** 9 skills (2 orchestrators, 7 workers)
+**Skills in domain:** 14 skills (2 orchestrators, 12 workers)
 
 ### Orchestrators
 
@@ -95,17 +95,27 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 
 **Design-First workflow:** `00-gold-layer-design` (stage 1) → reads `context/*.csv` → creates YAML, ERDs, docs → Bronze (stage 2) → Silver (stage 3) → `01-gold-layer-setup` (stage 4) → creates tables, merge scripts, jobs
 
-### Workers
+### Design Workers (Stage 1 — called by `gold-layer-design`)
 
 | Skill | Path | ~Tokens | Standalone |
 |---|---|---|---|
-| `yaml-driven-gold-setup` | `gold/02-yaml-driven-gold-setup/SKILL.md` | ~1.8K | Yes |
-| `gold-layer-documentation` | `gold/03-gold-layer-documentation/SKILL.md` | ~1.1K | Yes |
-| `gold-layer-merge-patterns` | `gold/04-gold-layer-merge-patterns/SKILL.md` | ~1.3K | Yes |
-| `gold-delta-merge-deduplication` | `gold/05-gold-delta-merge-deduplication/SKILL.md` | ~1.4K | Yes |
-| `fact-table-grain-validation` | `gold/06-fact-table-grain-validation/SKILL.md` | ~1.2K | Yes |
-| `gold-layer-schema-validation` | `gold/07-gold-layer-schema-validation/SKILL.md` | ~1.1K | Yes |
-| `mermaid-erd-patterns` | `gold/08-mermaid-erd-patterns/SKILL.md` | ~1.2K | Yes |
+| `01-grain-definition` | `gold/design-workers/01-grain-definition/SKILL.md` | ~1.2K | Yes |
+| `02-dimension-patterns` | `gold/design-workers/02-dimension-patterns/SKILL.md` | ~1.2K | Yes |
+| `03-fact-table-patterns` | `gold/design-workers/03-fact-table-patterns/SKILL.md` | ~1.2K | Yes |
+| `04-conformed-dimensions` | `gold/design-workers/04-conformed-dimensions/SKILL.md` | ~1.1K | Yes |
+| `05-erd-diagrams` | `gold/design-workers/05-erd-diagrams/SKILL.md` | ~1.2K | Yes |
+| `06-table-documentation` | `gold/design-workers/06-table-documentation/SKILL.md` | ~1.1K | Yes |
+| `07-design-validation` | `gold/design-workers/07-design-validation/SKILL.md` | ~1.1K | Yes |
+
+### Pipeline Workers (Stage 4 — called by `gold-layer-setup`)
+
+| Skill | Path | ~Tokens | Standalone |
+|---|---|---|---|
+| `01-yaml-table-setup` | `gold/pipeline-workers/01-yaml-table-setup/SKILL.md` | ~1.8K | Yes |
+| `02-merge-patterns` | `gold/pipeline-workers/02-merge-patterns/SKILL.md` | ~1.3K | Yes |
+| `03-deduplication` | `gold/pipeline-workers/03-deduplication/SKILL.md` | ~1.4K | Yes |
+| `04-grain-validation` | `gold/pipeline-workers/04-grain-validation/SKILL.md` | ~1.2K | Yes |
+| `05-schema-validation` | `gold/pipeline-workers/05-schema-validation/SKILL.md` | ~1.1K | Yes |
 
 **Key Patterns:**
 1. Always deduplicate before MERGE to prevent duplicate key errors
@@ -123,7 +133,7 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 
 ## Semantic Layer Index (Stage 6)
 
-**Skills in domain:** 6 skills (1 orchestrator, 5 workers)
+**Skills in domain:** 10 skills (1 orchestrator, 4 workers, 1 optimization orchestrator, 4 optimization workers)
 
 ### Orchestrator
 
@@ -139,18 +149,29 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 | `databricks-table-valued-functions` | `semantic-layer/02-databricks-table-valued-functions/SKILL.md` | ~1.3K | Yes |
 | `genie-space-patterns` | `semantic-layer/03-genie-space-patterns/SKILL.md` | ~1.5K | Yes |
 | `genie-space-export-import-api` | `semantic-layer/04-genie-space-export-import-api/SKILL.md` | ~1.1K | Yes |
-| `genie-space-optimization` | `semantic-layer/05-genie-space-optimization/SKILL.md` | ~1.8K | Yes |
+
+### Genie Optimization (Stage 6b — standalone orchestrator + 4 workers)
+
+| Skill | Path | ~Tokens | Standalone |
+|---|---|---|---|
+| `genie-optimization-orchestrator` | `semantic-layer/05-genie-optimization-orchestrator/SKILL.md` | ~1.5K | Yes |
+| `genie-benchmark-generator` | `semantic-layer/genie-optimization-workers/01-genie-benchmark-generator/SKILL.md` | ~1.2K | Yes |
+| `genie-benchmark-evaluator` | `semantic-layer/genie-optimization-workers/02-genie-benchmark-evaluator/SKILL.md` | ~1.3K | Yes |
+| `genie-metadata-optimizer` | `semantic-layer/genie-optimization-workers/03-genie-metadata-optimizer/SKILL.md` | ~1.2K | Yes |
+| `genie-optimization-applier` | `semantic-layer/genie-optimization-workers/04-genie-optimization-applier/SKILL.md` | ~1.2K | Yes |
 
 **Key Patterns:**
 1. Metric views use `WITH METRICS LANGUAGE YAML` syntax
 2. TVFs must have STRING parameters for Genie compatibility
 3. Genie Spaces need comprehensive agent instructions (≤20 lines)
 4. Export/Import uses `serialized_space` JSON format
-5. Optimization targets: accuracy ≥95%, repeatability ≥90%
+5. Optimization uses MLflow-driven 3-layer judge architecture (8 judges + arbiter)
+6. Optimization targets: accuracy ≥95%, repeatability ≥90%
+7. Optimization workers: Generator (benchmarks) → Evaluator (judges) → Optimizer (GEPA/introspection) → Applier (6 control levers + dual persistence)
 
-**Cross-domain usage:** `05-genie-space-optimization` is also used by `genai-agents/00-genai-agents-setup` (Phase 8: Genie Optimization).
+**Cross-domain usage:** `05-genie-optimization-orchestrator` is also used by `genai-agents/00-genai-agents-setup` (Phase 8: Genie Optimization). The orchestrator routes to 4 worker skills in `genie-optimization-workers/`.
 
-**Plan-as-Contract:** The orchestrator `consumes` `plans/manifests/semantic-layer-manifest.yaml` (Phase 0). Falls back to Gold table self-discovery if no manifest exists.
+**Plan-as-Contract:** The semantic-layer orchestrator `consumes` `plans/manifests/semantic-layer-manifest.yaml` (Phase 0). Falls back to Gold table self-discovery if no manifest exists.
 
 **When to load full skills:**
 - Building semantic layer end-to-end → Load `semantic-layer/00-semantic-layer-setup`
@@ -158,7 +179,9 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 - Creating TVFs → Load `semantic-layer/02-databricks-table-valued-functions`
 - Setting up Genie Space → Load `semantic-layer/03-genie-space-patterns`
 - API automation → Load `semantic-layer/04-genie-space-export-import-api`
-- Optimizing Genie → Load `semantic-layer/05-genie-space-optimization`
+- Optimizing Genie → Load `semantic-layer/05-genie-optimization-orchestrator` (routes to workers on demand)
+- Generating benchmarks only → Load `genie-optimization-workers/01-genie-benchmark-generator`
+- Running evaluation only → Load `genie-optimization-workers/02-genie-benchmark-evaluator`
 
 ---
 
@@ -179,7 +202,7 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 | `lakehouse-monitoring-comprehensive` | `monitoring/01-lakehouse-monitoring-comprehensive/SKILL.md` | ~1.7K | Yes | — |
 | `databricks-aibi-dashboards` | `monitoring/02-databricks-aibi-dashboards/SKILL.md` | ~1.4K | Yes | — |
 | `sql-alerting-patterns` | `monitoring/03-sql-alerting-patterns/SKILL.md` | ~1.8K | Yes | — |
-| `anomaly-detection` | `monitoring/04-anomaly-detection/SKILL.md` | ~1.5K | Yes | `silver-layer-creation`, `gold-layer-implementation` |
+| `anomaly-detection` | `monitoring/04-anomaly-detection/SKILL.md` | ~1.5K | Yes | `silver-layer-setup`, `gold-layer-setup` |
 
 **Key Patterns:**
 1. Custom metrics use `input_columns=[":table"]` for table-level KPIs
@@ -190,7 +213,7 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 
 **Plan-as-Contract:** The orchestrator `consumes` `plans/manifests/observability-manifest.yaml` (Phase 0). Falls back to Gold table self-discovery if no manifest exists.
 
-**Cross-Stage Trigger:** `04-anomaly-detection` is also invoked by `silver-layer-creation` (stage 3) and `gold-layer-implementation` (stage 4) to enable schema-level monitoring at schema creation time, before the observability stage.
+**Cross-Stage Trigger:** `04-anomaly-detection` is also invoked by `silver-layer-setup` (stage 3) and `gold-layer-setup` (stage 4) to enable schema-level monitoring at schema creation time, before the observability stage.
 
 **When to load full skills:**
 - Setting up observability end-to-end → Load `monitoring/00-observability-setup`
@@ -284,7 +307,7 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 
 | Skill | Path | Domain | Purpose |
 |---|---|---|---|
-| `genie-space-optimization` | `semantic-layer/05-genie-space-optimization/SKILL.md` | Semantic Layer | Genie accuracy testing, control levers, dual persistence |
+| `genie-optimization-orchestrator` | `semantic-layer/05-genie-optimization-orchestrator/SKILL.md` | Semantic Layer | Genie accuracy testing, control levers, dual persistence |
 
 **Key Patterns:**
 1. ResponsesAgent is MANDATORY for all new Databricks GenAI agents
@@ -298,7 +321,7 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 
 **When to load full skills:**
 - Building a new agent end-to-end → Load `genai-agents/00-genai-agents-setup`
-- Genie optimization (Phase 8 of agent implementation) → Load `semantic-layer/05-genie-space-optimization`
+- Genie optimization (Phase 8 of agent implementation) → Load `semantic-layer/05-genie-optimization-orchestrator`
 - Specific task → Load the relevant worker skill directly
 
 ---

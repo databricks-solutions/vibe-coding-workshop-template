@@ -66,7 +66,8 @@ measures:
 |-------|----------|------|-------------|
 | `version` | ✅ Yes | String | Must be `"1.1"` (quoted) |
 | `comment` | ✅ Yes | String | Structured description for Genie |
-| `source` | ✅ Yes | String | Fully qualified table name |
+| `source` | ✅ Yes | String | Fully qualified table name or SQL query |
+| `filter` | ❌ No | String | SQL boolean expression applied as WHERE clause to all queries |
 | `joins` | ❌ No | Array | List of dimension table joins |
 | `dimensions` | ✅ Yes | Array | List of dimension columns |
 | `measures` | ✅ Yes | Array | List of measure columns |
@@ -79,7 +80,7 @@ measures:
 |-------|-------|--------|
 | `name` | `Unrecognized field "name"` | ❌ NEVER include - name is in CREATE VIEW statement |
 | `time_dimension` | `Unrecognized field "time_dimension"` | ❌ Remove entirely - use regular dimension instead |
-| `window_measures` | `Unrecognized field "window_measures"` | ❌ Remove entirely - calculate in SQL/Python |
+| `window_measures` | `Unrecognized field "window_measures"` | ❌ Remove top-level `window_measures:` array. Individual measure `window:` property is Experimental (v0.1 only, DBR 16.4-17.1). For v1.1, calculate windowed aggregations in SQL/Python. |
 | `join_type` | Unsupported | ❌ Remove - defaults to LEFT OUTER JOIN |
 | `table` (in joins) | `Missing required creator property 'source'` | ✅ Use `source` instead |
 
@@ -89,13 +90,18 @@ measures:
 |-------|----------|------|-------------|
 | `name` | ✅ Yes | String | Alias used to reference joined table (e.g., `dim_store`) |
 | `source` | ✅ Yes | String | Fully qualified table path |
-| `'on'` | ✅ Yes | String | Join condition (quoted!) using `source.` prefix |
+| `'on'` | ✅ Yes (or `using`) | String | Join condition (quoted!) using `source.` prefix |
+| `using` | ✅ Yes (or `'on'`) | Array | Column names shared between source and join table (alternative to `'on'`) |
+| `joins` | ❌ No | Array | Nested joins for snowflake schema (DBR 17.1+) |
 
 **Join Requirements:**
-- Each join **MUST have** `name`, `source`, and `'on'` fields
-- ON clause uses `source.` for main table, join name for joined table
-- Each join must be direct: `source.fk = dim.pk` (NOT `dim1.fk = dim2.pk`)
+- Each join **MUST have** `name`, `source`, and either `'on'` or `using`
+- `ON` clause uses `source.` for main table, join name for joined table
+- `USING` clause lists columns with the same name in both tables
+- Each first-level join must reference `source` (NOT another join alias — that's transitive)
+- For transitive relationships, use nested `joins:` (snowflake schema) or denormalized columns
 - SCD2 joins must include `AND {dim_table}.is_current = true`
+- **MAP type columns are NOT supported** in joined tables
 
 ### Dimension Fields
 
@@ -119,6 +125,29 @@ measures:
 | `synonyms` | ✅ Yes | Array | 3-5 alternative names for Genie recognition |
 
 ### Format Options
+
+**Valid format types (exhaustive):**
+
+| Type | Use For | Common Mistake |
+|------|---------|----------------|
+| `byte` | Data sizes (storage, memory) | — |
+| `currency` | Monetary values (revenue, cost) | — |
+| `date` | Date-only values | — |
+| `date_time` | Timestamp values | — |
+| `number` | Counts, averages, decimals, integers | ❌ `decimal`, ❌ `integer` |
+| `percentage` | Ratios, rates, percentages | ❌ `percent` |
+
+**⚠️ `percent` is NOT valid** (use `percentage`). **`decimal` is NOT valid** (use `number`).
+
+#### Byte Format
+```yaml
+format:
+  type: byte
+  decimal_places:
+    type: exact
+    places: 1
+  abbreviation: compact
+```
 
 #### Currency Format
 ```yaml
@@ -153,6 +182,27 @@ format:
     type: exact
     places: 1  # Shows 45.3%
 ```
+
+#### Date Format
+```yaml
+format:
+  type: date
+  date_format: year_month_day  # YYYY-MM-DD
+  leading_zeros: true
+```
+
+Date format options: `year_week`, `locale_number_month`, `year_month_day`, `locale_long_month`, `locale_short_month`
+
+#### DateTime Format
+```yaml
+format:
+  type: date_time
+  date_format: year_month_day
+  time_format: locale_hour_minute_second
+  leading_zeros: true
+```
+
+Time format options: `locale_hour_minute_second`, `locale_hour_minute`, `no_time`
 
 ## Column Reference Rules
 

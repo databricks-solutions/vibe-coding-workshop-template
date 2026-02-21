@@ -27,8 +27,15 @@ metadata:
       paths:
         - "databricks-builder-app/README.md"
       relationship: "reference"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/databricks-lakebase-provisioned/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-02-19"
+      sync_commit: "latest"
 ---
 
 # Lakebase Memory Patterns for Stateful Agents
@@ -40,6 +47,47 @@ Use this skill when implementing stateful agents that need:
 - **Long-term memory**: User preferences and insights across sessions (user_id)
 - **Graceful degradation**: Agent works without memory tables
 - **Thread ID resolution**: Priority-based thread_id extraction from request context
+
+## Upstream: Lakebase Provisioned Patterns
+
+The upstream `databricks-lakebase-provisioned` skill in AI-Dev-Kit provides comprehensive Lakebase patterns:
+
+### OAuth Token Refresh (Production)
+Tokens expire after 1 hour. Production apps MUST implement token refresh:
+
+```python
+from databricks.sdk import WorkspaceClient
+import uuid
+
+w = WorkspaceClient()
+cred = w.database.generate_database_credential(
+    request_id=str(uuid.uuid4()),
+    instance_names=["my-lakebase-instance"]
+)
+token = cred.token  # Use as password, expires in 1 hour
+```
+
+For long-running apps, implement a background refresh loop every 50 minutes.
+
+### Databricks Apps Integration
+Apps use environment variables for Lakebase configuration:
+- `LAKEBASE_INSTANCE_NAME` / `LAKEBASE_DATABASE_NAME` — set automatically by Databricks Apps
+- Use `databricks apps add-resource` CLI to bind Lakebase to an app
+
+### MLflow Model Resources
+Declare Lakebase as a model resource for automatic credential provisioning:
+```python
+from mlflow.models.resources import DatabricksLakebase
+resources = [DatabricksLakebase(database_instance_name="my-lakebase-instance")]
+```
+
+### SDK Version Requirements
+- `databricks-sdk >= 0.61.0` (0.81.0+ recommended for full API support)
+- `psycopg >= 3.0` (supports `hostaddr` for DNS workaround)
+- `SQLAlchemy 2.x` with `postgresql+psycopg` driver
+
+### Capacity Sizing
+Lakebase Provisioned uses compute unit sizing: `CU_1`, `CU_2`, `CU_4`, `CU_8`.
 
 ## Two-Layer Memory Architecture
 

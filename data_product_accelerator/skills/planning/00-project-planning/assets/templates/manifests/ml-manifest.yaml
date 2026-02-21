@@ -76,6 +76,8 @@ models:
     business_questions:
       - "Which {entities} are likely to {prediction}?"
       - "What is the predicted {metric} for next {period}?"
+    use_case_refs:              # Links back to plans/use-case-catalog.md
+      - "UC-001"                # {Use case name}
     evaluation_metrics:
       - "{accuracy|rmse|f1_score|precision|recall|auc}"
     training_schedule: "weekly"

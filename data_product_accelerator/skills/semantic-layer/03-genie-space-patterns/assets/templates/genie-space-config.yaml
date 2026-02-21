@@ -102,17 +102,40 @@ tvfs:
           SELECT * FROM ${catalog}.${gold_schema}.{tvf_name}('param1', 'param2', 'param3');
 
 # Section G: Benchmark Questions
+# INTAKE WORKFLOW: Always prompt the user for benchmark questions first.
+#   - If user provides 10+: validate each, report issues, proceed with valid set
+#   - If user provides 1-9: validate, report issues, augment with synthetic to 10-15
+#   - If user provides none: generate 10-15 synthetic from asset metadata, show for review
+# See references/benchmark-intake-workflow.md for full validation pipeline.
 benchmark_questions:
-  - question: "{Natural language question}"
-    expected_sql: |
-      SELECT 
-        {columns}
-      FROM ${catalog}.${gold_schema}.{metric_view}
-      WHERE {conditions}
-      GROUP BY {dimensions}
-      ORDER BY MEASURE({metric}) DESC
-      LIMIT {n};
-    expected_result: "{Description of expected output}"
+  source: "user|synthetic|augmented"  # Track how benchmarks were obtained
+  user_submitted:
+    # Questions provided by the user (always preserved as-is)
+    - question: "{User's natural language question}"
+      expected_sql: "{SQL if user provided, or generate after validation}"
+      expected_asset: "MV|TVF|TABLE"
+      category: "aggregation|ranking|time-series|comparison|list"
+      validation_status: "valid|needs_info|invalid"
+  synthetic_additions:
+    # Questions generated from asset metadata to fill gaps
+    - question: "{Synthetic question from MV measure/TVF signature}"
+      expected_sql: |
+        SELECT 
+          {columns}
+        FROM ${catalog}.${gold_schema}.{metric_view}
+        WHERE {conditions}
+        GROUP BY {dimensions}
+        ORDER BY MEASURE({metric}) DESC
+        LIMIT {n};
+      expected_asset: "MV|TVF|TABLE"
+      category: "aggregation|ranking|time-series|comparison|list"
+      source: "synthetic"
+  combined_suite:
+    # Final validated set (user + synthetic, 10-15 questions, 4+ categories)
+    - question: "{Natural language question}"
+      expected_sql: |
+        SELECT {columns} FROM ${catalog}.${gold_schema}.{object} WHERE {conditions};
+      expected_result: "{Description of expected output}"
 
 # Deployment Configuration
 deployment:

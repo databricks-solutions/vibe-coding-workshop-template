@@ -1,6 +1,19 @@
 # Dimensional Modeling Guide
 
-Extracted from `context/prompts/03a-gold-layer-design-prompt.md` Steps 1.1-1.5.
+Extracted from `context/prompts/03a-gold-layer-design-prompt.md` Steps 1.1-1.5, enhanced with industry-standard dimensional modeling best practices.
+
+---
+
+## Four-Step Dimensional Design Process
+
+Before diving into the steps below, follow this industry-standard design sequence:
+
+1. **Select the Business Process** — Choose a measurable business process (sales, inventory, claims) to model. Each process becomes one or more fact tables.
+2. **Declare the Grain** — State the level of detail for each fact table. Use `design-workers/01-grain-definition/SKILL.md` for grain patterns.
+3. **Identify the Dimensions** — Determine the "who, what, where, when, why, how" context for each fact. Use `design-workers/02-dimension-patterns/SKILL.md` for advanced dimension patterns.
+4. **Identify the Facts** — Define the numeric measurements at the declared grain. Use `design-workers/03-fact-table-patterns/SKILL.md` for measure additivity and advanced fact patterns.
+
+After designing individual star schemas, use `design-workers/04-conformed-dimensions/SKILL.md` to build the enterprise bus matrix and identify conformed dimensions shared across processes.
 
 ---
 
@@ -55,7 +68,7 @@ When using SCD Type 2, the dimension MUST include:
 | **Transaction** | Individual events | No aggregation, single surrogate PK |
 | **Snapshot** | Point-in-time state | Entity + date PK, latest values |
 
-**Critical:** Read `fact-table-grain-validation` skill for grain validation patterns before finalizing.
+**Critical:** Read `design-workers/01-grain-definition` skill for grain definition patterns before finalizing.
 
 ---
 
@@ -132,3 +145,13 @@ Assign each table to exactly ONE domain for ERD and YAML organization:
 2. **Facts** → Assign to domain of the primary measure (sales fact → Sales)
 3. **Bridge tables** → Assign to domain of the "many" side
 4. **Conformed dimensions** (date, geography) → Own domain, referenced by others
+
+---
+
+## Advanced Design Patterns (Worker Skills)
+
+For advanced patterns beyond the steps above, read these design-worker skills:
+
+- **`design-workers/02-dimension-patterns/SKILL.md`** — Role-playing dimensions, degenerate dimensions, junk dimensions, mini-dimensions, hierarchy flattening, NULL handling with "Unknown" rows, anti-patterns (snowflaking, generic dimensions)
+- **`design-workers/03-fact-table-patterns/SKILL.md`** — Measure additivity classification, factless fact tables, accumulating snapshots, consolidated facts, late-arriving data, anti-patterns (centipede facts, pre-calculated ratios)
+- **`design-workers/04-conformed-dimensions/SKILL.md`** — Enterprise bus matrix, conformed dimension requirements, shrunken dimensions, conformed facts, drill-across queries, anti-pattern (fact-to-fact joins)

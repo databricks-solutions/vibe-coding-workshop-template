@@ -1,6 +1,6 @@
 ---
 name: silver-layer-setup
-description: End-to-end orchestrator for creating Silver layer DLT pipelines with Delta table-based data quality rules, quarantine patterns, and monitoring views. Orchestrates mandatory dependencies on common skills (databricks-table-properties, databricks-python-imports, databricks-asset-bundles, schema-management-patterns, unity-catalog-constraints, databricks-expert-agent) and Silver-domain skills (dlt-expectations-patterns, dqx-patterns). Use when creating a Silver layer from scratch, setting up Bronze-to-Silver pipelines, or implementing Silver DLT with streaming ingestion and runtime-updateable DQ rules.
+description: End-to-end orchestrator for creating Silver layer pipelines using Spark Declarative Pipelines (SDP, formerly DLT) with Delta table-based data quality rules, quarantine patterns, and monitoring views. Orchestrates mandatory dependencies on common skills (databricks-table-properties, databricks-python-imports, databricks-asset-bundles, schema-management-patterns, unity-catalog-constraints, databricks-expert-agent) and Silver-domain skills (dlt-expectations-patterns, dqx-patterns). Use when creating a Silver layer from scratch, setting up Bronze-to-Silver pipelines, or implementing Silver SDP/DLT with streaming ingestion and runtime-updateable DQ rules.
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"
@@ -29,23 +29,25 @@ metadata:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
       paths:
-        - "databricks-skills/spark-declarative-pipelines/SKILL.md"
+        - "databricks-skills/databricks-spark-declarative-pipelines/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
 
 # Silver Layer Setup - Orchestrator Skill
 
-End-to-end workflow for creating production-grade Silver layer DLT pipelines with Delta table-based data quality rules, quarantine patterns, streaming ingestion, and monitoring views.
+End-to-end workflow for creating production-grade Silver layer pipelines using Spark Declarative Pipelines (SDP, formerly Delta Live Tables/DLT) with Delta table-based data quality rules, quarantine patterns, streaming ingestion, and monitoring views.
+
+> **Naming:** Databricks rebranded DLT to **Spark Declarative Pipelines (SDP)** / **Lakeflow Declarative Pipelines (LDP)**. The modern Python API is `from pyspark import pipelines as dp`. However, our DQ rules framework still uses `import dlt` (legacy API) because `@dlt.expect_all_or_drop()` decorators are not yet available in the `dp` API. When Databricks migrates expectations to `dp`, both this skill and `dlt-expectations-patterns` will be updated. New projects may use `databricks pipelines init` to scaffold an SDP Asset Bundle project.
 
 **Time Estimate:** 3-4 hours for initial setup, 1 hour per additional table
 
 **What You'll Create:**
 1. `dq_rules` Delta table - Centralized rules repository in Unity Catalog
 2. `dq_rules_loader.py` - Pure Python module to load rules at runtime
-3. `silver_*.py` - DLT notebooks with expectations loaded from Delta table
-4. `silver_dlt_pipeline.yml` - Serverless DLT pipeline configuration
+3. `silver_*.py` - SDP/DLT notebooks with expectations loaded from Delta table
+4. `silver_pipeline.yml` - Serverless SDP pipeline configuration
 5. DQ monitoring views - Per-table metrics and referential integrity checks
 
 ---
@@ -76,7 +78,7 @@ End-to-end workflow for creating production-grade Silver layer DLT pipelines wit
 | Rules loader | `common/databricks-python-imports` | Pure Python module patterns (NO notebook header) |
 | DLT notebooks | `common/databricks-table-properties` | Silver-layer TBLPROPERTIES (CDF, row tracking, auto-optimize) |
 | Pipeline config | `common/databricks-asset-bundles` | DLT pipeline YAML, job YAML, serverless config |
-| Troubleshooting | `common/databricks-autonomous-operations` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs/pipelines fail |
+| Deployment (if user-triggered) | `common/databricks-autonomous-operations` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs/pipelines fail |
 
 **NEVER do these without FIRST reading the corresponding skill:**
 - NEVER write `table_properties={...}` without reading `databricks-table-properties`
@@ -193,6 +195,25 @@ src/{project}_silver/
 
 ---
 
+## Working Memory Management
+
+This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To maintain coherence without context pollution:
+
+**After each phase, persist a brief summary note** capturing:
+- **Phase 1 output:** Schema names (catalog, silver_schema), table list, DQ rules strategy decision
+- **Phase 2 output:** DQ rules table path, count of rules defined, rule severity distribution
+- **Phase 3 output:** `dq_rules_loader.py` path, confirmation it is pure Python (no notebook header)
+- **Phase 4 output:** DLT notebook paths per table, expectation counts, SCD handling decisions
+- **Phase 5 output:** Monitoring view paths, metric definitions
+- **Phase 6 output:** Pipeline YAML path, job YAML path, `databricks.yml` sync status
+- **Phase 7 output (if user-triggered):** Anomaly detection config, schema monitoring status
+
+**What to keep in working memory:** Only the current phase's context, the table list from Phase 1, and the previous phase's summary note. Discard intermediate outputs (full DDL strings, DQ rule DataFrames, raw DLT notebook contents) — they are on disk and reproducible.
+
+**Critical file note:** `dq_rules_loader.py` must be **pure Python** (NO `# Databricks notebook source` header). Carry this constraint through all phases.
+
+---
+
 ## Phased Implementation Workflow
 
 ### Phase 1: Requirements & Schema Setup (30 min)
@@ -224,8 +245,7 @@ src/{project}_silver/
 3. Apply TBLPROPERTIES from `databricks-table-properties`
 4. Apply PK constraint: `CONSTRAINT pk_dq_rules PRIMARY KEY (table_name, rule_name) NOT ENFORCED`
 5. Populate rules using the requirements from Phase 1
-6. Deploy and run: `databricks bundle run silver_dq_setup_job -t dev`
-7. Verify: `SELECT * FROM {catalog}.{silver_schema}.dq_rules`
+6. Verify file created: `setup_dq_rules_table.py` is ready for deployment (deployment is user-triggered)
 
 ---
 
@@ -294,7 +314,17 @@ src/{project}_silver/
 
 **See:** `references/pipeline-configuration.md` for Silver-specific examples
 
-**CRITICAL Deployment Order:**
+---
+
+### 🛑 STOP — Artifact Creation Complete
+
+**Phases 1–6 are complete.** All files (DQ rules table script, rules loader, DLT notebooks, monitoring views, pipeline/job YAMLs) have been created. **Do NOT proceed to deployment or Phase 7 unless the user explicitly requests it.**
+
+Report what was created and ask the user if they want to deploy and run.
+
+---
+
+**Deployment Order (USER-TRIGGERED ONLY — do not auto-execute):**
 ```bash
 # 1. Deploy everything
 databricks bundle deploy -t dev
@@ -311,7 +341,9 @@ databricks pipelines start-update --pipeline-name "[dev] Silver Layer Pipeline"
 
 ---
 
-### Phase 7: Enable Anomaly Detection on Silver Schema (5 min)
+### Phase 7: Enable Anomaly Detection on Silver Schema (5 min) — USER-TRIGGERED ONLY
+
+> **This phase is executed ONLY when the user explicitly requests it.** Do not auto-execute.
 
 **Pre-Condition - MUST read this skill first:**
 1. Read `monitoring/04-anomaly-detection/SKILL.md` — Schema-level freshness/completeness monitoring
@@ -454,7 +486,7 @@ Before considering the Silver layer complete, verify each item and confirm its s
 - [ ] `delta.enableRowTracking` = `true` on every Silver table (required for downstream MV incremental refresh)
 - [ ] Quarantine tables created for high-volume fact tables
 - [ ] DQ monitoring views created (including data freshness)
-- [ ] Deployment order correct: DQ setup job runs BEFORE DLT pipeline
+- [ ] (User-triggered) Deployment order documented: DQ setup job runs BEFORE DLT pipeline
 - [ ] `import dlt` used (NOT `from pyspark import pipelines as dp`)
 - [ ] `serverless: true` in pipeline YAML (NEVER classic clusters)
 - [ ] `photon: true` in pipeline YAML
@@ -463,8 +495,8 @@ Before considering the Silver layer complete, verify each item and confirm its s
 - [ ] Deduplication applied where Bronze may have duplicate records
 - [ ] `processed_timestamp` added to every Silver table
 - [ ] Event timestamps preserved from Bronze (not replaced by processing time)
-- [ ] Anomaly detection enabled on Silver schema (Phase 7)
-- [ ] Metadata tables (e.g., `dq_rules`) excluded from anomaly detection
+- [ ] (User-triggered) Anomaly detection enabled on Silver schema (Phase 7)
+- [ ] (User-triggered) Metadata tables (e.g., `dq_rules`) excluded from anomaly detection
 
 ---
 
@@ -504,6 +536,32 @@ Before considering the Silver layer complete, verify each item and confirm its s
 
 **Next stage:** After completing the Silver layer, proceed to:
 - **`gold/01-gold-layer-setup`** — Implement Gold layer tables, merge scripts, and FK constraints from the YAML designs created in stage 1
+
+---
+
+## Post-Completion: Skill Usage Summary (MANDATORY)
+
+**After completing all phases of this orchestrator, output a Skill Usage Summary reflecting what you ACTUALLY did — not a pre-written summary.**
+
+### What to Include
+
+1. Every skill `SKILL.md` or `references/` file you read (via the Read tool), in the order you read them
+2. Which phase you were in when you read it
+3. Whether it was a **Worker**, **Common**, **Cross-domain**, or **Reference** file
+4. A one-line description of what you specifically used it for in this session
+
+### Format
+
+| # | Phase | Skill / Reference Read | Type | What It Was Used For |
+|---|-------|----------------------|------|---------------------|
+| 1 | Phase N | `path/to/SKILL.md` | Worker / Common / Cross-domain / Reference | One-line description |
+
+### Summary Footer
+
+End with:
+- **Totals:** X worker skills, Y common skills, Z reference files read across N phases
+- **Skipped:** List any skills from the dependency table above that you did NOT need to read, and why (e.g., "phase not applicable", "user skipped", "no issues encountered")
+- **Unplanned:** List any skills you read that were NOT listed in the dependency table (e.g., for troubleshooting, edge cases, or user-requested detours)
 
 ---
 

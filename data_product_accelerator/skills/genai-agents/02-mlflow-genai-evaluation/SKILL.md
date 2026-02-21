@@ -1,11 +1,12 @@
 ---
 name: mlflow-genai-evaluation
 description: >
-  MLflow GenAI evaluation patterns with LLM judges, custom scorers with _extract_response_text()
-  helper, Databricks SDK for scorer LLM calls, metric aliases, threshold checking, 4-6
-  guidelines best practice, foundation model endpoints. Use when implementing agent evaluation
-  pipelines, creating custom LLM judges, setting up evaluation datasets, checking deployment
-  thresholds, or troubleshooting evaluation errors.
+  MLflow 3 GenAI evaluation patterns with LLM judges, MemAlign judge alignment, GEPA prompt
+  optimization, custom scorers with _extract_response_text() helper, Databricks SDK for scorer
+  LLM calls, metric aliases, threshold checking, 4-6 guidelines best practice, foundation model
+  endpoints. Use when implementing agent evaluation pipelines, creating custom LLM judges,
+  aligning judges with domain feedback, optimizing prompts, setting up UC trace ingestion for
+  production monitoring, or troubleshooting evaluation errors.
 license: Apache-2.0
 metadata:
   author: prashanth subrahmanyam
@@ -25,8 +26,15 @@ metadata:
       paths:
         - "databricks-tools-core/databricks_tools_core/sql/sql.py"
       relationship: "reference"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
+    - name: "ai-dev-kit"
+      repo: "databricks-solutions/ai-dev-kit"
+      paths:
+        - "databricks-skills/databricks-mlflow-evaluation/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-02-19"
+      sync_commit: "latest"
 ---
 
 # MLflow GenAI Evaluation Patterns
@@ -42,6 +50,22 @@ Production-grade patterns for evaluating Databricks GenAI agents using MLflow 3.
 - Troubleshooting evaluation errors (0.0 scores, metric name mismatches)
 - Optimizing guidelines for better evaluation scores
 - Querying evaluation results programmatically
+- Aligning LLM judges with domain expert feedback via MemAlign
+- Automated prompt optimization with GEPA (`optimize_prompts()`)
+- Setting up Unity Catalog trace ingestion for production monitoring
+
+---
+
+## Upstream API Note
+
+The upstream `databricks-mlflow-evaluation` skill in AI-Dev-Kit covers 8 end-to-end workflows: first-time evaluation setup, production trace-to-dataset, performance optimization, regression detection, custom scorer development, UC trace ingestion and production monitoring, judge alignment with MemAlign, and automated prompt optimization with GEPA.
+
+**Critical API facts:**
+- Use `mlflow.genai.evaluate()` (NOT `mlflow.evaluate()`)
+- Data format: `{"inputs": {"query": "..."}}` (nested structure required)
+- MemAlign is scorer-agnostic (works with any `feedback_value_type`)
+- GEPA optimization dataset must have both `inputs` AND `expectations` per record
+- Requires MLflow >= 3.5.0 for `optimize_prompts()`
 
 ---
 

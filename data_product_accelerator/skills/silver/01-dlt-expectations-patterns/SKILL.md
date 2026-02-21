@@ -1,6 +1,6 @@
 ---
 name: dlt-expectations-patterns
-description: Delta Live Tables expectations patterns for data quality with Unity Catalog Delta table storage. Use when implementing Silver layer DLT pipelines, creating portable data quality rules, or needing runtime-updateable expectations without code deployment. Supports severity-based filtering (critical vs warning) and quarantine patterns.
+description: Spark Declarative Pipeline (SDP, formerly DLT) expectations patterns for data quality with Unity Catalog Delta table storage. Use when implementing Silver layer SDP/DLT pipelines, creating portable data quality rules, or needing runtime-updateable expectations without code deployment. Supports severity-based filtering (critical vs warning) and quarantine patterns. Uses `import dlt` (legacy API) because `@dlt.expect_all_or_drop()` decorators are not yet available in the modern `dp` API (`from pyspark import pipelines as dp`).
 metadata:
   author: prashanth subrahmanyam
   version: "1.0"
@@ -17,12 +17,14 @@ metadata:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
       paths:
-        - "databricks-skills/spark-declarative-pipelines/SKILL.md"
+        - "databricks-skills/databricks-spark-declarative-pipelines/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-09"
+      last_synced: "2026-02-19"
       sync_commit: "97a3637"
 ---
-# Delta Live Tables Expectations Patterns
+# SDP/DLT Expectations Patterns
+
+> **Naming:** Databricks rebranded DLT to **Spark Declarative Pipelines (SDP)**. The modern Python API is `from pyspark import pipelines as dp` with `@dp.table()` decorators. However, expectations decorators (`@dlt.expect_all_or_drop()`, `@dlt.expect_all()`) remain in the legacy `import dlt` API. This skill uses the legacy API until expectations are migrated to `dp`.
 
 ## Overview
 

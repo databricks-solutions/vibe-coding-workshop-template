@@ -180,6 +180,8 @@ config = DataProfilingConfig(
 
 ```python
 refresh = w.data_quality.create_refresh(
+    object_type="table",
+    object_id=table_id,
     refresh=Refresh(
         object_type="table",
         object_id=table_id,
@@ -188,6 +190,10 @@ refresh = w.data_quality.create_refresh(
 print(f"Refresh ID: {refresh.refresh_id}")
 print(f"State: {refresh.state}")
 ```
+
+**Note:** `create_refresh()` requires `object_type` and `object_id` as separate positional
+parameters in addition to the `Refresh` object. This differs from `create_monitor()`, which
+only takes a `Monitor` object.
 
 ### Poll Refresh Status
 

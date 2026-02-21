@@ -1,0 +1,53 @@
+# Genie Space Deployment Job (Standalone)
+#
+# Deploys Genie Spaces from JSON configuration files via REST API using a notebook_task.
+# Use this template for standalone Genie deployment. For end-to-end semantic layer
+# deployment with dependency ordering, use the combined semantic-layer-job-template.yml
+# from the orchestrator skill instead.
+#
+# Usage:
+#   databricks bundle deploy -t dev
+#   databricks bundle run genie_deployment_job -t dev
+#
+# Prerequisites:
+#   - Metric Views and TVFs should be deployed first
+#   - Genie Space JSON configs must be synced
+#
+# CRITICAL: Add JSON sync to databricks.yml:
+#   sync:
+#     include:
+#       - "src/semantic/genie_configs/**/*.json"
+
+resources:
+  jobs:
+    genie_deployment_job:
+      name: "${bundle.target}-genie-space-deployment"
+
+      tags:
+        environment: "${bundle.target}"
+        layer: "semantic"
+        job_type: "genie_deployment"
+
+      tasks:
+        - task_key: deploy_genie_spaces
+          notebook_task:
+            notebook_path: "../../src/${var.project_name}_semantic/deploy_genie_spaces.py"
+            base_parameters:
+              catalog: "${var.catalog}"
+              gold_schema: "${var.gold_schema}"
+              config_dir: "src/semantic/genie_configs"
+              warehouse_id: "${var.warehouse_id}"
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "requests>=2.28"
+
+      email_notifications:
+        on_failure:
+          - "${var.notification_email}"
+
+      timeout_seconds: 1800

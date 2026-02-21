@@ -514,10 +514,39 @@ resources:
 ```
 
 **When to use:**
-- Table-Valued Functions creation
-- Complex SQL DDL operations
-- Multi-statement SQL scripts
+- DML queries using `:param` bind parameters (e.g., `WHERE date_col >= :start_date`)
+- Simple SQL scripts that do NOT need identifier substitution
 - Avoids Python wrapper overhead
+
+### ⚠️ CRITICAL: `sql_task` Parameter Limitation
+
+**`sql_task.parameters` are SQL bind parameters (`:param_name`), NOT string substitution.**
+
+They work in value positions:
+```sql
+SELECT * FROM my_table WHERE date_col >= :start_date  -- ✅ Works
+```
+
+They **CANNOT** be used for identifiers (catalog, schema, table, function names):
+```sql
+CREATE FUNCTION :catalog.:schema.my_func(...)  -- ❌ PARSE_SYNTAX_ERROR
+USE CATALOG :catalog;                          -- ❌ FAILS
+```
+
+**If your SQL needs `${catalog}` or `${gold_schema}` in DDL identifiers** (CREATE, ALTER, DROP, USE statements), you MUST use `notebook_task` with a Python script that performs string substitution before executing via `spark.sql()`.
+
+```yaml
+# ✅ CORRECT: notebook_task for DDL with identifier substitution
+- task_key: create_functions
+  notebook_task:
+    notebook_path: ../src/deploy_functions.py
+    base_parameters:
+      catalog: ${var.catalog}
+      gold_schema: ${var.gold_schema}
+  environment_key: default
+```
+
+**Updated guidance:** `sql_task` is appropriate for SQL scripts that do NOT need identifier substitution (e.g., DML queries using `:param` bind parameters). For DDL with `${catalog}` / `${gold_schema}` in identifiers (e.g., Table-Valued Functions, schema setup), use `notebook_task` with a Python wrapper.
 
 ## Python Notebook Parameter Passing (CRITICAL)
 

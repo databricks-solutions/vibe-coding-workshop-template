@@ -1,6 +1,6 @@
 ---
 name: gold-layer-design
-description: End-to-end orchestrator for designing complete Gold layer schemas with ERDs, YAML files, lineage tracking, and comprehensive business documentation. Guides users through dimensional modeling, ERD creation (master/domain/summary based on table count), YAML schema generation, column-level lineage documentation, business onboarding guide creation, source table mapping, and design validation. Orchestrates mandatory dependencies on Gold skills (mermaid-erd-patterns, yaml-driven-gold-setup, gold-layer-documentation, fact-table-grain-validation, gold-layer-schema-validation, gold-layer-merge-patterns). Use when designing a Gold layer from scratch, creating dimensional models, documenting business processes, or preparing for Gold layer implementation.
+description: End-to-end orchestrator for designing complete Gold layer schemas with ERDs, YAML files, lineage tracking, and comprehensive business documentation. Guides users through dimensional modeling, ERD creation (master/domain/summary based on table count), YAML schema generation, column-level lineage documentation, business onboarding guide creation, source table mapping, and design validation. Orchestrates design-workers (05-erd-diagrams, 06-table-documentation, 01-grain-definition, 07-design-validation, 02-dimension-patterns, 03-fact-table-patterns, 04-conformed-dimensions). Use when designing a Gold layer from scratch, creating dimensional models, documenting business processes, or preparing for Gold layer implementation.
 license: Apache-2.0
 metadata:
   author: prashanth subrahmanyam
@@ -20,22 +20,24 @@ metadata:
     - gold_layer_design/COLUMN_LINEAGE.csv
     - gold_layer_design/SOURCE_TABLE_MAPPING.csv
   workers:
-    - mermaid-erd-patterns
-    - yaml-driven-gold-setup
-    - gold-layer-documentation
-    - fact-table-grain-validation
-    - gold-layer-schema-validation
-    - gold-layer-merge-patterns
+    - design-workers/01-grain-definition
+    - design-workers/02-dimension-patterns
+    - design-workers/03-fact-table-patterns
+    - design-workers/04-conformed-dimensions
+    - design-workers/05-erd-diagrams
+    - design-workers/06-table-documentation
+    - design-workers/07-design-validation
   common_dependencies:
     - databricks-expert-agent
     - naming-tagging-standards
   dependencies:
-    - mermaid-erd-patterns
-    - yaml-driven-gold-setup
-    - gold-layer-documentation
-    - fact-table-grain-validation
-    - gold-layer-schema-validation
-    - gold-layer-merge-patterns
+    - design-workers/01-grain-definition
+    - design-workers/02-dimension-patterns
+    - design-workers/03-fact-table-patterns
+    - design-workers/04-conformed-dimensions
+    - design-workers/05-erd-diagrams
+    - design-workers/06-table-documentation
+    - design-workers/07-design-validation
   last_verified: "2026-02-07"
   volatility: low
   upstream_sources: []  # Internal dimensional modeling methodology
@@ -59,12 +61,13 @@ This skill orchestrates the following skills. Each MUST be read and followed at 
 
 | Skill | Read At | Purpose |
 |-------|---------|---------|
-| `fact-table-grain-validation` | Phase 2 | Grain validation for fact tables |
-| `mermaid-erd-patterns` | Phase 3 | ERD creation and organization strategy |
-| `yaml-driven-gold-setup` | Phase 4 | YAML schema file structure and setup script |
-| `gold-layer-documentation` | Phase 4 | Dual-purpose documentation standards |
-| `gold-layer-schema-validation` | Phase 8 | Schema consistency validation |
-| `gold-layer-merge-patterns` | Next Steps | Future implementation guidance |
+| `design-workers/01-grain-definition` | Phase 2 | Grain type decision tree for fact tables |
+| `design-workers/02-dimension-patterns` | Phase 2 | Dimension design patterns (role-playing, junk, degenerate, hierarchies) |
+| `design-workers/03-fact-table-patterns` | Phase 2 | Fact table patterns (measure additivity, factless, accumulating snapshots) |
+| `design-workers/04-conformed-dimensions` | Phase 2 | Enterprise integration (bus matrix, conformed dims, drill-across) |
+| `design-workers/05-erd-diagrams` | Phase 3 | ERD creation and organization strategy |
+| `design-workers/06-table-documentation` | Phase 4 | Dual-purpose documentation standards |
+| `design-workers/07-design-validation` | Phase 8 | YAML↔ERD↔Lineage cross-validation |
 
 ### 🔴 Non-Negotiable Defaults (YAML Schemas MUST Encode These)
 
@@ -125,6 +128,25 @@ table_properties:
 
 ---
 
+## Working Memory Management
+
+This orchestrator spans 9 phases over 4-8 hours. To maintain coherence without context pollution:
+
+**After each phase, persist a brief summary note** capturing:
+- **Phase 0:** Table inventory dict, entity classifications (dim/fact/bridge), FK relationships, suggested domains
+- **Phase 1:** Project context (name, schemas, use cases, stakeholders)
+- **Phase 2:** Dimensional model: dims, facts, measures, relationships, bus matrix, domain assignments
+- **Phase 3:** ERD file paths, strategy used (master-only / master+domain / full)
+- **Phase 4:** YAML file paths per domain, schema count, lineage gaps
+- **Phases 5-7:** Output file paths (COLUMN_LINEAGE.csv, BUSINESS_ONBOARDING_GUIDE.md, SOURCE_TABLE_MAPPING.csv)
+- **Phase 8:** Validation pass/fail summary, inconsistencies to fix
+
+**What to keep in working memory:** Current phase's design-worker skill, the table inventory dict (Phase 0), and previous phase's summary. Discard intermediate outputs (full CSV data, raw ERD source, complete YAML contents) — they are on disk.
+
+**What to offload:** Each design-worker skill has `Design Notes to Carry Forward` and `Next Step` sections. Read them to know what to pass to the next phase.
+
+---
+
 ## Step-by-Step Workflow
 
 ### Phase 0: Source Schema Intake (MANDATORY First Step)
@@ -137,120 +159,25 @@ table_properties:
 
 1. **Read and parse the schema CSV from `context/`:**
 
-```python
-import csv
-from pathlib import Path
-from collections import defaultdict
+   **MANDATORY: Read** `references/schema-intake-patterns.md` for complete implementations of `parse_schema_csv()`, `classify_tables()`, and `infer_relationships()`.
 
-def parse_schema_csv(csv_path: Path) -> dict:
-    """Parse customer schema CSV into structured table inventory."""
-    tables = defaultdict(lambda: {"columns": [], "column_count": 0})
-    
-    with open(csv_path) as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            table_name = row["table_name"]
-            tables[table_name]["columns"].append({
-                "name": row["column_name"],
-                "type": row.get("full_data_type", row.get("data_type", "STRING")),
-                "nullable": row.get("is_nullable", "YES") == "YES",
-                "comment": row.get("comment", ""),
-                "ordinal": int(row.get("ordinal_position", 0)),
-            })
-            tables[table_name]["column_count"] = len(tables[table_name]["columns"])
-            tables[table_name]["catalog"] = row.get("table_catalog", "")
-            tables[table_name]["schema"] = row.get("table_schema", "")
-    
-    return dict(tables)
-
-schema = parse_schema_csv(Path("context/Wanderbricks_Schema.csv"))
-print(f"Found {len(schema)} tables")
-for table, info in sorted(schema.items()):
-    print(f"  {table}: {info['column_count']} columns")
-```
+   - `parse_schema_csv(csv_path)` — Reads CSV into structured dict keyed by table name, with columns, types, nullability, and comments per table.
+   - Output: `{table_name: {"columns": [...], "column_count": N, "catalog": ..., "schema": ...}}`
 
 2. **Classify tables as dimensions, facts, or bridge/junction:**
 
-```python
-def classify_tables(schema: dict) -> dict:
-    """Classify tables as dimension, fact, or bridge based on column patterns."""
-    classified = {}
-    for table_name, info in schema.items():
-        cols = {c["name"] for c in info["columns"]}
-        col_types = {c["name"]: c["type"] for c in info["columns"]}
-        
-        # Count FK-like columns (columns ending in _id that reference other tables)
-        fk_columns = [c for c in cols if c.endswith("_id") and c != f"{table_name.rstrip('s')}_id"]
-        pk_candidates = [c for c in cols if c == f"{table_name.rstrip('s')}_id" or c == f"{table_name}_id"]
-        measure_types = {"FLOAT", "DOUBLE", "DECIMAL", "LONG", "INT"}
-        measures = [c for c in cols if col_types.get(c, "").upper().split("(")[0] in measure_types 
-                    and not c.endswith("_id")]
-        timestamps = [c for c in cols if col_types.get(c, "").upper() in {"TIMESTAMP", "DATE"}]
-        
-        if len(info["columns"]) <= 3 and len(fk_columns) >= 2:
-            entity_type = "bridge"
-        elif len(fk_columns) >= 2 and len(measures) >= 1:
-            entity_type = "fact"
-        elif len(timestamps) >= 2 and len(fk_columns) >= 2:
-            entity_type = "fact"
-        else:
-            entity_type = "dimension"
-        
-        classified[table_name] = {
-            **info,
-            "entity_type": entity_type,
-            "pk_candidates": pk_candidates,
-            "fk_columns": fk_columns,
-            "measures": measures,
-            "timestamps": timestamps,
-        }
-    return classified
-```
+   - `classify_tables(schema)` — Classifies each table based on column patterns:
+     - **bridge**: 3 or fewer columns AND 2+ FK-like columns
+     - **fact**: 2+ FK columns AND numeric measures, OR 2+ timestamps AND 2+ FKs
+     - **dimension**: everything else
+   - Also identifies: PK candidates, FK columns, measures, timestamps per table
 
 3. **Identify FK relationships from column comments and naming patterns:**
 
-```python
-import re
-
-def infer_relationships(classified: dict) -> list:
-    """Infer FK relationships from column names and comments."""
-    relationships = []
-    table_names = set(classified.keys())
-    
-    for table_name, info in classified.items():
-        for col in info["columns"]:
-            # Pattern 1: Column comment says "Foreign Key to 'X'"
-            if col.get("comment"):
-                fk_match = re.search(r"[Ff]oreign [Kk]ey to ['\"]?(\w+)['\"]?", col["comment"])
-                if fk_match:
-                    ref_table = fk_match.group(1)
-                    relationships.append({
-                        "from_table": table_name,
-                        "from_column": col["name"],
-                        "to_table": ref_table,
-                        "to_column": f"{ref_table.rstrip('s')}_id",
-                        "source": "comment",
-                    })
-                    continue
-            
-            # Pattern 2: Column name like 'other_table_id' matches a known table
-            if col["name"].endswith("_id"):
-                base = col["name"][:-3]  # Remove '_id'
-                for candidate in table_names:
-                    if candidate == table_name:
-                        continue
-                    # Match: user_id → users, host_id → hosts, property_id → properties
-                    if candidate.startswith(base) or candidate == base + "s" or candidate == base + "es":
-                        relationships.append({
-                            "from_table": table_name,
-                            "from_column": col["name"],
-                            "to_table": candidate,
-                            "to_column": col["name"],
-                            "source": "naming_convention",
-                        })
-                        break
-    return relationships
-```
+   - `infer_relationships(classified)` — Two inference strategies:
+     - Pattern 1: Column comment contains "Foreign Key to 'X'" → direct FK
+     - Pattern 2: Column name `other_table_id` matches a known table name
+   - Returns list of `{from_table, from_column, to_table, to_column, source}`
 
 4. **Produce Schema Intake Report:**
 
@@ -270,17 +197,17 @@ The report summarizes: table inventory, entity classification, inferred relation
 
 **Collect the following project context (enhanced with schema intake):**
 
-| Field | Example | Source |
-|-------|---------|--------|
-| Project Name | `wanderbricks_analytics` | User input |
-| Source Schema | `wanderbricks` | Extracted from schema CSV |
-| Gold Schema | `wanderbricks_gold` | User input (convention: `{project}_gold`) |
-| Business Domain | `travel`, `hospitality` | Inferred from schema CSV tables |
-| Primary Use Cases | booking analytics, revenue reporting | User input |
-| Key Stakeholders | Revenue Ops, Marketing | User input |
-| Reporting Frequency | Daily, Weekly, Monthly | User input |
-| Table Count | 15 tables (8 dims, 5 facts, 2 bridge) | Extracted from Phase 0 |
-| Inferred Relationships | 12 FK relationships | Extracted from Phase 0 |
+| Field | Example |
+|-------|---------|
+| Project Name | `wanderbricks_analytics` |
+| Source Schema | `wanderbricks` (from schema CSV) |
+| Gold Schema | `wanderbricks_gold` (convention: `{project}_gold`) |
+| Business Domain | `travel`, `hospitality` (inferred from schema CSV) |
+| Primary Use Cases | booking analytics, revenue reporting |
+| Key Stakeholders | Revenue Ops, Marketing |
+| Reporting Frequency | Daily, Weekly, Monthly |
+| Table Count | 15 tables — 8 dims, 5 facts, 2 bridge (from Phase 0) |
+| Inferred Relationships | 12 FK relationships (from Phase 0) |
 
 **Output:** Populated project context document (with Phase 0 schema intake data incorporated)
 
@@ -297,21 +224,30 @@ The report summarizes: table inventory, entity classification, inferred relation
 4. Define relationships (FK constraints)
 5. Assign tables to domains (Location, Product, Time, Sales, etc.)
 
-**MANDATORY: Read this skill using the Read tool BEFORE defining fact table grains:**
+**MANDATORY: Read these skills using the Read tool in order during Phase 2:**
 
-1. `data_product_accelerator/skills/gold/fact-table-grain-validation/SKILL.md` — Grain inference from PRIMARY KEY structure, transaction vs aggregated vs snapshot patterns, PK-grain decision tree
+1. `data_product_accelerator/skills/gold/design-workers/01-grain-definition/SKILL.md` — Grain inference from PRIMARY KEY structure, transaction vs aggregated vs snapshot patterns, PK-grain decision tree
+2. `data_product_accelerator/skills/gold/design-workers/02-dimension-patterns/SKILL.md` — Role-playing, degenerate, junk, mini-dimensions, hierarchy flattening, NULL handling
+3. `data_product_accelerator/skills/gold/design-workers/03-fact-table-patterns/SKILL.md` — Measure additivity, factless facts, accumulating snapshots, late-arriving data
+4. `data_product_accelerator/skills/gold/design-workers/04-conformed-dimensions/SKILL.md` — Enterprise bus matrix, conformed dimensions, shrunken dims, drill-across patterns
 
-**Apply from skill:**
+**Apply from skills:**
 - Infer grain type from PRIMARY KEY structure (transaction, aggregated, snapshot)
 - Document grain explicitly for each fact table
 - Validate PRIMARY KEY matches grain type using decision tree
+- Apply dimension patterns (denormalize hierarchies, handle NULLs with "Unknown" rows, combine flags into junk dimensions)
+- Classify measures as additive, semi-additive, or non-additive
+- Build the enterprise bus matrix mapping fact tables to dimensions
+- Identify conformed dimensions shared across multiple facts
 
 **Key Outputs:**
-- Dimensions table (name, business key, SCD type, source Silver table)
-- Facts table (name, grain, source Silver tables, update frequency)
-- Measures table (name, data type, calculation logic, business purpose)
+- Dimensions table (name, business key, SCD type, source Silver table, dimension pattern applied)
+- Facts table (name, grain, source Silver tables, update frequency, fact type)
+- Measures table (name, data type, calculation logic, business purpose, additivity classification)
 - Relationships table (fact FK → dimension PK, cardinality)
 - Domain assignments table (table → domain mapping)
+- Enterprise bus matrix (fact tables × dimensions)
+- NULL handling strategy (Unknown member rows per dimension)
 
 ---
 
@@ -319,7 +255,7 @@ The report summarizes: table inventory, entity classification, inferred relation
 
 **MANDATORY: Read this skill using the Read tool BEFORE creating any ERD diagrams:**
 
-1. `data_product_accelerator/skills/gold/mermaid-erd-patterns/SKILL.md` — ERD organization strategy (master/domain/summary), Mermaid syntax standards, domain emoji markers, relationship patterns, cross-domain references
+1. `data_product_accelerator/skills/gold/design-workers/05-erd-diagrams/SKILL.md` — ERD organization strategy (master/domain/summary), Mermaid syntax standards, domain emoji markers, relationship patterns, cross-domain references
 
 **Activities:**
 1. Count tables to determine ERD strategy (1-8, 9-20, 20+)
@@ -328,7 +264,7 @@ The report summarizes: table inventory, entity classification, inferred relation
 4. Create Summary ERD (`erd_summary.md`) if 20+ tables
 5. Add Domain Index table to Master ERD
 
-**Critical Rules (from mermaid-erd-patterns):**
+**Critical Rules (from 05-erd-diagrams):**
 - Use domain emoji markers (🏪 Location, 📦 Product, 📅 Time, 💰 Sales, 📊 Inventory)
 - Use `PK` markers only (no inline descriptions in ERD)
 - Use `by_{column}` pattern for relationship labels
@@ -346,18 +282,17 @@ The report summarizes: table inventory, entity classification, inferred relation
 
 **MANDATORY: Read each skill below using the Read tool BEFORE generating any YAML schema files:**
 
-1. `data_product_accelerator/skills/gold/yaml-driven-gold-setup/SKILL.md` — YAML schema file structure, domain-organized directories, column definition format, PK/FK in YAML
-2. `data_product_accelerator/skills/gold/gold-layer-documentation/SKILL.md` — Dual-purpose description pattern (`[Definition]. Business: [...]. Technical: [...].`), surrogate key naming, TBLPROPERTIES metadata, column comment standards
+1. `data_product_accelerator/skills/gold/design-workers/06-table-documentation/SKILL.md` — Dual-purpose description pattern (`[Definition]. Business: [...]. Technical: [...].`), surrogate key naming, TBLPROPERTIES metadata, column comment standards
 
 **Activities:**
 1. Create domain-organized YAML directory structure (`yaml/{domain}/`)
-2. Generate one YAML file per table using templates from `yaml-driven-gold-setup`
+2. Generate one YAML file per table using templates from `01-yaml-table-setup`
 3. Include complete column definitions with lineage metadata
 4. Document PRIMARY KEY and FOREIGN KEY constraints
 5. Apply standard table properties (CDF, row tracking, auto-optimize)
-6. Write dual-purpose descriptions following `gold-layer-documentation` patterns
+6. Write dual-purpose descriptions following `06-table-documentation` patterns
 
-**Critical Rules (from gold-layer-documentation + Non-Negotiable Defaults):**
+**Critical Rules (from design-workers/06-table-documentation + Non-Negotiable Defaults):**
 - Pattern: `[Definition]. Business: [context]. Technical: [details].`
 - Surrogate keys as PRIMARY KEYS (not business keys)
 - Include all TBLPROPERTIES (layer, domain, entity_type, grain, scd_type, etc.)
@@ -437,7 +372,7 @@ The report summarizes: table inventory, entity classification, inferred relation
 
 **MANDATORY: Read this skill using the Read tool BEFORE running design validation:**
 
-1. `data_product_accelerator/skills/gold/gold-layer-schema-validation/SKILL.md` — Schema consistency validation, DDL-first workflow, column matching between YAML and ERD
+1. `data_product_accelerator/skills/gold/design-workers/07-design-validation/SKILL.md` — YAML↔ERD↔Lineage cross-validation, PK/FK reference consistency, mandatory field validation
 
 **Also read:** `references/validation-checklists.md`
 
@@ -448,10 +383,11 @@ The report summarizes: table inventory, entity classification, inferred relation
 4. Validate PRIMARY KEY definitions match grain type
 5. Validate FOREIGN KEY references point to valid tables/columns
 6. Run lineage validation script
+7. **Upstream cross-reference (conditional):** If upstream source tables already exist (check via `spark.catalog.tableExists()`), run `cross_reference_silver_at_design_time()` from `references/schema-intake-patterns.md` to validate YAML lineage `silver_column` values against actual source table schemas. Fix any mismatches found. If source tables do not exist yet, note that this validation will be enforced as a hard gate during Phase 0 of `01-gold-layer-setup`.
 
 **Outputs:**
 - Validation report (pass/fail for each category)
-- List of inconsistencies to fix
+- List of inconsistencies to fix (including any upstream column mismatches)
 - Completed design sign-off checklist
 
 ---
@@ -528,8 +464,11 @@ After completing design and obtaining stakeholder sign-off, **read the implement
 1. `data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md` — End-to-end implementation of tables, merge scripts, FK constraints, and Asset Bundle jobs from the YAML designs created here
 
 That skill will in turn invoke:
-- `gold-layer-merge-patterns` — SCD Type 1/2 dimension merges, fact aggregation patterns
-- `gold-delta-merge-deduplication` — Mandatory deduplication before MERGE
+- `pipeline-workers/02-merge-patterns` — SCD Type 1/2 dimension merges, fact aggregation patterns
+- `pipeline-workers/03-deduplication` — Mandatory deduplication before MERGE
+- `pipeline-workers/01-yaml-table-setup` — YAML-driven DDL generation
+- `pipeline-workers/05-schema-validation` — DataFrame↔DDL schema validation
+- `pipeline-workers/04-grain-validation` — Pre-merge grain validation
 - All other implementation dependencies
 
 ## Pipeline Progression
@@ -548,9 +487,32 @@ That skill will in turn invoke:
 - **[Business Documentation Guide](references/business-documentation-guide.md)** - Business Onboarding Guide and Source Table Mapping
 - **[Validation Checklists](references/validation-checklists.md)** - All design validation checklists
 
+## Post-Completion: Skill Usage Summary (MANDATORY)
+
+**After completing all phases of this orchestrator, output a Skill Usage Summary reflecting what you ACTUALLY did — not a pre-written summary.**
+
+### What to Include
+
+1. Every skill `SKILL.md` or `references/` file you read (via the Read tool), in the order you read them
+2. Which phase you were in when you read it
+3. Whether it was a **Worker**, **Common**, **Cross-domain**, or **Reference** file
+4. A one-line description of what you specifically used it for in this session
+
+### Format
+
+| # | Phase | Skill / Reference Read | Type | What It Was Used For |
+|---|-------|----------------------|------|---------------------|
+| 1 | Phase N | `path/to/SKILL.md` | Worker / Common / Cross-domain / Reference | One-line description |
+
+### Summary Footer
+
+End with:
+- **Totals:** X worker skills, Y common skills, Z reference files read across N phases
+- **Skipped:** List any skills from the dependency table above that you did NOT need to read, and why (e.g., "phase not applicable", "user skipped", "no issues encountered")
+- **Unplanned:** List any skills you read that were NOT listed in the dependency table (e.g., for troubleshooting, edge cases, or user-requested detours)
+
+---
+
 ## External References
 
-- [Kimball Dimensional Modeling](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)
-- [Unity Catalog Constraints](https://docs.databricks.com/data-governance/unity-catalog/constraints.html)
-- [Mermaid ERD Syntax](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)
-- [AgentSkills.io Specification](https://agentskills.io/specification)
+- [Kimball Dimensional Modeling](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/) | [Unity Catalog Constraints](https://docs.databricks.com/data-governance/unity-catalog/constraints.html) | [Mermaid ERD Syntax](https://mermaid.js.org/syntax/entityRelationshipDiagram.html) | [AgentSkills.io Specification](https://agentskills.io/specification)

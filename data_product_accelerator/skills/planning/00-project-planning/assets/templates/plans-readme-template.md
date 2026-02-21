@@ -18,6 +18,7 @@
 
 | Phase | Document | Status | Description |
 |-------|----------|--------|-------------|
+| UC Catalog | [Use Case Catalog](./use-case-catalog.md) | {status} | Consolidated use case definitions with business questions |
 | 1 | [Phase 1: Use Cases](./phase1-use-cases.md) | {status} | Analytics artifacts |
 | 2 | [Phase 2: Agent Framework](./phase2-agent-framework.md) | {status} | AI agents |
 | 3 | [Phase 3: Frontend App](./phase3-frontend-app.md) | {status} | User interface |

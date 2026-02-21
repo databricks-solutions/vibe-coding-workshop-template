@@ -274,7 +274,7 @@ COMMENT ON COLUMN ${catalog}.${gold_schema}.fact_sales.transaction_date IS
 
 **Prevention:**
 - Run the [Pre-Addition Verification Query](./trusted-assets.md#pre-addition-verification-query) before adding any asset
-- Follow the [Gold Layer Documentation Skill](../../gold/gold-layer-documentation/SKILL.md) standards
+- Follow the [Table Documentation Skill](../../gold/design-workers/06-table-documentation/SKILL.md) standards
 - Zero NULL comments policy: every column must have a comment
 
 **Verification:**
