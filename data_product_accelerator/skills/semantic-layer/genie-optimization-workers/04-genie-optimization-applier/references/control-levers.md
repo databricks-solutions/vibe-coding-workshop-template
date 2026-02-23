@@ -66,6 +66,33 @@ columns:
 
 **When to use:** Aggregation queries return wrong results, or Genie doesn't use pre-built metrics.
 
+> **WARNING: MV column comments CANNOT be updated via `ALTER TABLE ALTER COLUMN COMMENT`.** Metric Views are VIEWs in Unity Catalog. Attempting `ALTER TABLE ... ALTER COLUMN ... COMMENT` on a Metric View will fail with `[EXPECT_TABLE_NOT_VIEW.NO_ALTERNATIVE] 'ALTER TABLE ... ALTER COLUMN' expects a table`. To update dimension/measure descriptions, you must DROP and recreate the entire VIEW.
+
+### Updating MV Column Comments (Full Recreation Required)
+
+```sql
+-- Step 1: Drop existing view
+DROP VIEW IF EXISTS ${catalog}.${schema}.mv_name;
+
+-- Step 2: Recreate with updated dimension/measure comments
+CREATE VIEW ${catalog}.${schema}.mv_name
+WITH METRICS
+LANGUAGE YAML
+COMMENT 'View-level description'
+AS $$
+version: 1
+source: ${catalog}.${schema}.source_table
+dimensions:
+  - name: check_in_date
+    expr: check_in_date
+    description: "Check-in date. Use for temporal filtering. For 'this year' queries, filter with >= DATE_TRUNC('year', CURRENT_DATE())."
+measures:
+  - name: total_revenue
+    expr: "SUM(revenue)"
+    description: "Total revenue in USD. Use MEASURE(total_revenue) for revenue queries."
+$$
+```
+
 ### Direct Update (Immediate)
 
 Redeploy the metric view:
@@ -126,6 +153,15 @@ measures:
 
 **When to use:** Parameterized queries fail, wrong parameters used, or TVF not selected by Genie.
 
+> **WARNING: TVF COMMENTs can ONLY be updated via `CREATE OR REPLACE FUNCTION` with the full function body.** There is no `ALTER FUNCTION SET COMMENT` or `COMMENT ON FUNCTION` syntax in Databricks SQL. Attempting either will return `[PARSE_SYNTAX_ERROR] Syntax error at or near 'FUNCTION'`.
+>
+> **Workflow for updating a TVF COMMENT:**
+> 1. Read the full function SQL from the repo file (`src/semantic/tvfs/<name>.sql`)
+> 2. Modify only the COMMENT section (between `RETURNS TABLE` and `RETURN`)
+> 3. Resolve template variables (`${catalog}`, `${gold_schema}`) for execution
+> 4. Execute the full `CREATE OR REPLACE FUNCTION` statement via SQL Statement API
+> 5. Re-template variables before writing back to the repo file
+
 ### Direct Update (Immediate)
 
 ```sql
@@ -158,6 +194,28 @@ CREATE OR REPLACE FUNCTION ${catalog}.${gold_schema}.get_top_cost_contributors(
 ...
 ```
 
+### TVF COMMENT Format
+
+TVF COMMENTs must follow this structured bullet-point layout. Genie parses these sections to decide when/how to call the function:
+
+```
+• PURPOSE: What this function returns and when to use it
+• BEST FOR: Specific query patterns that should use this TVF
+• NOT FOR: Patterns that should use a different asset (with redirect)
+• RETURNS: Column list (helps Genie understand output schema)
+• PARAMS:
+  - param_name (TYPE): Description. Format: <rule>.
+    Pass NULL (not the string 'NULL') to omit this filter.
+  - start_date (STRING): Start date inclusive.
+    Format: CAST(DATE_ADD(CURRENT_DATE(), -N) AS STRING).
+    Do NOT use hardcoded dates like '2025-01-01'.
+• SYNTAX: SELECT * FROM catalog.schema.tvf_name(
+    CAST(DATE_ADD(CURRENT_DATE(), -365) AS STRING), NULL)
+• NOTE: Additional constraints (e.g., ROW_NUMBER ranking)
+```
+
+> **Critical:** Without explicit "pass NULL, do NOT pass the string literal 'NULL'" guidance per optional param and `CAST(DATE_ADD(CURRENT_DATE(), -N) AS STRING)` syntax examples, Genie consistently (1) passes `'NULL'` string literal instead of SQL NULL, and (2) uses hardcoded dates instead of dynamic expressions.
+
 ### What to Fix
 
 | Issue | Fix Pattern |
@@ -166,6 +224,8 @@ CREATE OR REPLACE FUNCTION ${catalog}.${gold_schema}.get_top_cost_contributors(
 | Wrong parameters | Fix parameter names/descriptions in COMMENT |
 | Missing use cases | Add example queries to COMMENT |
 | Wrong return columns | Update RETURN clause and document in COMMENT |
+| Genie passes `'NULL'` string for optional params | Add "Pass NULL (not 'NULL')" to each optional param in PARAMS |
+| Genie uses hardcoded dates | Show `CAST(DATE_ADD(CURRENT_DATE(), -N) AS STRING)` in SYNTAX |
 
 ---
 
@@ -206,6 +266,12 @@ Update ML config in `src/ml/config/*.py`.
 ## Lever 6: Genie Instructions
 
 **When to use:** Asset routing issues, ambiguous term definitions, or as a last resort after levers 1-5.
+
+> **`description` vs `serialized_space`:** The Genie Space has two instruction-related fields:
+> - **`description`** — top-level field, updated via `PATCH {"description": "..."}`. Visible in the Space UI header.
+> - **`text_instructions`** — inside `serialized_space.instructions.text_instructions[]`, updated via `PATCH {"serialized_space": "<json>"}`. These are the structured routing rules Genie actually follows.
+>
+> When optimizing routing (Lever 6), update `text_instructions` inside `serialized_space`, not `description`. Both fields are separate — `description` is NOT inside `serialized_space`.
 
 > **For robust API operations**, see `genie-space-export-import-api` skill and its `import_genie_space.py` script, which handles JSON validation, error recovery, and field-level format requirements. The inline code below is a quick alternative for optimization-loop iterations.
 
@@ -287,6 +353,30 @@ with open(f"src/genie/{domain}_genie_export.json", "w") as f:
 | Define ambiguous terms | "'underperforming' = below median revenue" |
 | Set defaults | "No date → last 7 days" |
 | Specify formatting | "Currency: $, 2 decimals" |
+
+### Instruction Specificity Rules (Overcorrection Prevention)
+
+> **Critical:** Overly broad routing instructions cause overcorrections — redirecting TVF-appropriate queries to MVs or vice versa. Every instruction MUST include both a positive case and a negative exclusion.
+
+**Rules:**
+
+1. Every routing instruction MUST include both the POSITIVE case and NEGATIVE exclusion
+2. Use the question's exact phrasing or a close paraphrase, not generic patterns
+3. Distinguish simple aggregations (MV) from date-ranged/parameterized detail queries (TVF)
+
+**GOOD:**
+```
+"Revenue by destination country this year" → booking_analytics_metrics (MV).
+"Revenue by destination for last 6 months with breakdown" → get_revenue_summary (TVF).
+```
+
+**BAD:**
+```
+"Revenue by destination" → booking_analytics_metrics (MV).
+```
+Too broad — catches "Revenue by destination for last 6 months" which should use the TVF.
+
+**Recovery:** If a Lever 6 instruction causes a regression, narrow it with negative exclusion or remove it and rely on Lever 1/2/3 metadata.
 
 ---
 
@@ -404,6 +494,19 @@ When the introspection engine (or GEPA) generates a metadata change proposal, it
 | Wrong asset routing | 6 (Instructions) | `PATCH /api/2.0/genie/spaces/{id}` | `src/genie/{domain}_genie_export.json` |
 | Ambiguous terms | 6 (Instructions) | `PATCH /api/2.0/genie/spaces/{id}` | `src/genie/{domain}_genie_export.json` |
 | Missing sample queries | 6 (Instructions) | `PATCH /api/2.0/genie/spaces/{id}` | `src/genie/{domain}_genie_export.json` |
+
+### Template Variable Substitution in Repo Paths
+
+Repo paths in `dual_persistence.repo` may contain template placeholders that are substituted at apply time:
+
+| Placeholder | Substituted With |
+|-------------|------------------|
+| `{domain}` | Domain name (e.g., `cost`) |
+| `{space_id}` | Genie Space ID |
+
+Example: `gold_layer_design/yaml/{domain}/fact_usage.yaml` becomes `gold_layer_design/yaml/cost/fact_usage.yaml` when `domain=cost`. The applier script performs this substitution via `.replace("{domain}", domain).replace("{space_id}", space_id)` before resolving repo paths.
+
+---
 
 ### Dual Persistence per Proposal
 

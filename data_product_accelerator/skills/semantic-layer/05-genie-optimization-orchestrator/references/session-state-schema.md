@@ -17,33 +17,24 @@ import os
 # os.environ['DATABRICKS_TOKEN'] = '<token>'
 # os.environ['MLFLOW_TRACKING_URI'] = 'databricks'
 
-def verify_mlflow_tracking(experiment_name: str, host: str = None) -> dict:
-    """Create MLflow experiment and verify it is accessible.
+def _verify_mlflow_tracking():
+    """Fail fast if MLflow is not configured for remote tracking.
 
-    Call this ONCE at the start of every optimization session.
+    No arguments — reads tracking URI and env vars directly.
     Raises RuntimeError if MLflow is not configured for Databricks.
-
-    Returns:
-        dict with experiment_id and experiment_url
     """
     tracking_uri = mlflow.get_tracking_uri()
     if tracking_uri != "databricks" and not tracking_uri.startswith("databricks"):
-        if not os.environ.get("DATABRICKS_HOST"):
+        host = os.environ.get("DATABRICKS_HOST", "")
+        if not host:
             raise RuntimeError(
-                "MLflow not configured for Databricks. Set DATABRICKS_HOST, "
-                "DATABRICKS_TOKEN, MLFLOW_TRACKING_URI='databricks'"
+                "MLflow is not configured for Databricks tracking.\n"
+                "Set these environment variables before running:\n"
+                "  export DATABRICKS_HOST='https://<workspace>.cloud.databricks.com'\n"
+                "  export DATABRICKS_TOKEN='<token>'\n"
+                "  export MLFLOW_TRACKING_URI='databricks'\n"
+                "Or run inside a Databricks notebook where MLflow is auto-configured."
             )
-
-    mlflow.set_experiment(experiment_name)
-    experiment = mlflow.get_experiment_by_name(experiment_name)
-    assert experiment is not None, "Experiment creation failed"
-
-    host = host or os.environ.get("DATABRICKS_HOST", "")
-    url = f"{host}/#mlflow/experiments/{experiment.experiment_id}"
-    print(f"MLflow Experiment: {experiment_name}")
-    print(f"Experiment ID:     {experiment.experiment_id}")
-    print(f"Experiment URL:    {url}")
-    return {"experiment_id": experiment.experiment_id, "experiment_url": url}
 ```
 
 ---
@@ -113,156 +104,77 @@ databricks api get /api/2.0/genie/spaces --output json | jq '.spaces[] | {id: .s
 
 ---
 
-## Metadata Snapshot
-
-Before each optimization iteration, capture the current Genie Space configuration and store as an MLflow artifact for before/after comparison and rollback.
+## Space Config Retrieval
 
 ```python
-def snapshot_genie_metadata(space_id: str, experiment_name: str, version_tag: str) -> str:
-    """Capture current Genie Space config as an MLflow artifact.
-
-    Returns:
-        The artifact URI.
-    """
-    import json, tempfile, os
-
-    config_json = _fetch_space_config(space_id)
-
-    mlflow.set_experiment(experiment_name)
-    with mlflow.start_run(run_name=f"snapshot-{version_tag}") as run:
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False, prefix="genie_snapshot_"
-        )
-        json.dump(config_json, tmp, indent=2)
-        tmp.close()
-        mlflow.log_artifact(tmp.name, artifact_path="snapshots")
-        os.unlink(tmp.name)
-        return f"runs:/{run.info.run_id}/snapshots"
-
-
 def _fetch_space_config(space_id: str) -> dict:
-    """GET Genie Space config via SDK."""
-    import json
-    from databricks.sdk import WorkspaceClient
-    w = WorkspaceClient()
-    resp = w.api_client.do(
-        "GET", f"/api/2.0/genie/spaces/{space_id}"
+    """GET Genie Space config with full serialized_space content.
+
+    Always uses ?include_serialized_space=true to get full asset data.
+    Logs asset counts (tables, metric_views, tvfs, instructions).
+    """
+    config = w.api_client.do(
+        "GET",
+        f"/api/2.0/genie/spaces/{space_id}",
+        query={"include_serialized_space": "true"},
     )
-    return resp
+    data_assets = config.get("data_assets", [])
+    tables = sum(1 for a in data_assets if a.get("type") == "TABLE")
+    mvs = sum(1 for a in data_assets if a.get("type") == "METRIC_VIEW")
+    tvfs = sum(1 for a in data_assets if a.get("type") == "FUNCTION")
+    has_instructions = bool(config.get("general_instructions"))
+    print(f"  Space state: tables={tables}, metric_views={mvs}, tvfs={tvfs}, "
+          f"instructions={'present' if has_instructions else 'absent'}")
+    return config
 ```
 
 ---
 
 ## Genie Space Version Tracking (LoggedModel)
 
-Each optimization iteration creates an MLflow `LoggedModel` to track the exact Genie Space configuration that was evaluated. This connects config snapshots, evaluation results, and Genie API traces in the MLflow Versions tab.
+Each optimization iteration creates an MLflow `LoggedModel` via `create_external_model()` inside `mlflow.start_run()` to track the exact Genie Space configuration that was evaluated. This connects config snapshots, evaluation results, and Genie API traces in the MLflow Versions tab.
 
 ```python
-import hashlib
-import json
-import tempfile
-import os
-
 def create_genie_model_version(space_id: str, config: dict,
                                 iteration: int, domain: str,
                                 patch_set=None, parent_model_id=None,
-                                prompt_versions=None) -> str:
-    """Create a LoggedModel version for the current Genie Space state.
+                                prompt_versions=None, uc_schema: str | None = None) -> str:
+    """Create a LoggedModel with a linked creation run for this iteration.
 
-    The LoggedModel acts as a metadata hub linking this specific config
-    to its evaluation results, Genie API traces, applied patches, and
-    prompt versions. Call BEFORE evaluation so that
-    mlflow.genai.evaluate(model_id=...) links correctly.
+    Uses create_external_model() inside an mlflow.start_run() so that:
+      - "Logged From" in the UI points to the creation run (source_run_id)
+      - Artifacts (full UC metadata, config, patches) are persisted in the run
+      - Evaluation runs link back via mlflow.genai.evaluate(model_id=...)
 
-    Args:
-        space_id: Genie Space ID.
-        config: Full Genie Space configuration dict from the API.
-        iteration: Current optimization iteration number.
-        domain: Business domain name.
-        patch_set: List of patch dicts applied in this iteration (None for baseline).
-        parent_model_id: LoggedModel ID of the previous iteration (lineage chain).
-        prompt_versions: Dict mapping judge name to prompt version used.
-
-    Returns:
-        model_id (str) for passing to mlflow.genai.evaluate().
+    Artifact layout per creation run:
+      model_state/genie_config.json       - full Genie Space config
+      model_state/uc_columns.json         - complete information_schema.columns
+      model_state/uc_tags.json            - complete information_schema.table_tags
+      model_state/uc_routines.json        - complete INFORMATION_SCHEMA.ROUTINES
+      model_state/uc_metadata_diff.json   - diff vs parent model (if parent exists)
+      patches/patch_set.json              - full Patch DSL array
+      patches/patch_summary.json          - structured summary by type/lever/risk
     """
+    # ... UC metadata fetching via _run_sql_statement_rows() ...
+
     config_hash = hashlib.sha256(
-        json.dumps(config, sort_keys=True, default=str).encode()
+        json.dumps({"genie_config": config, "uc_columns": uc_columns,
+                     "uc_tags": uc_tags, "uc_routines": uc_routines},
+                    sort_keys=True, default=str).encode()
     ).hexdigest()[:12]
     model_name = f"genie-{domain}-iter{iteration}-{config_hash}"
 
-    active_model = mlflow.set_active_model(name=model_name)
-
-    instructions = config.get("general_instructions", "")
-    data_assets = config.get("data_assets", [])
-
-    params = {
-        "space_id": space_id,
-        "iteration": str(iteration),
-        "domain": domain,
-        "config_hash": config_hash,
-        "instruction_char_count": str(len(instructions)),
-        "data_asset_count": str(len(data_assets)),
-        "mv_count": str(sum(1 for a in data_assets if a.get("type") == "METRIC_VIEW")),
-        "tvf_count": str(sum(1 for a in data_assets if a.get("type") == "FUNCTION")),
-        "table_count": str(sum(1 for a in data_assets if a.get("type") == "TABLE")),
-        "instruction_preview": instructions[:200],
-        "patch_count": str(len(patch_set)) if patch_set else "0",
-        "patch_types": ",".join(p["type"] for p in patch_set) if patch_set else "none",
-        "patch_risk_levels": ",".join(
-            sorted(set(p.get("risk_level", "unknown") for p in patch_set))
-        ) if patch_set else "none",
-        "parent_model_id": parent_model_id or "none",
-        "prompt_versions": json.dumps(prompt_versions) if prompt_versions else "{}",
-    }
-    mlflow.log_model_params(model_id=active_model.model_id, params=params)
-
-    tmp_path = os.path.join(tempfile.gettempdir(), f"genie_config_iter{iteration}.json")
-    with open(tmp_path, "w") as f:
-        json.dump(config, f, indent=2, default=str)
-    mlflow.log_artifact(tmp_path, artifact_path="genie_config")
-    os.unlink(tmp_path)
-
-    if patch_set:
-        patch_path = os.path.join(tempfile.gettempdir(), f"patch_set_iter{iteration}.json")
-        with open(patch_path, "w") as f:
-            json.dump(patch_set, f, indent=2, default=str)
-        mlflow.log_artifact(patch_path, artifact_path="config_diffs")
-        os.unlink(patch_path)
-
-    print(f"  LoggedModel: {model_name} (model_id={active_model.model_id})")
-    return active_model.model_id
-```
-
-The updated `snapshot_genie_metadata()` now returns both the artifact URI and the `model_id`:
-
-```python
-def snapshot_genie_metadata(space_id: str, experiment_name: str,
-                             version_tag: str, iteration: int = 0,
-                             domain: str = "unknown") -> dict:
-    """Capture current Genie Space config and create a LoggedModel version.
-
-    Returns:
-        dict with artifact_uri and model_id.
-    """
-    import json, tempfile, os
-
-    config_json = _fetch_space_config(space_id)
-
-    mlflow.set_experiment(experiment_name)
-    with mlflow.start_run(run_name=f"snapshot-{version_tag}") as run:
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False, prefix="genie_snapshot_"
+    with mlflow.start_run(run_name=f"create_model_iter{iteration}_{config_hash}") as creation_run:
+        logged_model = mlflow.create_external_model(
+            name=model_name,
+            source_run_id=creation_run.info.run_id,
+            params=model_params,
+            tags={"domain": domain, "space_id": space_id, ...},
+            model_type="genie-space",
         )
-        json.dump(config_json, tmp, indent=2, default=str)
-        tmp.close()
-        mlflow.log_artifact(tmp.name, artifact_path="snapshots")
-        os.unlink(tmp.name)
-        artifact_uri = f"runs:/{run.info.run_id}/snapshots"
-
-    model_id = create_genie_model_version(space_id, config_json, iteration, domain)
-
-    return {"artifact_uri": artifact_uri, "model_id": model_id}
+        # Logs model_state/ artifacts (config, UC columns, tags, routines, diff)
+        # Logs patches/ artifacts (patch_set.json, patch_summary.json) if patch_set
+    return logged_model.model_id
 ```
 
 ---
@@ -273,12 +185,7 @@ After the optimization loop converges, promote the best-performing LoggedModel. 
 
 ```python
 def promote_best_model(session: dict):
-    """Tag the best-performing LoggedModel for promotion.
-
-    Call after the optimization loop converges or reaches max iterations.
-    The promoted model appears with a "promoted: true" tag in the
-    MLflow Versions tab for easy identification.
-    """
+    """Tag the best-performing LoggedModel for promotion."""
     best_iter = session.get("best_iteration", 0)
     iterations = session.get("iterations", [])
     if not iterations or best_iter < 1:
@@ -298,28 +205,25 @@ def promote_best_model(session: dict):
             "best_iteration": str(best_iter),
         },
     )
-    print(f"  Promoted LoggedModel: {best_model_id}")
 
 
-def rollback_to_model(model_id: str, space_id: str) -> dict:
-    """Restore Genie Space config from a LoggedModel's artifact.
+def rollback_to_model(model_id: str, space_id: str):
+    """Restore Genie Space config from a LoggedModel's creation run artifacts.
 
-    Used when P0 gate fails and the orchestrator needs to revert
-    to the previous iteration's configuration.
-
-    Returns:
-        The Genie Space config dict from the model's artifact, or None on failure.
+    Downloads model_state/genie_config.json from the creation run linked
+    via source_run_id. Guards against missing source_run_id.
     """
     model = mlflow.get_logged_model(model_id=model_id)
-    config_artifact = mlflow.artifacts.download_artifacts(
-        run_id=model.source_run_id, artifact_path="genie_config"
+    if not model.source_run_id:
+        print(f"  WARNING: LoggedModel {model_id} has no source_run_id")
+        return None
+
+    artifact_dir = mlflow.artifacts.download_artifacts(
+        run_id=model.source_run_id, artifact_path="model_state"
     )
-    import os
-    for f in os.listdir(config_artifact):
-        if f.endswith(".json"):
-            with open(os.path.join(config_artifact, f)) as fh:
-                return json.load(fh)
-    return None
+    config_path = os.path.join(artifact_dir, "genie_config.json")
+    with open(config_path) as f:
+        return json.load(f)
 ```
 
 ### Prompt Version Tracking
@@ -351,9 +255,7 @@ The orchestrator maintains this dict across iterations, persisted in `optimizati
 session = {
     "space_id": str,                 # Genie Space being optimized
     "domain": str,                   # Domain name (e.g., "cost")
-    "cli_profile": str | None,       # Databricks CLI profile (from databricks.yml)
     "started_at": str,               # ISO 8601 timestamp
-    "experiment_name": str,          # MLflow experiment path
     "current_iteration": int,        # 0 = not started, 1+ = iteration number
     "max_iterations": int,           # Default 5
     "status": str,                   # in_progress | converged | stalled | max_iterations | evaluated
@@ -384,12 +286,26 @@ session = {
     "patched_objects": list[str],     # Metadata objects modified by the current patch set
     "maturity_level": str,            # L1 (greedy) | L2 (GEPA) | L3 (multi-objective)
     "benchmark_corrections": list,    # Arbiter-corrected GT questions
-    "lever_impacts": {                # Per-lever before/after score tracking (Gap 15)
-        int: {                        # Lever number (1-6)
+    "lever_impacts": {                # Per-lever before/after score tracking
+        str: {                        # Lever number as string ("1"-"6")
             "before": dict,           # Scores before applying this lever's proposals
             "after": dict,            # Scores after applying this lever's proposals
             "proposals": list,        # Proposals applied for this lever
             "delta": float,           # overall_accuracy change
+        }
+    },
+    "worker_reads": list,             # Audit trail of worker SKILL.md reads
+    "eval_dataset_name": str | None,  # UC evaluation dataset name
+    "use_patch_dsl": bool,            # Default True — use Patch DSL for apply
+    "repeatability_pct": float,       # Current repeatability percentage (default 0.0)
+    "best_repeatability": float,      # Best repeatability across iterations (default 0.0)
+    "repeatability_target": float,    # Target repeatability (default 90.0)
+    "lever_audit": {                  # Per-lever attempt tracking
+        str: {                        # Lever number as string ("1"-"6")
+            "attempted": bool,
+            "proposals_generated": int,
+            "proposals_applied": int,
+            "skip_reason": str | None,
         }
     },
 }
@@ -405,7 +321,10 @@ from datetime import datetime
 from pathlib import Path
 
 def init_progress(space_id: str, domain: str, max_iterations: int = 5) -> dict:
-    """Initialize a new optimization progress tracker."""
+    """Initialize a new optimization progress tracker.
+
+    Returns the full session dict with all fields from the schema above.
+    """
     return {
         "space_id": space_id,
         "domain": domain,
@@ -418,7 +337,30 @@ def init_progress(space_id: str, domain: str, max_iterations: int = 5) -> dict:
         "best_overall_accuracy": 0.0,
         "remaining_failures": [],
         "convergence_reason": None,
+        "promoted_model_id": None,
+        "score_history": [],
+        "patch_history": [],
+        "pareto_frontier": [],
+        "current_patch_set": None,
+        "patched_objects": [],
+        "maturity_level": "L1",
+        "benchmark_corrections": [],
         "lever_impacts": {},
+        "worker_reads": [],
+        "eval_dataset_name": None,
+        "use_patch_dsl": True,
+        "repeatability_pct": 0.0,
+        "best_repeatability": 0.0,
+        "repeatability_target": 90.0,
+        "lever_audit": {
+            str(i): {
+                "attempted": False,
+                "proposals_generated": 0,
+                "proposals_applied": 0,
+                "skip_reason": None,
+            }
+            for i in range(1, 7)
+        },
     }
 
 
@@ -432,7 +374,11 @@ def load_progress(path: str) -> dict:
 
 
 def update_progress(progress: dict, iteration_result: dict) -> dict:
-    """Append an iteration result to the progress tracker."""
+    """Append an iteration result to the progress tracker.
+
+    Also updates: score_history, patch_history, repeatability tracking,
+    and Pareto frontier via _update_pareto_frontier().
+    """
     progress["iterations"].append(iteration_result)
     progress["current_iteration"] = iteration_result.get("iteration", len(progress["iterations"]))
 
@@ -442,6 +388,31 @@ def update_progress(progress: dict, iteration_result: dict) -> dict:
         progress["best_iteration"] = progress["current_iteration"]
 
     progress["remaining_failures"] = iteration_result.get("remaining_failures", [])
+
+    # Score history
+    scores = iteration_result.get("scores", {})
+    if scores:
+        progress.setdefault("score_history", []).append({
+            "iteration": progress["current_iteration"],
+            "scores": scores,
+            "overall_accuracy": overall,
+        })
+
+    # Patch history
+    patches = iteration_result.get("patch_set") or iteration_result.get("proposals_applied", [])
+    if patches:
+        progress.setdefault("patch_history", []).append({
+            "iteration": progress["current_iteration"],
+            "patches": patches,
+        })
+
+    # Repeatability tracking
+    rep_pct = iteration_result.get("repeatability_pct", 0)
+    if rep_pct:
+        progress["repeatability_pct"] = rep_pct
+        if rep_pct > progress.get("best_repeatability", 0):
+            progress["best_repeatability"] = rep_pct
+
     return progress
 
 
@@ -494,7 +465,6 @@ def register_optimizer_prompts(experiment_name: str, domain: str,
                 )
                 mlflow.genai.set_prompt_alias(name=prompt_name, alias="production", version=version.version)
                 registered[name] = {"name": prompt_name, "version": version.version, "storage": "prompt_registry"}
-                print(f"  [Prompt Registry] Registered: {prompt_name} v{version.version}")
             except Exception as e:
                 print(f"  [Prompt Registry] Skipped {prompt_name}: {e}")
 
@@ -507,7 +477,6 @@ def register_optimizer_prompts(experiment_name: str, domain: str,
             with open(tmp, "w") as f:
                 f.write(template)
             mlflow.log_artifact(tmp, artifact_path=f"judge_prompts/{name}")
-            print(f"  [MLflow Artifact] Logged: judge_prompts/{name}")
 
         mlflow.log_params({
             "num_prompts": len(JUDGE_PROMPTS),
@@ -516,7 +485,6 @@ def register_optimizer_prompts(experiment_name: str, domain: str,
             "registration_date": datetime.now().isoformat(),
         })
 
-    print(f"\n  Registered {len(JUDGE_PROMPTS)} prompts (artifacts in experiment: {experiment_name})")
     return registered
 ```
 
@@ -548,7 +516,7 @@ def register_optimizer_prompts(experiment_name: str, domain: str,
 
 ---
 
-## Pre-Optimization Setup (from optimization-workflow.md)
+## Pre-Optimization Setup
 
 ### 0. Resolve CLI Profile & Discover Genie Space ID
 
@@ -567,16 +535,13 @@ Delegate to Generator worker. See `genie-benchmark-generator` SKILL.md.
 
 ### 2. Sync to MLflow Evaluation Dataset
 
-```python
-dataset_name = sync_yaml_to_mlflow_dataset(yaml_path, uc_schema, domain)
-```
+Owned by the evaluator job — the orchestrator only computes `eval_dataset_name` and passes it as a job parameter.
 
-### 3. Snapshot Current Metadata & Create LoggedModel
+### 3. Fetch Config & Create LoggedModel
 
 ```python
-snapshot = snapshot_genie_metadata(space_id, experiment_name, "pre-optimization",
-                                   iteration=0, domain=domain)
-model_id = snapshot["model_id"]  # Pass to evaluator for linked evaluation
+config = _fetch_space_config(space_id)
+model_id = create_genie_model_version(space_id, config, 0, domain, uc_schema=uc_schema)
 ```
 
 ---

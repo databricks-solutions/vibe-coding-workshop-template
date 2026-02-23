@@ -51,9 +51,20 @@ resources:
               warehouse_id: "${var.warehouse_id}"
               catalog: "${var.catalog}"
               gold_schema: "${var.gold_schema}"
+              # LoggedModel ID for config version tracking. Create via
+              # create_genie_model_version() in orchestrator.py before running.
+              # If empty, evaluation runs but config version tracking is disabled.
               model_id: ""
               dataset_mode: "uc"
               uc_schema: "${var.catalog}.${var.gold_schema}"
+              # Repeatability check: re-queries each question 2 extra times
+              # to measure SQL generation consistency. Adds ~24s per question.
+              # The orchestrator enables this only during full-scope evaluations.
+              run_repeatability: "false"
+              eval_scope: "full"
+              patched_objects_b64: ""
+              eval_dataset_name: ""
+              min_benchmarks: "10"
           environment_key: default
 
       environments:

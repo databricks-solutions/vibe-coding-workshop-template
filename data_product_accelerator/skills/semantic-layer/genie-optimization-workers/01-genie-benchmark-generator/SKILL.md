@@ -9,7 +9,7 @@ description: >
   arbiter corrections require GT updates.
 metadata:
   author: prashanth subrahmanyam
-  version: "3.0.0"
+  version: "3.1.0"
   domain: semantic-layer
   role: worker
   called_by:
@@ -47,6 +47,12 @@ Creates, validates, and syncs benchmark question suites for Genie Space evaluati
 | `gt_validation_report` | dict | Per-question validation results |
 | `yaml_path` | str | Path to saved golden-queries.yaml |
 | `benchmark_count` | int | Number of benchmarks created |
+
+### Optional Outputs
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `example_question_sqls` | list[dict] | Optional: up to 10 example Q&A pairs for the Genie Space config. Each entry has `id` (32-hex UUID via `uuid.uuid4().hex`), `question`, and `sql`. |
 
 > **Warning:** The evaluator REQUIRES `eval_dataset_name` to use `mlflow.genai.evaluate()`. Skipping dataset sync means the Datasets and Evaluation tabs will be empty. Always run `sync_yaml_to_mlflow_dataset()`.
 
@@ -97,6 +103,14 @@ Optional fields (auto-populated by GT validation):
 - `required_tables`, `required_columns`, `required_joins`
 - `expected_result_hash`, `expected_result_sample`, `expected_row_count`, `expected_columns`
 
+### ID Format Requirements
+
+| Entity | ID Format | Example | Notes |
+|--------|-----------|---------|-------|
+| Benchmark questions | `domain_NNN` | `cost_001` | Human-readable, sequential within domain |
+| `example_question_sqls` | 32-hex UUID | `a1b2c3d4e5f6...` | Via `uuid.uuid4().hex` — required by Genie API |
+| `sql_functions` (TVFs) | 32-hex UUID | `f6e5d4c3b2a1...` | Via `uuid.uuid4().hex` — required by Genie API |
+
 See [golden-queries.yaml](assets/templates/golden-queries.yaml) for the full template.
 
 ## Benchmark Splits (P12)
@@ -116,13 +130,15 @@ See [golden-queries.yaml](assets/templates/golden-queries.yaml) for the full tem
 - `validate_benchmarks()` now also populates `expected_columns` from the GT SQL result.
 - All validation output fields: `expected_result_hash`, `expected_result_sample`, `expected_row_count`, `expected_columns`.
 
-## Coverage Requirements
+## Coverage Requirements (MUST)
+
+Benchmarks MUST meet minimum coverage thresholds. Insufficient coverage produces statistically unreliable evaluation results and blocks the optimization loop (evaluator's `min_benchmarks` guard).
 
 | Domain Size | Min Questions | Min Categories |
 |-------------|---------------|----------------|
 | Small (1-3 tables) | 10 | 4 |
 | Medium (4-8 tables) | 15 | 6 |
-| Large (9+ tables) | 20-25 | 8 |
+| Large (9+ tables) | 20 | 8 |
 
 ## Common Mistakes
 
@@ -135,9 +151,30 @@ See [golden-queries.yaml](assets/templates/golden-queries.yaml) for the full tem
 | Template variables in `expected_sql` without documenting handoff | Evaluator gets `PARSE_SYNTAX_ERROR` | Document that evaluator must receive `catalog` and `gold_schema` as parameters and call `resolve_sql()` |
 | Skipping dataset sync to UC | Evaluator can't use `mlflow.genai.evaluate(data=...)`, Evaluation tab empty | Always run `sync_yaml_to_mlflow_dataset()` — it's required for the MLflow GenAI evaluation flow |
 
+### Ground Truth Validation Handoff
+
+The generator's GT validation functions (`validate_ground_truth_sql()` and `validate_with_retry()` from `references/gt-validation.md`) are consumed by the evaluator in **Cell 3a** as a structural pre-check before evaluation begins. The evaluator:
+1. Executes each benchmark's `expected_sql` with `LIMIT 1`
+2. Auto-remediates failures via LLM with full schema context (`information_schema.columns` + `INFORMATION_SCHEMA.ROUTINES`)
+3. Emits `gt_remediation_queue.yaml` for unrepairable benchmarks, which the orchestrator routes back to the generator
+
+The generator should expect to receive remediation requests containing the original SQL and Spark error messages, and produce replacement benchmarks.
+
 ## HARD CONSTRAINTS
 
 - `sync_yaml_to_mlflow_dataset()` MUST run when `uc_schema` is available. Skipping leaves the Datasets tab empty.
+- Generated benchmarks for large domains (9+ tables) MUST meet minimum question count (20) and minimum category count (8). These are hard requirements, not recommendations.
+
+## Benchmark Correction
+
+When the orchestrator's arbiter detects that Genie produced correct SQL but the benchmark expected_sql was wrong (`genie_correct` verdict), it passes `corrected_questions` to the Generator. This triggers a benchmark correction workflow:
+
+1. **Receive `corrected_questions`** from the orchestrator. Each entry contains `question_id`, `verdict`, `expected_sql` (old), `generated_sql` (Genie's correct SQL), and `rationale`.
+2. **Update the benchmark YAML** -- replace the `expected_sql` for each corrected question with Genie's SQL.
+3. **Re-validate** the updated benchmarks via `sync_yaml_to_mlflow_dataset()` to ensure the new expected SQL is valid.
+4. **Return the updated `eval_dataset_name`** to the orchestrator so the next evaluation uses corrected benchmarks.
+
+This ensures benchmark quality improves over iterations rather than penalizing Genie for correct answers.
 
 ## Scripts
 

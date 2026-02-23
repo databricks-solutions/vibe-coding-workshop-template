@@ -182,17 +182,20 @@ The field must be `answer` containing an array of objects with `format` ("SQL" o
 
 ## Error 10: Arrays Not Sorted
 
-**Symptom:** API rejects payload with ordering/sorting error.
+**Symptom:** `Invalid export proto: data_sources.tables must be sorted by identifier`
 
-**Cause:** Arrays in the Genie Space JSON are not sorted by their required key.
+**Cause:** The Genie API uses protobuf serialization requiring deterministic ordering. Arrays in the `serialized_space` JSON are not sorted by their required key.
 
-**Fix:** Sort all arrays before submission:
-- `tables` → sort by `table_name`
-- `materialized_views` → sort by `materialized_view_name`
-- `sql_functions` → sort by `function_name`
-- `example_question_sqls` → sort by `question[0]`
+**Fix:** Call `sort_genie_config()` before every PATCH request. Correct sort keys:
+- `data_sources.tables` → sort by `identifier`
+- `data_sources.metric_views` → sort by `identifier`
+- `instructions.sql_functions` → sort by `(id, identifier)`
+- `instructions.text_instructions` → sort by `id`
+- `instructions.example_question_sqls` → sort by `id`
+- `config.sample_questions` → sort by `id`
+- `benchmarks.questions` → sort by `id`
 
-Use the `sort_all_arrays()` function from the deploy template.
+The canonical `sort_genie_config()` implementation lives in `04-genie-optimization-applier/scripts/optimization_applier.py` and is documented in `04-genie-space-export-import-api/SKILL.md` Section 8.
 
 ---
 
@@ -219,7 +222,7 @@ Use the `sort_all_arrays()` function from the deploy template.
 - [ ] All IDs are 32-character hex strings (no dashes)
 - [ ] All string arrays (question, content, sql) are arrays even for single values
 - [ ] All identifiers use full 3-part UC names (`catalog.schema.object`)
-- [ ] All arrays sorted by required keys (tables by table_name, sql_functions by function_name, etc.)
+- [ ] All arrays sorted by required keys (tables/metric_views by `identifier`, sql_functions by `(id, identifier)`, others by `id`)
 
 ### config.sample_questions (CRITICAL)
 
@@ -265,11 +268,13 @@ Use the `sort_all_arrays()` function from the deploy template.
 
 #### Array Sorting
 
-- [ ] `tables` sorted by `table_name`
-- [ ] `materialized_views` sorted by `materialized_view_name`
-- [ ] `sql_functions` sorted by `function_name`
-- [ ] `example_question_sqls` sorted by `question[0]`
-- [ ] Sorting applied BEFORE variable substitution (sort keys must be final values)
+- [ ] `data_sources.tables` sorted by `identifier`
+- [ ] `data_sources.metric_views` sorted by `identifier`
+- [ ] `instructions.sql_functions` sorted by `(id, identifier)`
+- [ ] `instructions.text_instructions` sorted by `id`
+- [ ] `instructions.example_question_sqls` sorted by `id`
+- [ ] `config.sample_questions` sorted by `id`
+- [ ] Sorting applied via `sort_genie_config()` BEFORE PATCH submission
 
 ---
 

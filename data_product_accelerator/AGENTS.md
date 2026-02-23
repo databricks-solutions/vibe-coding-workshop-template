@@ -32,6 +32,8 @@ repo-root/                           <-- workspace root / agent CWD
 
 **MANDATORY:** Before starting any Databricks implementation task, consult this routing table. For ambiguous tasks, read the full skill navigator: `data_product_accelerator/skills/skill-navigator/SKILL.md`
 
+> **Visual learner?** See the [Interactive Skill Navigation Guide](data_product_accelerator/docs/framework-design/10-skill-navigation-visual-guide.html) — an animated walkthrough showing how the agent navigates from AGENTS.md through all 9 pipeline stages. Open the HTML file in any browser.
+
 ## Design-First Pipeline
 
 ```
@@ -69,6 +71,20 @@ data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Si
 | "PRIMARY KEY", "FOREIGN KEY", "constraint", "PK/FK" | `data_product_accelerator/skills/common/unity-catalog-constraints/SKILL.md` |
 | "Genie optimization", "8 judges", "GEPA", "metadata optimization", "dual persistence" | `data_product_accelerator/skills/semantic-layer/05-genie-optimization-orchestrator/SKILL.md` |
 | "audit skills", "check freshness", "stale skills", "verify skills" | `data_product_accelerator/skills/admin/skill-freshness-audit/SKILL.md` |
+
+## Orchestrator Deep Dives (optional learning resources)
+
+For detailed walkthroughs of how orchestrators manage context and load workers:
+
+| Orchestrator | Walkthrough Document |
+|--------------|---------------------|
+| Gold Design (stage 1) | [`docs/framework-design/13-gold-design-orchestrator-walkthrough.md`](data_product_accelerator/docs/framework-design/13-gold-design-orchestrator-walkthrough.md) |
+| Silver Setup (stage 3) | [`docs/framework-design/14-silver-orchestrator-walkthrough.md`](data_product_accelerator/docs/framework-design/14-silver-orchestrator-walkthrough.md) |
+| Gold Implementation (stage 4) | [`docs/framework-design/15-gold-pipeline-orchestrator-walkthrough.md`](data_product_accelerator/docs/framework-design/15-gold-pipeline-orchestrator-walkthrough.md) |
+| Semantic Layer (stage 6) | [`docs/framework-design/12-semantic-layer-orchestrator-walkthrough.md`](data_product_accelerator/docs/framework-design/12-semantic-layer-orchestrator-walkthrough.md) |
+| Genie Optimization (stage 6b) | [`docs/agent-walkthrough.md`](data_product_accelerator/docs/agent-walkthrough.md) |
+
+These walkthroughs show progressive disclosure patterns, context management, and worker skill loading strategies. Read them to understand how orchestrators minimize token usage while maximizing context relevance.
 
 ## Key Rule
 
@@ -154,3 +170,7 @@ If your IDE doesn't support `@` references, paste the file path or ask the agent
 Read the file data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md and follow its instructions.
 I have a customer schema at data_product_accelerator/context/Wanderbricks_Schema.csv.
 ```
+
+### Efficiency Tip
+
+To reduce total pipeline time by 30-40%, see the [Parallel Execution Guide](data_product_accelerator/docs/framework-design/09-parallel-execution-guide.md) for strategies to run independent stages concurrently (e.g., Gold Design + Bronze Setup can run in parallel).

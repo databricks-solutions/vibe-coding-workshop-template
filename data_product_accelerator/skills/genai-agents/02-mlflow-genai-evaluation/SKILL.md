@@ -10,7 +10,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.2.0"
   domain: genai-agents
   role: worker
   pipeline_stage: 9
@@ -242,6 +242,60 @@ def cost_accuracy_judge(
 
 ---
 
+## CRITICAL: `make_judge()` Template Variable Constraints
+
+`make_judge()` and the MLflow Prompt Registry use the same `{{ }}` template syntax but have **different validation rules**:
+
+| System | Allowed Variable Names | Validation |
+|--------|----------------------|------------|
+| Prompt Registry (`register_prompt()`) | Any `{{ variable }}` | No validation — any name accepted |
+| `make_judge(instructions=...)` | Only 5 allowed (see below) | Strict — raises `MlflowException` on unknown variables |
+
+**`make_judge()` only permits these 5 template variables:**
+- `{{ inputs }}` — the eval record's `inputs` dict
+- `{{ outputs }}` — the `predict_fn` return value
+- `{{ trace }}` — the MLflow trace from `predict_fn`
+- `{{ expectations }}` — the eval record's `expectations` dict
+- `{{ conversation }}` — conversation data (for chat models)
+
+**Bidirectional constraint:**
+1. MUST contain **at least one** of the 5 allowed variables (plain text is rejected)
+2. MUST NOT contain **any other** `{{ variable }}` names (custom variables are rejected)
+
+```python
+# WRONG — custom variables crash make_judge()
+"Question: {{question}}\nExpected SQL: {{expected_sql}}\nGenerated SQL: {{genie_sql}}"
+
+# WRONG — no variables at all, also crashes make_judge()
+"Evaluate the SQL quality and respond with yes or no."
+
+# CORRECT — uses only allowed variables
+"User question: {{ inputs }}\nGenerated SQL: {{ outputs }}\nExpected SQL: {{ expectations }}"
+```
+
+---
+
+## CRITICAL: `predict_fn` Keyword Argument Contract
+
+`mlflow.genai.evaluate()` **unpacks** the `inputs` dict as keyword arguments when calling `predict_fn`. The function signature must match the keys in `eval_records["inputs"]`.
+
+```python
+# Given eval records with:
+eval_records = [{"inputs": {"question": "...", "space_id": "...", "expected_sql": "..."}, ...}]
+
+# WRONG — receives keyword args, not a dict
+def predict_fn(inputs: dict) -> dict:
+    question = inputs["question"]  # TypeError or MlflowException
+
+# CORRECT — signature matches input keys
+def predict_fn(question: str, expected_sql: str = "", **kwargs) -> dict:
+    # question and expected_sql are unpacked directly
+    # space_id, catalog, etc. land in **kwargs (use closure for these)
+    ...
+```
+
+---
+
 ## Metric Aliases Quick Reference
 
 **CRITICAL: Handle metric name variations across MLflow versions.**
@@ -333,3 +387,28 @@ Before running agent evaluation:
 ### Related Skills
 - `ml-pipeline-setup` - MLflow model patterns
 - `responses-agent-patterns` - ResponsesAgent implementation patterns
+
+---
+
+## Scorer vs Evaluator Semantics
+
+`make_judge()` returns an **`InstructionsJudge` scorer callable** — an object intended for use inside `mlflow.genai.evaluate(scorers=[...])`. Scorers are **not standalone evaluators**:
+
+- **Scorers** are callables that receive structured inputs from `mlflow.genai.evaluate()` and return `Feedback` objects. They have no `.evaluate()` method.
+- **`mlflow.genai.evaluate()`** is the evaluator — it orchestrates the predict function, passes data through scorers, and logs results to MLflow.
+
+For inline/conditional LLM calls **outside** the `mlflow.genai.evaluate()` harness (e.g., arbiter conditional scoring, ad-hoc quality checks), use direct LLM calls:
+- `_call_llm_for_scoring()` via `w.serving_endpoints.query()` (Databricks SDK)
+- Parse JSON verdicts from the LLM response manually
+
+| Use Case | Correct Approach | Wrong Approach |
+|----------|-----------------|----------------|
+| Running all judges on benchmark suite | `mlflow.genai.evaluate(scorers=[judge1, judge2])` | Calling each judge manually in a loop |
+| Conditional scoring (arbiter fires only on disagreement) | `_call_llm_for_scoring(prompt)` inside a `@scorer` | `make_judge().evaluate(data)` — no `.evaluate()` method |
+| Quick ad-hoc LLM quality check | `w.serving_endpoints.query(...)` | `make_judge()(inputs)` — wrong call signature |
+
+### Common Mistakes
+
+| Mistake | Consequence | Fix |
+|---------|-------------|-----|
+| Calling `make_judge().evaluate()` for standalone scoring | `AttributeError: 'InstructionsJudge' object has no attribute 'evaluate'` | Use `_call_llm_for_scoring()` for inline/conditional LLM calls, or pass scorers to `mlflow.genai.evaluate(scorers=[...])` |

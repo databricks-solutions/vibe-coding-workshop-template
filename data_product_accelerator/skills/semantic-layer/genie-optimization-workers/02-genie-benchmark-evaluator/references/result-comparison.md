@@ -1,91 +1,62 @@
 # Result Comparison Patterns
 
-This reference documents the DataFrame comparison logic used by the `result_correctness` scorer in Layer 2 of the Genie Benchmark Evaluator. Both SQLs (Genie-generated and ground truth) are executed via Spark, and their result sets are compared using a cascading match strategy.
+This reference documents the DataFrame comparison logic used by the `result_correctness` scorer in Layer 2 of the Genie Benchmark Evaluator. Both SQLs (Genie-generated and ground truth) are executed inside `genie_predict_fn`, and their result sets are compared using a cascading match strategy: exact → hash → signature → mismatch.
 
 ---
 
-## execute_both_sqls
+## Inline Comparison in genie_predict_fn
 
-Executes both the Genie-generated SQL and the ground truth SQL against the warehouse, then delegates to `compare_result_sets()` for the actual comparison.
-
-```python
-def execute_both_sqls(genie_sql: str, gt_sql: str, spark) -> dict:
-    """Execute both SQLs and compare results.
-
-    Returns:
-        dict with match_type (exact|approximate|structural|mismatch),
-        gt_rows, genie_rows, detail
-    """
-    try:
-        gt_df = spark.sql(gt_sql).toPandas()
-    except Exception as e:
-        return {"match_type": "error", "detail": f"GT SQL failed: {e}", "gt_rows": 0, "genie_rows": 0}
-
-    try:
-        genie_df = spark.sql(genie_sql).toPandas()
-    except Exception as e:
-        return {"match_type": "error", "detail": f"Genie SQL failed: {e}", "gt_rows": len(gt_df), "genie_rows": 0}
-
-    return compare_result_sets(gt_df, genie_df)
-```
-
----
-
-## compare_result_sets
-
-Compares two pandas DataFrames using a cascading strategy: exact → approximate → structural → mismatch.
+The template does NOT use separate `execute_both_sqls()` or `compare_result_sets()` functions. All comparison logic lives inline in `genie_predict_fn`. SQL execution is lifted there so every scorer (including `result_correctness` and `arbiter_scorer`) reads pre-computed `outputs["comparison"]` — no scorer calls `spark.sql()`.
 
 ```python
-import numpy as np
+# Inside genie_predict_fn — after run_genie_query, sanitize_sql, resolve_sql
+comparison = {"match": False, "match_type": "mismatch", "gt_rows": 0,
+              "genie_rows": 0, "gt_hash": None, "genie_hash": None,
+              "gt_signature": None, "genie_signature": None, "error": None}
+if genie_sql and gt_sql:
+    try:
+        gt_df = normalize_result_df(spark.sql(gt_sql).toPandas())
+        genie_df = normalize_result_df(spark.sql(genie_sql).toPandas())
+        gt_hash = hashlib.md5(gt_df.to_csv(index=False).encode()).hexdigest()[:8]
+        genie_hash = hashlib.md5(genie_df.to_csv(index=False).encode()).hexdigest()[:8]
+        exact_match = gt_df.shape == genie_df.shape and gt_df.equals(genie_df)
+        hash_match = gt_hash == genie_hash
+        gt_sig = result_signature(gt_df)
+        genie_sig = result_signature(genie_df)
+        sig_match = (gt_sig["schema_hash"] == genie_sig["schema_hash"]
+                     and gt_sig["row_count"] == genie_sig["row_count"])
+        comparison = {
+            "match": exact_match or hash_match,  # signature is recorded but does not set match=True
+            "match_type": "exact" if exact_match else ("hash" if hash_match else ("signature" if sig_match else "mismatch")),
+            "gt_rows": len(gt_df),
+            "genie_rows": len(genie_df),
+            "gt_hash": gt_hash,
+            "genie_hash": genie_hash,
+            "gt_signature": gt_sig,
+            "genie_signature": genie_sig,
+            "error": None,
+        }
+    except Exception as e:
+        comparison["error"] = str(e)[:200]
+else:
+    comparison["error"] = "Missing SQL for comparison"
 
-def compare_result_sets(gt_df, genie_df) -> dict:
-    """Compare two DataFrames: exact → approximate → structural → mismatch."""
-    gt_rows = len(gt_df)
-    genie_rows = len(genie_df)
-    base = {"gt_rows": gt_rows, "genie_rows": genie_rows}
-
-    if gt_df.equals(genie_df):
-        return {**base, "match_type": "exact", "detail": "DataFrames are identical."}
-
-    if set(gt_df.columns) == set(genie_df.columns) and gt_rows == genie_rows:
-        gt_sorted = gt_df.sort_values(by=list(gt_df.columns)).reset_index(drop=True)
-        genie_sorted = genie_df[gt_df.columns].sort_values(by=list(gt_df.columns)).reset_index(drop=True)
-
-        if gt_sorted.equals(genie_sorted):
-            return {**base, "match_type": "exact", "detail": "Same data, different row order."}
-
-        try:
-            numeric_cols = gt_sorted.select_dtypes(include=[np.number]).columns
-            if len(numeric_cols) > 0:
-                close = np.allclose(
-                    gt_sorted[numeric_cols].values,
-                    genie_sorted[numeric_cols].values,
-                    rtol=1e-2, atol=1e-6, equal_nan=True,
-                )
-                if close:
-                    return {**base, "match_type": "approximate", "detail": "Numeric values within 1% tolerance."}
-        except (TypeError, ValueError):
-            pass
-
-    if gt_rows == genie_rows:
-        return {**base, "match_type": "structural", "detail": f"Same row count ({gt_rows}) but different columns or values."}
-
-    return {**base, "match_type": "mismatch", "detail": f"Row count differs: GT={gt_rows}, Genie={genie_rows}."}
+return {"response": genie_sql, "status": ..., "conversation_id": ..., "comparison": comparison}
 ```
 
 ---
 
 ## Match Types
 
-| Match Type | Meaning | Result Correctness |
-|------------|---------|-------------------|
-| **exact** | DataFrames are identical, or same data with different row order | `yes` |
-| **approximate** | Same schema and row count; numeric columns within 1% tolerance (`np.allclose`) | `yes` |
-| **structural** | Same row count but different columns or non-numeric values | `yes` (conservative pass) |
-| **mismatch** | Row count differs | `no` |
-| **error** | One or both SQLs failed to execute | `no` |
+| Match Type | Meaning | comparison["match"] | Result Correctness |
+|------------|---------|---------------------|-------------------|
+| **exact** | DataFrames have identical shape and `df.equals()` returns True | `True` | `yes` |
+| **hash** | MD5 of `to_csv()` output matches (same data, possibly different row order) | `True` | `yes` |
+| **signature** | Same schema_hash and row_count from `result_signature()` | `False` | `no` |
+| **mismatch** | None of the above | `False` | `no` |
+| **error** | One or both SQLs failed to execute; `comparison["error"]` is set | `False` | `no` |
 
-The `result_correctness` scorer returns `"yes"` for `exact`, `approximate`, and `structural`; it returns `"no"` for `mismatch` and `error`.
+The template sets `comparison["match"] = exact_match or hash_match` — signature match is recorded in `match_type` but does NOT set `match=True`. The `result_correctness` scorer returns `"yes"` only when `cmp.get("match")` is True (i.e., exact or hash); it returns `"no"` for signature, mismatch, and error.
 
 ---
 
@@ -102,7 +73,7 @@ Before comparison, both DataFrames are normalized using `normalize_result_df()` 
 
 ```python
 def normalize_result_df(df):
-    """Deterministic normalization of a result DataFrame."""
+    """Deterministic normalization of a result DataFrame (P9)."""
     if df is None or df.empty:
         return df
     df = df.copy()
@@ -118,20 +89,27 @@ def normalize_result_df(df):
     return df
 ```
 
-### Result Signatures
+---
 
-For quick schema comparison without full DataFrame comparison, use `result_signature()`:
+## result_signature
+
+For quick schema + row count comparison without full DataFrame equality, use `result_signature()`:
 
 ```python
 def result_signature(df):
-    """Quick schema hash + rowcount + numeric sums for result comparison."""
+    """Quick schema hash + rowcount + numeric sums for result comparison (P9)."""
     if df is None or df.empty:
         return {"schema_hash": "", "row_count": 0, "numeric_sums": {}}
     schema_str = ",".join(f"{c}:{df[c].dtype}" for c in sorted(df.columns))
     schema_hash = hashlib.md5(schema_str.encode()).hexdigest()[:8]
-    numeric_sums = {col: round(float(df[col].sum()), 6)
-                    for col in df.select_dtypes(include=["number"]).columns}
-    return {"schema_hash": schema_hash, "row_count": len(df), "numeric_sums": numeric_sums}
+    numeric_sums = {}
+    for col in df.select_dtypes(include=["number"]).columns:
+        numeric_sums[col] = round(float(df[col].sum()), 6)
+    return {
+        "schema_hash": schema_hash,
+        "row_count": len(df),
+        "numeric_sums": numeric_sums,
+    }
 ```
 
-Two results with the same signature have identical schemas, row counts, and numeric column sums — a strong heuristic for equivalence without full cell-by-cell comparison.
+Two results with the same `schema_hash` and `row_count` are considered structurally equivalent (match_type `signature`). The `numeric_sums` are available for additional heuristics but the template uses only schema_hash and row_count for match determination.

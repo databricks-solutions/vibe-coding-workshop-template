@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Genie Optimization Orchestrator v3.4.0
+Genie Optimization Orchestrator v4.2.0
 
 Routes to 4 worker skills on demand. Maintains session state in
 optimization-progress.json and MLflow experiment tags.
@@ -16,7 +16,7 @@ Usage:
     python orchestrator.py --space-id <ID> --benchmarks golden-queries.yaml --resume
     python orchestrator.py --space-id <ID> --benchmarks golden-queries.yaml --job-mode --target dev
     python orchestrator.py --space-id <ID> --benchmarks golden-queries.yaml --worker-dir ../genie-optimization-workers
-    python orchestrator.py --space-id <ID> --benchmarks golden-queries.yaml --job-mode --target dev --inline-routing-only
+    # NOTE: --job-mode is REQUIRED for lever-aware optimization (8-judge harness).
 
 Requirements:
     - databricks-sdk
@@ -25,6 +25,7 @@ Requirements:
     - gepa>=0.1.0 (Tier 1 only)
 """
 
+import re
 import time
 import json
 import yaml
@@ -204,6 +205,56 @@ def _verify_mlflow_tracking():
             )
 
 
+def _split_uc_schema(uc_schema: str | None) -> tuple[str, str]:
+    """Split <catalog>.<schema> into components."""
+    if not uc_schema or "." not in uc_schema:
+        return "", ""
+    parts = uc_schema.split(".")
+    if len(parts) < 2:
+        return "", ""
+    return parts[0], parts[1]
+
+
+def _run_sql_statement_rows(warehouse_id: str, statement: str) -> list[dict]:
+    """Execute SQL Statement API query and return rows as dicts (best effort)."""
+    if w is None or not warehouse_id:
+        return []
+    try:
+        resp = w.api_client.do(
+            "POST",
+            "/api/2.0/sql/statements",
+            body={
+                "warehouse_id": warehouse_id,
+                "statement": statement,
+                "wait_timeout": "30s",
+                "disposition": "INLINE",
+                "format": "JSON_ARRAY",
+            },
+        )
+        statement_id = resp.get("statement_id")
+        status = (resp.get("status") or {}).get("state", "")
+        polls = 0
+        while statement_id and status in ("PENDING", "RUNNING") and polls < 30:
+            time.sleep(2)
+            resp = w.api_client.do("GET", f"/api/2.0/sql/statements/{statement_id}")
+            status = (resp.get("status") or {}).get("state", "")
+            polls += 1
+
+        if status != "SUCCEEDED":
+            return []
+
+        manifest = resp.get("manifest", {}) or {}
+        result = resp.get("result", {}) or {}
+        columns = (((manifest.get("schema") or {}).get("columns")) or [])
+        data_rows = result.get("data_array", []) or []
+        if not columns:
+            return []
+        col_names = [c.get("name", f"c{i}") for i, c in enumerate(columns)]
+        return [dict(zip(col_names, row)) for row in data_rows]
+    except Exception:
+        return []
+
+
 # =========================================================================
 # Space Discovery
 # =========================================================================
@@ -221,43 +272,246 @@ def discover_spaces() -> list:
 # LoggedModel Version Tracking
 # =========================================================================
 
+def _build_patch_summary(patch_set: list, iteration: int) -> dict:
+    """Build a structured summary of patches for quick cross-model comparison."""
+    from collections import Counter
+    by_type = Counter()
+    by_lever = Counter()
+    by_risk = Counter()
+    targets = []
+    patch_details = []
+    for p in patch_set:
+        ptype = p.get("type", f"lever_{p.get('lever', 'unknown')}")
+        lever = str(p.get("lever", "unknown"))
+        risk = p.get("risk_level", "unknown")
+        target = p.get("target") or p.get("object_id") or p.get("table") or ""
+        by_type[ptype] += 1
+        by_lever[lever] += 1
+        by_risk[risk] += 1
+        if target:
+            targets.append(target)
+        patch_details.append({
+            "type": ptype,
+            "target": target,
+            "lever": lever,
+            "risk": risk,
+            "description": p.get("change_description", p.get("description", "")),
+        })
+    return {
+        "iteration": iteration,
+        "patch_count": len(patch_set),
+        "by_type": dict(by_type),
+        "by_lever": dict(by_lever),
+        "by_risk": dict(by_risk),
+        "targets": targets,
+        "patches": patch_details,
+    }
+
+
+def _compute_uc_metadata_diff(
+    parent_model_id: str | None,
+    current_columns: list,
+    current_tags: list,
+    current_routines: list,
+) -> dict | None:
+    """Compute UC metadata diff between current state and parent LoggedModel.
+
+    Downloads parent's model_state/ artifacts via source_run_id and diffs
+    columns (keyed by table_name+column_name), tags (keyed by table+tag_name),
+    and routines (keyed by routine_name).
+    """
+    if not parent_model_id or parent_model_id == "none":
+        return None
+    try:
+        parent = mlflow.get_logged_model(model_id=parent_model_id)
+        if not parent.source_run_id:
+            return None
+        import tempfile as _tf
+        artifact_dir = mlflow.artifacts.download_artifacts(
+            run_id=parent.source_run_id,
+            artifact_path="model_state",
+            dst_path=_tf.mkdtemp(prefix="parent_model_state_"),
+        )
+    except Exception:
+        return None
+
+    import os as _os
+
+    def _load_json(fname):
+        fpath = _os.path.join(artifact_dir, fname)
+        if _os.path.exists(fpath):
+            with open(fpath) as f:
+                return json.load(f)
+        return []
+
+    prev_columns = _load_json("uc_columns.json")
+    prev_tags = _load_json("uc_tags.json")
+    prev_routines = _load_json("uc_routines.json")
+
+    import shutil as _sh
+    _sh.rmtree(artifact_dir, ignore_errors=True)
+
+    def _diff_rows(prev, curr, key_fields, compare_fields=None):
+        def _row_key(row):
+            return tuple(str(row.get(k, "")) for k in key_fields)
+        prev_map = {_row_key(r): r for r in prev}
+        curr_map = {_row_key(r): r for r in curr}
+        prev_keys = set(prev_map.keys())
+        curr_keys = set(curr_map.keys())
+        added = [curr_map[k] for k in sorted(curr_keys - prev_keys)]
+        removed = [prev_map[k] for k in sorted(prev_keys - curr_keys)]
+        modified = []
+        if compare_fields:
+            for k in sorted(prev_keys & curr_keys):
+                for field in compare_fields:
+                    old_val = str(prev_map[k].get(field, ""))
+                    new_val = str(curr_map[k].get(field, ""))
+                    if old_val != new_val:
+                        modified.append({
+                            "key": ".".join(str(x) for x in k),
+                            "field": field,
+                            "old": old_val,
+                            "new": new_val,
+                        })
+        return {"added": added, "removed": removed, "modified": modified}
+
+    col_diff = _diff_rows(
+        prev_columns, current_columns,
+        key_fields=["table_name", "column_name"],
+        compare_fields=["data_type", "comment"],
+    )
+    tag_diff = _diff_rows(
+        prev_tags, current_tags,
+        key_fields=["table_name", "tag_name"],
+        compare_fields=["tag_value"],
+    )
+    routine_diff = _diff_rows(
+        prev_routines, current_routines,
+        key_fields=["routine_name"],
+        compare_fields=["routine_definition", "return_type"],
+    )
+
+    return {
+        "parent_model_id": parent_model_id,
+        "columns": col_diff,
+        "tags": tag_diff,
+        "routines": routine_diff,
+        "summary": {
+            "columns_changed": len(col_diff["added"]) + len(col_diff["removed"]) + len(col_diff["modified"]),
+            "tags_changed": len(tag_diff["added"]) + len(tag_diff["removed"]) + len(tag_diff.get("modified", [])),
+            "routines_changed": len(routine_diff["added"]) + len(routine_diff["removed"]) + len(routine_diff["modified"]),
+        },
+    }
+
+
+def link_eval_scores_to_model(model_id: str, eval_result: dict):
+    """Log evaluation scores as model-level metrics for cross-model comparison.
+
+    Called after each evaluation so per-judge scores appear on the Models tab
+    and are searchable via search_logged_models().
+    """
+    if not model_id or not eval_result:
+        return
+    scores = eval_result.get("scores", {})
+    metrics = {"overall_accuracy": eval_result.get("overall_accuracy", 0)}
+    for judge_name, score in scores.items():
+        if isinstance(score, (int, float)):
+            metrics[judge_name] = score
+    rep = eval_result.get("repeatability_pct")
+    if rep:
+        metrics["repeatability_pct"] = rep
+    try:
+        mlflow.log_metrics(metrics=metrics, model_id=model_id)
+    except Exception as e:
+        print(f"  WARNING: Failed to link eval scores to model {model_id}: {e}")
+
+
 def create_genie_model_version(space_id: str, config: dict,
                                 iteration: int, domain: str,
                                 patch_set=None, parent_model_id=None,
-                                prompt_versions=None) -> str:
-    """Create a LoggedModel for this iteration's Genie Space config.
+                                prompt_versions=None, uc_schema: str | None = None) -> str:
+    """Create a LoggedModel with a linked creation run for this iteration.
 
-    The LoggedModel acts as a metadata hub linking this specific config
-    to its evaluation results, Genie API traces, applied patches, and
-    prompt versions. Call BEFORE evaluation so that
-    mlflow.genai.evaluate(model_id=...) links correctly.
+    Uses create_external_model() inside an mlflow.start_run() so that:
+      - "Logged From" in the UI points to the creation run (source_run_id)
+      - Artifacts (full UC metadata, config, patches) are persisted in the run
+      - Evaluation runs link back via mlflow.genai.evaluate(model_id=...)
 
-    Args:
-        space_id: Genie Space ID.
-        config: Full Genie Space configuration dict from the API.
-        iteration: Current optimization iteration number.
-        domain: Business domain name.
-        patch_set: List of patch dicts applied in this iteration (None for baseline).
-        parent_model_id: LoggedModel ID of the previous iteration (lineage chain).
-        prompt_versions: Dict mapping judge name to prompt version used.
-
-    Returns:
-        model_id (str) to pass to evaluator.
+    Artifact layout per creation run:
+      model_state/genie_config.json       - full Genie Space config
+      model_state/uc_columns.json         - complete information_schema.columns
+      model_state/uc_tags.json            - complete information_schema.table_tags
+      model_state/uc_routines.json        - complete INFORMATION_SCHEMA.ROUTINES
+      model_state/uc_metadata_diff.json   - diff vs parent model (if parent exists)
+      patches/patch_set.json              - full Patch DSL array
+      patches/patch_summary.json          - structured summary by type/lever/risk
     """
     import tempfile
     import os as _os
 
+    uc_columns = []
+    uc_tags = []
+    uc_routines = []
+    warehouse_id = config.get("warehouse_id", "")
+    uc_catalog, uc_db = _split_uc_schema(uc_schema)
+    if uc_catalog and uc_db and warehouse_id:
+        uc_columns = _run_sql_statement_rows(
+            warehouse_id,
+            (
+                f"SELECT table_name, column_name, data_type, comment "
+                f"FROM {uc_catalog}.information_schema.columns "
+                f"WHERE table_schema = '{uc_db}'"
+            ),
+        )
+        uc_tags = _run_sql_statement_rows(
+            warehouse_id,
+            (
+                f"SELECT * FROM {uc_catalog}.information_schema.table_tags "
+                f"WHERE schema_name = '{uc_db}'"
+            ),
+        )
+        uc_routines = _run_sql_statement_rows(
+            warehouse_id,
+            (
+                f"SELECT routine_name, routine_type, routine_definition, "
+                f"data_type AS return_type, routine_schema "
+                f"FROM {uc_catalog}.INFORMATION_SCHEMA.ROUTINES "
+                f"WHERE routine_schema = '{uc_db}'"
+            ),
+        )
+
     config_hash = hashlib.sha256(
-        json.dumps(config, sort_keys=True, default=str).encode()
+        json.dumps(
+            {
+                "genie_config": config,
+                "uc_columns": uc_columns,
+                "uc_tags": uc_tags,
+                "uc_routines": uc_routines,
+            },
+            sort_keys=True,
+            default=str,
+        ).encode()
     ).hexdigest()[:12]
     model_name = f"genie-{domain}-iter{iteration}-{config_hash}"
-
-    active_model = mlflow.set_active_model(name=model_name)
 
     instructions = config.get("general_instructions", "")
     data_assets = config.get("data_assets", [])
 
-    params = {
+    patch_summary = _build_patch_summary(patch_set, iteration) if patch_set else None
+    patch_levers = ",".join(
+        str(p.get("lever", "?")) for p in patch_set
+    ) if patch_set else "none"
+    patch_targets_list = [
+        p.get("target") or p.get("object_id") or p.get("table") or ""
+        for p in (patch_set or [])
+    ]
+    patch_targets_preview = ",".join(patch_targets_list[:3]) or "none"
+
+    uc_diff = _compute_uc_metadata_diff(
+        parent_model_id, uc_columns, uc_tags, uc_routines,
+    )
+
+    model_params = {
         "space_id": space_id,
         "iteration": str(iteration),
         "domain": domain,
@@ -269,34 +523,112 @@ def create_genie_model_version(space_id: str, config: dict,
         "table_count": str(sum(1 for a in data_assets if a.get("type") == "TABLE")),
         "instruction_preview": instructions[:200],
         "patch_count": str(len(patch_set)) if patch_set else "0",
-        "patch_types": ",".join(p["type"] for p in patch_set) if patch_set else "none",
+        "patch_types": ",".join(
+            p.get("type", f"lever_{p.get('lever', 'unknown')}")
+            for p in patch_set
+        ) if patch_set else "none",
+        "patch_levers": patch_levers,
+        "patch_targets": patch_targets_preview,
         "patch_risk_levels": ",".join(
             sorted(set(p.get("risk_level", "unknown") for p in patch_set))
         ) if patch_set else "none",
         "parent_model_id": parent_model_id or "none",
         "prompt_versions": json.dumps(prompt_versions) if prompt_versions else "{}",
+        "uc_schema": uc_schema or "",
+        "uc_columns_count": str(len(uc_columns)),
+        "uc_tags_count": str(len(uc_tags)),
+        "uc_routines_count": str(len(uc_routines)),
     }
-    mlflow.log_model_params(model_id=active_model.model_id, params=params)
+    if uc_diff:
+        model_params["uc_columns_changed"] = str(uc_diff["summary"]["columns_changed"])
+        model_params["uc_tags_changed"] = str(uc_diff["summary"]["tags_changed"])
+        model_params["uc_routines_changed"] = str(uc_diff["summary"]["routines_changed"])
 
-    tmp_path = _os.path.join(tempfile.gettempdir(), f"genie_config_iter{iteration}.json")
-    with open(tmp_path, "w") as f:
-        json.dump(config, f, indent=2, default=str)
-    mlflow.log_artifact(tmp_path, artifact_path="genie_config")
-    _os.unlink(tmp_path)
+    run_name = f"create_model_iter{iteration}_{config_hash}"
+    with mlflow.start_run(run_name=run_name) as creation_run:
+        mlflow.log_params({
+            "space_id": space_id,
+            "iteration": str(iteration),
+            "domain": domain,
+            "config_hash": config_hash,
+            "model_name": model_name,
+        })
 
-    if patch_set:
-        patch_path = _os.path.join(tempfile.gettempdir(), f"patch_set_iter{iteration}.json")
-        with open(patch_path, "w") as f:
-            json.dump(patch_set, f, indent=2, default=str)
-        mlflow.log_artifact(patch_path, artifact_path="config_diffs")
-        _os.unlink(patch_path)
+        logged_model = mlflow.create_external_model(
+            name=model_name,
+            source_run_id=creation_run.info.run_id,
+            params=model_params,
+            tags={
+                "domain": domain,
+                "space_id": space_id,
+                "iteration": str(iteration),
+                "parent_model_id": parent_model_id or "",
+            },
+            model_type="genie-space",
+        )
 
-    print(f"  LoggedModel: {model_name} (model_id={active_model.model_id})")
+        state_dir = _os.path.join(
+            tempfile.gettempdir(),
+            f"model_state_iter{iteration}_{config_hash}",
+        )
+        _os.makedirs(state_dir, exist_ok=True)
+
+        for fname, data in [
+            ("genie_config.json", config),
+            ("uc_columns.json", uc_columns),
+            ("uc_tags.json", uc_tags),
+            ("uc_routines.json", uc_routines),
+        ]:
+            fpath = _os.path.join(state_dir, fname)
+            with open(fpath, "w") as sf:
+                json.dump(data, sf, indent=2, default=str)
+            mlflow.log_artifact(fpath, artifact_path="model_state")
+
+        if uc_diff:
+            diff_path = _os.path.join(state_dir, "uc_metadata_diff.json")
+            with open(diff_path, "w") as df:
+                json.dump(uc_diff, df, indent=2, default=str)
+            mlflow.log_artifact(diff_path, artifact_path="model_state")
+
+        if patch_set:
+            patch_path = _os.path.join(state_dir, "patch_set.json")
+            with open(patch_path, "w") as f:
+                json.dump(patch_set, f, indent=2, default=str)
+            mlflow.log_artifact(patch_path, artifact_path="patches")
+
+            summary_path = _os.path.join(state_dir, "patch_summary.json")
+            with open(summary_path, "w") as f:
+                json.dump(patch_summary, f, indent=2, default=str)
+            mlflow.log_artifact(summary_path, artifact_path="patches")
+
+        import shutil as _shutil
+        _shutil.rmtree(state_dir, ignore_errors=True)
+
+        mlflow.log_metric("uc_columns_count", len(uc_columns))
+        mlflow.log_metric("uc_tags_count", len(uc_tags))
+        mlflow.log_metric("uc_routines_count", len(uc_routines))
+        mlflow.log_metric("data_asset_count", len(data_assets))
+        if uc_diff:
+            mlflow.log_metric("uc_columns_changed", uc_diff["summary"]["columns_changed"])
+            mlflow.log_metric("uc_tags_changed", uc_diff["summary"]["tags_changed"])
+            mlflow.log_metric("uc_routines_changed", uc_diff["summary"]["routines_changed"])
+
+    mlflow.set_active_model(model_id=logged_model.model_id)
+
+    print(f"  LoggedModel: {model_name} (model_id={logged_model.model_id})")
+    print(f"    Logged From: run {creation_run.info.run_id}")
+    print(f"    Artifacts: genie_config.json, uc_columns.json ({len(uc_columns)} rows), "
+          f"uc_tags.json ({len(uc_tags)} rows), uc_routines.json ({len(uc_routines)} rows)")
+    if uc_diff:
+        s = uc_diff["summary"]
+        print(f"    UC diff vs parent: {s['columns_changed']} cols, "
+              f"{s['tags_changed']} tags, {s['routines_changed']} routines changed")
     if parent_model_id and parent_model_id != "none":
-        print(f"    parent: {parent_model_id}")
+        print(f"    Parent: {parent_model_id}")
     if patch_set:
-        print(f"    patches: {len(patch_set)} ({params['patch_types']})")
-    return active_model.model_id
+        print(f"    Patches: {len(patch_set)} (levers={patch_levers}, "
+              f"types={model_params['patch_types']})")
+    return logged_model.model_id
 
 
 def promote_best_model(session: dict):
@@ -333,42 +665,95 @@ def promote_best_model(session: dict):
 
 
 def rollback_to_model(model_id: str, space_id: str):
-    """Restore Genie Space config from a LoggedModel's artifact.
+    """Restore Genie Space config from a LoggedModel's creation run artifacts.
 
-    Used when P0 gate fails and the orchestrator needs to revert
-    to the previous iteration's configuration.
+    Downloads model_state/genie_config.json from the creation run linked
+    via source_run_id. Used when P0 gate fails and the orchestrator needs
+    to revert to the previous iteration's configuration.
     """
     try:
         model = mlflow.get_logged_model(model_id=model_id)
-        config_artifact = mlflow.artifacts.download_artifacts(
-            run_id=model.source_run_id, artifact_path="genie_config"
+        if not model.source_run_id:
+            print(f"  WARNING: LoggedModel {model_id} has no source_run_id — "
+                  "cannot download artifacts for rollback.")
+            return None
+
+        artifact_dir = mlflow.artifacts.download_artifacts(
+            run_id=model.source_run_id, artifact_path="model_state"
         )
         import os as _os
-        config_path = None
-        for fname in _os.listdir(config_artifact):
-            if fname.endswith(".json"):
-                config_path = _os.path.join(config_artifact, fname)
-                break
-        if config_path is None:
-            print(f"  WARNING: No .json file found in artifact dir: {config_artifact}")
-            return None
+        config_path = _os.path.join(artifact_dir, "genie_config.json")
+        if not _os.path.exists(config_path):
+            for fname in _os.listdir(artifact_dir):
+                if fname.endswith(".json") and "config" in fname:
+                    config_path = _os.path.join(artifact_dir, fname)
+                    break
+            else:
+                print(f"  WARNING: No genie_config.json in {artifact_dir}")
+                return None
 
         with open(config_path) as f:
             config = json.load(f)
 
         print(f"  Rollback config loaded from LoggedModel {model_id}")
-        print(f"    config_hash: {config.get('config_hash', 'unknown')}")
+        print(f"    source_run: {model.source_run_id}")
         return config
     except Exception as e:
         print(f"  WARNING: Rollback from LoggedModel failed: {e}")
         return None
 
 
+_TEMPORAL_PHRASES = re.compile(
+    r"\b(this year|last year|last quarter|this quarter|last \d+ months?|"
+    r"last \d+ days?|this month|last month|year to date|ytd)\b",
+    re.IGNORECASE,
+)
+_HARDCODED_DATE = re.compile(r"'\d{4}-\d{2}-\d{2}'")
+
+
+def _check_temporal_freshness(benchmarks: list) -> list:
+    """Flag benchmarks with temporal phrasing but hardcoded dates in expected SQL.
+
+    Returns list of dicts with question_id, question, and the hardcoded dates found.
+    """
+    stale = []
+    for b in benchmarks:
+        question = b.get("question", "")
+        expected_sql = b.get("expected_sql", "") or b.get("sql", "")
+        if _TEMPORAL_PHRASES.search(question) and _HARDCODED_DATE.search(expected_sql):
+            dates_found = _HARDCODED_DATE.findall(expected_sql)
+            qid = b.get("question_id", b.get("id", "unknown"))
+            print(
+                f"  WARNING: {qid} has temporal phrasing but hardcoded dates "
+                f"{dates_found} in expected SQL — GT may be stale"
+            )
+            stale.append({
+                "question_id": qid,
+                "question": question,
+                "hardcoded_dates": dates_found,
+            })
+    if stale:
+        print(f"  {len(stale)} benchmarks flagged for potential date staleness")
+    return stale
+
+
 def _fetch_space_config(space_id: str) -> dict:
-    """GET Genie Space config via SDK."""
+    """GET Genie Space config with full serialized_space content."""
     if w is None:
         return {}
-    return w.api_client.do("GET", f"/api/2.0/genie/spaces/{space_id}")
+    config = w.api_client.do(
+        "GET",
+        f"/api/2.0/genie/spaces/{space_id}",
+        query={"include_serialized_space": "true"},
+    )
+    data_assets = config.get("data_assets", [])
+    tables = sum(1 for a in data_assets if a.get("type") == "TABLE")
+    mvs = sum(1 for a in data_assets if a.get("type") == "METRIC_VIEW")
+    tvfs = sum(1 for a in data_assets if a.get("type") == "FUNCTION")
+    has_instructions = bool(config.get("general_instructions"))
+    print(f"  Space state: tables={tables}, metric_views={mvs}, tvfs={tvfs}, "
+          f"instructions={'present' if has_instructions else 'absent'}")
+    return config
 
 
 # =========================================================================
@@ -399,6 +784,19 @@ def init_progress(space_id: str, domain: str, max_iterations: int = 5) -> dict:
         "lever_impacts": {},
         "worker_reads": [],
         "eval_dataset_name": None,
+        "use_patch_dsl": True,
+        "repeatability_pct": 0.0,
+        "best_repeatability": 0.0,
+        "repeatability_target": 90.0,
+        "lever_audit": {
+            str(i): {
+                "attempted": False,
+                "proposals_generated": 0,
+                "proposals_applied": 0,
+                "skip_reason": None,
+            }
+            for i in range(1, 7)
+        },
     }
 
 
@@ -436,6 +834,12 @@ def update_progress(progress: dict, iteration_result: dict) -> dict:
             "patches": patches,
         })
 
+    rep_pct = iteration_result.get("repeatability_pct", 0)
+    if rep_pct:
+        progress["repeatability_pct"] = rep_pct
+        if rep_pct > progress.get("best_repeatability", 0):
+            progress["best_repeatability"] = rep_pct
+
     _update_pareto_frontier(progress, iteration_result)
     return progress
 
@@ -456,7 +860,8 @@ def _compute_patch_cost(proposals: list) -> int:
 def _update_pareto_frontier(progress: dict, iteration_result: dict):
     """Track multi-objective Pareto frontier (P6).
 
-    Objectives: correctness up, regressions down, patch_cost down, coverage up.
+    Objectives (higher is better): correctness, repeatability.
+    Objectives (lower is better): regressions, patch_cost.
     """
     scores = iteration_result.get("scores", {})
     if not scores:
@@ -466,6 +871,7 @@ def _update_pareto_frontier(progress: dict, iteration_result: dict):
     vector = {
         "iteration": progress["current_iteration"],
         "correctness": iteration_result.get("overall_accuracy", 0),
+        "repeatability": iteration_result.get("repeatability_pct", 0),
         "regressions": len(iteration_result.get("regressions", [])),
         "patch_cost": _compute_patch_cost(proposals),
         "model_id": iteration_result.get("model_id"),
@@ -476,11 +882,14 @@ def _update_pareto_frontier(progress: dict, iteration_result: dict):
     is_dominated = False
     for i, existing in enumerate(frontier):
         ex_cost = existing.get("patch_cost", existing.get("patch_count", 0))
+        ex_rep = existing.get("repeatability", 0)
         if (vector["correctness"] >= existing["correctness"]
+                and vector["repeatability"] >= ex_rep
                 and vector["regressions"] <= existing["regressions"]
                 and vector["patch_cost"] <= ex_cost):
             dominated.append(i)
         elif (existing["correctness"] >= vector["correctness"]
+              and ex_rep >= vector["repeatability"]
               and existing["regressions"] <= vector["regressions"]
               and ex_cost <= vector["patch_cost"]):
             is_dominated = True
@@ -594,6 +1003,9 @@ def verify_dual_persistence(apply_results: list) -> list[str]:
 
     Returns list of proposal_ids where repo_status is not 'success'.
     """
+    if isinstance(apply_results, dict):
+        # Patch DSL path returns apply_log dict, not per-proposal repo statuses.
+        return []
     missing = []
     for r in apply_results:
         if r.get("repo_status") != "success":
@@ -604,84 +1016,6 @@ def verify_dual_persistence(apply_results: list) -> list[str]:
 def write_progress(progress: dict, path: str):
     with open(path, "w") as f:
         json.dump(progress, f, indent=2)
-
-
-# =========================================================================
-# Prompt Registration (dual storage)
-# =========================================================================
-
-def _register_judge_prompts_to_experiment(experiment_name: str, domain: str):
-    """Register judge prompts to both MLflow Prompt Registry and experiment artifacts.
-
-    Hard constraint #11: prompts MUST be in the Prompt Registry.
-    Artifact logging kept as secondary backup for discoverability.
-    """
-    judge_prompts = {
-        "schema_accuracy": (
-            "You are a SQL schema expert. Determine if the generated SQL "
-            "references the correct tables, columns, and joins for the given question."
-        ),
-        "logical_accuracy": (
-            "You are a SQL logic expert. Determine if the generated SQL applies "
-            "correct aggregations, filters, GROUP BY, ORDER BY, and WHERE clauses."
-        ),
-        "semantic_equivalence": (
-            "You are a SQL semantics expert. Determine if two SQL queries measure "
-            "the SAME business metric despite syntactic differences."
-        ),
-        "completeness": (
-            "You are a SQL completeness expert. Determine if the generated SQL "
-            "fully answers the user's question."
-        ),
-        "arbiter": (
-            "You are a senior SQL arbiter. Two SQL queries attempted to answer "
-            "the same business question but produced different results. "
-            "Determine which is correct."
-        ),
-    }
-
-    prompt_versions = {}
-    for name, template in judge_prompts.items():
-        registry_name = f"genie_opt_{name}"
-        try:
-            prompt = mlflow.genai.register_prompt(
-                name=registry_name,
-                template=template,
-            )
-            try:
-                mlflow.genai.set_prompt_alias(
-                    name=registry_name, alias="production", version=prompt.version
-                )
-            except Exception:
-                pass
-            prompt_versions[name] = prompt.version
-            print(f"    Prompt Registry: {registry_name} v{prompt.version}")
-        except Exception as e:
-            print(f"    WARNING: Prompt Registry registration failed for {name}: {e}")
-            prompt_versions[name] = "artifact_only"
-
-    mlflow.set_experiment(experiment_name)
-    run_name = f"register_prompts_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    with mlflow.start_run(run_name=run_name) as run:
-        import tempfile
-        import os as _os
-
-        for name, template in judge_prompts.items():
-            tmp = _os.path.join(tempfile.gettempdir(), f"genie_opt_{name}.txt")
-            with open(tmp, "w") as f:
-                f.write(template)
-            mlflow.log_artifact(tmp, artifact_path=f"judge_prompts/{name}")
-            _os.unlink(tmp)
-
-        mlflow.log_params({
-            "num_prompts": len(judge_prompts),
-            "prompt_keys": ",".join(judge_prompts.keys()),
-            "domain": domain,
-            "registration_date": datetime.now().isoformat(),
-            "prompt_versions": json.dumps(prompt_versions),
-        })
-        print(f"  Prompts registered to experiment (run: {run.info.run_id})")
-    return prompt_versions
 
 
 # =========================================================================
@@ -836,6 +1170,7 @@ def trigger_evaluation_job(
     target="dev", job_name="genie_evaluation_job",
     eval_scope=None, model_id=None, patched_objects=None,
     eval_dataset_name: str = None,
+    run_repeatability: bool = False,
 ):
     """Trigger the genie_evaluation_job via bundle run."""
     import subprocess
@@ -852,6 +1187,8 @@ def trigger_evaluation_job(
         params_str += f",patched_objects_b64={encoded}"
     if eval_dataset_name:
         params_str += f",eval_dataset_name={eval_dataset_name}"
+    if run_repeatability:
+        params_str += ",run_repeatability=true"
 
     cmd = [
         "databricks", "bundle", "run", "-t", target, job_name,
@@ -929,12 +1266,14 @@ def run_evaluation_via_job(
     space_id, experiment_name, iteration, benchmarks_path, domain, target="dev",
     model_id: str = None, eval_scope: str = None, patched_objects: list = None,
     eval_dataset_name: str = None,
+    run_repeatability: bool = False,
 ):
     """Trigger job, poll completion, parse output or fall back to MLflow."""
     trigger = trigger_evaluation_job(
         space_id, experiment_name, iteration, benchmarks_path, domain, target,
         eval_scope=eval_scope, model_id=model_id, patched_objects=patched_objects,
         eval_dataset_name=eval_dataset_name,
+        run_repeatability=run_repeatability,
     )
     if trigger["status"] != "TRIGGERED" or not trigger.get("run_id"):
         return {
@@ -981,17 +1320,74 @@ def run_evaluation_via_job(
     overall_pct = overall * 100 if isinstance(overall, float) and overall <= 1.0 else overall
     raw_scores = job_result.get("per_judge", {})
 
-    return {
+    rows = job_result.get("rows", [])
+    arbiter_actions = job_result.get("arbiter_actions", [])
+    repeatability_pct = job_result.get("repeatability_pct", 0)
+    repeatability_details = job_result.get("repeatability_details", [])
+    failures_rich = []
+
+    mlflow_run_id = job_result.get("run_id")
+    if mlflow_run_id and (not rows or not arbiter_actions):
+        try:
+            import tempfile as _tf
+            artifact_dir = mlflow.artifacts.download_artifacts(
+                run_id=mlflow_run_id, artifact_path="evaluation",
+                dst_path=_tf.mkdtemp(prefix="eval_artifacts_"),
+            )
+            import os as _osmod
+            failures_path = _osmod.path.join(artifact_dir, "failures.json")
+            if _osmod.path.exists(failures_path):
+                with open(failures_path) as f:
+                    failures_rich = json.load(f)
+                print(f"  Downloaded failures.json: {len(failures_rich)} entries")
+
+            arbiter_path = _osmod.path.join(artifact_dir, "arbiter_actions.json")
+            if _osmod.path.exists(arbiter_path) and not arbiter_actions:
+                with open(arbiter_path) as f:
+                    arbiter_actions = json.load(f)
+                print(f"  Downloaded arbiter_actions.json: {len(arbiter_actions)} entries")
+
+            if not rows:
+                results_path = _osmod.path.join(artifact_dir, "eval_results.json")
+                if _osmod.path.exists(results_path):
+                    with open(results_path) as f:
+                        rows = json.load(f)
+                    print(f"  Downloaded eval_results.json: {len(rows)} rows")
+
+            if not repeatability_details:
+                rep_path = _osmod.path.join(artifact_dir, "repeatability.json")
+                if _osmod.path.exists(rep_path):
+                    with open(rep_path) as f:
+                        rep_data = json.load(f)
+                    repeatability_pct = rep_data.get("average_repeatability_pct", 0)
+                    repeatability_details = rep_data.get("results", [])
+                    print(f"  Downloaded repeatability.json: {repeatability_pct:.0f}% avg, "
+                          f"{len(repeatability_details)} questions")
+
+            import shutil as _sh
+            _sh.rmtree(artifact_dir, ignore_errors=True)
+        except Exception as e:
+            print(f"  NOTE: Could not download evaluation artifacts: {e}")
+
+    if not rows and failures_rich:
+        rows = failures_rich
+
+    result = {
         "iteration": iteration,
         "timestamp": datetime.utcnow().isoformat() + "Z",
-        "mlflow_run_id": job_result.get("run_id"),
+        "mlflow_run_id": mlflow_run_id,
         "overall_accuracy": overall_pct,
         "failures": job_result.get("failure_question_ids", []),
         "remaining_failures": job_result.get("failure_question_ids", []),
         "scores": _normalize_scores(raw_scores),
-        "total_questions": job_result.get("total_questions", 0),
-        "rows": job_result.get("rows", []),
+        "total_questions": job_result.get("total_questions", job_result.get("questions_total", 0)),
+        "rows": rows,
+        "arbiter_actions": arbiter_actions,
     }
+    if repeatability_pct:
+        result["repeatability_pct"] = repeatability_pct
+        result["repeatability_details"] = repeatability_details
+    return result
 
 
 def query_latest_evaluation(experiment_name, iteration=None):
@@ -1161,7 +1557,6 @@ def run_optimization_loop(
     lever_aware=True,
     deploy_target=None,
     worker_dir=None,
-    inline_routing_only=False,
 ):
     """MLflow-backed optimization loop with progress tracking.
 
@@ -1194,7 +1589,7 @@ def run_optimization_loop(
     mode_label = "JOB" if job_mode else "INLINE"
     lever_label = "LEVER-AWARE" if (lever_aware and _WORKERS_AVAILABLE) else "EVAL-ONLY"
     print("=" * 60)
-    print(f"Genie Optimization Orchestrator v3.4.0 [{mode_label}] [{lever_label}]")
+    print(f"Genie Optimization Orchestrator v4.2.0 [{mode_label}] [{lever_label}]")
     print(f"Space ID: {space_id}")
     print(f"Domain: {domain}")
     print(f"Benchmarks: {len(benchmarks)} questions")
@@ -1204,48 +1599,33 @@ def run_optimization_loop(
     print(f"Started: {datetime.now().isoformat()}")
     print("=" * 60)
 
-    if lever_aware and not job_mode:
-        if not inline_routing_only:
-            print(
-                "ERROR: Lever-aware optimization requires --job-mode for full "
-                "multi-judge evaluation. Inline mode only checks asset routing.\n"
-                "Options:\n"
-                "  1. Add --job-mode --target dev  (recommended)\n"
-                "  2. Add --inline-routing-only    (accept limited evaluation)\n"
-                "Falling back to evaluate-only mode."
+    if not job_mode:
+        if lever_aware:
+            raise RuntimeError(
+                "ERROR: Lever-aware optimization REQUIRES --job-mode.\n"
+                "The inline evaluator only checks asset routing — it does NOT run\n"
+                "the 8-judge mlflow.genai.evaluate() harness, does NOT produce ASI\n"
+                "metadata, and does NOT write to the UC ASI table. The optimizer\n"
+                "would receive no judge feedback and generate empty proposals.\n\n"
+                "Fix: add --job-mode --target dev\n"
+                "  python orchestrator.py --space-id <ID> --benchmarks golden-queries.yaml "
+                "--job-mode --target dev"
             )
-            lever_aware = False
-        else:
-            print(
-                "WARNING: --inline-routing-only active. Inline evaluation only "
-                "checks asset routing. Results may not reflect full judge scoring."
-            )
-    elif not job_mode:
         print(
-            "WARNING: Inline evaluation only checks asset routing. "
-            "Use --job-mode for full multi-judge evaluation."
+            "WARNING: Inline evaluation only checks asset routing (1 judge). "
+            "Use --job-mode for the full 8-judge evaluation harness."
         )
 
     exp_name = experiment_name or _default_experiment_path(domain)
     _validate_experiment_path(exp_name)
 
     eval_dataset_name = None
-    if uc_schema and benchmarks_path:
-        try:
-            from benchmark_generator import sync_yaml_to_mlflow_dataset
-            eval_dataset_name = sync_yaml_to_mlflow_dataset(benchmarks_path, uc_schema, domain)
-            print(f"  UC Evaluation Dataset synced: {eval_dataset_name}")
-        except ImportError:
-            print("  WARNING: benchmark_generator not importable. "
-                  "Evaluator will create dataset inline if needed.")
-        except Exception as e:
-            print(f"  WARNING: Dataset sync failed ({e}). "
-                  "Evaluator will create dataset inline.")
+    if uc_schema:
+        eval_dataset_name = f"{uc_schema}.genie_benchmarks_{domain}"
+        print(f"  UC Evaluation Dataset name: {eval_dataset_name} "
+              "(created by evaluator job)")
     progress["eval_dataset_name"] = eval_dataset_name
-
-    if start_iteration == 1 and not job_mode:
-        print("\n  Registering judge prompts to experiment...")
-        _register_judge_prompts_to_experiment(exp_name, domain)
+    eval_dataset_ref = {"name": eval_dataset_name}
 
     _prev_model_id = None
 
@@ -1259,6 +1639,7 @@ def run_optimization_loop(
                     patch_set=patch_set,
                     parent_model_id=_prev_model_id,
                     prompt_versions=prompt_versions,
+                    uc_schema=uc_schema,
                 )
                 _prev_model_id = mid
                 return mid
@@ -1266,7 +1647,8 @@ def run_optimization_loop(
             print(f"  WARNING: LoggedModel creation failed: {e}")
         return None
 
-    def _run_eval(iter_num, model_id=None, eval_scope="full", patched_objects=None):
+    def _run_eval(iter_num, model_id=None, eval_scope="full", patched_objects=None,
+                   run_repeatability=False):
         if job_mode:
             return run_evaluation_via_job(
                 space_id, exp_name, iter_num,
@@ -1274,7 +1656,8 @@ def run_optimization_loop(
                 model_id=model_id,
                 eval_scope=eval_scope,
                 patched_objects=patched_objects,
-                eval_dataset_name=eval_dataset_name,
+                eval_dataset_name=eval_dataset_ref["name"],
+                run_repeatability=run_repeatability,
             )
         else:
             return run_evaluation_iteration(
@@ -1287,6 +1670,7 @@ def run_optimization_loop(
         model_id = _snapshot_and_get_model_id(1)
         result = _run_eval(1, model_id=model_id)
         result["model_id"] = model_id
+        link_eval_scores_to_model(model_id, result)
         update_progress(progress, result)
         progress["status"] = "evaluated"
         write_progress(progress, progress_path)
@@ -1309,6 +1693,7 @@ def run_optimization_loop(
             max_iterations=max_iterations,
             _snapshot_fn=_snapshot_and_get_model_id,
             _eval_fn=_run_eval,
+            eval_dataset_ref=eval_dataset_ref,
         )
 
     # ── Legacy evaluate-only fallback ─────────────────────────────
@@ -1319,6 +1704,7 @@ def run_optimization_loop(
         model_id = _snapshot_and_get_model_id(iteration)
         result = _run_eval(iteration, model_id=model_id)
         result["model_id"] = model_id
+        link_eval_scores_to_model(model_id, result)
         update_progress(progress, result)
         write_progress(progress, progress_path)
 
@@ -1377,6 +1763,169 @@ def run_optimization_loop(
     return progress
 
 
+def _synthesize_repeatability_failures(repeatability_details: list) -> list:
+    """Convert non-repeatable questions into synthetic failure rows for the optimizer.
+
+    Only questions with CRITICAL_VARIANCE or SIGNIFICANT_VARIANCE are included.
+    These synthetic rows carry ASI metadata so cluster_failures() can group them.
+    Routing depends on asset type: TABLE/MV -> Lever 1 (structured metadata),
+    TVF -> Lever 6 (instructions).
+    """
+    synthetic_rows = []
+    for detail in repeatability_details:
+        classification = detail.get("classification", "IDENTICAL")
+        if classification not in ("CRITICAL_VARIANCE", "SIGNIFICANT_VARIANCE"):
+            continue
+        asset = detail.get("dominant_asset", "TABLE")
+        if asset == "MV":
+            counterfactual = (
+                "Add structured column metadata (business_definition, synonyms, grain) "
+                "to underlying tables; convert to TVF if variance persists"
+            )
+        elif asset == "TVF":
+            counterfactual = "Add instruction clarifying deterministic parameter selection for TVF"
+        else:
+            counterfactual = (
+                "Add structured metadata (business_definition, synonyms, join_keys, "
+                "do_not_use_when) to table/column comments and UC tags "
+                "(preferred_for_genie, domain)"
+            )
+        synthetic_rows.append({
+            "inputs/question_id": detail.get("question_id", ""),
+            "inputs/question": detail.get("question", ""),
+            "feedback/repeatability": "no",
+            "rationale/repeatability": (
+                f"SQL variance: {detail.get('unique_variants', 0)} distinct variants "
+                f"across {len(detail.get('hashes', []))} runs "
+                f"({detail.get('repeatability_pct', 0):.0f}% repeatability, asset={asset})"
+            ),
+            "metadata/repeatability/failure_type": "repeatability_issue",
+            "metadata/repeatability/severity": (
+                "critical" if classification == "CRITICAL_VARIANCE" else "major"
+            ),
+            "metadata/repeatability/blame_set": asset,
+            "metadata/repeatability/counterfactual_fix": counterfactual,
+        })
+    return synthetic_rows
+
+
+def _compute_cross_iteration_repeatability(current_rows: list, previous_rows: list) -> dict:
+    """Compare SQL outputs between two iterations to detect instability.
+
+    Builds question_id -> sql_hash maps for both iterations and checks for
+    matches. Questions whose SQL changed AND were previously correct are flagged
+    as "concerning" (potential side-effect regressions). Questions whose SQL
+    changed AND were previously incorrect are flagged as "expected" (optimization
+    may be working).
+
+    Returns dict with:
+        avg_pct: float (0-100) average match percentage
+        details: list of per-question dicts
+        unstable_details: list of dicts for questions that changed SQL
+    """
+    def _sql_hash(sql: str) -> str:
+        if not sql:
+            return "NONE"
+        return hashlib.md5(sql.strip().lower().encode()).hexdigest()[:8]
+
+    prev_map = {}
+    for row in previous_rows:
+        qid = (
+            row.get("inputs/question_id")
+            or row.get("question_id")
+            or row.get("inputs/question", "")
+        )
+        sql = row.get("outputs/response", "") or row.get("response", "")
+        was_correct = str(row.get("feedback/result_correctness", "")).lower() not in ("no", "false", "0")
+        prev_map[qid] = {"hash": _sql_hash(sql), "was_correct": was_correct}
+
+    details = []
+    unstable = []
+    matched_count = 0
+
+    for row in current_rows:
+        qid = (
+            row.get("inputs/question_id")
+            or row.get("question_id")
+            or row.get("inputs/question", "")
+        )
+        if not qid or qid not in prev_map:
+            continue
+        sql = row.get("outputs/response", "") or row.get("response", "")
+        curr_hash = _sql_hash(sql)
+        prev_entry = prev_map[qid]
+        is_match = curr_hash == prev_entry["hash"]
+        if is_match:
+            matched_count += 1
+
+        asset = detect_asset_type(sql) if sql else "NONE"
+        entry = {
+            "question_id": qid,
+            "question": row.get("inputs/question", ""),
+            "matched": is_match,
+            "current_hash": curr_hash,
+            "prev_hash": prev_entry["hash"],
+            "dominant_asset": asset,
+            "was_previously_correct": prev_entry["was_correct"],
+        }
+        details.append(entry)
+        if not is_match:
+            unstable.append(entry)
+
+    total = len(details)
+    avg_pct = (matched_count / total * 100) if total > 0 else 100.0
+
+    return {
+        "avg_pct": avg_pct,
+        "total_questions": total,
+        "matched": matched_count,
+        "changed": total - matched_count,
+        "details": details,
+        "unstable_details": unstable,
+    }
+
+
+def _synthesize_repeatability_failures_from_cross_iter(unstable_details: list) -> list:
+    """Convert cross-iteration SQL instabilities into synthetic failure rows.
+
+    Only flags questions whose SQL changed AND were previously correct
+    (concerning side-effect regressions). Questions that changed from incorrect
+    are treated as expected optimization effects.
+    """
+    synthetic_rows = []
+    for detail in unstable_details:
+        if detail.get("was_previously_correct") is False:
+            continue
+        asset = detail.get("dominant_asset", "TABLE")
+        if asset == "MV":
+            counterfactual = (
+                "Add structured column metadata (business_definition, synonyms, grain) "
+                "to underlying tables; convert to TVF if variance persists"
+            )
+        elif asset == "TVF":
+            counterfactual = "Add instruction clarifying deterministic parameter selection for TVF"
+        else:
+            counterfactual = (
+                "Add structured metadata (business_definition, synonyms, join_keys, "
+                "do_not_use_when) to table/column comments and UC tags "
+                "(preferred_for_genie, domain)"
+            )
+        synthetic_rows.append({
+            "inputs/question_id": detail.get("question_id", ""),
+            "inputs/question": detail.get("question", ""),
+            "feedback/repeatability": "no",
+            "rationale/repeatability": (
+                f"Cross-iteration SQL change: hash {detail.get('prev_hash', '?')} -> "
+                f"{detail.get('current_hash', '?')} (was previously correct, asset={asset})"
+            ),
+            "metadata/repeatability/failure_type": "repeatability_issue",
+            "metadata/repeatability/severity": "major",
+            "metadata/repeatability/blame_set": asset,
+            "metadata/repeatability/counterfactual_fix": counterfactual,
+        })
+    return synthetic_rows
+
+
 def _run_lever_aware_loop(
     space_id,
     benchmarks,
@@ -1392,6 +1941,7 @@ def _run_lever_aware_loop(
     max_iterations,
     _snapshot_fn,
     _eval_fn,
+    eval_dataset_ref=None,
 ):
     """Phase 1-4 lever-aware optimization loop.
 
@@ -1402,7 +1952,11 @@ def _run_lever_aware_loop(
     """
     cluster_failures, generate_metadata_proposals, detect_regressions, run_gepa_optimization = _import_optimizer()
     apply_proposal_batch, strip_non_exportable_fields, verify_repo_update = _import_applier()
-    from optimization_applier import apply_patch_set as _apply_patch_set, rollback as _rollback
+    from optimization_applier import (
+        apply_patch_set as _apply_patch_set,
+        rollback as _rollback,
+        proposals_to_patches as _proposals_to_patches,
+    )
 
     iteration_counter = progress.get("current_iteration", 0)
 
@@ -1410,6 +1964,58 @@ def _run_lever_aware_loop(
         nonlocal iteration_counter
         iteration_counter += 1
         return iteration_counter
+
+    def _apply_benchmark_corrections_if_needed(corrections: list[dict], at_iteration: int):
+        """Patch benchmarks from arbiter genie_correct verdicts and re-sync dataset."""
+        if len(corrections) < 3 or not benchmarks_path:
+            return
+        try:
+            with open(benchmarks_path) as _bf:
+                _all = yaml.safe_load(_bf) or {}
+        except Exception as _read_err:
+            print(f"  WARNING: Could not read benchmarks YAML for corrections: {_read_err}")
+            return
+
+        _benchmarks = _all.get(domain, _all.get("benchmarks", []))
+        if not isinstance(_benchmarks, list) or not _benchmarks:
+            return
+
+        _by_qid = {}
+        for _c in corrections:
+            if _c.get("verdict") != "genie_correct":
+                continue
+            _qid = str(_c.get("question_id", "")).strip()
+            _genie_sql = (_c.get("generated_sql") or "").strip()
+            if _qid and _genie_sql:
+                _by_qid[_qid] = _genie_sql
+                add_benchmark_correction(
+                    progress=progress,
+                    question_id=_qid,
+                    old_gt=str(_c.get("expected_sql", "")),
+                    new_gt=_genie_sql,
+                    arbiter_run_id="",
+                )
+
+        if not _by_qid:
+            return
+
+        _updated = 0
+        for _b in _benchmarks:
+            _qid = str(_b.get("id", "")).strip()
+            if _qid in _by_qid:
+                _b["expected_sql"] = _by_qid[_qid]
+                _b["source"] = "arbiter_corrected"
+                _updated += 1
+
+        if _updated == 0:
+            return
+
+        with open(benchmarks_path, "w") as _wf:
+            yaml.dump(_all, _wf, default_flow_style=False, sort_keys=False)
+        print(f"  Applied {_updated} arbiter benchmark corrections to YAML.")
+        print("  UC dataset will be re-synced by the evaluator job on next run.")
+
+        progress["benchmark_corrections_applied_at"] = at_iteration
 
     # ── Phase 1: Baseline Evaluation ──────────────────────────────
     print("\n" + "=" * 60)
@@ -1420,6 +2026,7 @@ def _run_lever_aware_loop(
     model_id = _snapshot_fn(iter_num)
     baseline_result = _eval_fn(iter_num, model_id=model_id, eval_scope="full")
     baseline_result["model_id"] = model_id
+    link_eval_scores_to_model(model_id, baseline_result)
     update_progress(progress, baseline_result)
     write_progress(progress, progress_path)
 
@@ -1427,6 +2034,18 @@ def _run_lever_aware_loop(
     prev_accuracy = baseline_result.get("overall_accuracy", 0)
     prev_model_id = model_id
 
+    _baseline_arbiter = baseline_result.get("arbiter_actions", [])
+    _baseline_genie_correct = [a for a in _baseline_arbiter if a.get("verdict") == "genie_correct"]
+    if len(_baseline_genie_correct) >= 3:
+        print(f"\n  WARNING: Arbiter found {len(_baseline_genie_correct)} benchmark corrections needed.")
+        print("  ACTION: Load Generator to update benchmark expected SQL.")
+        progress["benchmark_correction_needed"] = True
+        progress["corrected_questions"] = _baseline_genie_correct
+        _apply_benchmark_corrections_if_needed(_baseline_genie_correct, iter_num)
+
+    baseline_rep = baseline_result.get("repeatability_pct", 0)
+    if baseline_rep:
+        print(f"  Baseline repeatability: {baseline_rep:.0f}% (target: {progress.get('repeatability_target', 90):.0f}%)")
     print(f"\n  Baseline accuracy: {prev_accuracy:.0f}%")
 
     if all_thresholds_met(prev_scores):
@@ -1472,17 +2091,59 @@ def _run_lever_aware_loop(
                     }
                     for qid in eval_results_for_optimizer.get("failures", [])
                 ]
+
+            # Inject cross-iteration repeatability failures (from iteration 2+)
+            if len(progress["iterations"]) >= 2:
+                prev_rows = progress["iterations"][-2].get("rows", [])
+                curr_rows = eval_results_for_optimizer.get("rows", [])
+                if prev_rows and curr_rows:
+                    cross_rep = _compute_cross_iteration_repeatability(curr_rows, prev_rows)
+                    progress["cross_iteration_repeatability"] = cross_rep["avg_pct"]
+                    print(f"  Cross-iteration repeatability: {cross_rep['avg_pct']:.0f}% "
+                          f"({cross_rep['changed']} questions changed SQL)")
+                    if cross_rep.get("unstable_details"):
+                        synthetic = _synthesize_repeatability_failures_from_cross_iter(
+                            cross_rep["unstable_details"]
+                        )
+                        if synthetic:
+                            rows = eval_results_for_optimizer.get("rows", [])
+                            eval_results_for_optimizer["rows"] = rows + synthetic
+                            print(f"  Injected {len(synthetic)} cross-iteration repeatability "
+                                  "failures into optimizer input")
+
             clusters = cluster_failures(eval_results_for_optimizer, metadata_snapshot)
             proposals = generate_metadata_proposals(clusters, metadata_snapshot, target_lever=lever)
 
+            lever_key = str(lever)
+            progress.setdefault("lever_audit", {})[lever_key] = progress.get("lever_audit", {}).get(lever_key, {})
+            progress["lever_audit"][lever_key]["attempted"] = True
+            progress["lever_audit"][lever_key]["proposals_generated"] = len(proposals) if proposals else 0
+
             if not proposals:
                 print(f"  No proposals for lever {lever}. Skipping.")
+                progress["lever_audit"][lever_key]["skip_reason"] = "no_proposals_generated"
                 continue
 
             print(f"  Generated {len(proposals)} proposals for lever {lever}.")
 
-            # 2b. Apply proposals with dual persistence verification
-            apply_results = apply_proposal_batch(proposals, space_id, domain)
+            # 2b. Apply proposals (Patch DSL preferred, apply_proposal_batch fallback)
+            pending_apply_log = None
+            if progress.get("use_patch_dsl", True):
+                try:
+                    current_config = _fetch_space_config(space_id) or metadata_snapshot or {}
+                    patches = _proposals_to_patches(proposals)
+                    pending_apply_log = _apply_patch_set(
+                        space_id,
+                        patches,
+                        current_config,
+                        use_patch_dsl=True,
+                    )
+                    apply_results = []
+                except Exception as e:
+                    print(f"  WARNING: Patch DSL failed ({e}). Falling back to apply_proposal_batch.")
+                    apply_results = apply_proposal_batch(proposals, space_id, domain)
+            else:
+                apply_results = apply_proposal_batch(proposals, space_id, domain)
 
             failed_repos = verify_dual_persistence(apply_results)
             if failed_repos:
@@ -1524,6 +2185,7 @@ def _run_lever_aware_loop(
             print(f"  Gates passed. Running full evaluation for lever {lever}...")
             lever_result = _eval_fn(iter_num, model_id=model_id, eval_scope="full")
             lever_result["model_id"] = model_id
+            link_eval_scores_to_model(model_id, lever_result)
             lever_result["proposals_applied"] = proposals
             lever_result["slice_result"] = {
                 "accuracy": slice_acc,
@@ -1533,11 +2195,24 @@ def _run_lever_aware_loop(
                 "failures": p0_failures,
                 "passed": len(p0_failures) == 0,
             }
+            if pending_apply_log:
+                lever_result["apply_log"] = pending_apply_log
             update_progress(progress, lever_result)
             write_progress(progress, progress_path)
 
             lever_scores = lever_result.get("scores", {})
             lever_accuracy = lever_result.get("overall_accuracy", 0)
+
+            # 2c-ii. Arbiter threshold check
+            _arbiter_actions = lever_result.get("arbiter_actions", [])
+            _genie_corrections = [a for a in _arbiter_actions if a.get("verdict") == "genie_correct"]
+            if len(_genie_corrections) >= 3:
+                print(f"  WARNING: Arbiter found {len(_genie_corrections)} questions where "
+                      "Genie was correct but benchmark expected different SQL.")
+                print("  ACTION: Load Generator to update benchmark expected SQL.")
+                progress["benchmark_correction_needed"] = True
+                progress["corrected_questions"] = _genie_corrections
+                _apply_benchmark_corrections_if_needed(_genie_corrections, iter_num)
 
             # 2d. Track per-lever impact
             log_lever_impact(progress, lever, prev_scores, lever_scores, proposals)
@@ -1551,13 +2226,21 @@ def _run_lever_aware_loop(
                 print(f"  REGRESSION detected after lever {lever}: {regressions}")
                 print("  Rolling back...")
                 rollback_config = rollback_to_model(prev_model_id, space_id)
+                _lever_apply_log = lever_result.get("apply_log")
+                if _lever_apply_log and progress.get("use_patch_dsl", True):
+                    try:
+                        _rollback(_lever_apply_log, space_id)
+                        print("  Patch DSL rollback successful.")
+                    except Exception as e:
+                        print(f"  WARNING: Patch DSL rollback failed: {e}")
                 if rollback_config is not None:
-                    print("  Rollback successful. Skipping this lever.")
+                    print("  LoggedModel rollback successful. Skipping this lever.")
                 else:
-                    print("  WARNING: Rollback failed. Continuing with degraded state.")
+                    print("  WARNING: LoggedModel rollback failed. Continuing with degraded state.")
                 continue
 
             print(f"  Lever {lever} result: {lever_accuracy:.0f}% (delta: {lever_accuracy - prev_accuracy:+.0f}%)")
+            progress["lever_audit"][lever_key]["proposals_applied"] = len(proposals)
             prev_scores = lever_scores
             prev_accuracy = lever_accuracy
             prev_model_id = model_id
@@ -1566,6 +2249,22 @@ def _run_lever_aware_loop(
 
         # ── Phase 3: GEPA for Lever 6 ────────────────────────────
         if not all_thresholds_met(prev_scores) and iteration_counter < max_iterations:
+            # Lever exhaustion gate: all levers 1-5 must be attempted or have a skip reason
+            lever_audit = progress.get("lever_audit", {})
+            unattempted = []
+            for lv in range(1, 6):
+                info = lever_audit.get(str(lv), {})
+                if not info.get("attempted") and not info.get("skip_reason"):
+                    unattempted.append(lv)
+            if unattempted:
+                print(f"\n  WARNING: Levers {unattempted} were never attempted before GEPA.")
+                print("  Hard constraint #14 requires levers 1-5 be exhausted before Lever 6.")
+                for lv in unattempted:
+                    lever_audit.setdefault(str(lv), {})["skip_reason"] = "skipped_before_gepa"
+
+            progress["lever_audit"]["6"] = progress.get("lever_audit", {}).get("6", {})
+            progress["lever_audit"]["6"]["attempted"] = True
+
             print("\n" + "=" * 60)
             print("Phase 3: GEPA Lever 6 (Genie Instructions)")
             print("=" * 60)
@@ -1589,10 +2288,27 @@ def _run_lever_aware_loop(
 
                 if gepa_result:
                     print(f"  GEPA produced {len(gepa_result)} patches.")
-                    apply_results = apply_proposal_batch(
-                        [{"proposal_id": f"GEPA_{i}", "lever": 6, "change_description": f"GEPA patch: {p.get('type', 'unknown')}", "dual_persistence": {"api": "PATCH /api/2.0/genie/spaces/{space_id}", "repo": f"src/genie/{domain}_genie_export.json"}} for i, p in enumerate(gepa_result)],
-                        space_id, domain,
-                    )
+                    if progress.get("use_patch_dsl", True):
+                        try:
+                            current_config = _fetch_space_config(space_id) or metadata_snapshot or {}
+                            apply_results = _apply_patch_set(
+                                space_id,
+                                gepa_result,
+                                current_config,
+                                use_patch_dsl=True,
+                            )
+                            progress.setdefault("gepa_apply_log", apply_results)
+                        except Exception as e:
+                            print(f"  WARNING: Patch DSL failed for GEPA ({e}). Using fallback.")
+                            apply_results = apply_proposal_batch(
+                                [{"proposal_id": f"GEPA_{i}", "lever": 6, "change_description": f"GEPA patch: {p.get('type', 'unknown')}", "dual_persistence": {"api": "PATCH /api/2.0/genie/spaces/{space_id}", "repo": f"src/genie/{domain}_genie_export.json"}} for i, p in enumerate(gepa_result)],
+                                space_id, domain,
+                            )
+                    else:
+                        apply_results = apply_proposal_batch(
+                            [{"proposal_id": f"GEPA_{i}", "lever": 6, "change_description": f"GEPA patch: {p.get('type', 'unknown')}", "dual_persistence": {"api": "PATCH /api/2.0/genie/spaces/{space_id}", "repo": f"src/genie/{domain}_genie_export.json"}} for i, p in enumerate(gepa_result)],
+                            space_id, domain,
+                        )
                     print("  Waiting 30s for propagation...")
                     time.sleep(30)
 
@@ -1600,6 +2316,7 @@ def _run_lever_aware_loop(
                     model_id = _snapshot_fn(iter_num, patch_set=gepa_result)
                     gepa_eval = _eval_fn(iter_num, model_id=model_id, eval_scope="full")
                     gepa_eval["model_id"] = model_id
+                    link_eval_scores_to_model(model_id, gepa_eval)
                     update_progress(progress, gepa_eval)
                     write_progress(progress, progress_path)
 
@@ -1622,6 +2339,35 @@ def _run_lever_aware_loop(
                     print("  GEPA returned no patches.")
             except Exception as e:
                 print(f"  WARNING: GEPA phase failed: {e}")
+
+    # ── Phase 3b: Final dedicated repeatability test ────────────
+    if job_mode and iteration_counter > 1:
+        print("\n" + "=" * 60)
+        print("Phase 3b: Final Repeatability Test (Cell 9c re-query)")
+        print("=" * 60)
+        try:
+            rep_iter = _next_iter()
+            rep_model_id = _snapshot_fn(rep_iter)
+            rep_result = _run_eval(
+                rep_iter, model_id=rep_model_id, eval_scope="full",
+                run_repeatability=True,
+            )
+            rep_result["model_id"] = rep_model_id
+            link_eval_scores_to_model(rep_model_id, rep_result)
+            update_progress(progress, rep_result)
+            write_progress(progress, progress_path)
+            final_rep_pct = rep_result.get("repeatability_pct", 0)
+            rep_target = progress.get("repeatability_target", 90)
+            print(f"  Final repeatability: {final_rep_pct:.0f}% (target: {rep_target:.0f}%)")
+            if final_rep_pct < rep_target:
+                rep_details = rep_result.get("repeatability_details", [])
+                synthetic = _synthesize_repeatability_failures(rep_details)
+                if synthetic:
+                    print(f"  {len(synthetic)} non-repeatable questions detected. "
+                          "Feed to next optimization cycle if needed.")
+                    progress["final_repeatability_failures"] = synthetic
+        except Exception as e:
+            print(f"  WARNING: Final repeatability test failed: {e}")
 
     # ── Phase 4: Deploy and Verify ────────────────────────────────
     if progress.get("status") not in ("converged", "stalled"):
@@ -1646,6 +2392,7 @@ def _run_lever_aware_loop(
             model_id = _snapshot_fn(iter_num)
             held_out_result = _eval_fn(iter_num, model_id=model_id, eval_scope="held_out")
             held_out_result["model_id"] = model_id
+            link_eval_scores_to_model(model_id, held_out_result)
             update_progress(progress, held_out_result)
             write_progress(progress, progress_path)
             print(f"  Post-deploy accuracy: {held_out_result.get('overall_accuracy', 0):.0f}%")
@@ -1667,7 +2414,7 @@ def _run_lever_aware_loop(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Genie Optimization Orchestrator v3.4.0"
+        description="Genie Optimization Orchestrator v4.2.0"
     )
     parser.add_argument("--space-id", help="Genie Space ID")
     parser.add_argument(
@@ -1736,12 +2483,6 @@ def main():
         help="Directory containing worker scripts (metadata_optimizer.py, optimization_applier.py). "
              "Defaults to sibling paths relative to this script.",
     )
-    parser.add_argument(
-        "--inline-routing-only", action="store_true", default=False,
-        help="Accept limited inline evaluation for lever-aware mode without --job-mode. "
-             "Only checks asset routing, not full multi-judge scoring.",
-    )
-
     args = parser.parse_args()
 
     lever_aware = args.lever_aware and not args.no_lever_aware and not args.evaluate_only
@@ -1792,7 +2533,6 @@ def main():
         lever_aware=lever_aware,
         deploy_target=args.deploy_target,
         worker_dir=args.worker_dir,
-        inline_routing_only=args.inline_routing_only,
     )
 
     generate_report(progress, args.domain, args.output_dir)

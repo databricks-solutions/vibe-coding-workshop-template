@@ -22,10 +22,11 @@
         "repeatability": 0.0
       },
       "overall_accuracy": 0.0,
-      "failure_clusters": [],
+      "total_questions": 0,
+      "correct_count": 0,
+      "failures": [],
+      "remaining_failures": [],
       "proposals_applied": [],
-      "proposals_deferred": [],
-      "regressions_detected": [],
       "arbiter_corrections": [],
       "next_action": ""
     }
@@ -41,5 +42,20 @@
   "current_patch_set": null,
   "patched_objects": [],
   "maturity_level": "L1",
-  "benchmark_corrections": []
+  "benchmark_corrections": [],
+  "lever_impacts": {},
+  "worker_reads": [],
+  "eval_dataset_name": null,
+  "use_patch_dsl": true,
+  "repeatability_pct": 0.0,
+  "best_repeatability": 0.0,
+  "repeatability_target": 90.0,
+  "lever_audit": {
+    "1": {"attempted": false, "proposals_generated": 0, "proposals_applied": 0, "skip_reason": null},
+    "2": {"attempted": false, "proposals_generated": 0, "proposals_applied": 0, "skip_reason": null},
+    "3": {"attempted": false, "proposals_generated": 0, "proposals_applied": 0, "skip_reason": null},
+    "4": {"attempted": false, "proposals_generated": 0, "proposals_applied": 0, "skip_reason": null},
+    "5": {"attempted": false, "proposals_generated": 0, "proposals_applied": 0, "skip_reason": null},
+    "6": {"attempted": false, "proposals_generated": 0, "proposals_applied": 0, "skip_reason": null}
+  }
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-End-to-end integration test for the Genie Optimization Orchestrator v3.4.0.
+End-to-end integration test for the Genie Optimization Orchestrator v4.1.0.
 
 Exercises the lever-aware loop with mock data and mocked Genie/MLflow APIs.
 No live Genie Space or Databricks workspace required.
@@ -83,6 +83,15 @@ def test_init_progress():
     assert progress["maturity_level"] == "L1"
     assert progress["worker_reads"] == []
     assert progress["eval_dataset_name"] is None
+    assert progress["use_patch_dsl"] is True
+    assert "lever_audit" in progress
+    assert len(progress["lever_audit"]) == 6
+    for i in range(1, 7):
+        la = progress["lever_audit"][str(i)]
+        assert la["attempted"] is False
+        assert la["proposals_generated"] == 0
+        assert la["proposals_applied"] == 0
+        assert la["skip_reason"] is None
     print("  PASS: init_progress")
 
 
@@ -220,6 +229,166 @@ def test_worker_import_wiring():
     print("  PASS: worker import wiring")
 
 
+def test_asi_aware_clustering():
+    """Test that cluster_failures prefers ASI metadata when available."""
+    optimizer_path = Path(__file__).parent.parent.parent / "genie-optimization-workers" / "03-genie-metadata-optimizer" / "scripts"
+    if str(optimizer_path) not in sys.path:
+        sys.path.insert(0, str(optimizer_path))
+
+    from metadata_optimizer import cluster_failures, _map_to_lever
+
+    rows_with_asi = [
+        {
+            "inputs/question": "q1", "feedback/result_correctness": "no",
+            "rationale/result_correctness": "Mismatch",
+            "metadata/result_correctness/failure_type": "wrong_aggregation",
+            "metadata/result_correctness/blame_set": "booking_analytics_metrics",
+            "metadata/result_correctness/counterfactual_fix": "Add column comment to total_bookings",
+        },
+        {
+            "inputs/question": "q2", "feedback/result_correctness": "no",
+            "rationale/result_correctness": "Mismatch",
+            "metadata/result_correctness/failure_type": "wrong_aggregation",
+            "metadata/result_correctness/blame_set": "booking_analytics_metrics",
+            "metadata/result_correctness/counterfactual_fix": "Add column comment to total_bookings",
+        },
+    ]
+    clusters = cluster_failures({"rows": rows_with_asi}, {})
+    assert len(clusters) >= 1, f"Expected >= 1 cluster, got {len(clusters)}"
+    c = clusters[0]
+    assert c["asi_failure_type"] == "wrong_aggregation"
+    assert c["asi_blame_set"] == "booking_analytics_metrics"
+    assert len(c["asi_counterfactual_fixes"]) == 2
+
+    assert _map_to_lever("other", asi_failure_type="wrong_aggregation") == 2
+    assert _map_to_lever("other", asi_failure_type=None) == 6
+    assert _map_to_lever("wrong_table") == 1
+    print("  PASS: test_asi_aware_clustering")
+
+
+def test_repeatability_integration():
+    """Test repeatability v2: cross-iteration comparison, structured metadata routing, synthetic failures."""
+    from orchestrator import (
+        init_progress, update_progress, _synthesize_repeatability_failures,
+        _compute_cross_iteration_repeatability, _synthesize_repeatability_failures_from_cross_iter,
+    )
+
+    # 1. init_progress includes repeatability fields
+    progress = init_progress("space_123", "cost")
+    assert progress["repeatability_pct"] == 0.0, "repeatability_pct should default to 0.0"
+    assert progress["best_repeatability"] == 0.0, "best_repeatability should default to 0.0"
+    assert progress["repeatability_target"] == 90.0, "repeatability_target should default to 90.0"
+
+    # 2. update_progress tracks repeatability and updates best
+    result_with_rep = {
+        **MOCK_EVAL_RESULT,
+        "model_id": "m001",
+        "repeatability_pct": 78.0,
+        "repeatability_details": [
+            {"question_id": "q1", "question": "What is total revenue?",
+             "repeatability_pct": 66.7, "classification": "SIGNIFICANT_VARIANCE",
+             "unique_variants": 2, "dominant_asset": "MV", "hashes": ["a1", "a1", "b2"]},
+            {"question_id": "q2", "question": "Top 10 customers",
+             "repeatability_pct": 100.0, "classification": "IDENTICAL",
+             "unique_variants": 1, "dominant_asset": "TABLE", "hashes": ["c3", "c3", "c3"]},
+        ],
+    }
+    update_progress(progress, result_with_rep)
+    assert progress["repeatability_pct"] == 78.0
+    assert progress["best_repeatability"] == 78.0
+
+    result2 = {
+        **MOCK_EVAL_RESULT, "iteration": 2,
+        "model_id": "m002",
+        "repeatability_pct": 92.0,
+    }
+    update_progress(progress, result2)
+    assert progress["best_repeatability"] == 92.0
+
+    # 3. Pareto frontier includes repeatability
+    frontier = progress.get("pareto_frontier", [])
+    for v in frontier:
+        assert "repeatability" in v, f"Pareto vector missing repeatability: {v}"
+
+    # 4. _map_to_lever routes repeatability_issue by blame_set (v3.8.0)
+    optimizer_path = Path(__file__).parent.parent.parent / "genie-optimization-workers" / "03-genie-metadata-optimizer" / "scripts"
+    if str(optimizer_path) not in sys.path:
+        sys.path.insert(0, str(optimizer_path))
+    from metadata_optimizer import _map_to_lever
+    assert _map_to_lever("repeatability_issue") == 1, "TABLE default should route to lever 1"
+    assert _map_to_lever("repeatability_issue", blame_set="TABLE") == 1, "TABLE -> lever 1"
+    assert _map_to_lever("repeatability_issue", blame_set="MV") == 1, "MV -> lever 1"
+    assert _map_to_lever("repeatability_issue", blame_set="TVF") == 6, "TVF -> lever 6"
+    assert _map_to_lever("other", asi_failure_type="repeatability_issue") == 1, "ASI override -> lever 1"
+    assert _map_to_lever("other", asi_failure_type="repeatability_issue", blame_set="TVF") == 6
+
+    # 5. _synthesize_repeatability_failures (Cell 9c data) uses structured metadata counterfactuals
+    details = [
+        {"question_id": "q1", "question": "Revenue?", "repeatability_pct": 33.3,
+         "classification": "CRITICAL_VARIANCE", "unique_variants": 3, "dominant_asset": "MV",
+         "hashes": ["a", "b", "c"]},
+        {"question_id": "q2", "question": "Customers?", "repeatability_pct": 100.0,
+         "classification": "IDENTICAL", "unique_variants": 1, "dominant_asset": "TABLE",
+         "hashes": ["d", "d", "d"]},
+        {"question_id": "q3", "question": "Churn?", "repeatability_pct": 66.7,
+         "classification": "SIGNIFICANT_VARIANCE", "unique_variants": 2, "dominant_asset": "TVF",
+         "hashes": ["e", "e", "f"]},
+    ]
+    synthetic = _synthesize_repeatability_failures(details)
+    assert len(synthetic) == 2, f"Expected 2 synthetic failures, got {len(synthetic)}"
+    assert synthetic[0]["metadata/repeatability/failure_type"] == "repeatability_issue"
+    assert synthetic[0]["metadata/repeatability/severity"] == "critical"
+    assert synthetic[0]["metadata/repeatability/blame_set"] == "MV"
+    assert "structured" in synthetic[0]["metadata/repeatability/counterfactual_fix"].lower(), \
+        "MV counterfactual should recommend structured metadata"
+    assert synthetic[1]["metadata/repeatability/blame_set"] == "TVF"
+    assert "instruction" in synthetic[1]["metadata/repeatability/counterfactual_fix"].lower(), \
+        "TVF counterfactual should recommend instruction"
+
+    # 6. _compute_cross_iteration_repeatability compares SQL across iterations
+    prev_rows = [
+        {"inputs/question_id": "q1", "inputs/question": "Revenue?",
+         "outputs/response": "SELECT SUM(revenue) FROM sales",
+         "feedback/result_correctness": "yes"},
+        {"inputs/question_id": "q2", "inputs/question": "Top customers",
+         "outputs/response": "SELECT * FROM customers LIMIT 10",
+         "feedback/result_correctness": "no"},
+        {"inputs/question_id": "q3", "inputs/question": "Churn rate",
+         "outputs/response": "SELECT get_churn_rate(30)",
+         "feedback/result_correctness": "yes"},
+    ]
+    curr_rows = [
+        {"inputs/question_id": "q1", "inputs/question": "Revenue?",
+         "outputs/response": "SELECT SUM(revenue) FROM sales"},
+        {"inputs/question_id": "q2", "inputs/question": "Top customers",
+         "outputs/response": "SELECT name FROM customers ORDER BY spend DESC LIMIT 10"},
+        {"inputs/question_id": "q3", "inputs/question": "Churn rate",
+         "outputs/response": "SELECT get_churn_rate(60)"},
+    ]
+    cross_rep = _compute_cross_iteration_repeatability(curr_rows, prev_rows)
+    assert cross_rep["total_questions"] == 3
+    assert cross_rep["matched"] == 1, "Only q1 should match"
+    assert cross_rep["changed"] == 2, "q2 and q3 changed"
+    assert 30 < cross_rep["avg_pct"] < 40, f"Expected ~33.3%, got {cross_rep['avg_pct']}"
+    unstable = cross_rep["unstable_details"]
+    assert len(unstable) == 2
+    q2_entry = next(d for d in unstable if d["question_id"] == "q2")
+    assert q2_entry["was_previously_correct"] is False
+    q3_entry = next(d for d in unstable if d["question_id"] == "q3")
+    assert q3_entry["was_previously_correct"] is True
+    assert q3_entry["dominant_asset"] == "TVF"
+
+    # 7. _synthesize_repeatability_failures_from_cross_iter only flags previously-correct changes
+    cross_synth = _synthesize_repeatability_failures_from_cross_iter(unstable)
+    assert len(cross_synth) == 1, "Only q3 (previously correct) should be synthesized"
+    assert cross_synth[0]["inputs/question_id"] == "q3"
+    assert cross_synth[0]["metadata/repeatability/failure_type"] == "repeatability_issue"
+    assert cross_synth[0]["metadata/repeatability/blame_set"] == "TVF"
+    assert "instruction" in cross_synth[0]["metadata/repeatability/counterfactual_fix"].lower()
+
+    print("  PASS: test_repeatability_integration")
+
+
 def run_all():
     verbose = "--verbose" in sys.argv
     tests = [
@@ -234,6 +403,8 @@ def run_all():
         test_verify_dual_persistence,
         test_lever_aware_loop_structure,
         test_worker_import_wiring,
+        test_asi_aware_clustering,
+        test_repeatability_integration,
     ]
 
     passed = 0

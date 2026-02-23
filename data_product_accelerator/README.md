@@ -49,6 +49,10 @@ Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold
 
 4. **Follow the [QUICKSTART guide](QUICKSTART.md)** for all 9 stages (+ optional Stage 6b optimization)
 
+5. **Explore the visual guides** (optional):
+   - [Interactive Skill Navigation](docs/framework-design/10-skill-navigation-visual-guide.html) — animated walkthrough
+   - [Skill Hierarchy Tree](docs/framework-design/11-skill-hierarchy-tree.html) — visual organization map
+
 ---
 
 ## How It Works
@@ -181,12 +185,24 @@ After using this framework:
 
 ## Documentation
 
-| Document | Purpose |
-|----------|---------|
-| [AGENTS.md](AGENTS.md) | Universal entry point for any AI coding assistant |
-| [QUICKSTART.md](QUICKSTART.md) | One-prompt-per-stage guide (start here) |
-| [Framework Design Docs](docs/framework-design/00-index.md) | Complete architecture and design documentation |
-| [Skill Navigator](skills/skill-navigator/SKILL.md) | Master skill routing system |
+| Document | Purpose | Type |
+|----------|---------|------|
+| [AGENTS.md](AGENTS.md) | Universal entry point for any AI coding assistant | Quick Reference |
+| [QUICKSTART.md](QUICKSTART.md) | One-prompt-per-stage guide (start here) | Tutorial |
+| **Framework Design** | | |
+| [Framework Index](docs/framework-design/00-index.md) | Complete architecture and design documentation | Design Docs |
+| [Parallel Execution Guide](docs/framework-design/09-parallel-execution-guide.md) | Run independent stages concurrently (30-40% time savings) | Advanced |
+| **Visual Guides** | | |
+| [Interactive Skill Navigation](docs/framework-design/10-skill-navigation-visual-guide.html) | Animated walkthrough (open in browser) | Interactive |
+| [Skill Hierarchy Tree](docs/framework-design/11-skill-hierarchy-tree.html) | Visual skill organization map | Interactive |
+| **Orchestrator Walkthroughs** | | |
+| [Gold Design Orchestrator](docs/framework-design/13-gold-design-orchestrator-walkthrough.md) | Progressive disclosure for dimensional modeling | Deep Dive |
+| [Silver Orchestrator](docs/framework-design/14-silver-orchestrator-walkthrough.md) | Context-aware DLT pipeline generation | Deep Dive |
+| [Gold Pipeline Orchestrator](docs/framework-design/15-gold-pipeline-orchestrator-walkthrough.md) | YAML-to-implementation patterns | Deep Dive |
+| [Semantic Layer Orchestrator](docs/framework-design/12-semantic-layer-orchestrator-walkthrough.md) | Manifest-driven semantic layer setup | Deep Dive |
+| [Genie Optimization Agent](docs/agent-walkthrough.md) | Long-running optimization loop navigation | Deep Dive |
+| **Skill System** | | |
+| [Skill Navigator](skills/skill-navigator/SKILL.md) | Master skill routing system | Reference |
 
 ---
 

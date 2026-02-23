@@ -23,16 +23,17 @@ The arbiter prevents "chasing wrong ground truth" — if the benchmark SQL is in
 
 The arbiter is a `@scorer`-decorated function in `all_scorers`. It reads the pre-computed `outputs["comparison"]` dict from `genie_predict_fn` — no `spark.sql()` calls.
 
+**IMPORTANT:** Do NOT stack `@mlflow.trace` on `@scorer`. The mlflow.genai.evaluate() harness traces scorer execution automatically. Stacking strips `.register()` and leaves the Judges tab empty.
+
 ```python
-@mlflow.trace(name="arbiter", span_type="JUDGE")
 @scorer
 def arbiter_scorer(inputs: dict, outputs: dict, expectations: dict) -> Feedback:
     """Layer 3: Arbiter — conditional scorer that fires only when results disagree.
 
     Reads outputs["comparison"] pre-computed in genie_predict_fn.
     Returns value="skipped" when results match (no LLM call).
-    When results disagree, invokes the LLM arbiter and returns one of:
-    genie_correct, ground_truth_correct, both_correct, neither_correct.
+    When results disagree, invokes the LLM arbiter via _call_llm_for_scoring()
+    and returns one of: genie_correct, ground_truth_correct, both_correct, neither_correct.
     """
     cmp = outputs.get("comparison", {}) if isinstance(outputs, dict) else {}
 
@@ -50,31 +51,43 @@ def arbiter_scorer(inputs: dict, outputs: dict, expectations: dict) -> Feedback:
     gt_sql = resolve_sql(expectations.get("expected_response", ""))
     question = inputs.get("question", "")
 
-    arbiter = make_judge(
-        name="arbiter",
-        instructions=loaded_prompts.get("arbiter", JUDGE_PROMPTS["arbiter"]),
-        model="databricks:/databricks-claude-sonnet-4-6",
-    )
-
-    context = (
+    _arbiter_instructions = loaded_prompts.get("arbiter", JUDGE_PROMPTS.get("arbiter", ""))
+    prompt = (
+        f"{_arbiter_instructions}\n\n"
         f"Question: {question}\n"
         f"Ground Truth SQL: {gt_sql}\n"
         f"Genie SQL: {genie_sql}\n"
-        f"Result comparison: {json.dumps(cmp)}"
+        f"Result comparison: {json.dumps(cmp)}\n\n"
+        'Respond with JSON only: {"verdict": "<genie_correct|ground_truth_correct|both_correct|neither_correct>", '
+        '"failure_type": "<wrong_aggregation|wrong_filter|wrong_table|other>", '
+        '"blame_set": ["<blamed_object>"], '
+        '"rationale": "<brief explanation>"}'
     )
-    feedback = arbiter.evaluate(
-        request=context,
-        response=genie_sql,
-        expected_response=gt_sql,
-    )
-
-    verdict = _parse_arbiter_verdict(feedback)
-    return Feedback(
-        name="arbiter", value=verdict,
-        rationale=feedback.rationale if hasattr(feedback, "rationale") else str(feedback),
-        source=AssessmentSource(source_type="LLM_JUDGE",
-                                source_id="databricks:/databricks-claude-sonnet-4-6"),
-    )
+    try:
+        result = _call_llm_for_scoring(prompt)
+        verdict = result.get("verdict", "ground_truth_correct")
+        if verdict not in ("genie_correct", "ground_truth_correct", "both_correct", "neither_correct"):
+            verdict = _parse_arbiter_verdict(type("F", (), {"rationale": result.get("rationale", str(result))})())
+        _meta = None
+        if verdict in ("ground_truth_correct", "neither_correct"):
+            _meta = build_asi_metadata(
+                failure_type=result.get("failure_type", "other"),
+                severity="major", confidence=0.85,
+                blame_set=result.get("blame_set", []),
+                counterfactual_fix=result.get("rationale", ""))
+        return Feedback(
+            name="arbiter", value=verdict,
+            rationale=result.get("rationale", verdict),
+            source=LLM_SOURCE, metadata=_meta)
+    except Exception as e:
+        verdict = "ground_truth_correct"
+        return Feedback(
+            name="arbiter", value=verdict,
+            rationale=f"Arbiter LLM call failed, defaulting to ground_truth_correct: {e}",
+            source=LLM_SOURCE,
+            metadata=build_asi_metadata(
+                failure_type="other", severity="info", confidence=0.0,
+                counterfactual_fix="LLM judge unavailable — retry or check endpoint"))
 ```
 
 ---

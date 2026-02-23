@@ -19,6 +19,20 @@ This navigation skill implements **tiered context loading** with **orchestrator-
 
 **For detailed domain index summaries, see:** [references/domain-indexes.md](references/domain-indexes.md)
 
+**For visual learners:**
+- [Interactive Skill Navigation Guide](../../docs/framework-design/10-skill-navigation-visual-guide.html) — animated browser-based walkthrough
+- [Skill Hierarchy Tree](../../docs/framework-design/11-skill-hierarchy-tree.html) — visual organization map
+
+**For orchestrator deep dives:**
+- [Gold Design Orchestrator Walkthrough](../../docs/framework-design/13-gold-design-orchestrator-walkthrough.md)
+- [Silver Orchestrator Walkthrough](../../docs/framework-design/14-silver-orchestrator-walkthrough.md)
+- [Gold Pipeline Orchestrator Walkthrough](../../docs/framework-design/15-gold-pipeline-orchestrator-walkthrough.md)
+- [Semantic Layer Orchestrator Walkthrough](../../docs/framework-design/12-semantic-layer-orchestrator-walkthrough.md)
+- [Genie Optimization Agent Walkthrough](../../docs/agent-walkthrough.md)
+
+**For efficiency optimization:**
+- [Parallel Execution Guide](../../docs/framework-design/09-parallel-execution-guide.md) — run independent stages concurrently
+
 ---
 
 ## Pipeline Progression Overview (Design-First)
@@ -67,6 +81,8 @@ Gold YAML ─► Planning (stage 5) ─► Manifests ─► Downstream Orchestra
 Each downstream orchestrator has a **Phase 0: Read Plan** step that reads its manifest. If the manifest doesn't exist (e.g., user skipped Planning), the orchestrator falls back to **self-discovery** from Gold tables.
 
 **Key metadata fields:** `emits` (on Planning), `consumes` + `consumes_fallback` (on downstream orchestrators).
+
+**See also:** [Semantic Layer Orchestrator Walkthrough](../../docs/framework-design/12-semantic-layer-orchestrator-walkthrough.md) for a detailed example of how orchestrators consume manifests and fall back to self-discovery.
 
 ---
 

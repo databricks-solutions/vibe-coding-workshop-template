@@ -82,9 +82,9 @@ class GenieMetadataAdapter:
 
         asi_trajectories = []
         scores = []
+        examples = self._get_benchmark_examples(patch_set_json)
 
-        # Run evaluator over benchmark examples (implementation-specific)
-        for example in self._get_benchmark_examples():
+        for example in examples:
             score, asi = self.evaluator_fn(config_copy, example)
             scores.append(score)
             asi_trajectories.append(asi)
@@ -129,22 +129,27 @@ class GenieMetadataAdapter:
         candidates = []
 
         for _ in range(n):
-            patch_set = _synthesize_patch_set_from_failures(
-                failures, self.config, self.judge_suite
-            )
-            if patch_set and _validate_patch_set(patch_set):
+            patch_set = propose_patch_set_from_asi(failures, self.config)
+            if not patch_set and failures:
+                fixes = []
+                for f in failures:
+                    cf = f.get("counterfactual_fix") or f.get("counterfactual_fixes") or []
+                    fixes.extend(cf if isinstance(cf, list) else [cf] if cf else [])
+                patch_set = _synthesize_patches_from_fixes(fixes, failures, self.config)
+            if patch_set and validate_patch_set(patch_set)[0]:
                 candidates.append(patch_set)
 
         return candidates[:n]
 
-    def _get_benchmark_examples(self) -> list:
-        """Return benchmark examples for evaluation (implementation-specific)."""
-        # Load from config or external source
+    def _get_benchmark_examples(self, patch_set: list = None) -> list:
+        """Return benchmark examples. When no live API, uses patch_set as single example: [{"patch_set": patch_set, "asi": {}}]."""
+        if patch_set is not None:
+            return [{"patch_set": patch_set, "asi": {}}]
         return getattr(self.config, "_benchmark_examples", [])
 
     def _get_current_failures(self) -> list:
-        """Return current judge feedback failures (implementation-specific)."""
-        return getattr(self.config, "_judge_feedbacks", [])
+        """Return current judge feedback failures from config._judge_feedbacks."""
+        return self.config.get("_judge_feedbacks", [])
 ```
 
 ### run_gepa_optimization — Top-Level Function
@@ -253,24 +258,22 @@ def strip_non_exportable_fields(config: dict) -> dict:
 
 
 def _apply_patch_set_to_config(config: dict, patch_set: list[dict]) -> None:
-    """Apply patch set to config in-place (implementation-specific)."""
+    """Apply patch set to config in-place. Implementation in metadata_optimizer; no separate _apply_single_patch."""
     for p in patch_set:
-        _apply_single_patch(config, p)
+        # Inline logic: add_instruction, add_synonym, update_description, etc. (see metadata_optimizer._apply_patch_set_to_config)
+        pass
 
 
-def _validate_patch_set(patch_set: list[dict]) -> bool:
-    """Validate patch set (use validate_patch_set from metadata_optimizer)."""
-    from metadata_optimizer import validate_patch_set
-    is_valid, _ = validate_patch_set(patch_set)
-    return is_valid
+def validate_patch_set(patch_set: list[dict]) -> tuple[bool, list[str]]:
+    """Validate patch set (import from metadata_optimizer)."""
+    from metadata_optimizer import validate_patch_set as _validate
+    return _validate(patch_set)
 
 
-def _synthesize_patch_set_from_failures(
-    failures: list, config: dict, judge_suite: dict
-) -> list[dict]:
-    """Synthesize patch set from failures (use propose_patch_set_from_asi logic)."""
-    from metadata_optimizer import propose_patch_set_from_asi
-    return propose_patch_set_from_asi(failures, config)
+def propose_patch_set_from_asi(failures: list, config: dict, target_lever: int | None = None) -> list[dict]:
+    """Synthesize patch set from failures. Import from metadata_optimizer."""
+    from metadata_optimizer import propose_patch_set_from_asi as _propose
+    return _propose(failures, config, target_lever)
 ```
 
 ### Helper Function Sources
@@ -279,9 +282,10 @@ def _synthesize_patch_set_from_failures(
 |----------|-----------|-------|
 | `strip_non_exportable_fields()` | Self-contained above; also in `optimization_applier.py` | MUST call before any PATCH |
 | `sort_genie_config()` | `optimization_applier.py` or `control-levers.md` | MUST call after `strip_non_exportable_fields()` |
-| `validate_patch_set()` | `metadata_optimizer.py` | Import from optimizer script |
-| `propose_patch_set_from_asi()` | `metadata_optimizer.py` | Import from optimizer script |
-| `_apply_single_patch()` | Implementation-specific | Apply one patch to config in-place |
+| `validate_patch_set()` | `metadata_optimizer.py` | Import from optimizer script (no underscore prefix) |
+| `propose_patch_set_from_asi()` | `metadata_optimizer.py` | Synthesize patch set from failures |
+| `_synthesize_patches_from_fixes()` | `metadata_optimizer.py` | Internal: map counterfactual fixes to patches |
+| `_apply_patch_set_to_config()` | `metadata_optimizer.py` | Apply patches in-place; no separate _apply_single_patch |
 
 ### Feature Gate
 

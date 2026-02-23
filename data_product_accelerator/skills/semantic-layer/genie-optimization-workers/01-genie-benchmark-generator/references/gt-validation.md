@@ -174,20 +174,11 @@ def sync_yaml_to_mlflow_dataset(yaml_path: str, uc_schema: str, domain: str) -> 
 
 ## Auto-Populate Metadata Dependencies
 
-Extract `required_tables`, `required_columns`, and `required_joins` from `expected_sql` during benchmark intake:
+The canonical implementation is `parse_sql_dependencies()` in `benchmark_generator.py`. It extracts `required_tables`, `required_columns`, and `required_joins` from `expected_sql` during benchmark intake using regex-based parsing on FROM, JOIN, WHERE, SELECT, GROUP BY, and ORDER BY clauses.
 
-```python
-import re
+**What it extracts:**
+- **Tables:** From `FROM` and `JOIN` clauses (fully qualified names normalized to table name)
+- **Columns:** From SELECT, WHERE, ON, GROUP BY, ORDER BY (excluding SQL keywords)
+- **Joins:** Join type, target table, and ON condition (truncated to 100 chars)
 
-def extract_dependencies(expected_sql: str) -> dict:
-    """Parse expected_sql to extract table/column references."""
-    sql_lower = expected_sql.lower()
-    tables = re.findall(r'from\s+([\w.]+)', sql_lower) + re.findall(r'join\s+([\w.]+)', sql_lower)
-    return {
-        "required_tables": list(set(t.split(".")[-1] for t in tables)),
-        "required_columns": [],
-        "required_joins": [],
-    }
-```
-
-These fields enable the introspection engine (Optimizer worker) to identify which control lever changes will affect which questions.
+These fields enable the introspection engine (Optimizer worker) to identify which control lever changes will affect which questions. Use `parse_sql_dependencies(sql)` from `benchmark_generator.py` as the reference implementation.

@@ -48,7 +48,7 @@ Use this skill when you need to:
 | Operation | Method | Endpoint | Use Case |
 |-----------|--------|----------|----------|
 | **List Spaces** | GET | `/api/2.0/genie/spaces` | Discover existing spaces |
-| **Get Space** | GET | `/api/2.0/genie/spaces/{space_id}` | Export config, backup |
+| **Get Space** | GET | `/api/2.0/genie/spaces/{space_id}?include_serialized_space=true` | Export config, backup |
 | **Create Space** | POST | `/api/2.0/genie/spaces` | New deployment, CI/CD |
 | **Update Space** | PATCH | `/api/2.0/genie/spaces/{space_id}` | Modify config, add benchmarks |
 | **Delete Space** | DELETE | `/api/2.0/genie/spaces/{space_id}` | Cleanup, teardown |
@@ -225,36 +225,57 @@ genie_config['data_sources']['tables'] = [
 
 ### Section 8: Array Sorting Requirements
 
-**All arrays in the Genie Space JSON MUST be sorted.** The API validates array ordering and will reject payloads with unsorted arrays.
+**CRITICAL: All arrays in the Genie Space JSON MUST be sorted before any PATCH request.** The Genie API uses protobuf serialization which requires deterministic ordering. Unsorted arrays produce: `Invalid export proto: data_sources.tables must be sorted by identifier`.
 
-**Sort keys by array:**
+**Sort keys by array path:**
 
-| Array | Sort Key | Direction |
-|-------|----------|-----------|
-| `tables` | `table_name` | Ascending |
-| `materialized_views` | `materialized_view_name` | Ascending |
-| `sql_functions` | `function_name` | Ascending |
-| `example_question_sqls` | `question[0]` | Ascending |
+| Array Path | Sort Key | Direction |
+|------------|----------|-----------|
+| `data_sources.tables` | `identifier` | Ascending |
+| `data_sources.metric_views` | `identifier` | Ascending |
+| `instructions.sql_functions` | `(id, identifier)` | Ascending |
+| `instructions.text_instructions` | `id` | Ascending |
+| `instructions.example_question_sqls` | `id` | Ascending |
+| `config.sample_questions` | `id` | Ascending |
+| `benchmarks.questions` | `id` | Ascending |
 
-**Implementation:**
+**Implementation — `sort_genie_config()`:**
 ```python
-def sort_all_arrays(space: dict) -> dict:
-    """Sort all arrays in Genie Space JSON by their respective sort keys."""
-    if "tables" in space:
-        space["tables"] = sorted(space["tables"], key=lambda x: x.get("table_name", ""))
-    if "materialized_views" in space:
-        space["materialized_views"] = sorted(space["materialized_views"], key=lambda x: x.get("materialized_view_name", ""))
-    if "sql_functions" in space:
-        space["sql_functions"] = sorted(space["sql_functions"], key=lambda x: x.get("function_name", ""))
-    if "example_question_sqls" in space:
-        space["example_question_sqls"] = sorted(
-            space["example_question_sqls"],
-            key=lambda x: x.get("question", [""])[0] if isinstance(x.get("question"), list) else x.get("question", "")
+def sort_genie_config(config: dict) -> dict:
+    """Sort all arrays in Genie config — API rejects unsorted data."""
+    if "data_sources" in config:
+        for key in ["tables", "metric_views"]:
+            if key in config["data_sources"]:
+                config["data_sources"][key] = sorted(
+                    config["data_sources"][key],
+                    key=lambda x: x.get("identifier", ""),
+                )
+    if "instructions" in config:
+        if "sql_functions" in config["instructions"]:
+            config["instructions"]["sql_functions"] = sorted(
+                config["instructions"]["sql_functions"],
+                key=lambda x: (x.get("id", ""), x.get("identifier", "")),
+            )
+        for key in ["text_instructions", "example_question_sqls"]:
+            if key in config["instructions"]:
+                config["instructions"][key] = sorted(
+                    config["instructions"][key],
+                    key=lambda x: x.get("id", ""),
+                )
+    if "config" in config and "sample_questions" in config["config"]:
+        config["config"]["sample_questions"] = sorted(
+            config["config"]["sample_questions"],
+            key=lambda x: x.get("id", ""),
         )
-    return space
+    if "benchmarks" in config and "questions" in config["benchmarks"]:
+        config["benchmarks"]["questions"] = sorted(
+            config["benchmarks"]["questions"],
+            key=lambda x: x.get("id", ""),
+        )
+    return config
 ```
 
-**Always call `sort_all_arrays()` BEFORE submitting to the API.**
+**Always call `sort_genie_config()` BEFORE submitting to the API.** The canonical implementation lives in `04-genie-optimization-applier/scripts/optimization_applier.py`.
 
 ### Section 9: Idempotent Deployment (Update-or-Create)
 
@@ -299,7 +320,7 @@ else:
 | `INVALID_PARAMETER_VALUE: Expected array` | `question` is string | Wrap in array: `["question"]` |
 | `Exceeded maximum number (50)` | Too many TVFs/benchmarks | Truncate to 50 in generation script |
 | `expected_sql` field not recognized | Used `expected_sql` instead of `answer` | Use `answer: [{format: "SQL", content: ["SELECT ..."]}]` |
-| `must be sorted` / array ordering error | Arrays not sorted by required key | Call `sort_all_arrays()` before submission |
+| `Invalid export proto: data_sources.tables must be sorted by identifier` | Arrays not sorted — sort key is `identifier` (not `table_name`) for tables/metric_views, `id` for all others | Call `sort_genie_config()` before every PATCH (see Section 8) |
 | Invalid ID format | ID is not 32-char hex, contains dashes, or is prefixed | Use `uuid.uuid4().hex` exclusively |
 
 See [Troubleshooting Guide](references/troubleshooting.md) for detailed fix scripts.
@@ -379,6 +400,12 @@ After completing Genie Space API deployment, carry these notes to the next worke
 - **Validation results:** Benchmark SQL validation pass/fail counts per space
 - **Cross-environment status:** Which environments (dev/staging/prod) have been deployed to
 
+## Common Mistakes
+
+| Mistake | Consequence | Fix |
+|---------|-------------|-----|
+| GET space without `?include_serialized_space=true` | Response contains only top-level metadata (title, description, space_id); `data_assets`, `general_instructions`, and nested config are omitted — space appears empty | Always append `?include_serialized_space=true` to the Get Space endpoint |
+
 ## Next Step
 
 After API deployment is complete:
@@ -388,6 +415,7 @@ After API deployment is complete:
 
 ## Version History
 
+- **v3.6.0** (Feb 22, 2026) — Fixed Section 8 array sorting: corrected sort keys from `table_name`/`materialized_view_name`/`function_name` to `identifier`/`id` (matching actual API protobuf requirements). Replaced `sort_all_arrays()` with `sort_genie_config()` (canonical implementation in applier). Updated Common Errors with specific error message `Invalid export proto: data_sources.tables must be sorted by identifier`. Added missing arrays (`text_instructions`, `sample_questions`, `benchmarks.questions`) to sort table.
 - **v2.0** (Feb 2026) — Array sorting requirements (Section 8); idempotent deployment pattern (Section 9); expanded array format table; strengthened ID generation guidance; 3 new common errors; deploy template major rewrite; benchmark SQL validation templates added; Notes to Carry Forward and Next Step for progressive disclosure
 - **v3.0** (January 2026) - Inventory-driven programmatic generation, template variables, 100% deployment success
 - **v2.0** (January 2026) - Production deployment patterns, format validation, 8 common error fixes

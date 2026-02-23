@@ -85,3 +85,6 @@ node_modules/
 .coverage
 htmlcov/
 .mypy_cache/
+
+# Development seed data (large SQL files)
+data_product_accelerator/docs/development/02_seed_section_input_prompts.sql

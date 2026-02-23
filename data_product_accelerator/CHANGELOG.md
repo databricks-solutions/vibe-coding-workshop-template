@@ -19,6 +19,7 @@ Updated framework visual guides to explicitly model optional Stage 6b as a stand
 - **`docs/framework-design/11-skill-hierarchy-tree.html`** — Added dedicated Stage 6b orchestrator branch with its 4 worker skills, updated semantic worker names to canonical paths, and expanded animation sequence to include Stage 6b traversal
 - **`skills/monitoring/04-anomaly-detection/SKILL.md`** — Corrected stale `called_by` and integration text references from `silver-layer-creation`/`gold-layer-implementation` to `silver-layer-setup`/`gold-layer-setup`
 - **`docs/framework-design/05-skill-domains.md`** — Removed stale legacy orchestrator names and clarified canonical Silver orchestrator naming
+- **`docs/development/section_input_prompts_dml.sql`** — Updated Step 14 semantic-layer guidance to keep optimization as optional Stage 6b (separate Step 15 prompt), removed stale `05-genie-space-optimization` reference, and aligned worker count/phase sequencing with current orchestrator behavior
 
 ---
 

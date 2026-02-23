@@ -20,8 +20,8 @@ import json
 import subprocess
 from pathlib import Path
 
-# Feature flag for Module 4 patch DSL (default False - preserves legacy behavior)
-USE_PATCH_DSL = False
+# Feature flag for Module 4 patch DSL (default True - proven working path)
+USE_PATCH_DSL = True
 
 NON_EXPORTABLE_FIELDS = {
     "id", "title", "description", "creator", "creator_id",
@@ -193,6 +193,16 @@ def render_patch(patch: dict, space_id: str, space_config: dict) -> dict:
             json.dumps({"op": "update_column_description", "table": table_id, "column": column_name, "old_text": old_text, "new_text": new_text}),
             json.dumps({"op": "update_column_description", "table": table_id, "column": column_name, "old_text": new_text, "new_text": old_text}),
         )
+    if patch_type == "update_table_comment":
+        return action(
+            json.dumps({"op": "update_description", "target": target, "old_text": old_text, "new_text": new_text}),
+            json.dumps({"op": "update_description", "target": target, "old_text": new_text, "new_text": old_text}),
+        )
+    if patch_type == "update_tvf_comment":
+        return action(
+            json.dumps({"op": "update_tvf_comment", "tvf": target, "old_text": old_text, "new_text": new_text}),
+            json.dumps({"op": "update_tvf_comment", "tvf": target, "old_text": new_text, "new_text": old_text}),
+        )
 
     # Joins
     if patch_type == "add_join":
@@ -322,7 +332,8 @@ def classify_risk(patch: dict) -> str:
     pt = patch.get("type", "")
     low = {
         "add_synonym", "add_description", "add_column_description",
-        "update_column_description", "update_description", "add_instruction",
+        "update_column_description", "update_description", "update_table_comment",
+        "update_tvf_comment", "add_instruction",
     }
     medium = {
         "add_table", "hide_column", "add_join", "add_default_filter",
@@ -616,8 +627,8 @@ def _apply_action_to_config(space_config: dict, action: dict) -> bool:
                 funcs.pop(i)
                 return True
         return False
-    # add_tvf_parameter, remove_tvf_parameter, update_tvf_sql - TVF definition lives in SQL files; config only has identifier
-    if op in ("add_tvf_parameter", "remove_tvf_parameter", "update_tvf_sql"):
+    # add_tvf_parameter, remove_tvf_parameter, update_tvf_sql, update_tvf_comment - TVF definition lives in SQL files; config only has identifier
+    if op in ("add_tvf_parameter", "remove_tvf_parameter", "update_tvf_sql", "update_tvf_comment"):
         return True  # No-op for config; would need file mutation
 
     # MV - metric_views in data_sources; YAML lives in repo files
@@ -645,6 +656,65 @@ def _apply_action_to_config(space_config: dict, action: dict) -> bool:
         return False
 
     return False
+
+
+_LEVER_TO_PATCH_TYPE = {
+    ("wrong_column", 1): "update_column_description",
+    ("wrong_table", 1): "update_table_comment",
+    ("missing_column", 1): "update_column_description",
+    ("wrong_join", 1): "update_column_description",
+    ("wrong_aggregation", 2): "update_mv_measure",
+    ("wrong_measure", 2): "update_mv_measure",
+    ("wrong_filter", 3): "update_tvf_comment",
+    ("tvf_parameter_error", 3): "update_tvf_comment",
+    ("repeatability_issue", 3): "update_tvf_comment",
+    ("asset_routing_error", 6): "add_instruction",
+    ("missing_instruction", 6): "add_instruction",
+    ("missing_filter", 2): "update_mv_yaml",
+    ("missing_temporal_filter", 2): "update_mv_yaml",
+    ("missing_filter", 3): "update_tvf_comment",
+    ("missing_filter", 6): "add_instruction",
+    ("ambiguous_question", 6): "add_instruction",
+    ("description_mismatch", 1): "update_column_description",
+    ("missing_synonym", 1): "update_column_description",
+}
+
+
+def proposals_to_patches(proposals: list) -> list:
+    """Convert ASI-enriched optimizer proposals into Patch DSL patches.
+
+    Each proposal has an 'asi' dict with failure_type, blame_set, counterfactual_fixes.
+    Maps to concrete patch_type using _LEVER_TO_PATCH_TYPE.
+    """
+    patches = []
+    for p in proposals:
+        asi = p.get("asi", {})
+        if not isinstance(asi, dict):
+            asi = {}
+        failure_type = asi.get("failure_type", p.get("lever_type", "other"))
+        lever = p.get("lever", 6)
+        patch_type = _LEVER_TO_PATCH_TYPE.get(
+            (failure_type, lever),
+            _LEVER_TO_PATCH_TYPE.get((failure_type, 1), "add_instruction")
+        )
+        blame_set = asi.get("blame_set", [])
+        target = blame_set[0] if blame_set else p.get("change_description", "unknown")
+        fixes = asi.get("counterfactual_fixes", [])
+        if isinstance(fixes, str):
+            fixes = [fixes]
+        new_text = fixes[0] if fixes else p.get("change_description", "")
+
+        patches.append({
+            "type": patch_type,
+            "target": target,
+            "new_text": new_text,
+            "old_text": "",
+            "risk_level": "medium",
+            "predicted_affected_questions": p.get("questions_fixed", 0),
+            "grounded_in": p.get("grounded_in", []),
+            "source_proposal_id": p.get("proposal_id", ""),
+        })
+    return patches
 
 
 def apply_patch_set(
@@ -923,10 +993,10 @@ def main():
         help="Genie deployment job name (default: genie_spaces_deployment_job)",
     )
     parser.add_argument(
-        "--use-patch-dsl",
+        "--no-patch-dsl",
         action="store_true",
         default=False,
-        help="Use patch DSL (Module 4): render_patch, apply_patch_set, rollback (default: False)",
+        help="Disable Patch DSL; use legacy apply_proposal_batch() (default: Patch DSL enabled)",
     )
     parser.add_argument(
         "--space-config",
@@ -943,9 +1013,16 @@ def main():
     with open(proposals_path) as f:
         data = json.load(f)
 
-    # Patch DSL path: patches + space_config -> apply_patch_set
+    use_dsl = not args.no_patch_dsl
     patches = data.get("patches", data.get("patch_set", []))
-    if args.use_patch_dsl and patches:
+
+    # Auto-convert proposals to patches if proposals exist but patches don't
+    if use_dsl and not patches and data.get("proposals"):
+        print("Auto-converting proposals to patches via proposals_to_patches()...")
+        patches = proposals_to_patches(data["proposals"])
+        print(f"  Converted {len(data['proposals'])} proposals -> {len(patches)} patches")
+
+    if use_dsl and patches:
         space_config_path = args.space_config or data.get("space_config_path")
         if not space_config_path:
             print("ERROR: --use-patch-dsl with patches requires --space-config or space_config_path in data.")
@@ -971,6 +1048,11 @@ def main():
         with open(sp_path, "w") as f:
             json.dump(space_config, f, indent=2)
         print(f"  Updated config written to: {sp_path}")
+        # Write apply_log.json sidecar for rollback traceability
+        _log_path = proposals_path.parent / "apply_log.json"
+        with open(_log_path, "w") as f:
+            json.dump(apply_log, f, indent=2, default=str)
+        print(f"  Apply log sidecar: {_log_path}")
         if args.deploy_target:
             result = deploy_bundle_and_run_genie_job(
                 target=args.deploy_target,
