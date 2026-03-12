@@ -5,8 +5,8 @@
 #
 # Creates or recreates the tables in Lakebase using Python/psycopg2.
 # Optionally creates the Lakebase instance if it doesn't exist.
-# Reads DDL from db/lakehouse/ddl/*.sql
-# Reads DML seed data from db/lakehouse/dml_seed/*.sql
+# Reads DDL from db/lakebase/ddl/*.sql
+# Reads DML seed data from db/lakebase/dml_seed/*.sql
 #
 # USAGE:
 #   ./scripts/setup-lakebase.sh                      # Create tables if not exist + seed
@@ -19,17 +19,26 @@
 #   ./scripts/setup-lakebase.sh --full-setup         # Full setup: instance + permissions + tables
 #
 # REQUIREMENTS:
-#   - Python with psycopg2-binary, requests
+#   - Python with psycopg (v3) or psycopg2-binary, requests
 #   - databricks CLI (authenticated)
+#   - databricks-sdk (Python)
 #
 # SQL FILES:
-#   db/lakehouse/ddl/           - Table definitions (PostgreSQL syntax)
-#   db/lakehouse/dml_seed/      - Seed data (will be transformed from Spark to PG)
+#   db/lakebase/ddl/           - Table definitions (PostgreSQL syntax)
+#   db/lakebase/dml_seed/      - Seed data (will be transformed from Spark to PG)
+#
+# LAKEBASE MODES:
+#   autoscaling  - Uses ENDPOINT_NAME + generate_database_credential (preferred)
+#   provisioned  - Uses OAuth token directly as Postgres password (legacy)
+#   Mode is auto-detected from ENDPOINT_NAME format (projects/... = autoscaling)
 #
 # CONFIGURATION (environment variables):
 #   DATABRICKS_HOST             - Workspace URL (default from app.yaml)
-#   LAKEBASE_INSTANCE_NAME      - Instance name (default: vibe-coding-workshop-lakebase)
-#   APP_NAME                    - App name (default: vibe-coding-workshop-app)
+#   LAKEBASE_INSTANCE_NAME      - Instance name
+#   APP_NAME                    - App name
+#   LAKEBASE_MODE               - "autoscaling" or "provisioned" (auto-detected)
+#   ENDPOINT_NAME               - Autoscaling endpoint path (from app.yaml)
+#   PRODUCTION_SCHEMA           - Schema name that requires extra confirmation
 #
 # =============================================================================
 
@@ -48,7 +57,8 @@ cd "$PROJECT_ROOT"
 # Default configuration
 LAKEBASE_INSTANCE_NAME="${LAKEBASE_INSTANCE_NAME:-vibe-coding-workshop-lakebase}"
 APP_NAME="${APP_NAME:-vibe-coding-workshop-app}"
-DATABRICKS_HOST="${DATABRICKS_HOST:-https://e2-demo-field-eng.cloud.databricks.com}"
+DATABRICKS_HOST="${DATABRICKS_HOST:-}"
+AUTO_APPROVE=false
 
 # Parse arguments
 ACTION="create"
@@ -92,6 +102,10 @@ while [[ $# -gt 0 ]]; do
         --instance-name)
             LAKEBASE_INSTANCE_NAME="$2"
             shift 2
+            ;;
+        --yes|--auto-approve)
+            AUTO_APPROVE=true
+            shift
             ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
@@ -177,7 +191,31 @@ fi
 
 LAKEBASE_DATABASE="${LAKEBASE_DATABASE_OVERRIDE:-$(get_yaml_value "LAKEBASE_DATABASE")}"
 LAKEBASE_PORT="${LAKEBASE_PORT_OVERRIDE:-$(get_yaml_value "LAKEBASE_PORT")}"
-LAKEBASE_USER="${LAKEBASE_USER_OVERRIDE:-$(get_yaml_value "LAKEBASE_USER")}"
+
+# Extract ENDPOINT_NAME and LAKEBASE_MODE (critical for autoscaling vs provisioned auth)
+if [[ -z "${ENDPOINT_NAME:-}" ]]; then
+    ENDPOINT_NAME=$(get_yaml_value "ENDPOINT_NAME")
+fi
+if [[ -z "${LAKEBASE_MODE:-}" ]]; then
+    # Auto-detect mode: if ENDPOINT_NAME looks like "projects/..." it's autoscaling
+    if [[ "${ENDPOINT_NAME:-}" == projects/* ]]; then
+        LAKEBASE_MODE="autoscaling"
+    else
+        LAKEBASE_MODE="provisioned"
+    fi
+fi
+
+# Get the current authenticated user from Databricks CLI (not from app.yaml)
+# During deployment, setup-lakebase.sh runs as the deployer, not as the app's service principal
+if [[ -n "${LAKEBASE_USER_OVERRIDE:-}" ]]; then
+    LAKEBASE_USER="$LAKEBASE_USER_OVERRIDE"
+else
+    LAKEBASE_USER=$(databricks current-user me --output json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('userName',''))" 2>/dev/null) || true
+    if [[ -z "$LAKEBASE_USER" ]]; then
+        echo -e "${RED}Error: Could not determine current Databricks user${NC}"
+        exit 1
+    fi
+fi
 
 # Display configuration source
 if [[ -n "${LAKEBASE_SCHEMA_OVERRIDE:-}" ]]; then
@@ -191,19 +229,27 @@ echo -e "  Database: ${BLUE}${LAKEBASE_DATABASE}${NC}"
 echo -e "  Schema:   ${BLUE}${LAKEBASE_SCHEMA}${NC}"
 echo -e "  Port:     ${BLUE}${LAKEBASE_PORT}${NC}"
 echo -e "  User:     ${BLUE}${LAKEBASE_USER}${NC}"
+echo -e "  Mode:     ${BLUE}${LAKEBASE_MODE}${NC}"
+if [[ "$LAKEBASE_MODE" == "autoscaling" && -n "$ENDPOINT_NAME" ]]; then
+    echo -e "  Endpoint: ${BLUE}${ENDPOINT_NAME}${NC}"
+fi
 echo ""
 
-# SAFETY CHECK: Confirm if targeting production schema
-if [[ "$LAKEBASE_SCHEMA" == "vibe_coding_workshop" && "$ACTION" == "recreate" ]]; then
-    echo -e "${RED}═══════════════════════════════════════════════════════════════${NC}"
-    echo -e "${RED}  ⚠️  WARNING: You are about to RECREATE tables in PRODUCTION!${NC}"
-    echo -e "${RED}  Schema: $LAKEBASE_SCHEMA${NC}"
-    echo -e "${RED}═══════════════════════════════════════════════════════════════${NC}"
-    echo ""
-    read -p "Type 'YES-PRODUCTION' to confirm: " confirmation
-    if [[ "$confirmation" != "YES-PRODUCTION" ]]; then
-        echo -e "${RED}Aborted. Use --target development for dev environment.${NC}"
-        exit 1
+# SAFETY CHECK: Confirm recreate unless auto-approved
+# Set PRODUCTION_SCHEMA env var to require extra confirmation for a specific schema
+PRODUCTION_SCHEMA="${PRODUCTION_SCHEMA:-}"
+if [[ "$ACTION" == "recreate" && "$AUTO_APPROVE" != true ]]; then
+    if [[ -n "$PRODUCTION_SCHEMA" && "$LAKEBASE_SCHEMA" == "$PRODUCTION_SCHEMA" ]]; then
+        echo -e "${RED}═══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${RED}  ⚠️  WARNING: You are about to RECREATE tables in PRODUCTION!${NC}"
+        echo -e "${RED}  Schema: $LAKEBASE_SCHEMA${NC}"
+        echo -e "${RED}═══════════════════════════════════════════════════════════════${NC}"
+        echo ""
+        read -p "Type 'YES-PRODUCTION' to confirm: " confirmation
+        if [[ "$confirmation" != "YES-PRODUCTION" ]]; then
+            echo -e "${RED}Aborted.${NC}"
+            exit 1
+        fi
     fi
 fi
 
@@ -213,14 +259,14 @@ fi
 
 if ! databricks current-user me &>/dev/null; then
     echo -e "${RED}Error: Not authenticated to Databricks${NC}"
-    echo "Run: databricks auth login --host https://e2-demo-field-eng.cloud.databricks.com"
+    echo "Run: databricks auth login --host <your-workspace-url>"
     exit 1
 fi
 
-# Check if required Python packages are available
-python3 -c "import psycopg2" 2>/dev/null || {
-    echo -e "${YELLOW}Installing psycopg2-binary...${NC}"
-    pip3 install -q psycopg2-binary
+# Check if required Python packages are available (prefer psycopg3, fall back to psycopg2)
+python3 -c "import psycopg" 2>/dev/null || python3 -c "import psycopg2" 2>/dev/null || {
+    echo -e "${YELLOW}Installing psycopg[binary]...${NC}"
+    pip3 install -q "psycopg[binary]" || pip3 install -q psycopg2-binary
 }
 
 python3 -c "import requests" 2>/dev/null || {
@@ -233,7 +279,8 @@ python3 -c "import requests" 2>/dev/null || {
 # =============================================================================
 
 # Export variables for Python
-export LAKEBASE_HOST LAKEBASE_DATABASE LAKEBASE_SCHEMA LAKEBASE_PORT LAKEBASE_USER ACTION PROJECT_ROOT
+export LAKEBASE_HOST LAKEBASE_DATABASE LAKEBASE_SCHEMA LAKEBASE_PORT LAKEBASE_USER ACTION PROJECT_ROOT DATABRICKS_HOST
+export LAKEBASE_MODE ENDPOINT_NAME
 
 python3 << 'PYTHON_EOF'
 import os
@@ -241,11 +288,9 @@ import sys
 import re
 import glob
 
-# Suppress warnings
 import warnings
 warnings.filterwarnings('ignore')
 
-# Configuration from environment
 HOST = os.environ.get('LAKEBASE_HOST', '')
 DATABASE = os.environ.get('LAKEBASE_DATABASE', '')
 SCHEMA = os.environ.get('LAKEBASE_SCHEMA', '')
@@ -253,10 +298,12 @@ PORT = int(os.environ.get('LAKEBASE_PORT', '5432'))
 USER = os.environ.get('LAKEBASE_USER', '')
 ACTION = os.environ.get('ACTION', 'create')
 PROJECT_ROOT = os.environ.get('PROJECT_ROOT', '.')
+LAKEBASE_MODE = os.environ.get('LAKEBASE_MODE', 'provisioned')
+ENDPOINT_NAME = os.environ.get('ENDPOINT_NAME', '')
 
 # Paths to SQL files
-DDL_DIR = os.path.join(PROJECT_ROOT, 'db', 'lakehouse', 'ddl')
-DML_SEED_DIR = os.path.join(PROJECT_ROOT, 'db', 'lakehouse', 'dml_seed')
+DDL_DIR = os.path.join(PROJECT_ROOT, 'db', 'lakebase', 'ddl')
+DML_SEED_DIR = os.path.join(PROJECT_ROOT, 'db', 'lakebase', 'dml_seed')
 
 print(f"Action: {ACTION}")
 print()
@@ -404,11 +451,12 @@ def execute_sql_file(cursor, file_path: str, schema: str, ignore_errors: bool = 
 
 
 def get_ddl_files() -> list:
-    """Get sorted list of DDL SQL files."""
+    """Get sorted list of DDL SQL files (excluding UC-only files like tags)."""
     if not os.path.exists(DDL_DIR):
         return []
+    EXCLUDE_PATTERNS = {'apply_tags'}
     files = sorted(glob.glob(os.path.join(DDL_DIR, '*.sql')))
-    return files
+    return [f for f in files if not any(p in os.path.basename(f) for p in EXCLUDE_PATTERNS)]
 
 
 def get_dml_seed_files() -> list:
@@ -423,51 +471,80 @@ def get_dml_seed_files() -> list:
 # Database Connection
 # =============================================================================
 
-# Get OAuth token
+# Get OAuth token (or autoscaling credential)
 try:
     from databricks.sdk import WorkspaceClient
-    w = WorkspaceClient(host="https://e2-demo-field-eng.cloud.databricks.com")
-    
+    db_host = os.environ.get('DATABRICKS_HOST', '')
+    w = WorkspaceClient(host=db_host) if db_host else WorkspaceClient()
+
     token = None
-    if hasattr(w.config, 'token') and w.config.token:
-        token = w.config.token
+    if LAKEBASE_MODE == 'autoscaling' and ENDPOINT_NAME:
+        credential = w.postgres.generate_database_credential(endpoint=ENDPOINT_NAME)
+        token = credential.token
+        if not USER:
+            USER = w.current_user.me().user_name
+        print(f"✓ Got Autoscaling database credential (user={USER})")
     else:
-        headers = w.config.authenticate()
-        if headers and 'Authorization' in headers:
-            auth = headers['Authorization']
-            if auth.startswith('Bearer '):
-                token = auth[7:]
-    
+        if hasattr(w.config, 'token') and w.config.token:
+            token = w.config.token
+        else:
+            headers = w.config.authenticate()
+            if headers and 'Authorization' in headers:
+                auth = headers['Authorization']
+                if auth.startswith('Bearer '):
+                    token = auth[7:]
+        if token:
+            print("✓ Got OAuth token")
+
     if not token:
-        print("❌ Failed to get OAuth token")
+        print("❌ Failed to get authentication token")
         sys.exit(1)
-    
-    print("✓ Got OAuth token")
     print()
 except Exception as e:
-    print(f"❌ Error getting OAuth token: {e}")
+    print(f"❌ Error getting token: {e}")
     sys.exit(1)
 
-# Connect to Lakebase
+# Connect to Lakebase (with retry for fresh instances / scale-to-zero cold starts)
+import time as _time
+
+# Prefer psycopg3, fall back to psycopg2
 try:
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
-    
-    conn = psycopg2.connect(
-        host=HOST,
-        port=PORT,
-        database=DATABASE,
-        user=USER,
-        password=token,
-        sslmode='require'
-    )
-    conn.autocommit = True
-    cursor = conn.cursor()
-    print("✓ Connected to Lakebase")
-    print()
-except Exception as e:
-    print(f"❌ Failed to connect to Lakebase: {e}")
-    sys.exit(1)
+    import psycopg as _pg
+    _USE_PSYCOPG3 = True
+except ImportError:
+    import psycopg2 as _pg
+    _USE_PSYCOPG3 = False
+
+MAX_RETRIES = 5
+RETRY_DELAY = 10
+
+conn = None
+for attempt in range(1, MAX_RETRIES + 1):
+    try:
+        if _USE_PSYCOPG3:
+            conn = _pg.connect(
+                host=HOST, port=PORT, dbname=DATABASE,
+                user=USER, password=token, sslmode='require',
+                autocommit=True,
+            )
+        else:
+            conn = _pg.connect(
+                host=HOST, port=PORT, database=DATABASE,
+                user=USER, password=token, sslmode='require',
+            )
+            conn.autocommit = True
+        cursor = conn.cursor()
+        print("✓ Connected to Lakebase")
+        print()
+        break
+    except Exception as e:
+        if attempt == MAX_RETRIES:
+            print(f"❌ Failed to connect to Lakebase after {MAX_RETRIES} attempts: {e}")
+            sys.exit(1)
+        wait = RETRY_DELAY * attempt
+        print(f"⏳ Connection attempt {attempt}/{MAX_RETRIES} failed, retrying in {wait}s...")
+        print(f"   ({e})")
+        _time.sleep(wait)
 
 # =============================================================================
 # Execute Actions
@@ -477,7 +554,14 @@ try:
     if ACTION == "status":
         print("Checking table status...")
         
-        tables = ['usecase_descriptions', 'section_input_prompts', 'sessions']
+        cursor.execute(f"""
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema='{SCHEMA}' AND table_type='BASE TABLE'
+            ORDER BY table_name
+        """)
+        tables = [row[0] for row in cursor.fetchall()]
+        if not tables:
+            print("  No tables found in schema.")
         for table in tables:
             cursor.execute(f"""
                 SELECT COUNT(*) FROM information_schema.tables 
@@ -494,9 +578,14 @@ try:
     
     elif ACTION == "drop":
         print("Dropping tables...")
-        tables = ['usecase_descriptions', 'section_input_prompts', 'sessions']
+        cursor.execute(f"""
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema='{SCHEMA}' AND table_type='BASE TABLE'
+            ORDER BY table_name
+        """)
+        tables = [row[0] for row in cursor.fetchall()]
         for table in tables:
-            cursor.execute(f"DROP TABLE IF EXISTS {SCHEMA}.{table}")
+            cursor.execute(f"DROP TABLE IF EXISTS {SCHEMA}.{table} CASCADE")
             print(f"  Dropped {table}")
         print("✓ Tables dropped")
     
@@ -504,11 +593,16 @@ try:
         print("Recreating tables...")
         print()
         
-        # Drop existing tables
+        # Drop existing tables (discover dynamically)
         print("  Dropping existing tables...")
-        tables = ['usecase_descriptions', 'section_input_prompts', 'sessions']
+        cursor.execute(f"""
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema='{SCHEMA}' AND table_type='BASE TABLE'
+            ORDER BY table_name
+        """)
+        tables = [row[0] for row in cursor.fetchall()]
         for table in tables:
-            cursor.execute(f"DROP TABLE IF EXISTS {SCHEMA}.{table}")
+            cursor.execute(f"DROP TABLE IF EXISTS {SCHEMA}.{table} CASCADE")
         
         # Create schema
         print("  Creating schema...")
@@ -532,17 +626,32 @@ try:
             count = execute_sql_file(cursor, dml_file, SCHEMA, ignore_errors=True)
             print(f"({count} statements)")
         
-        # Reset sequences after seeding to avoid duplicate key errors
+        # Reset all sequences in the schema to avoid duplicate key errors
         print("  Resetting sequences...")
-        for table, col in [('usecase_descriptions', 'config_id'), ('section_input_prompts', 'input_id')]:
-            try:
-                cursor.execute(f"SELECT MAX({col}) FROM {SCHEMA}.{table}")
-                max_val = cursor.fetchone()[0] or 0
-                seq_name = f"{SCHEMA}.{table}_{col}_seq"
-                cursor.execute(f"SELECT setval('{seq_name}', {max_val + 1}, false)")
-                print(f"    {table}.{col} sequence reset to {max_val + 1}")
-            except Exception as e:
-                print(f"    (sequence for {table}.{col} not found or already correct)")
+        try:
+            cursor.execute(f"""
+                SELECT sequence_name FROM information_schema.sequences
+                WHERE sequence_schema = '{SCHEMA}'
+            """)
+            seqs = [row[0] for row in cursor.fetchall()]
+            for seq_name in seqs:
+                parts = seq_name.rsplit('_', 1)
+                if len(parts) == 2 and parts[1] == 'seq':
+                    col_and_table = parts[0]
+                else:
+                    continue
+                tbl_col = col_and_table.rsplit('_', 1)
+                if len(tbl_col) == 2:
+                    tbl, col = tbl_col
+                    try:
+                        cursor.execute(f"SELECT MAX({col}) FROM {SCHEMA}.{tbl}")
+                        max_val = cursor.fetchone()[0] or 0
+                        cursor.execute(f"SELECT setval('{SCHEMA}.{seq_name}', {max_val + 1}, false)")
+                        print(f"    {seq_name} reset to {max_val + 1}")
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"    (sequence reset skipped: {e})")
         
         print()
         print("✓ Tables recreated and seeded successfully")
@@ -564,13 +673,23 @@ try:
             count = execute_sql_file(cursor, ddl_file, SCHEMA, ignore_errors=True)
             print(f"({count} statements)")
         
-        # Check if tables need seeding
-        cursor.execute(f"SELECT COUNT(*) FROM {SCHEMA}.usecase_descriptions")
-        uc_count = cursor.fetchone()[0]
-        cursor.execute(f"SELECT COUNT(*) FROM {SCHEMA}.section_input_prompts")
-        sip_count = cursor.fetchone()[0]
+        # Check if tables need seeding by checking row count of first table found
+        needs_seed = True
+        try:
+            cursor.execute(f"""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema='{SCHEMA}' AND table_type='BASE TABLE'
+                ORDER BY table_name LIMIT 1
+            """)
+            row = cursor.fetchone()
+            if row:
+                cursor.execute(f"SELECT COUNT(*) FROM {SCHEMA}.{row[0]}")
+                total = cursor.fetchone()[0] or 0
+                needs_seed = total == 0
+        except Exception:
+            pass
         
-        if uc_count == 0 or sip_count == 0:
+        if needs_seed:
             print(f"  Executing DML seed from {DML_SEED_DIR}/...")
             dml_files = get_dml_seed_files()
             for dml_file in dml_files:
@@ -579,22 +698,91 @@ try:
                 count = execute_sql_file(cursor, dml_file, SCHEMA, ignore_errors=True)
                 print(f"({count} statements)")
             
-            # Reset sequences after seeding to avoid duplicate key errors
             print("  Resetting sequences...")
-            for table, col in [('usecase_descriptions', 'config_id'), ('section_input_prompts', 'input_id')]:
-                try:
-                    cursor.execute(f"SELECT MAX({col}) FROM {SCHEMA}.{table}")
-                    max_val = cursor.fetchone()[0] or 0
-                    seq_name = f"{SCHEMA}.{table}_{col}_seq"
-                    cursor.execute(f"SELECT setval('{seq_name}', {max_val + 1}, false)")
-                    print(f"    {table}.{col} sequence reset to {max_val + 1}")
-                except Exception as e:
-                    print(f"    (sequence for {table}.{col} not found or already correct)")
+            try:
+                cursor.execute(f"""
+                    SELECT sequence_name FROM information_schema.sequences
+                    WHERE sequence_schema = '{SCHEMA}'
+                """)
+                for (seq_name,) in cursor.fetchall():
+                    try:
+                        parts = seq_name.rsplit('_', 1)
+                        if len(parts) == 2 and parts[1] == 'seq':
+                            tbl_col = parts[0].rsplit('_', 1)
+                            if len(tbl_col) == 2:
+                                tbl, col = tbl_col
+                                cursor.execute(f"SELECT MAX({col}) FROM {SCHEMA}.{tbl}")
+                                max_val = cursor.fetchone()[0] or 0
+                                cursor.execute(f"SELECT setval('{SCHEMA}.{seq_name}', {max_val + 1}, false)")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
         else:
-            print(f"  Tables already have data (usecase: {uc_count}, section_prompts: {sip_count})")
+            print(f"  Tables already have data, skipping seed.")
         
         print()
         print("✓ Tables ready")
+
+    # ── Create Postgres roles for the app service principal ──
+    # databricks_auth extension + databricks_create_role() are autoscaling-only SQL functions.
+    # For provisioned, SP roles are managed via REST API in deploy.sh (Step 3b).
+    sp_id = os.environ.get("APP_SERVICE_PRINCIPAL_ID", "")
+    lakebase_mode = os.environ.get("LAKEBASE_MODE", "provisioned")
+    if sp_id and lakebase_mode == "autoscaling":
+        print()
+        print("Setting up Postgres roles for app service principal...")
+        try:
+            cursor.execute("CREATE EXTENSION IF NOT EXISTS databricks_auth")
+            print(f"  ✓ databricks_auth extension ready")
+        except Exception as e:
+            if "already exists" in str(e):
+                print(f"  ✓ databricks_auth extension already exists")
+            else:
+                print(f"  ⚠ Could not create extension: {e}")
+
+        try:
+            cursor.execute(f"SELECT databricks_create_role('{sp_id}', 'SERVICE_PRINCIPAL')")
+            print(f"  ✓ Postgres role created for SP: {sp_id[:20]}...")
+        except Exception as e:
+            if "already exists" in str(e):
+                print(f"  ✓ Postgres role already exists for SP: {sp_id[:20]}...")
+            else:
+                print(f"  ⚠ Could not create SP role: {e}")
+
+        try:
+            cursor.execute(f'GRANT USAGE ON SCHEMA {SCHEMA} TO "{sp_id}"')
+            cursor.execute(f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {SCHEMA} TO "{sp_id}"')
+            cursor.execute(f'ALTER DEFAULT PRIVILEGES IN SCHEMA {SCHEMA} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "{sp_id}"')
+            print(f"  ✓ Schema permissions granted to SP on {SCHEMA}")
+        except Exception as e:
+            print(f"  ⚠ Could not grant schema permissions: {e}")
+
+        conn.commit()
+        print("✓ Service principal database access configured")
+
+    # ── Grant public role access so all authenticated users can use the workshop ──
+    print()
+    print("Setting up public access for all workspace users...")
+    try:
+        cursor.execute(f"GRANT CREATE ON DATABASE {DATABASE} TO public")
+        print(f"  ✓ CREATE on database {DATABASE} granted to public")
+    except Exception as e:
+        if "already" in str(e).lower():
+            print("  ✓ CREATE on database already granted to public")
+        else:
+            print(f"  ⚠ Could not grant CREATE on database: {e}")
+
+    try:
+        cursor.execute(f"GRANT USAGE ON SCHEMA {SCHEMA} TO public")
+        cursor.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {SCHEMA} TO public")
+        cursor.execute(f"ALTER DEFAULT PRIVILEGES IN SCHEMA {SCHEMA} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO public")
+        print(f"  ✓ Schema and table permissions granted to public on {SCHEMA}")
+    except Exception as e:
+        print(f"  ⚠ Could not grant public schema permissions: {e}")
+
+    conn.commit()
+    print("✓ Public access configured for all authenticated users")
 
 except Exception as e:
     print(f"❌ Error: {e}")

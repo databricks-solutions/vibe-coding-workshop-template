@@ -395,37 +395,61 @@ if [[ "$TABLES_ONLY" != true ]]; then
     print_header "STEP 0: Configure app.yaml for Target"
     
     # Get Lakebase instance host for this target
+    # Supports both Autoscaling (databricks postgres) and Provisioned (database instances API)
     print_step "Getting Lakebase instance details for target: $TARGET..."
-    
-    INSTANCE_DETAILS=$(databricks api get "/api/2.0/database/instances/$LAKEBASE_INSTANCE" $PROFILE_FLAG 2>/dev/null) || true
-    
-    if [[ -n "$INSTANCE_DETAILS" ]]; then
-        TARGET_LAKEBASE_HOST=$(echo "$INSTANCE_DETAILS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('read_write_dns',''))")
-        
-        if [[ -n "$TARGET_LAKEBASE_HOST" ]]; then
-            print_success "Instance: $LAKEBASE_INSTANCE"
-            print_success "Host: $TARGET_LAKEBASE_HOST"
-            print_success "Schema: $LAKEBASE_SCHEMA"
-            
-            # Update app.yaml with correct values
-            print_step "Updating app.yaml with target-specific Lakebase config..."
-            
-            # Update LAKEBASE_HOST
-            sed -i.bak "s|value: \"instance-[^\"]*\.database\.cloud\.databricks\.com\"|value: \"$TARGET_LAKEBASE_HOST\"|g" app.yaml
-            
-            # Update LAKEBASE_SCHEMA
-            sed -i.bak "s|name: LAKEBASE_SCHEMA.*|name: LAKEBASE_SCHEMA|g" app.yaml
-            sed -i.bak "/name: LAKEBASE_SCHEMA/{n;s|value: \"[^\"]*\"|value: \"$LAKEBASE_SCHEMA\"|;}" app.yaml
-            
-            rm -f app.yaml.bak
-            
-            print_success "app.yaml updated for $TARGET environment"
-            echo ""
-            echo -e "  LAKEBASE_HOST:   ${CYAN}$TARGET_LAKEBASE_HOST${NC}"
-            echo -e "  LAKEBASE_SCHEMA: ${CYAN}$LAKEBASE_SCHEMA${NC}"
-        else
-            print_warning "Could not get instance host"
+
+    TARGET_LAKEBASE_HOST=""
+    TARGET_ENDPOINT_NAME=""
+
+    # Try Autoscaling first: databricks postgres list-endpoints
+    ENDPOINTS_JSON=$(databricks postgres list-endpoints "projects/${LAKEBASE_INSTANCE}/branches/main" $PROFILE_FLAG -o json 2>/dev/null) || true
+    if [[ -n "$ENDPOINTS_JSON" && "$ENDPOINTS_JSON" != "null" ]]; then
+        TARGET_LAKEBASE_HOST=$(echo "$ENDPOINTS_JSON" | python3 -c "import sys,json; eps=json.load(sys.stdin); print(eps[0]['status']['hosts']['host'] if eps else '')" 2>/dev/null) || true
+        TARGET_ENDPOINT_NAME="projects/${LAKEBASE_INSTANCE}/branches/main/endpoints/primary"
+        DETECTED_MODE="autoscaling"
+    fi
+
+    # Fall back to Provisioned API
+    if [[ -z "$TARGET_LAKEBASE_HOST" ]]; then
+        INSTANCE_DETAILS=$(databricks api get "/api/2.0/database/instances/$LAKEBASE_INSTANCE" $PROFILE_FLAG 2>/dev/null) || true
+        if [[ -n "$INSTANCE_DETAILS" ]]; then
+            TARGET_LAKEBASE_HOST=$(echo "$INSTANCE_DETAILS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('read_write_dns',''))" 2>/dev/null) || true
+            DETECTED_MODE="provisioned"
         fi
+    fi
+
+    if [[ -n "$TARGET_LAKEBASE_HOST" ]]; then
+        print_success "Instance: $LAKEBASE_INSTANCE"
+        print_success "Host: $TARGET_LAKEBASE_HOST"
+        print_success "Mode: ${DETECTED_MODE:-unknown}"
+        print_success "Schema: $LAKEBASE_SCHEMA"
+
+        print_step "Updating app.yaml with target-specific Lakebase config..."
+
+        # Update LAKEBASE_HOST (match any *.database.*.cloud.databricks.com or ep-*.database.* pattern)
+        python3 -c "
+import re, sys
+with open('app.yaml', 'r') as f:
+    content = f.read()
+# Update LAKEBASE_HOST value
+content = re.sub(
+    r'(name: LAKEBASE_HOST\s*\n\s*value: \")[^\"]*\"',
+    r'\g<1>${TARGET_LAKEBASE_HOST}\"'.replace('\${TARGET_LAKEBASE_HOST}', '${TARGET_LAKEBASE_HOST}'),
+    content
+)
+# Update LAKEBASE_SCHEMA value
+content = re.sub(
+    r'(name: LAKEBASE_SCHEMA\s*\n\s*value: \")[^\"]*\"',
+    r'\g<1>${LAKEBASE_SCHEMA}\"'.replace('\${LAKEBASE_SCHEMA}', '${LAKEBASE_SCHEMA}'),
+    content
+)
+with open('app.yaml', 'w') as f:
+    f.write(content)
+" 2>/dev/null && print_success "app.yaml updated for $TARGET environment" || print_warning "Could not update app.yaml"
+
+        echo ""
+        echo -e "  LAKEBASE_HOST:   ${CYAN}$TARGET_LAKEBASE_HOST${NC}"
+        echo -e "  LAKEBASE_SCHEMA: ${CYAN}$LAKEBASE_SCHEMA${NC}"
     else
         print_warning "Could not get instance details - app.yaml unchanged"
     fi
@@ -598,12 +622,27 @@ if [[ "$TABLES_ONLY" != true && "$SKIP_PERMISSIONS" != true ]]; then
         # =================================================================
         if [[ -n "$LAKEBASE_INSTANCE" ]]; then
             print_step "3c. Linking Lakebase as app resource (via lakebase_manager.py)..."
-            
-            python3 "$SCRIPT_DIR/lakebase_manager.py" \
+
+            # Derive workspace URL from databricks.yml target
+            WORKSPACE_HOST=$(python3 -c "
+import re
+with open('databricks.yml', 'r') as f:
+    content = f.read()
+pattern = r'^  $TARGET:.*?host:\s*(https?://[^\s]+)'
+target_match = re.search(pattern.replace('\$TARGET', '$TARGET'), content, re.MULTILINE | re.DOTALL)
+if target_match:
+    print(target_match.group(1).rstrip('/'))
+" 2>/dev/null) || true
+
+            if [[ -z "$WORKSPACE_HOST" ]]; then
+                WORKSPACE_HOST=$(databricks $PROFILE_FLAG auth env 2>/dev/null | grep DATABRICKS_HOST | cut -d= -f2) || true
+            fi
+
+            python3 "${PROJECT_ROOT}/scripts/lakebase_manager.py" \
                 --action link-app-resource \
                 --app-name "$APP_NAME" \
                 --instance-name "$LAKEBASE_INSTANCE" \
-                --host "$WORKSPACE_URL" \
+                --host "${WORKSPACE_HOST:-}" \
                 --project-root "$PROJECT_ROOT" || {
                 print_warning "Could not link app resource - may need manual setup"
             }
@@ -621,44 +660,64 @@ if [[ "$SKIP_TABLES" != true ]]; then
     print_header "STEP 4: Setup Lakebase Tables"
     
     # Get Lakebase instance details to find the correct host
+    # Supports both Autoscaling and Provisioned tiers
     print_step "Getting Lakebase instance connection details..."
-    
-    INSTANCE_INFO=$(databricks api get "/api/2.0/database/instances/$LAKEBASE_INSTANCE" $PROFILE_FLAG 2>/dev/null) || true
-    
-    if [[ -n "$INSTANCE_INFO" ]]; then
-        LAKEBASE_HOST_FROM_INSTANCE=$(echo "$INSTANCE_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('read_write_dns',''))")
-        INSTANCE_STATE=$(echo "$INSTANCE_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('state',''))")
-        
+
+    LAKEBASE_HOST_FROM_INSTANCE=""
+    DETECTED_ENDPOINT_NAME=""
+    DETECTED_LAKEBASE_MODE=""
+
+    # Try Autoscaling first
+    ENDPOINTS_JSON=$(databricks postgres list-endpoints "projects/${LAKEBASE_INSTANCE}/branches/main" $PROFILE_FLAG -o json 2>/dev/null) || true
+    if [[ -n "$ENDPOINTS_JSON" && "$ENDPOINTS_JSON" != "null" ]]; then
+        LAKEBASE_HOST_FROM_INSTANCE=$(echo "$ENDPOINTS_JSON" | python3 -c "import sys,json; eps=json.load(sys.stdin); print(eps[0]['status']['hosts']['host'] if eps else '')" 2>/dev/null) || true
         if [[ -n "$LAKEBASE_HOST_FROM_INSTANCE" ]]; then
-            print_success "Instance: $LAKEBASE_INSTANCE"
-            print_success "Host: $LAKEBASE_HOST_FROM_INSTANCE"
-            print_success "State: $INSTANCE_STATE"
-            print_success "Schema: $LAKEBASE_SCHEMA"
-        else
-            print_warning "Could not get instance host - using app.yaml fallback"
+            DETECTED_ENDPOINT_NAME="projects/${LAKEBASE_INSTANCE}/branches/main/endpoints/primary"
+            DETECTED_LAKEBASE_MODE="autoscaling"
         fi
-    else
-        print_warning "Could not get instance info - using app.yaml fallback"
-        LAKEBASE_HOST_FROM_INSTANCE=""
     fi
-    
+
+    # Fall back to Provisioned API
+    if [[ -z "$LAKEBASE_HOST_FROM_INSTANCE" ]]; then
+        INSTANCE_INFO=$(databricks api get "/api/2.0/database/instances/$LAKEBASE_INSTANCE" $PROFILE_FLAG 2>/dev/null) || true
+        if [[ -n "$INSTANCE_INFO" ]]; then
+            LAKEBASE_HOST_FROM_INSTANCE=$(echo "$INSTANCE_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('read_write_dns',''))" 2>/dev/null) || true
+            DETECTED_LAKEBASE_MODE="provisioned"
+        fi
+    fi
+
+    if [[ -n "$LAKEBASE_HOST_FROM_INSTANCE" ]]; then
+        print_success "Instance: $LAKEBASE_INSTANCE"
+        print_success "Host: $LAKEBASE_HOST_FROM_INSTANCE"
+        print_success "Mode: $DETECTED_LAKEBASE_MODE"
+        print_success "Schema: $LAKEBASE_SCHEMA"
+    else
+        print_warning "Could not get instance host - using app.yaml fallback"
+    fi
+
     echo ""
     print_step "Running Lakebase table setup..."
     echo -e "  Target Schema: ${CYAN}$LAKEBASE_SCHEMA${NC}"
     echo ""
-    
-    # CRITICAL: Export environment variable overrides to ensure correct target
-    # These override any values from app.yaml in setup-lakebase.sh
+
     export LAKEBASE_INSTANCE_NAME="$LAKEBASE_INSTANCE"
     export LAKEBASE_SCHEMA_OVERRIDE="$LAKEBASE_SCHEMA"
     export APP_NAME="$APP_NAME"
-    
+
     if [[ -n "$LAKEBASE_HOST_FROM_INSTANCE" ]]; then
         export LAKEBASE_HOST_OVERRIDE="$LAKEBASE_HOST_FROM_INSTANCE"
     fi
-    
-    # Run table setup with explicit schema override
-    if ./scripts/setup-lakebase.sh --recreate; then
+    if [[ -n "$DETECTED_LAKEBASE_MODE" ]]; then
+        export LAKEBASE_MODE="$DETECTED_LAKEBASE_MODE"
+    fi
+    if [[ -n "$DETECTED_ENDPOINT_NAME" ]]; then
+        export ENDPOINT_NAME="$DETECTED_ENDPOINT_NAME"
+    fi
+    if [[ -n "$SERVICE_PRINCIPAL_ID" ]]; then
+        export APP_SERVICE_PRINCIPAL_ID="$SERVICE_PRINCIPAL_ID"
+    fi
+
+    if ./scripts/setup-lakebase.sh --recreate --auto-approve; then
         print_success "Lakebase tables created and seeded in schema: $LAKEBASE_SCHEMA"
     else
         print_error "Table setup failed"

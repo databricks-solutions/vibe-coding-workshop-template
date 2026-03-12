@@ -1,6 +1,18 @@
 # Lakebase Database Setup
 
 Helper scripts for managing Lakebase PostgreSQL tables and permissions in Databricks Apps.
+Supports both **Autoscaling** (preferred) and **Provisioned** (legacy) Lakebase tiers.
+
+## Lakebase Tiers
+
+| Aspect | Autoscaling | Provisioned |
+|--------|------------|-------------|
+| CLI namespace | `databricks postgres` | `databricks database` |
+| Resource model | Project > Branch > Endpoint | Flat Instance |
+| ENDPOINT_NAME | `projects/<name>/branches/<branch>/endpoints/<ep>` | N/A |
+| Port | 5432 | 5432 |
+| Scale-to-zero | Yes | No |
+| Mode auto-detect | ENDPOINT_NAME starts with `projects/` | Otherwise |
 
 ## Directory Structure
 
@@ -40,11 +52,14 @@ INSERT INTO ${schema}.your_table (name) VALUES ('Example');
 Before your app can access Lakebase, setup permissions:
 
 ```bash
-# Setup all permissions at once
-python scripts/lakebase_manager.py --action setup-all-permissions --catalog your_catalog
+# Grant Unity Catalog permissions
+python scripts/lakebase_manager.py --action grant-permissions --catalog your_catalog
 
-# Or via deploy script
-./scripts/deploy.sh --setup-permissions --catalog your_catalog
+# Add Lakebase database role
+python scripts/lakebase_manager.py --action add-lakebase-role
+
+# Link Lakebase as app resource (enables automatic PGPASSWORD)
+python scripts/lakebase_manager.py --action link-app-resource
 ```
 
 ### 4. Run Table Setup
@@ -84,10 +99,6 @@ Your app needs three types of permissions to access Lakebase:
 ### Permission Management
 
 ```bash
-# Setup ALL permissions at once (recommended)
-python scripts/lakebase_manager.py --action setup-all-permissions --catalog my_catalog
-
-# Individual permission commands:
 # 1. Grant Unity Catalog permissions
 python scripts/lakebase_manager.py --action grant-permissions --catalog my_catalog
 
@@ -95,7 +106,7 @@ python scripts/lakebase_manager.py --action grant-permissions --catalog my_catal
 python scripts/lakebase_manager.py --action add-lakebase-role
 
 # 3. Link Lakebase as app resource
-python scripts/lakebase_manager.py --action add-app-resource
+python scripts/lakebase_manager.py --action link-app-resource
 
 # List existing roles
 python scripts/lakebase_manager.py --action list-lakebase-roles
@@ -113,8 +124,8 @@ python scripts/lakebase_manager.py --action check
 # Get app service principal info
 python scripts/lakebase_manager.py --action app-info
 
-# Get Lakebase instance connection details
-python scripts/lakebase_manager.py --action instance-info
+# Get full app details
+python scripts/lakebase_manager.py --action full-info
 
 # Get setup instructions
 python scripts/lakebase_manager.py --action instructions
@@ -123,22 +134,19 @@ python scripts/lakebase_manager.py --action instructions
 ### Full Deployment
 
 ```bash
-# Full deployment: create app + permissions + tables
-./scripts/deploy.sh --full --catalog my_catalog
+# Full deployment: bundle + permissions + tables
+./scripts/deploy.sh
 
-# Deploy app + setup permissions
-./scripts/deploy.sh --setup-permissions --catalog my_catalog
-
-# Deploy app + setup tables
-./scripts/deploy.sh --with-lakebase
+# Code-only quick deploy
+./scripts/deploy.sh --code-only
 
 # Only setup tables (skip app deployment)
-./scripts/deploy.sh --lakebase-only
+./scripts/deploy.sh --tables-only
 ```
 
 ## SQL Format
 
-Use `${schema}` placeholder - replaced at runtime with `LAKEBASE_SCHEMA` from app.yaml.
+Use `${schema}` placeholder -- replaced at runtime with `LAKEBASE_SCHEMA` from app.yaml.
 
 Example:
 
@@ -156,15 +164,15 @@ Update these environment variables in `app.yaml`:
 ```yaml
 env:
   - name: LAKEBASE_HOST
-    value: "your-instance.database.cloud.databricks.com"
+    value: "your-endpoint.database.us-east-1.cloud.databricks.com"
   - name: LAKEBASE_DATABASE
     value: "databricks_postgres"
   - name: LAKEBASE_SCHEMA
     value: "your_schema_name"
   - name: LAKEBASE_PORT
-    value: "443"
-  - name: LAKEBASE_USER
-    value: "databricks"
+    value: "5432"
+  - name: ENDPOINT_NAME
+    value: "projects/your-project/branches/main/endpoints/primary"
 ```
 
 Get connection details from Databricks UI:
@@ -178,42 +186,32 @@ The scripts read from these environment variables (with app.yaml fallback):
 |----------|-------------|
 | `DATABRICKS_HOST` | Databricks workspace URL |
 | `APP_NAME` | Databricks App name |
-| `LAKEBASE_INSTANCE_NAME` | Lakebase instance name |
+| `LAKEBASE_INSTANCE_NAME` | Lakebase instance / project name |
 | `LAKEBASE_HOST` | Lakebase PostgreSQL endpoint |
 | `LAKEBASE_DATABASE` | Database name (usually `databricks_postgres`) |
 | `LAKEBASE_SCHEMA` | Schema for your tables |
-| `LAKEBASE_PORT` | PostgreSQL port (usually `443`) |
-| `LAKEBASE_USER` | Database user (usually `databricks`) |
+| `LAKEBASE_PORT` | PostgreSQL port (5432) |
+| `LAKEBASE_MODE` | `autoscaling` or `provisioned` (auto-detected from ENDPOINT_NAME) |
+| `ENDPOINT_NAME` | Autoscaling endpoint path (from app.yaml) |
+| `PRODUCTION_SCHEMA` | Schema name requiring extra confirmation on recreate |
 
 ## Troubleshooting
 
 ### Permission Errors
 
-If you get permission errors when accessing Lakebase:
-
 ```bash
-# Check current permissions
 python scripts/lakebase_manager.py --action status
-
-# Setup all permissions
-python scripts/lakebase_manager.py --action setup-all-permissions --catalog your_catalog
 ```
 
 ### Connection Errors
 
 ```bash
-# Verify Lakebase instance is running
-python scripts/lakebase_manager.py --action instance-info
-
-# Check connectivity
 python scripts/lakebase_manager.py --action check
 ```
 
 ### Missing PGPASSWORD
 
-If your app can't authenticate to Lakebase:
-
 ```bash
 # Link Lakebase as app resource (enables automatic PGPASSWORD)
-python scripts/lakebase_manager.py --action add-app-resource
+python scripts/lakebase_manager.py --action link-app-resource
 ```
