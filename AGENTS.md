@@ -16,14 +16,14 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 ├── PRE-REQUISITES.md                   <-- Workshop prerequisites checklist
 ├── env.example                         <-- Environment variable template
 │
-├── apps_lakebase/                      <-- Component 1: Databricks App (FastAPI + Lakebase)
-│   ├── app.yaml                        #   App entry point config
-│   ├── pyproject.toml                  #   Python dependencies
-│   ├── server/                         #   FastAPI backend
-│   │   ├── app.py                      #     Main application
-│   │   └── routers/                    #     API + health endpoints
-│   ├── scripts/                        #   Setup, deploy, local dev scripts
-│   └── lakebase/                       #   Lakebase DDL/DML reference
+├── apps_lakebase/                      <-- Component 1: Databricks AppKit Workshop
+│   ├── Instructions.md                 #   Comprehensive 4-phase workshop guide
+│   └── skills/                         #   5 agent skills for the full app lifecycle
+│       ├── appkit-scaffold/            #     Scaffold new AppKit projects
+│       ├── appkit-build/               #     Build UI + backend from a PRD
+│       ├── appkit-deploy/              #     Deploy to Databricks Apps
+│       ├── appkit-plugin-add/          #     Add plugins (Lakebase, Analytics, Genie, Files)
+│       └── appkit-lakebase-navigator/  #     Wire Lakebase PostgreSQL backend
 │
 ├── agentic-framework/                  <-- Component 2: Multi-Agent Build Framework
 │   ├── agents/                         #   Agent prompts (PRD analyzer, skill scaffolder, etc.)
@@ -48,7 +48,7 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 
 | Direction | Location | Examples |
 |-----------|----------|----------|
-| **Read from** (framework) | `apps_lakebase/`, `agentic-framework/`, `data_product_accelerator/` | Skills, manifests, server code, docs |
+| **Read from** (framework) | `apps_lakebase/`, `agentic-framework/`, `data_product_accelerator/` | Skills, instructions, agent prompts, docs |
 | **Write to** (artifacts) | Repository root | `gold_layer_design/`, `src/`, `plans/`, `resources/`, `databricks.yml` |
 
 > **Rule:** Generated artifact paths (`gold_layer_design/`, `src/`, `plans/`, `resources/`, `databricks.yml`) are relative to the repository root. Never create generated files inside `data_product_accelerator/`, `apps_lakebase/`, or `agentic-framework/`.
@@ -76,18 +76,18 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 | "Asset Bundle", "DAB", "deploy pipeline", "job YAML" | Read `data_product_accelerator/AGENTS.md` |
 | "naming", "tagging", "PII", "PK/FK", "constraints", "table properties" | Read `data_product_accelerator/AGENTS.md` |
 
-### Databricks App — `apps_lakebase/`
+### Databricks AppKit Workshop — `apps_lakebase/`
+
+The app is **scaffolded at runtime** via `databricks apps init` (not pre-built). The skills guide the full lifecycle.
 
 | Keywords | Read This |
 |----------|-----------|
-| "FastAPI", "backend", "server", "API endpoint", "routers" | `apps_lakebase/server/app.py`, `apps_lakebase/server/routers/` |
-| "Lakebase", "PostgreSQL", "database tables", "DDL", "DML" | `apps_lakebase/lakebase/README.md`, `apps_lakebase/scripts/setup-lakebase.sh` |
-| "deploy app", "app.yaml", "Databricks Apps" | `apps_lakebase/app.yaml`, `apps_lakebase/scripts/deploy.sh` |
-| "setup", "authentication", "PAT", "CLI profile" | `apps_lakebase/scripts/setup.sh`, `env.example` |
-| "local dev", "hot reload", "run local", "watch" | `apps_lakebase/scripts/watch.sh`, `apps_lakebase/scripts/run_local.sh` |
-| "health check", "readiness", "liveness" | `apps_lakebase/server/routers/health.py` |
-| "dependencies", "pyproject.toml", "requirements" | `apps_lakebase/pyproject.toml` |
-| "app status", "app logs" | `apps_lakebase/scripts/app_status.sh` |
+| "scaffold", "create app", "new app", "AppKit", "init app", "bootstrap app" | `apps_lakebase/skills/appkit-scaffold/SKILL.md` |
+| "build app", "implement UI", "frontend", "backend", "PRD", "components" | `apps_lakebase/skills/appkit-build/SKILL.md` |
+| "deploy app", "app.yaml", "Databricks Apps", "validate app" | `apps_lakebase/skills/appkit-deploy/SKILL.md` |
+| "Lakebase", "PostgreSQL", "database tables", "wiring", "persistence" | `apps_lakebase/skills/appkit-lakebase-navigator/SKILL.md` |
+| "add plugin", "analytics plugin", "genie plugin", "files plugin" | `apps_lakebase/skills/appkit-plugin-add/SKILL.md` |
+| "workshop guide", "full lifecycle", "phases", "Instructions" | `apps_lakebase/Instructions.md` |
 
 ### Agentic Framework — `agentic-framework/`
 
@@ -154,11 +154,19 @@ This framework is built on the open [Agent Skills (SKILL.md)](https://agentskill
 | IDE / Agent | How It Discovers This File | File Reference Syntax |
 |-------------|---------------------------|----------------------|
 | **Cursor** | Auto-loads `AGENTS.md` | `@path/to/file` |
-| **Claude Code** | Reads `AGENTS.md` (or `CLAUDE.md`) at repo root | Reference files by path in conversation |
+| **Claude Code** | Reads `AGENTS.md` (or `CLAUDE.md`) at repo root | Reference files by path |
+| **VS Code / Copilot** | Reads `AGENTS.md` or `.github/copilot-instructions.md` | `#file:path/to/file` |
 | **Windsurf** | Reads `AGENTS.md` or `.windsurfrules` at repo root | `@path/to/file` |
-| **Copilot** | Reads `AGENTS.md` or `.github/copilot-instructions.md` | `#file:path/to/file` |
 | **Codex** | Reads `AGENTS.md` at repo root | Reference files by path |
 | **Other** | Point the agent to this file manually | Paste file contents or path |
+
+**Databricks Agent Skills** are installed project-level into `.agents/skills/` (gitignored) for all IDEs:
+
+```bash
+git clone --depth 1 https://github.com/databricks/databricks-agent-skills .agents/skills/databricks-skills
+```
+
+This follows the [agentskills.io](https://agentskills.io) cross-agent standard and is discovered by Cursor, VS Code, Windsurf, Claude Code, and any compatible agent. See `apps_lakebase/skills/appkit-scaffold/SKILL.md` Step 1 for details.
 
 ---
 
@@ -171,11 +179,11 @@ I have a customer schema at @data_product_accelerator/context/booking_app_schema
 Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
 ```
 
-### Databricks App
+### Databricks AppKit App
 
 ```
-Add a new API endpoint to the Databricks App.
-Read @apps_lakebase/server/routers/api.py and add a GET /recommendations endpoint.
+Scaffold a new Databricks AppKit app with analytics and Lakebase plugins.
+Read @apps_lakebase/skills/appkit-scaffold/SKILL.md
 ```
 
 ### Agentic Framework

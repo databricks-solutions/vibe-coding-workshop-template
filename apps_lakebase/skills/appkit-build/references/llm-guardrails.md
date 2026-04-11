@@ -10,11 +10,12 @@
 
 1. **Do NOT invent APIs.** Only use documented exports from `@databricks/appkit` and `@databricks/appkit-ui`. If unsure, stick to patterns shown in the docs.
 2. **`createApp()` is async.** Always `await createApp(...)`. If top-level await isn't available, use `void createApp(...)` but never ignore promise rejection.
-3. **Always `useMemo` query parameters.** Every params object passed to `useAnalyticsQuery` or chart components must be wrapped in `useMemo` — otherwise React triggers infinite refetch loops.
+3. **Always `useMemo` query parameters.** Every params object passed to `useAnalyticsQuery` or chart components must be wrapped in `useMemo` — otherwise React triggers infinite refetch loops. For parameterless queries (typegen produces `Record<string, never>`), pass `useMemo(() => ({}), [])`.
 4. **Always handle loading/error/empty states.** Use `Skeleton` for loading, error text for errors, and meaningful empty states.
 5. **Always use `sql.*` helpers** for query parameter values (`sql.date()`, `sql.string()`, `sql.number()`). Do not pass raw strings or numbers.
-6. **Never construct SQL dynamically.** Use parameterized queries with `:paramName` placeholders in `.sql` files.
-7. **Never use `require()`.** Use ESM `import`/`export` only. `package.json` must have `"type": "module"`.
+6. **SQL results return strings.** `useAnalyticsQuery` may return all column values as strings at runtime, even for `INT`, `DECIMAL`, or `BOOLEAN` columns. Always coerce with `Number()` before arithmetic and comparisons. Without this, expressions like `a + b` produce string concatenation (`"73" + "51" = "7351"`) instead of addition (`73 + 51 = 124`).
+7. **Never construct SQL dynamically.** Use parameterized queries with `:paramName` placeholders in `.sql` files.
+8. **Never use `require()`.** Use ESM `import`/`export` only. `package.json` must have `"type": "module"`.
 
 ---
 
@@ -45,7 +46,7 @@ Failure to do this causes build errors in strict TypeScript setups.
 
 - Charts are ECharts-based — use props (`xKey`, `yKey`, `colors`), NOT Recharts children (`<XAxis>`, `<Bar>`, etc.)
 - Use `format="auto"` on charts unless you have a specific reason for `"json"` or `"arrow"`
-- If using tooltips, wrap the root component with `<TooltipProvider>`
+- Wrap the root component with `<TooltipProvider>` in `App.tsx` — many AppKit components use tooltips internally
 - All data-driven components must show three states: loading → data → empty/error
 
 ---

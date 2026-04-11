@@ -6,28 +6,38 @@ Get started building your data product on Databricks. Choose your starting point
 
 ---
 
-## Path A: Deploy a Databricks App
+## Path A: Build and Deploy a Databricks App
 
-Get a FastAPI backend with Lakebase running on Databricks Apps in 4 commands:
+Build a full-stack TypeScript app on Databricks AppKit, guided by 5 agent skills:
 
 ```bash
 # 1. Clone template
 git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git my-project && cd my-project
 
-# 2. Setup (configure auth + install deps)
-cd apps_lakebase && ./scripts/setup.sh
+# 2. Authenticate
+databricks auth login --host https://your-workspace.cloud.databricks.com
 
-# 3. Deploy
-./scripts/deploy.sh --create
-
-# 4. Open your app URL!
+# 3. Open your AI coding assistant and prompt:
 ```
+
+```
+I want to build a Databricks App. Read @apps_lakebase/skills/appkit-scaffold/SKILL.md and scaffold a new AppKit project.
+```
+
+Follow the 4-phase workflow in [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md):
+
+| Phase | What Happens | Skill Used |
+|-------|-------------|------------|
+| 1 | Scaffold + build UI from a PRD, test locally | `appkit-scaffold`, `appkit-build` |
+| 2 | Deploy to Databricks Apps | `appkit-deploy` |
+| 3 | Wire Lakebase PostgreSQL backend | `appkit-lakebase-navigator` |
+| 4 | End-to-end verification | `appkit-deploy` |
 
 ---
 
 ## Path B: Build an End-to-End Data Pipeline
 
-Take a raw schema CSV through the full medallion architecture — Bronze, Silver, Gold, semantic layer, Genie Spaces, ML, and GenAI agents — using one prompt per stage:
+Take a raw schema CSV through the full medallion architecture -- Bronze, Silver, Gold, semantic layer, Genie Spaces, ML, and GenAI agents -- using one prompt per stage:
 
 1. Drop your schema CSV into `data_product_accelerator/context/`
 2. Open your AI coding assistant (Cursor, Claude Code, Windsurf, etc.)
@@ -38,7 +48,7 @@ I have a customer schema at @data_product_accelerator/context/Wanderbricks_Schem
 Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md
 ```
 
-4. Follow the full [9-stage pipeline guide](data_product_accelerator/QUICKSTART.md) — one prompt per stage, one new conversation per stage.
+4. Follow the full [9-stage pipeline guide](data_product_accelerator/QUICKSTART.md) -- one prompt per stage, one new conversation per stage.
 
 ---
 
@@ -46,33 +56,32 @@ Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold
 
 | Directory | What It Does |
 |-----------|-------------|
-| `apps_lakebase/` | Databricks App — FastAPI backend + Lakebase (managed PostgreSQL) |
-| `data_product_accelerator/` | 50 agent skills for building end-to-end data products (9 stages) |
+| `apps_lakebase/` | AppKit workshop -- 5 agent skills for building full-stack Databricks Apps |
+| `data_product_accelerator/` | 59 agent skills for building end-to-end data products (9 stages) |
 | `agentic-framework/` | Multi-agent build framework for Databricks Foundation Models |
 
 ---
 
-## App Commands
+## AppKit Commands (after scaffolding)
 
-All app commands are run from the `apps_lakebase/` directory:
+After scaffolding your app with the `appkit-scaffold` skill, these commands run from your generated app directory:
 
 | Task | Command |
 |------|---------|
-| **Setup** | `./scripts/setup.sh` |
-| **First Deploy** | `./scripts/deploy.sh --create` |
-| **Update Deploy** | `./scripts/deploy.sh` |
-| **Local Dev** | `./scripts/watch.sh` |
-| **Check Status** | `./scripts/app_status.sh` |
-| **Setup Lakebase** | `./scripts/setup-lakebase.sh` |
+| **Install deps** | `npm install` |
+| **Dev server** | `npm run dev` |
+| **Build** | `npm run build` |
+| **Type generation** | `npm run typegen` |
+| **Validate** | `databricks apps validate` |
+| **Deploy** | `databricks apps deploy --profile <PROFILE>` |
+| **AppKit docs** | `npx @databricks/appkit docs` |
 
 ---
 
-## Local URLs
+## Local URLs (after scaffolding)
 
-- **API**: http://localhost:8000
-- **Docs**: http://localhost:8000/docs
+- **App + API**: http://localhost:8000
 - **Health**: http://localhost:8000/health
-- **Readiness**: http://localhost:8000/ready
 
 ---
 
@@ -84,25 +93,30 @@ Build a complete Databricks data product using one prompt per stage:
 Schema CSV → Gold Design → Bronze → Silver → Gold → Semantic Layer → Observability → ML → GenAI Agents
 ```
 
-- [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md) — Step-by-step (9 stages)
-- [data_product_accelerator/AGENTS.md](data_product_accelerator/AGENTS.md) — Skill routing table
+- [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md) -- Step-by-step (9 stages)
+- [data_product_accelerator/AGENTS.md](data_product_accelerator/AGENTS.md) -- Skill routing table
 
 ---
 
 ## Troubleshooting
 
 ```bash
-# Reconfigure auth
-cd apps_lakebase
-rm .env.local && ./scripts/setup.sh
+# Check CLI version (must be >= 0.295.0)
+databricks --version
 
-# Check connection
+# Reconfigure auth
+databricks auth login --host https://your-workspace.cloud.databricks.com
+
+# Verify connection
 databricks current-user me
 
-# Check app status
-./scripts/app_status.sh --verbose
+# Check deployed app
+databricks apps get <APP_NAME> --profile <PROFILE>
+
+# Kill stuck dev server
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 ```
 
 ---
 
-**Full docs**: [README.md](README.md) | **Prerequisites**: [PRE-REQUISITES.md](PRE-REQUISITES.md) | **9-stage guide**: [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md)
+**Full docs**: [README.md](README.md) | **Prerequisites**: [PRE-REQUISITES.md](PRE-REQUISITES.md) | **AppKit guide**: [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md) | **9-stage guide**: [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md)

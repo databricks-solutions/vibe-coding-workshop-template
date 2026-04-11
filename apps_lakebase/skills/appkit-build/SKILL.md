@@ -175,7 +175,7 @@ Build the UI in two phases so you get immediate visual feedback before SQL queri
 
 **Phase 1 — Static data for immediate visual feedback:**
 
-Use the `data` prop on AppKit data components (charts, tables) with representative sample data. This lets you design and iterate on the UI without waiting for SQL queries or type generation.
+Use the `data` prop on AppKit data components (charts, tables) with representative sample data. This lets you build and iterate on the UI visually before wiring up live query-driven data.
 
 ```tsx
 <BarChart
@@ -218,13 +218,15 @@ All static demo data must be replaced with query-driven data before declaring th
 
 READ [references/llm-guardrails.md](references/llm-guardrails.md) for the complete list. Key ones:
 
-- **Always `useMemo`** on query parameters — prevents infinite refetch loops
+- **SQL results return strings** — `useAnalyticsQuery` may return all values as strings at runtime, even for numeric columns. Always coerce with `Number()` before arithmetic to avoid string concatenation bugs
+- **Always `useMemo`** on query parameters — prevents infinite refetch loops. For parameterless queries (`Record<string, never>`), pass `useMemo(() => ({}), [])`
 - **Always handle loading/error/empty states** — use `Skeleton` for loading
 - **Always use `sql.*` helpers** for parameters (`sql.date()`, `sql.string()`, `sql.number()`)
 - **Use `import type`** for type-only imports when `verbatimModuleSyntax` is enabled
 - **Never invent APIs** — only use documented exports from `@databricks/appkit` and `@databricks/appkit-ui`
 - **Never build SQL strings dynamically** — use parameterized queries
 - **`createApp()` is async** — always `await` it
+- **Wrap root with `<TooltipProvider>`** — many AppKit components use tooltips internally; add this to `App.tsx` by default
 
 ### UI Components
 
@@ -234,6 +236,50 @@ Check the live docs for the latest component list:
 
 ```bash
 npx @databricks/appkit docs "appkit-ui API reference"
+```
+
+**Note:** The `docs` search matches section headings only. Searching for a component name like `"DataTable"` may fail. Use the full doc path for specific components:
+
+```bash
+npx @databricks/appkit docs "./docs/api/appkit-ui/data/DataTable.md"
+```
+
+### Routing
+
+The scaffold generates react-router v7 with `createBrowserRouter`. For multi-page apps, set up routing in `App.tsx`:
+
+- **`createBrowserRouter`** — define routes with path and element
+- **`<Outlet />`** — render child routes inside a layout component
+- **`<NavLink>`** — navigation links with active state styling
+- **`useParams()`** — read URL parameters (e.g. `/orders/:id`)
+- **`useNavigate()`** — programmatic navigation
+
+```tsx
+import { createBrowserRouter, RouterProvider, NavLink, Outlet } from "react-router-dom";
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Layout />,
+    children: [
+      { index: true, element: <Dashboard /> },
+      { path: "orders", element: <Orders /> },
+      { path: "orders/:id", element: <OrderDetail /> },
+    ],
+  },
+]);
+
+function Layout() {
+  return (
+    <div>
+      <nav>
+        <NavLink to="/">Dashboard</NavLink>
+        <NavLink to="/orders">Orders</NavLink>
+      </nav>
+      <Outlet />
+    </div>
+  );
+}
 ```
 
 ---
@@ -252,6 +298,22 @@ Verify at `http://localhost:8000`:
 
 ---
 
+## Known Gotchas
+
+Common runtime surprises that cause bugs or confusion:
+
+| Gotcha | Fix |
+|--------|-----|
+| SQL results return strings even for numeric columns | Coerce with `Number()` before arithmetic |
+| `useAnalyticsQuery` params must be wrapped in `useMemo` | Unwrapped objects trigger infinite refetch loops |
+| Parameterless queries generate `Record<string, never>` | Pass `useMemo(() => ({}), [])` |
+| Charts are ECharts-based, not Recharts | Use props (`xKey`, `yKey`, `colors`) — not children (`<XAxis>`, `<Bar>`) |
+| `import type` required with `verbatimModuleSyntax` | Separate type-only imports or build fails |
+| Chart components accept both `data` (static) and `queryKey` (query-driven) props | Use `data` for Phase 1 static data, `queryKey` + `params` for Phase 2 |
+| `npx @databricks/appkit docs` search matches section headings only | Use full doc path for specific component lookups |
+
+---
+
 ## Pre-Finalization Checklist
 
 Before declaring the build complete:
@@ -261,13 +323,13 @@ Before declaring the build complete:
 - [ ] All query parameters wrapped in `useMemo`
 - [ ] Loading/error/empty states on every data component
 - [ ] `tests/smoke.spec.ts` selectors updated for your app
-- [ ] Static demo data renders correctly (swap to live data happens in Phase 3 — Lakebase wiring)
+- [ ] Static demo data renders correctly (swap to live data happens in Phase 4 — Lakebase wiring)
 - [ ] `npm run dev` runs cleanly at `http://localhost:8000`
 
 ---
 
 ## What's Next: Deploying
 
-Once local testing passes, deploy to Databricks Apps using the `appkit-deploy` skill at `@apps_lakebase/skills/appkit-deploy/SKILL.md`. The calling prompt (`02-deploy.md` or `04-e2e-test.md`) will set variables and invoke the skill.
+Once local testing passes, deploy to Databricks Apps using the `appkit-deploy` skill at `@apps_lakebase/skills/appkit-deploy/SKILL.md`. The calling prompt (`02-deploy.md` or `05-e2e-test.md`) will set variables and invoke the skill.
 
 See the [AppKit App Management docs](https://databricks.github.io/appkit/docs/app-management) for advanced deploy options.

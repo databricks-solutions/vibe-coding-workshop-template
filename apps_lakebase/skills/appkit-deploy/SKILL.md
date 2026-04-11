@@ -44,6 +44,7 @@ Before deploying, ensure:
 - The app builds locally (`npm run build` succeeds)
 - `$APP_NAME` and `$PROFILE` are set by the calling prompt
 - The app directory contains `app.yaml` and `databricks.yml`
+- If deploying to a **different workspace** than where the app was scaffolded: update the `host` in `databricks.yml`, update `sql_warehouse_id` for the new workspace, and remove stale bundle state with `rm -rf $APP_NAME/.databricks`
 
 ---
 
@@ -61,18 +62,26 @@ The bundled reference at [references/app-management.md](references/app-managemen
 
 ## Step 1: Validate Configuration
 
-Verify `app.yaml` has the correct startup command:
+Verify `app.yaml` has a startup command:
 
 ```bash
-grep "build/index.mjs" $APP_NAME/app.yaml
+grep -E "build/index\.mjs|npm.*start" $APP_NAME/app.yaml
 ```
 
-You should see `command: [node, build/index.mjs]`. If missing, add it:
+Accepted patterns:
+
+- `command: ['npm', 'run', 'start']` — AppKit default (scaffold output)
+- `command: [node, build/index.mjs]` — legacy / alternative
+
+If using `npm run start`, verify the `start` script in `package.json` points to the correct built output (e.g., `node dist/server.js`).
+
+If no startup command is present, add the default:
 
 ```yaml
 command:
-  - node
-  - build/index.mjs
+  - npm
+  - run
+  - start
 ```
 
 Check that required environment bindings are present. At minimum, apps using the analytics plugin need:
@@ -107,7 +116,14 @@ cd $APP_NAME
 npm run build
 ```
 
-This must complete without errors. A successful build produces `build/index.mjs` — this is what `app.yaml`'s command runs in production.
+This must complete without errors. A successful build produces the output referenced by `app.yaml`'s command (typically `build/index.mjs` or `dist/server.js`).
+
+Verify the build output exists before deploying:
+
+```bash
+# Check for the file that app.yaml's command references
+ls dist/server.js 2>/dev/null || ls build/index.mjs 2>/dev/null || echo "WARNING: No build output found — check app.yaml command"
+```
 
 If there are TypeScript or build errors, fix them before proceeding.
 
@@ -125,7 +141,15 @@ This single command runs the full pipeline:
 2. Deploys the bundle to the workspace
 3. Starts the app
 
-Wait for completion (typically 1-2 minutes).
+Wait for completion — typically 1-3 minutes for redeployments, up to 5 minutes for first deploys.
+
+Verify the app is running before proceeding:
+
+```bash
+databricks apps get $APP_NAME --output json --profile $PROFILE | jq '{status: .status.state, compute: .compute_status.state}'
+```
+
+If `compute` is not `ACTIVE` or `status` is not `RUNNING`, wait 30 seconds and re-check. Use `databricks apps logs $APP_NAME --follow --profile $PROFILE` to stream logs in real-time instead of polling repeatedly.
 
 For faster iteration after the first deploy, use `--skip-build` if the code hasn't changed:
 
@@ -163,6 +187,7 @@ If errors exist:
 1. Identify the error from the log output
 2. Apply the fix in the app directory
 3. Redeploy: `databricks apps deploy --profile $PROFILE`
+   - For config-only changes (e.g., fixing `app.yaml` env vars or `databricks.yml` resources), use `--skip-build` to save 1-2 minutes: `databricks apps deploy --skip-build --profile $PROFILE`
 4. Check logs again
 
 If no errors: deployment is successful.
@@ -173,7 +198,7 @@ Repeat up to 3 times. If errors persist after 3 attempts, report them for manual
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `Cannot find module 'build/index.mjs'` | Build output missing or `app.yaml` command wrong | Verify `app.yaml` has `command: [node, build/index.mjs]` and `npm run build` succeeds |
+| `Cannot find module 'build/index.mjs'` | Build output missing or `app.yaml` command wrong | Verify `app.yaml` command matches the build output (see Step 1) and `npm run build` succeeds |
 | `DATABRICKS_WAREHOUSE_ID is not set` | Analytics plugin can't find the warehouse | Add `valueFrom: sql-warehouse` for `DATABRICKS_WAREHOUSE_ID` in `app.yaml` |
 | Connection refused / timeout on SQL queries | SQL warehouse starting up or stopped | Wait 30s and retry; check warehouse is running in the workspace |
 | TypeScript / build errors during deploy | Compilation issues in `server/` or `client/` | Run `npm run build` locally, fix errors, redeploy |
@@ -187,17 +212,17 @@ The calling prompt may define additional plugin-specific errors (e.g., Lakebase 
 
 If deployment fails because the workspace has hit its app limit, do NOT rename your app. Instead, free up a slot by removing the oldest stopped app:
 
-Find stopped apps sorted by oldest first:
+Find the oldest stopped app:
 
 ```bash
-databricks apps list -o json --profile $PROFILE | jq -r '[.[] | select(.compute_status.state == "STOPPED")] | sort_by(.update_time) | .[0] | .name'
-```
-
-Delete it and wait for cleanup to complete:
-
-```bash
-databricks apps delete <name-from-above> --profile $PROFILE
-sleep 10
+OLDEST=$(databricks apps list -o json --profile $PROFILE | jq -r '[.[] | select(.compute_status.state == "STOPPED")] | sort_by(.update_time) | .[0] | .name // empty')
+if [ -z "$OLDEST" ]; then
+  echo "No stopped apps to delete. Manual workspace cleanup needed."
+else
+  echo "Deleting oldest stopped app: $OLDEST"
+  databricks apps delete "$OLDEST" --profile $PROFILE
+  sleep 10
+fi
 ```
 
 Retry the deployment.

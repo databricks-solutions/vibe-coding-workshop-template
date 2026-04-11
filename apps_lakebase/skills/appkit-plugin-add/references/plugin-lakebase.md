@@ -49,15 +49,32 @@ env:
 
 When deployed with a `postgres` database resource, `PGHOST`, `PGDATABASE`, `PGSSLMODE`, `PGUSER`, `PGPORT`, and `PGAPPNAME` are auto-injected by the platform. Only `LAKEBASE_ENDPOINT` must be set explicitly.
 
-### 4. Create a Lakebase Project First
+### 4. Add Postgres Resource to databricks.yml
+
+If the app was scaffolded without `--features lakebase`, `databricks.yml` will not include the Lakebase resource. Add it so the Service Principal gets Lakebase connectivity on deploy:
+
+```yaml
+resources:
+  - name: postgres
+    postgres:
+      branch: projects/<project-name>/branches/production
+      permission: CAN_CONNECT_AND_CREATE
+```
+
+Add this under the existing `resources:` section alongside any other resources (e.g., `sql-warehouse`). Without this, `databricks apps deploy` will not provision Lakebase access for the app's Service Principal.
+
+### 5. Create a Lakebase Project First
 
 Before using the plugin, you need a Lakebase Postgres Autoscaling project. Create one via:
 - The Databricks UI (Compute > Lakebase Postgres)
-- Or: `databricks postgres projects create --name <project-name>`
+- Or: `databricks postgres create-project --name <project-name>`
 
-Then create a branch and database within the project.
+Then retrieve the host from the endpoint listing:
+```bash
+databricks postgres list-endpoints projects/<project-name>/branches/production --output json
+```
 
-### 5. Using the Pool
+### 6. Using the Pool
 
 ```typescript
 const AppKit = await createApp({
@@ -114,6 +131,12 @@ When you create the app with the Lakebase resource, the Service Principal gets `
 3. **Run locally** — your Databricks identity is used for OAuth authentication.
 
 The `databricks_superuser` role gives full DML access (read/write) but not DDL (create schema/table). Deploy first so the Service Principal creates all objects.
+
+## Gotchas
+
+- **`autoStart: false` required with `server.extend()`:** When adding custom Express routes via `server.extend()` (for Lakebase CRUD endpoints), you must pass `server({ autoStart: false })` and call `AppKit.server.start()` manually after registering routes. Without this, the server starts before routes are registered.
+- **DECIMAL/NUMERIC columns return strings:** `node-pg` returns `DECIMAL` and `NUMERIC` values as strings (e.g., `"189.00"`) to avoid JavaScript floating-point precision loss. Always coerce with `Number()` before arithmetic.
+- **SERIAL + `ON CONFLICT DO NOTHING` doesn't prevent duplicate seed data:** SERIAL always generates new IDs, so the conflict never triggers on the primary key. Use a count-check pattern (`SELECT count(*) → INSERT if 0`) for idempotent seeding.
 
 ## Combining with Other Plugins
 

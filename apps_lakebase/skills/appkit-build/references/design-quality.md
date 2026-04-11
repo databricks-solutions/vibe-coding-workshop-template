@@ -26,12 +26,14 @@ Choose a clear conceptual direction and execute with precision. Bold maximalism 
 - **Avoid** generic defaults: Inter, Roboto, Arial, system fonts
 - Pair a distinctive display font with a refined body font
 - Use font size, weight, and letter-spacing with deliberate contrast
+- **Loading fonts in AppKit:** Add a Google Fonts `<link>` to `client/index.html`, then apply via `font-family` in `client/src/index.css`
 
 ### Color & Theme
 - Commit to a cohesive palette using CSS variables
 - Dominant colors with sharp accents outperform timid, evenly-distributed palettes
 - **Avoid** cliched schemes — particularly purple gradients on white backgrounds
 - Design for both light and dark themes; vary across projects
+- **AppKit theming:** The scaffold generates `client/src/index.css` with commented-out oklch CSS custom properties (e.g. `--primary`, `--background`, `--accent`). Uncomment and customize these variables — this is the primary theming mechanism for creating a distinctive palette
 
 ### Motion & Interaction
 - Use animations for delight and micro-interactions

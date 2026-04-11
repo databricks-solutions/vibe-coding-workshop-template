@@ -21,7 +21,8 @@ This template is a complete **data product builder** powered by vibe coding. Sta
 | Tool | Required | Installation |
 |------|----------|-------------|
 | **Databricks Workspace** | Yes | Access to a Databricks workspace with Unity Catalog |
-| **Databricks CLI** | Yes | `curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh \| sh` |
+| **Databricks CLI >= 0.295.0** | Yes | `curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh \| sh` |
+| **Node.js v22+** | Yes (Path A) | [nodejs.org](https://nodejs.org/) — required by AppKit |
 | **AI-Powered IDE** | Yes | [Cursor](https://cursor.com), [Windsurf](https://windsurf.com), VS Code + Copilot, or similar |
 | **Python 3.10+** | Yes | [python.org](https://www.python.org/downloads/) |
 | **Git** | Yes | [git-scm.com](https://git-scm.com/) |
@@ -35,17 +36,22 @@ cd my-project
 
 ### Choose Your Starting Point
 
-#### Path A: Deploy a Databricks App
+#### Path A: Build and Deploy a Databricks App
 
-Get a FastAPI backend with Lakebase (managed PostgreSQL) running on Databricks Apps:
+Build a full-stack TypeScript app on Databricks AppKit, guided by 5 agent skills:
 
-```bash
-cd apps_lakebase
-./scripts/setup.sh          # Configure auth + install deps
-./scripts/deploy.sh --create # Deploy to Databricks Apps
+1. Read the workshop guide: [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md)
+2. Open your AI coding assistant and prompt:
+
+```
+I want to build a Databricks App. Read @apps_lakebase/skills/appkit-scaffold/SKILL.md and scaffold a new AppKit project.
 ```
 
-After deployment, open your app URL in the browser.
+3. Follow the 4-phase workflow in Instructions.md:
+   - **Phase 1:** Scaffold + build UI from a PRD (uses `appkit-scaffold` and `appkit-build` skills)
+   - **Phase 2:** Deploy to Databricks Apps (uses `appkit-deploy` skill)
+   - **Phase 3:** Wire Lakebase PostgreSQL backend (uses `appkit-lakebase-navigator` skill)
+   - **Phase 4:** End-to-end verification
 
 #### Path B: Build an End-to-End Data Pipeline
 
@@ -79,24 +85,14 @@ vibe-coding-workshop-template/
 ├── SECURITY.md                     # Security policy
 ├── env.example                     # Environment variable template
 │
-├── apps_lakebase/                  # Databricks App (FastAPI + Lakebase)
-│   ├── app.yaml                    #   Databricks App entry point config
-│   ├── pyproject.toml              #   Python dependencies
-│   ├── server/                     #   FastAPI backend
-│   │   ├── app.py                  #     Main application
-│   │   └── routers/
-│   │       ├── health.py           #     Health/readiness endpoints
-│   │       └── api.py              #     API endpoints (workspace, catalogs, query)
-│   ├── scripts/                    #   Development & deployment scripts
-│   │   ├── setup.sh                #     Configure auth & install deps
-│   │   ├── deploy.sh               #     Deploy to Databricks Apps
-│   │   ├── watch.sh                #     Local dev server (hot reload)
-│   │   ├── run_local.sh            #     Test locally before deploying
-│   │   ├── app_status.sh           #     Check deployed app status
-│   │   ├── setup-lakebase.sh       #     Set up Lakebase tables
-│   │   └── lakebase_manager.py     #     Lakebase connectivity & permissions
-│   └── lakebase/
-│       └── README.md               #   Lakebase DDL/DML reference
+├── apps_lakebase/                  # Databricks AppKit Workshop (5 agent skills)
+│   ├── Instructions.md             #   Comprehensive 4-phase workshop guide
+│   └── skills/                     #   Agent skills for the full app lifecycle
+│       ├── appkit-scaffold/        #     Scaffold new AppKit projects (+ agent skills install)
+│       ├── appkit-build/           #     Build UI + backend from a PRD
+│       ├── appkit-deploy/          #     Deploy to Databricks Apps
+│       ├── appkit-plugin-add/      #     Add plugins (Lakebase, Analytics, Genie, Files)
+│       └── appkit-lakebase-navigator/ #  Wire Lakebase PostgreSQL backend
 │
 ├── data_product_accelerator/       # 59 Agent Skills for End-to-End Data Products
 │   ├── AGENTS.md                   #   Detailed skill routing table
@@ -151,7 +147,7 @@ Raw Schema CSV or Existing Data
   ├─► ML Pipelines         — MLflow experiments, training, inference
   ├─► GenAI Agents         — ResponsesAgent, evaluation, deployment
   │
-  └─► Databricks App       — FastAPI + Lakebase, deployed on Databricks Apps
+  └─► Databricks App       — AppKit (full-stack TypeScript), deployed on Databricks Apps
 ```
 
 Each stage is driven by a single prompt to your AI coding assistant. The 59 agent skills in `data_product_accelerator/` encode production-tested patterns so you get governed, high-quality output at every step.
@@ -181,42 +177,34 @@ See [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART
 
 ---
 
-## Databricks App (FastAPI + Lakebase)
+## Databricks AppKit Workshop (5 Agent Skills)
 
-The `apps_lakebase/` directory contains a production-ready **FastAPI backend** with Lakebase (managed PostgreSQL) integration, deployable to Databricks Apps.
+The `apps_lakebase/` directory contains **5 agent skills** and a comprehensive workshop guide for building full-stack TypeScript apps on [Databricks AppKit](https://databricks.github.io/appkit/). The app is **not pre-built** — it gets scaffolded at runtime via `databricks apps init` and built iteratively with your AI coding assistant.
 
-**Key features:**
-- FastAPI with structured logging and CORS
-- Health, readiness, and liveness endpoints
-- Unity Catalog integration (catalogs, schemas, tables, SQL queries)
-- Lakebase PostgreSQL connectivity
-- Optional frontend serving (React/Vite from `client/build`)
-- Deploy scripts for Databricks Apps platform
+**What gets built:**
+- Full-stack TypeScript app (React + Tailwind CSS frontend, AppKit backend)
+- SQL Warehouse integration for analytics queries
+- Optional Lakebase (managed PostgreSQL) persistence
+- Deployed to Databricks Apps with hot reload for local dev
 
-### App Commands
+### Workshop Skills
 
-All commands run from the `apps_lakebase/` directory:
+| Skill | Purpose |
+|-------|---------|
+| `appkit-scaffold` | Scaffold new AppKit projects with plugins (analytics, lakebase, genie, files) |
+| `appkit-build` | Build UI and backend from a PRD — components, queries, type generation |
+| `appkit-deploy` | Deploy to Databricks Apps, validate configuration |
+| `appkit-plugin-add` | Add plugins to an existing AppKit project |
+| `appkit-lakebase-navigator` | Wire Lakebase PostgreSQL backend for transactional data |
 
-| Command | Description |
-|---------|-------------|
-| `./scripts/setup.sh` | Configure authentication and install dependencies |
-| `./scripts/deploy.sh --create` | First deployment (creates the app) |
-| `./scripts/deploy.sh` | Update existing app |
-| `./scripts/deploy.sh --verbose` | Deploy with detailed output |
-| `./scripts/watch.sh` | Start local dev server with hot reload |
-| `./scripts/run_local.sh` | Test app locally (production mode) |
-| `./scripts/setup-lakebase.sh` | Set up Lakebase tables and permissions |
-| `./scripts/app_status.sh` | Check app status and URL |
-
-### Local Development URLs
+### Local Development (after scaffolding)
 
 | Service | URL |
 |---------|-----|
-| API | http://localhost:8000 |
-| API Documentation | http://localhost:8000/docs |
+| App + API | http://localhost:8000 |
 | Health Check | http://localhost:8000/health |
-| Readiness Check | http://localhost:8000/ready |
-| Frontend (if enabled) | http://localhost:5173 |
+
+Start the dev server from your scaffolded app directory with `npm run dev`.
 
 ---
 
@@ -245,135 +233,133 @@ The `agentic-framework/` directory provides prompts and patterns for building **
 
 ## How Deployment Works
 
-When you run `./scripts/deploy.sh` from `apps_lakebase/`:
+After scaffolding your AppKit app, deployment uses the Databricks CLI:
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                     Deployment Process                              │
-├────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  1. BUILD         2. GENERATE        3. SYNC          4. DEPLOY    │
-│  ────────────     ────────────       ────────────     ──────────   │
-│  Frontend         requirements.txt   Files to         Start app    │
-│  (if exists)      from pyproject     Workspace        runtime      │
-│                                                                     │
-│  client/dist/ ──► requirements.txt ──► /Workspace/... ──► App URL  │
-│                                                                     │
-│  5. LAKEBASE (optional)                                             │
-│  ──────────────────────                                             │
-│  Set permissions + create tables                                    │
-│                                                                     │
-└────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                   AppKit Deployment Process                       │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  1. BUILD          2. VALIDATE         3. DEPLOY                  │
+│  ────────────      ────────────        ────────────               │
+│  npm run build     databricks apps     databricks apps            │
+│  (client + server) validate            deploy --profile <P>       │
+│                                                                   │
+│  client/dist/ + server/ ──► Validation ──► Databricks Apps URL   │
+│                                                                   │
+│  4. LAKEBASE (optional)                                           │
+│  ──────────────────────                                           │
+│  Wire PostgreSQL via appkit-lakebase-navigator skill              │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Files for Deployment
+### Key Files in the Generated App
 
 | File | Purpose |
 |------|---------|
-| `apps_lakebase/app.yaml` | Defines how Databricks starts your app |
-| `apps_lakebase/pyproject.toml` | Python dependencies |
-| `apps_lakebase/server/app.py` | Your FastAPI application |
+| `app.yaml` | Defines how Databricks starts your app |
+| `databricks.yml` | Databricks bundle configuration |
+| `server/server.ts` | AppKit backend entry point |
+| `client/src/` | React + Tailwind CSS frontend |
+| `package.json` | Node.js dependencies |
+
+See the `appkit-deploy` skill for the full deployment workflow.
 
 ---
 
 ## Authentication
 
-### Option 1: Personal Access Token (Recommended for Development)
+Configure a Databricks CLI profile to authenticate:
 
-1. Go to your Databricks workspace
-2. Click your username > **User Settings** > **Developer** > **Access Tokens**
-3. Generate a new token
-4. Run `./scripts/setup.sh` (from `apps_lakebase/`) and enter your token
+```bash
+databricks auth login --host https://your-workspace.cloud.databricks.com
+```
 
-### Option 2: CLI Profile (Recommended for Production)
+Verify it works:
 
-1. Configure a CLI profile:
-   ```bash
-   databricks auth login --host https://your-workspace.cloud.databricks.com --profile myprofile
-   ```
-2. Run `./scripts/setup.sh` and select "CLI Profile"
-3. Enter your profile name
+```bash
+databricks current-user me
+```
+
+To use a named profile (useful when working with multiple workspaces):
+
+```bash
+databricks auth login --host https://your-workspace.cloud.databricks.com --profile myprofile
+databricks current-user me --profile myprofile
+```
+
+All skills and CLI commands accept a `--profile` flag to target a specific workspace.
 
 ---
 
 ## Customizing Your App
 
-### Adding API Endpoints
+After scaffolding, your generated AppKit app is a full-stack TypeScript project. Customize it using standard AppKit patterns:
 
-Edit `apps_lakebase/server/routers/api.py`:
+### Adding Backend Routes
 
-```python
-from fastapi import APIRouter
+Edit `server/server.ts` in your generated app directory to add tRPC routes or custom endpoints. See the `appkit-build` skill for patterns.
 
-router = APIRouter()
+### Adding Plugins
 
-@router.get("/hello")
-async def hello():
-    return {"message": "Hello from Databricks!"}
+Use the `appkit-plugin-add` skill to add capabilities:
 
-@router.get("/data/{table_name}")
-async def get_data(table_name: str):
-    from databricks.sdk import WorkspaceClient
-    w = WorkspaceClient()
-    # Query your data...
-    return {"table": table_name}
 ```
+Read @apps_lakebase/skills/appkit-plugin-add/SKILL.md and add the Lakebase plugin to my app.
+```
+
+Available plugins: `analytics`, `lakebase`, `genie`, `files`
 
 ### Adding Dependencies
 
-1. Edit `apps_lakebase/pyproject.toml`:
-   ```toml
-   dependencies = [
-       "fastapi>=0.109.0",
-       "your-new-package>=1.0.0",  # Add here
-   ]
-   ```
+```bash
+npm install your-package
+```
 
-2. Deploy:
-   ```bash
-   cd apps_lakebase
-   ./scripts/deploy.sh
-   ```
+### Consulting AppKit Docs
+
+```bash
+npx @databricks/appkit docs              # documentation index
+npx @databricks/appkit docs "<query>"    # search for a specific topic
+```
 
 ---
 
 ## Troubleshooting
 
-### "App not found" error
+### Check Databricks CLI
 
 ```bash
-# Make sure to use --create on first deployment
-cd apps_lakebase
-./scripts/deploy.sh --create
+databricks --version          # Should be >= 0.295.0
+databricks current-user me    # Verify authentication
+databricks auth profiles      # List configured profiles
 ```
 
 ### Authentication failed
 
 ```bash
-# Reconfigure authentication
-rm .env.local
-./scripts/setup.sh
+databricks auth login --host https://your-workspace.cloud.databricks.com
 ```
 
-### Check Databricks CLI
+### Port 8000 in use
 
 ```bash
-# Verify CLI is working
-databricks --version
-databricks current-user me
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+npm run dev
 ```
 
-### View App Logs
-
-1. Get your app URL: `./scripts/app_status.sh`
-2. Open `<app-url>/logz` in your browser (requires auth)
-
-### Local Testing
+### View Deployed App Logs
 
 ```bash
-# Test locally before deploying
-cd apps_lakebase
-./scripts/run_local.sh
+databricks apps get <APP_NAME> --profile <PROFILE>
+```
+
+### Local Testing (after scaffolding)
+
+```bash
+cd <your-app-directory>
+npm run dev
 # Open http://localhost:8000
 ```
 
@@ -382,11 +368,11 @@ cd apps_lakebase
 ## Resources
 
 - [PRE-REQUISITES.md](PRE-REQUISITES.md) — Workshop prerequisites checklist
+- [AppKit Workshop Guide](apps_lakebase/Instructions.md) — 4-phase Databricks App guide
 - [Data Product Accelerator QUICKSTART](data_product_accelerator/QUICKSTART.md) — 9-stage pipeline guide
+- [Databricks AppKit Documentation](https://databricks.github.io/appkit/) — AppKit SDK reference
 - [Databricks Apps Documentation](https://docs.databricks.com/dev-tools/databricks-apps/)
 - [Databricks CLI Installation](https://docs.databricks.com/dev-tools/cli/install.html)
-- [Databricks SDK for Python](https://docs.databricks.com/dev-tools/sdk-python.html)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [Agent Skills (SKILL.md) Format](https://agentskills.io)
 - [Unity Catalog](https://docs.databricks.com/unity-catalog/)
 - [Delta Live Tables](https://docs.databricks.com/dlt/)
@@ -400,7 +386,7 @@ This is a **Git template repository**. To use it:
 
 1. Click "Use this template" on GitHub, or clone directly
 2. Choose your starting point:
-   - **Deploy an app:** `cd apps_lakebase && ./scripts/setup.sh && ./scripts/deploy.sh --create`
+   - **Build a Databricks App:** Follow the [AppKit workshop guide](apps_lakebase/Instructions.md) — scaffold, build, deploy, and wire Lakebase
    - **Build a data product:** Drop a schema CSV in `data_product_accelerator/context/` and follow the [9-stage guide](data_product_accelerator/QUICKSTART.md)
    - **Build agents:** Use the prompts in `agentic-framework/agents/` to scaffold multi-agent systems
 3. Iterate with your AI coding assistant — the agent skills handle the patterns

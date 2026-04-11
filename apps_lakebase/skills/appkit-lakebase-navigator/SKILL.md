@@ -53,6 +53,9 @@ Match the user's request keywords to the correct skill. Read the skill's `SKILL.
 | "create app", "scaffold", "init", "new app", "bootstrap", "start new project" | `appkit-scaffold/SKILL.md` | Create a new AppKit project |
 | "add plugin", "add lakebase", "add analytics", "add genie", "add files", "integrate postgres", "extend app" | `appkit-plugin-add/SKILL.md` | Add a plugin to an existing project |
 | "build UI", "implement PRD", "create dashboard", "add page", "build features", "develop frontend", "create components" | `appkit-build/SKILL.md` | Build features from a PRD or spec |
+| "setup lakebase", "create lakebase project", "lakebase endpoint", "lakebase compute" | Phase 3 of `Instructions.md` or `prompts/03-setup-lakebase.md` | Create and configure a Lakebase project |
+| "wire lakebase", "connect lakebase", "lakebase wiring", "lakebase backend", "CRUD API", "lakebase tables", "DDL" | Phase 4 of `Instructions.md` or `prompts/04-lakebase-wiring.md` | Wire Lakebase to UI with DDL, API routes, and data architecture |
+| "lakebase CLI", "lakebase troubleshoot", "lakebase branches", "lakebase roles" | `databricks-lakebase` agent skill (installed via Databricks Agent Skills). Fallback: https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-lakebase/SKILL.md | Advanced Lakebase CLI operations, troubleshooting, branches, roles |
 | "deploy", "push to production", "ship app", "fix deploy error", "app won't start", "redeploy" | `appkit-deploy/SKILL.md` | Deploy to Databricks Apps |
 
 ---
@@ -62,12 +65,16 @@ Match the user's request keywords to the correct skill. Read the skill's `SKILL.
 ```
 1. User request received
 2. Detect keywords from the routing table above
-3. IF "create" / "new" / "scaffold" / "init"     → Read appkit-scaffold/SKILL.md
-4. IF "add plugin" / "integrate" / "add lakebase" → Read appkit-plugin-add/SKILL.md
-5. IF "build" / "implement" / "PRD" / "UI"        → Read appkit-build/SKILL.md
-6. IF "deploy" / "ship" / "fix deploy"            → Read appkit-deploy/SKILL.md
-7. IF ambiguous or multi-step                      → Ask user to clarify, or follow
-                                                     the lifecycle order (scaffold → build → deploy)
+3. IF "create" / "new" / "scaffold" / "init"       → Read appkit-scaffold/SKILL.md
+4. IF "add plugin" / "integrate" / "add lakebase"   → Read appkit-plugin-add/SKILL.md
+5. IF "build" / "implement" / "PRD" / "UI"          → Read appkit-build/SKILL.md
+6. IF "setup lakebase" / "create lakebase project"   → Read prompts/03-setup-lakebase.md
+                                                       (also read databricks-lakebase skill for CLI reference)
+7. IF "wire lakebase" / "connect lakebase" / "DDL"  → Read prompts/04-lakebase-wiring.md
+8. IF "lakebase CLI" / "lakebase troubleshoot"       → Read and follow databricks-lakebase agent skill
+9. IF "deploy" / "ship" / "fix deploy"              → Read appkit-deploy/SKILL.md
+10. IF ambiguous or multi-step                       → Ask user to clarify, or follow
+                                                       the lifecycle order (scaffold → build → deploy)
 ```
 
 ---

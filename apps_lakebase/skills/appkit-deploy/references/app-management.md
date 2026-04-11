@@ -10,9 +10,17 @@
 The `app.yaml` file configures the app's runtime environment in Databricks Apps.
 
 ```yaml
+# AppKit default (scaffold output)
 command:
-  - node
-  - build/index.mjs
+  - npm
+  - run
+  - start
+
+# Legacy / alternative (verify build output path matches)
+# command:
+#   - node
+#   - build/index.mjs
+
 env:
   - name: DATABRICKS_WAREHOUSE_ID
     valueFrom: sql-warehouse
@@ -46,17 +54,19 @@ Runs the full pipeline: build frontend, deploy bundle, start app.
 ## App Lifecycle Commands
 
 ```bash
-databricks apps start <name>           # Start a stopped app
-databricks apps stop <name>            # Stop without deleting
-databricks apps get <name>             # Detailed app info (URL, status, SP ID)
-databricks apps list                   # List all apps
-databricks apps delete <name>          # Permanently delete (irreversible)
+databricks apps start <name> --profile <PROFILE>    # Start a stopped app
+databricks apps stop <name> --profile <PROFILE>     # Stop without deleting
+databricks apps get <name> --profile <PROFILE>      # Detailed app info (URL, status, SP ID)
+databricks apps list --profile <PROFILE>            # List all apps
+databricks apps delete <name> --profile <PROFILE>   # Permanently delete (irreversible)
 ```
+
+`--profile` is required for all `databricks` CLI commands in multi-workspace setups. It is not needed for `npm` commands.
 
 ## Log Streaming
 
 ```bash
-databricks apps logs <name>            # Last 200 lines, then exit
+databricks apps logs <name> --profile <PROFILE>   # Last 200 lines, then exit
 ```
 
 ### Options
@@ -73,11 +83,11 @@ databricks apps logs <name>            # Last 200 lines, then exit
 ### Examples
 
 ```bash
-databricks apps logs my-app --tail-lines 50
-databricks apps logs my-app --follow --search ERROR
-databricks apps logs my-app --follow --source APP
-databricks apps logs my-app --follow --output-file app.log
-databricks apps logs my-app --follow --timeout 5m
+databricks apps logs my-app --tail-lines 50 --profile <PROFILE>
+databricks apps logs my-app --follow --search ERROR --profile <PROFILE>
+databricks apps logs my-app --follow --source APP --profile <PROFILE>
+databricks apps logs my-app --follow --output-file app.log --profile <PROFILE>
+databricks apps logs my-app --follow --timeout 5m --profile <PROFILE>
 ```
 
 ## Environment Variables

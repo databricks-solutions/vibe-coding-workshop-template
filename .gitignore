@@ -45,6 +45,9 @@ uv.lock
 .cursor/*
 !.cursor/rules/
 
+# Agent Skills (cloned from upstream, not vendored)
+.agents/
+
 # Jupyter Notebooks
 .ipynb_checkpoints/
 
