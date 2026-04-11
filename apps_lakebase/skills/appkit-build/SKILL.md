@@ -261,7 +261,7 @@ Before declaring the build complete:
 - [ ] All query parameters wrapped in `useMemo`
 - [ ] Loading/error/empty states on every data component
 - [ ] `tests/smoke.spec.ts` selectors updated for your app
-- [ ] All static demo data replaced with query-driven data (`queryKey` + `params`)
+- [ ] Static demo data renders correctly (swap to live data happens in Phase 3 — Lakebase wiring)
 - [ ] `npm run dev` runs cleanly at `http://localhost:8000`
 
 ---

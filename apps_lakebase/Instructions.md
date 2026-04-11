@@ -151,7 +151,7 @@ Review `@docs/design_prd.md` (parent `docs/` folder at repo root) to understand:
 
 Read and follow the `appkit-build` skill at `@apps_lakebase/skills/appkit-build/SKILL.md`. The skill covers the full workflow: SQL queries, type generation, backend plugins, frontend components, design quality, and testing.
 
-**Demo data strategy:** Start by using static `data` arrays on AppKit data components (charts, tables) so the UI works immediately. Write SQL files in `config/queries/` alongside. Once types are generated via `npm run typegen`, swap components from static `data` to query-driven `queryKey` + `params`. All static data must be replaced before declaring the build complete.
+**Demo data strategy:** Use static `data` arrays on AppKit data components (charts, tables) so the UI works immediately without a live backend. Write SQL files in `config/queries/` alongside and run `npm run typegen` to generate types — but keep the static data in place for now. The swap from static demo data to live query-driven data happens later in Phase 3 (Lakebase wiring).
 
 ---
 
@@ -180,7 +180,7 @@ Open `http://localhost:8000` and verify:
 - Navigation works across pages
 - Data queries return results (loading -> data flow)
 - All interactive elements respond
-- All static demo data has been replaced with query-driven data
+- Static demo data renders correctly in all components
 
 ---
 
