@@ -1,0 +1,79 @@
+# AppKit LLM Guardrails
+
+> **Upstream (always check for latest):** https://databricks.github.io/appkit/docs/development/llm-guide
+>
+> Run `npx @databricks/appkit docs "llm guide"` for the live version. This file is a fallback.
+
+---
+
+## Hard Rules
+
+1. **Do NOT invent APIs.** Only use documented exports from `@databricks/appkit` and `@databricks/appkit-ui`. If unsure, stick to patterns shown in the docs.
+2. **`createApp()` is async.** Always `await createApp(...)`. If top-level await isn't available, use `void createApp(...)` but never ignore promise rejection.
+3. **Always `useMemo` query parameters.** Every params object passed to `useAnalyticsQuery` or chart components must be wrapped in `useMemo` — otherwise React triggers infinite refetch loops.
+4. **Always handle loading/error/empty states.** Use `Skeleton` for loading, error text for errors, and meaningful empty states.
+5. **Always use `sql.*` helpers** for query parameter values (`sql.date()`, `sql.string()`, `sql.number()`). Do not pass raw strings or numbers.
+6. **Never construct SQL dynamically.** Use parameterized queries with `:paramName` placeholders in `.sql` files.
+7. **Never use `require()`.** Use ESM `import`/`export` only. `package.json` must have `"type": "module"`.
+
+---
+
+## TypeScript Import Rules
+
+When `tsconfig.json` has `"verbatimModuleSyntax": true` (AppKit default), always separate type-only imports:
+
+```typescript
+import type { ReactNode } from "react";
+import { useMemo } from "react";
+```
+
+Failure to do this causes build errors in strict TypeScript setups.
+
+---
+
+## SQL Query Rules
+
+- Place all queries in `config/queries/` — each file becomes a query key
+- Annotate parameters with `-- @param name TYPE` comments (`STRING`, `NUMERIC`, `BOOLEAN`, `DATE`, `TIMESTAMP`)
+- Use `:paramName` placeholders — never concatenate SQL strings
+- `:workspaceId` is auto-injected by the server — do NOT annotate it
+- `queryKey.sql` runs as service principal; `queryKey.obo.sql` runs as the user's identity
+
+---
+
+## Frontend Component Rules
+
+- Charts are ECharts-based — use props (`xKey`, `yKey`, `colors`), NOT Recharts children (`<XAxis>`, `<Bar>`, etc.)
+- Use `format="auto"` on charts unless you have a specific reason for `"json"` or `"arrow"`
+- If using tooltips, wrap the root component with `<TooltipProvider>`
+- All data-driven components must show three states: loading → data → empty/error
+
+---
+
+## Pre-Finalization Checklist
+
+### Project Setup
+- [ ] `package.json` has `"type": "module"`
+- [ ] `tsx` is in devDependencies
+- [ ] `dev` script: `NODE_ENV=development tsx watch server/server.ts`
+- [ ] `client/index.html` exists with `<div id="root">` and script pointing to `client/src/main.tsx`
+
+### Backend
+- [ ] `await createApp({ plugins: [...] })` used
+- [ ] `server()` plugin always included
+- [ ] If using SQL: `analytics({})` included + `config/queries/*.sql` present
+- [ ] Queries use `:param` placeholders, params passed from UI using `sql.*`
+- [ ] If workspace-scoped: uses `:workspaceId`
+
+### Frontend
+- [ ] `useMemo` wraps all parameter objects
+- [ ] Loading/error/empty states are explicit on every data component
+- [ ] Charts use props, NOT Recharts children
+- [ ] `import type` used for type-only imports
+
+### Never Do
+- [ ] Don't build SQL strings manually
+- [ ] Don't pass untyped raw params for annotated queries
+- [ ] Don't ignore `createApp()`'s promise
+- [ ] Don't invent UI components not listed in the docs
+- [ ] Don't pass Recharts-style children to AppKit chart components
