@@ -17,13 +17,14 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 ├── env.example                         <-- Environment variable template
 │
 ├── apps_lakebase/                      <-- Component 1: Databricks AppKit Workshop
-│   ├── Instructions.md                 #   Comprehensive 4-phase workshop guide
-│   └── skills/                         #   5 agent skills for the full app lifecycle
-│       ├── appkit-scaffold/            #     Scaffold new AppKit projects
-│       ├── appkit-build/               #     Build UI + backend from a PRD
-│       ├── appkit-deploy/              #     Deploy to Databricks Apps
-│       ├── appkit-plugin-add/          #     Add plugins (Lakebase, Analytics, Genie, Files)
-│       └── appkit-lakebase-navigator/  #     Wire Lakebase PostgreSQL backend
+│   ├── Instructions.md                 #   Comprehensive 5-phase workshop guide
+│   └── skills/                         #   6 agent skills for the full app lifecycle
+│       ├── 00-appkit-navigator/        #     Entry-point navigator (read first)
+│       ├── 01-appkit-scaffold/         #     Scaffold new AppKit projects
+│       ├── 02-appkit-build/            #     Build UI + backend from a PRD
+│       ├── 03-appkit-deploy/           #     Deploy to Databricks Apps
+│       ├── 04-appkit-plugin-add/       #     Add plugins (Lakebase, Analytics, Genie, Files)
+│       └── 05-appkit-lakebase-wiring/  #     Wire Lakebase backend (DDL, APIs, frontend hooks)
 │
 ├── agentic-framework/                  <-- Component 2: Multi-Agent Build Framework
 │   ├── agents/                         #   Agent prompts (PRD analyzer, skill scaffolder, etc.)
@@ -82,11 +83,12 @@ The app is **scaffolded at runtime** via `databricks apps init` (not pre-built).
 
 | Keywords | Read This |
 |----------|-----------|
-| "scaffold", "create app", "new app", "AppKit", "init app", "bootstrap app" | `apps_lakebase/skills/appkit-scaffold/SKILL.md` |
-| "build app", "implement UI", "frontend", "backend", "PRD", "components" | `apps_lakebase/skills/appkit-build/SKILL.md` |
-| "deploy app", "app.yaml", "Databricks Apps", "validate app" | `apps_lakebase/skills/appkit-deploy/SKILL.md` |
-| "Lakebase", "PostgreSQL", "database tables", "wiring", "persistence" | `apps_lakebase/skills/appkit-lakebase-navigator/SKILL.md` |
-| "add plugin", "analytics plugin", "genie plugin", "files plugin" | `apps_lakebase/skills/appkit-plugin-add/SKILL.md` |
+| "scaffold", "create app", "new app", "AppKit", "init app", "bootstrap app" | `apps_lakebase/skills/01-appkit-scaffold/SKILL.md` |
+| "build app", "implement UI", "frontend", "backend", "PRD", "components" | `apps_lakebase/skills/02-appkit-build/SKILL.md` |
+| "deploy app", "app.yaml", "Databricks Apps", "validate app" | `apps_lakebase/skills/03-appkit-deploy/SKILL.md` |
+| "Lakebase", "PostgreSQL", "database tables", "wiring", "persistence" | `apps_lakebase/skills/00-appkit-navigator/SKILL.md` |
+| "wire lakebase", "DDL", "CRUD API", "database schema design", "useLakebaseData", "mock fallback" | `apps_lakebase/skills/05-appkit-lakebase-wiring/SKILL.md` |
+| "add plugin", "analytics plugin", "genie plugin", "files plugin" | `apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` |
 | "workshop guide", "full lifecycle", "phases", "Instructions" | `apps_lakebase/Instructions.md` |
 
 ### Agentic Framework — `agentic-framework/`
@@ -166,7 +168,7 @@ This framework is built on the open [Agent Skills (SKILL.md)](https://agentskill
 git clone --depth 1 https://github.com/databricks/databricks-agent-skills .agents/skills/databricks-skills
 ```
 
-This follows the [agentskills.io](https://agentskills.io) cross-agent standard and is discovered by Cursor, VS Code, Windsurf, Claude Code, and any compatible agent. See `apps_lakebase/skills/appkit-scaffold/SKILL.md` Step 1 for details.
+This follows the [agentskills.io](https://agentskills.io) cross-agent standard and is discovered by Cursor, VS Code, Windsurf, Claude Code, and any compatible agent. See `apps_lakebase/skills/01-appkit-scaffold/SKILL.md` Step 1 for details.
 
 ---
 
@@ -183,7 +185,7 @@ Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold
 
 ```
 Scaffold a new Databricks AppKit app with analytics and Lakebase plugins.
-Read @apps_lakebase/skills/appkit-scaffold/SKILL.md
+Read @apps_lakebase/skills/01-appkit-scaffold/SKILL.md
 ```
 
 ### Agentic Framework

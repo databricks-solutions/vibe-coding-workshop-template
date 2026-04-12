@@ -16,6 +16,8 @@
 6. **SQL results return strings.** `useAnalyticsQuery` may return all column values as strings at runtime, even for `INT`, `DECIMAL`, or `BOOLEAN` columns. Always coerce with `Number()` before arithmetic and comparisons. Without this, expressions like `a + b` produce string concatenation (`"73" + "51" = "7351"`) instead of addition (`73 + 51 = 124`).
 7. **Never construct SQL dynamically.** Use parameterized queries with `:paramName` placeholders in `.sql` files.
 8. **Never use `require()`.** Use ESM `import`/`export` only. `package.json` must have `"type": "module"`.
+9. **Never import Express directly.** Express is bundled inside `@databricks/appkit`. Access it only via `server.extend((app) => { ... })`. Importing Express directly may work locally due to `node_modules` hoisting but fails in production builds where only declared dependencies are bundled.
+10. **Chart `data` props require index signatures.** If passing a named TypeScript interface to chart component `data` props, the interface must include `[key: string]: unknown` because `ChartData` expects `Record<string, unknown>[]`.
 
 ---
 
@@ -39,6 +41,7 @@ Failure to do this causes build errors in strict TypeScript setups.
 - Use `:paramName` placeholders — never concatenate SQL strings
 - `:workspaceId` is auto-injected by the server — do NOT annotate it
 - `queryKey.sql` runs as service principal; `queryKey.obo.sql` runs as the user's identity
+- **Avoid `:limit` in parameterized queries** — typegen may treat the value as a string, causing SQL type errors. Use a hardcoded `LIMIT` value or a CTE pattern instead.
 
 ---
 

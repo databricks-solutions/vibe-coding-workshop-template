@@ -1,5 +1,5 @@
 ---
-name: appkit-scaffold
+name: 01-appkit-scaffold
 description: >
   Scaffold new Databricks AppKit applications using the Databricks CLI and Agent Skills.
   Creates blank or plugin-enabled AppKit projects (Lakebase, Analytics, Genie, Files).
@@ -7,9 +7,10 @@ description: >
   new app, or set up a full-stack TypeScript Databricks application. Triggers on
   "create app", "new app", "scaffold", "AppKit", "databricks app", "blank app",
   "bootstrap app", "init app". To add a plugin to an existing app, use the
-  appkit-plugin-add skill instead.
+  04-appkit-plugin-add skill instead.
 license: Apache-2.0
 compatibility: Requires Databricks CLI >= 0.295.0 and Node.js v22+
+allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(git:*) Bash(node:*) Read
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"
@@ -33,11 +34,11 @@ Create and configure Databricks AppKit projects — blank or with plugins — us
 - Scaffolding a blank app or one with specific plugins (Lakebase, Analytics, Genie, Files)
 - Setting up a full-stack TypeScript app that deploys to Databricks Apps
 
-**Not for adding plugins to an existing app.** Use the `appkit-plugin-add` skill for that.
+**Not for adding plugins to an existing app.** Use the `04-appkit-plugin-add` skill for that.
 
 ## Prerequisites
 
-Before scaffolding, verify these requirements:
+Before scaffolding, verify these requirements. Run `bash apps_lakebase/skills/00-appkit-navigator/scripts/validate-prereqs.sh --profile $PROFILE` to check all prerequisites at once, or verify manually:
 
 ```bash
 # 1. Databricks CLI >= 0.295.0
@@ -48,11 +49,31 @@ node --version
 
 # 3. Authenticated CLI profile
 databricks auth profiles
+
+# 4. Verify access to the target workspace
+databricks current-user me --host <WORKSPACE_URL>
+# If this returns 403, you do not have access. Stop and ask the user for a different workspace.
 ```
 
 If the CLI is not installed or outdated, see the [Databricks CLI installation guide](https://docs.databricks.com/aws/en/dev-tools/cli/tutorial).
 
 **Profile Selection:** If the calling prompt specifies a profile, use it. Otherwise, list all profiles with `databricks auth profiles`, present them to the user, and let the user choose. Do not silently default to a profile when multiple are available.
+
+**Programmatic profile discovery** (for scripted or multi-phase workflows):
+
+```bash
+TARGET_HOST="<WORKSPACE_URL>"
+PROFILE=$(databricks auth profiles --output json 2>/dev/null \
+  | jq -r --arg host "$TARGET_HOST" \
+    '[.profiles[] | select(.host == $host)] | .[0].name // empty')
+
+if [ -z "$PROFILE" ]; then
+  databricks auth login --host "$TARGET_HOST"
+  PROFILE=$(databricks auth profiles --output json 2>/dev/null \
+    | jq -r --arg host "$TARGET_HOST" \
+      '[.profiles[] | select(.host == $host)] | .[0].name // empty')
+fi
+```
 
 ---
 
@@ -98,6 +119,13 @@ bash scripts/install-agent-skills.sh
 After installation, confirm the skills are available. The CLI tools should respond:
 ```bash
 databricks experimental aitools tools --help
+```
+
+Verify the Lakebase skill is present (needed in Phase 3+):
+```bash
+ls .agents/skills/databricks-skills/skills/databricks-lakebase/SKILL.md 2>/dev/null \
+  && echo "Lakebase skill: OK" \
+  || echo "WARNING: Lakebase skill not found — re-run git clone step"
 ```
 
 This is idempotent — safe to run multiple times.
@@ -176,20 +204,23 @@ If any files are missing, the scaffold may have partially failed. Re-run the sca
 
 This starts the dev server with hot reload on `http://localhost:8000`.
 
-### Validate and Deploy
+---
 
-```bash
-databricks apps validate
-databricks apps deploy --profile <PROFILE>
-```
+## What's Next
+
+After the scaffold is working locally:
+
+- **Build features:** Use the `02-appkit-build` skill to implement UI and backend from a PRD
+- **Deploy:** Use the `03-appkit-deploy` skill for the full deploy workflow (config validation, build, deploy, UI verification, error diagnosis). Do not run `databricks apps deploy` directly from this skill — the deploy skill covers it more thoroughly.
+- **Add plugins:** Use the `04-appkit-plugin-add` skill to add Lakebase, Analytics, Genie, or Files plugins
 
 ---
 
 ## Adding a Plugin to an Existing App
 
-To add a plugin (Lakebase, Analytics, Genie, Files) to an existing AppKit project, use the **`appkit-plugin-add`** skill. It covers plugin registration, environment variables, `app.yaml` configuration, and frontend integration.
+To add a plugin (Lakebase, Analytics, Genie, Files) to an existing AppKit project, use the **`04-appkit-plugin-add`** skill. It covers plugin registration, environment variables, `app.yaml` configuration, and frontend integration.
 
-After scaffolding with `--features`, consult the `appkit-plugin-add` skill for detailed plugin configuration and frontend integration guidance.
+After scaffolding with `--features`, consult the `04-appkit-plugin-add` skill for detailed plugin configuration and frontend integration guidance.
 
 ---
 

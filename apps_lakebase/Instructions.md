@@ -12,15 +12,10 @@ This guide is structured as a series of **phases**, each designed to be given as
 ```
 Phase 1              Phase 2            Phase 3            Phase 4              Phase 5
 Scaffold, Build -->  Deploy        -->  Setup Lakebase --> Wire Lakebase   -->  Deploy + E2E Test
-& Test Locally       (Analytics Only)   Project            Backend (local)      with Lakebase
+& Test Locally       (Mock Data)        Project            Backend (local)      with Lakebase
 ```
 
-### Two Pathways
-
-| Pathway | Phases | Use When |
-|---------|--------|----------|
-| **Path A: Analytics Only** | Phase 1 -> Phase 2 | You only need SQL warehouse queries (dashboards, reports) |
-| **Path B: Analytics + Lakebase** | Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 | You need transactional data (CRUD), Lakebase PostgreSQL, and analytics |
+Phases 1-2 build and deploy a functional UI with mock data (no database required). Phases 3-5 add a Lakebase PostgreSQL backend with live data.
 
 ---
 
@@ -45,12 +40,12 @@ Fill in these values before starting. They are referenced throughout all phases.
 |-----------|-------|-------------|
 | `{workspace_url}` | __________________ | Your Databricks workspace URL (e.g. `https://myworkspace.cloud.databricks.com`) |
 | `{use_case_slug}` | __________________ | Short app identifier (e.g. `bookings`, `inventory`, `analytics`) |
-| `{user_app_name}` | __________________ | Lakebase project name (Path B only — set in Phase 3) |
-| `{LAKEBASE_HOST}` | __________________ | Lakebase host address (Path B only — output of Phase 3) |
+| `{user_app_name}` | __________________ | Lakebase project name (set in Phase 3) |
+| `{LAKEBASE_HOST}` | __________________ | Lakebase host address (output of Phase 3) |
 
 ---
 
-### Lakebase Setup [Path B only]
+### Lakebase Setup
 
 Lakebase project creation and configuration is handled in **Phase 3**. Do not create a project manually — Phase 3 walks through project creation, endpoint discovery, and compute optimization step by step.
 
@@ -58,27 +53,85 @@ Fill in `{user_app_name}` and `{LAKEBASE_HOST}` in the Workshop Parameters table
 
 ---
 
+### Session State File (Cross-Phase Context)
+
+Each phase should begin by reading `.vibecoding-state.md` (if it exists) from the app root (`apps_lakebase/$APP_NAME/`). Each phase should end by appending resolved issues, current variable values, and workarounds.
+
+Example:
+
+```markdown
+## Phase 1: Scaffold + Build
+- APP_NAME: prashanth-s-stayfinder
+- Workspace: https://fevm-prashanth-subrahmanyam.cloud.databricks.com
+- Note: Typegen TABLE_OR_VIEW_NOT_FOUND errors are expected (no live tables in Phase 1)
+```
+
+This prevents re-discovery of the same issues across phases (~7 min + ~10K tokens saved per session).
+
+---
+
 ---
 
 ## Phase 1: Scaffold, Build, and Test Locally
 
-In this phase, you will authenticate to Databricks, scaffold a new AppKit project with the analytics plugin, implement a UI from a PRD, and verify everything works locally. This is the foundation for all subsequent phases.
+In this phase, you will authenticate to Databricks, scaffold a blank AppKit project, implement a UI with mock data from a PRD, and verify everything works locally. No SQL warehouse or database is needed. This is the foundation for all subsequent phases.
 
 Start a new Agent thread and use the following prompt:
 
 ---
 
-### Your Task
+### System Prompt
 
-You are a full-stack developer building a web application on Databricks AppKit. Your goal is to scaffold an AppKit project, implement UI and backend features from a PRD, and test locally.
+*Instructions for the AI model*
 
-**Workspace:** `{workspace_url}`
+You are a full-stack developer building a web application on Databricks AppKit. Your goal is to scaffold a blank AppKit project, implement a UI with mock data from a PRD, and test locally.
 
-**Working directory:** Run all app commands and create/edit app files under the `apps_lakebase/` folder. Design docs (PRD, UI design) remain in the parent `docs/` folder at repo root.
+Key requirements:
+
+- Scaffold a **blank** AppKit project (no plugins) using the `01-appkit-scaffold` skill
+- Read the PRD to understand user personas, journeys, and data requirements
+- Build the app using the `02-appkit-build` skill (frontend components, design quality, routing)
+- Use static mock data arrays in all components — no live backend, no SQL warehouse, no database
+- Create a UI design document describing screens, components, and navigation
+- Test locally at `http://localhost:8000` before proceeding
+
+CLI Best Practices:
+
+- Run from `apps_lakebase/` or use `apps_lakebase/scripts/` for scripts
+- Run CLI commands outside the IDE sandbox to avoid SSL/TLS certificate errors
 
 ---
 
-### Step 1.1: Authenticate and Set Up Variables
+### Input Template
+
+*Pass as-is to output (skip LLM)*
+
+*LLM bypass enabled — This template will be returned directly to the user without AI processing*
+
+#### Your Task
+
+You are a full-stack developer building a web application on Databricks AppKit. Your goal is to scaffold a blank AppKit project, build a UI with mock data from a PRD, and test locally.
+
+**Workspace:** `{workspace_url}`
+
+#### File Locations
+
+| What | Where |
+|------|-------|
+| All app source, configs, server, client | `apps_lakebase/$APP_NAME/` |
+| Design docs (PRD, UI design) | `docs/` (repo root) |
+
+All file paths below are relative to `apps_lakebase/$APP_NAME/` unless explicitly prefixed with `docs/`.
+
+#### Hard Constraints
+
+- **Workspace access:** Verify with `databricks current-user me --host {workspace_url}` before proceeding. If you get a 403, STOP and ask the user for a different workspace.
+- **Typegen noise:** `npm run dev` triggers `npm run typegen` via the `predev` hook. `TABLE_OR_VIEW_NOT_FOUND` errors are expected when no live SQL queries are configured. These do not block the app.
+- **App name:** Constructed below — do not use a shell variable named `USERNAME` (collides with system env vars on macOS/Linux).
+
+---
+
+#### Step 1.1: Authenticate and Set Up Variables
 
 ```bash
 # Authenticate to Databricks
@@ -92,25 +145,35 @@ LASTINITIAL=$(echo "$EMAIL" | cut -d'@' -f1 | cut -d'.' -f2 | cut -c1)
 APP_PREFIX="${FIRSTNAME}-${LASTINITIAL}"
 APP_NAME="${APP_PREFIX}-{use_case_slug}"
 echo "App: $APP_NAME | Email: $EMAIL"
+
+# Validate and auto-truncate APP_NAME
+if [ ${#APP_NAME} -gt 26 ]; then
+  APP_NAME=$(echo "$APP_NAME" | cut -c1-26 | sed 's/-$//')
+  echo "Truncated to: $APP_NAME"
+fi
+if echo "$APP_NAME" | grep -q '[^a-z0-9-]'; then
+  echo "ERROR: APP_NAME contains invalid characters: $APP_NAME"
+  echo "Must be lowercase letters, numbers, and hyphens only."
+fi
 ```
 
-**Important:** App names must be max 26 characters, lowercase letters/numbers/hyphens only (no underscores). Truncate if necessary.
+**Important:** App names must be max 26 characters, lowercase letters/numbers/hyphens only (no underscores). The validation above catches issues automatically.
 
 ---
 
-### Step 1.2: Install Agent Skills and Scaffold the AppKit App
+#### Step 1.2: Install Agent Skills and Scaffold the AppKit App
 
-Read and follow **every step** in the `appkit-scaffold` skill at `@apps_lakebase/skills/appkit-scaffold/SKILL.md`. Do not skip any steps.
+Read and follow **every step** in the `01-appkit-scaffold` skill at `@apps_lakebase/skills/01-appkit-scaffold/SKILL.md`. Do not skip any steps.
 
 The skill will guide you through:
 1. **Installing Databricks Agent Skills** — required before scaffolding. Do not skip this.
 2. **Scaffolding the AppKit project** inside `apps_lakebase/`
 
 **Parameters to use** (the skill needs these values):
-- **Profile:** Use `$PROFILE` from Step 1.1 (or select one via `databricks auth profiles`)
+- **Profile:** Use `$PROFILE` (or select one via `databricks auth profiles`)
 - **App name:** Use `$APP_NAME` from Step 1.1
-- **Features:** `analytics` (the PRD will need data queries)
-- **Description:** `"{use_case_slug} dashboard"`
+- **Features:** None — scaffold a **blank** app (no `--features` flag)
+- **Description:** `"{use_case_slug} app"`
 - **Working directory:** Run `cd apps_lakebase` first so the app is created inside `apps_lakebase/`
 
 After the skill completes scaffold + `npm install`, verify config files:
@@ -126,37 +189,53 @@ If these don't match `$APP_NAME`, update them manually.
 
 ---
 
-### Step 1.3: Read the PRD
+#### Step 1.3: Read the PRD
 
 Review `@docs/design_prd.md` (parent `docs/` folder at repo root) to understand:
 
 - User personas and their needs
 - Key user journeys (Happy Path only)
 - Core features and requirements
-- Data requirements — what tables/queries will the UI need?
+- Data requirements — what entities and relationships the UI needs to display
 
 ---
 
-### Step 1.4: Build the App
+#### Step 1.4: Build the App
 
-Read and follow the `appkit-build` skill at `@apps_lakebase/skills/appkit-build/SKILL.md`. The skill covers the full workflow: SQL queries, type generation, backend plugins, frontend components, design quality, and testing.
+Read and follow the `02-appkit-build` skill at `@apps_lakebase/skills/02-appkit-build/SKILL.md`. The skill covers frontend components, design quality, routing, and testing.
 
-**Demo data strategy:** Use static `data` arrays on AppKit data components (charts, tables) so the UI works immediately without a live backend. Write SQL files in `config/queries/` alongside and run `npm run typegen` to generate types — but keep the static data in place for now. The swap from static demo data to live query-driven data happens later in Phase 4 (Lakebase wiring).
+**Demo data strategy:** Use static mock data arrays directly in your components. All charts, tables, and data-driven components should use the `data` prop with hardcoded representative sample data. There is no live backend, no SQL warehouse, and no database at this stage — the goal is a fully functional UI with realistic-looking mock data.
+
+**Skip these parts of the build skill** (they are not relevant for a blank app):
+- SQL query file creation (`config/queries/`)
+- `npm run typegen` (type generation from SQL files)
+- `useAnalyticsQuery` hooks
+- `useMemo` on query parameters and `sql.*` helpers
+
+The backend only needs the `server()` plugin registered:
+
+```typescript
+import { createApp, server } from "@databricks/appkit";
+
+await createApp({
+  plugins: [server()],
+});
+```
 
 ---
 
-### Step 1.5: Create UI Design Document
+#### Step 1.5: Create UI Design Document
 
 Save a design overview to `@docs/ui_design.md` (parent `docs/` folder at repo root) describing:
 
 - Key screens/pages
-- Core components and their data sources
+- Core components and their mock data sources
 - Navigation flow
 - Design direction and aesthetic choices
 
 ---
 
-### Step 1.6: Test Locally
+#### Step 1.6: Test Locally
 
 From your app directory (`apps_lakebase/$APP_NAME/`):
 
@@ -167,24 +246,53 @@ lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 npm run dev
 ```
 
+**Note:** `npm run dev` triggers `npm run typegen` automatically via the `predev` hook. You may see `TABLE_OR_VIEW_NOT_FOUND` errors for queries referencing tables that don't exist yet — this is expected and does not block the app from running.
+
 Open `http://localhost:8000` and verify:
 
 - The UI loads without console errors
 - Navigation works across pages
-- Data queries return results (loading -> data flow)
 - All interactive elements respond
-- Static demo data renders correctly in all components
+- Static mock data renders correctly in all components
+
+**Automated check (if browser is unavailable):**
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8000
+# Should return 200
+```
+
+**Visual verification** is recommended before proceeding. If you have access to the `web-devloop-tester` subagent, use it to check for console errors and layout issues.
 
 ---
 
-### What It Produces
+#### Summary Checklist
 
-- Scaffolded AppKit project at `apps_lakebase/$APP_NAME/`
-- SQL query files in `config/queries/` for all data needs
-- Generated TypeScript types via `npm run typegen`
-- Backend server (`server/server.ts`) with analytics plugin registered
-- Frontend pages and components (`client/src/`) with type-safe data fetching
-- UI design document at `docs/ui_design.md`
+- [ ] Databricks CLI is authenticated and `APP_NAME` is set
+- [ ] AppKit project is scaffolded inside `apps_lakebase/` as a blank app (no plugins)
+- [ ] Backend (`server/server.ts`) has the `server()` plugin registered
+- [ ] Frontend (`client/src/`) implements key pages with mock data
+- [ ] Loading/error/empty states on every data-driven component
+- [ ] `tests/smoke.spec.ts` selectors updated for your app's DOM structure
+- [ ] `@docs/ui_design.md` is created (parent docs folder)
+- [ ] `npm run dev` runs cleanly at `http://localhost:8000`
+
+Only proceed to deployment after local testing passes.
+
+---
+
+### How to Use
+
+1. Copy the **Input Template** section above
+2. Replace `{workspace_url}` and `{use_case_slug}` with your values
+3. Paste into Cursor or Copilot
+4. The code assistant will:
+   - Authenticate and scaffold a blank AppKit project
+   - Read your PRD and build the UI with mock data
+   - Create `ui_design.md`
+   - Test locally at `http://localhost:8000`
+
+**Note:** This step focuses on local development with static mock data. No SQL warehouse or database is needed. Deployment to Databricks happens in Phase 2. Live data wiring via Lakebase happens in Phases 3-5.
 
 ---
 
@@ -198,18 +306,15 @@ apps_lakebase/$APP_NAME/
 ├── databricks.yml              # Databricks bundle config
 ├── package.json                # Dependencies (@databricks/appkit, etc.)
 ├── tsconfig.json
-├── config/
-│   └── queries/
-│       └── *.sql               # SQL query files (one per data need from the PRD)
 ├── server/
-│   └── server.ts               # AppKit backend (analytics plugin)
+│   └── server.ts               # AppKit backend (server plugin only)
 ├── client/
 │   ├── index.html
 │   ├── vite.config.ts
 │   └── src/
 │       ├── main.tsx
 │       ├── App.tsx             # Root component with routing
-│       └── appKitTypes.d.ts   # Auto-generated query types (from npm run typegen)
+│       └── components/         # UI components with mock data
 └── tests/
     └── smoke.spec.ts           # Smoke test (update selectors for your app)
 ```
@@ -218,7 +323,7 @@ Pages and components under `client/src/` will vary based on your PRD.
 
 **Terminal output — `npm run dev`:**
 
-Output format varies by AppKit version. Look for confirmation that the server is running on port 8000, the analytics plugin loaded, and the Vite dev server is ready. You may see a Registered Routes table and `[appkit:server]`-prefixed log lines — this is normal.
+Output format varies by AppKit version. Look for confirmation that the server is running on port 8000 and the Vite dev server is ready. You may see a Registered Routes table and `[appkit:server]`-prefixed log lines — this is normal.
 
 **Architecture — Local Development:**
 
@@ -226,16 +331,11 @@ Output format varies by AppKit version. Look for confirmation that the server is
 graph LR
     Browser["Browser<br/>localhost:8000"] --> Vite["Vite Dev Server<br/>(HMR + Proxy)"]
     Vite --> AppKit["AppKit Backend<br/>(Node.js/Express)"]
-    AppKit --> SQLWarehouse["SQL Warehouse<br/>(Databricks)"]
 
     subgraph local [Local Machine]
         Browser
         Vite
         AppKit
-    end
-
-    subgraph cloud [Databricks Cloud]
-        SQLWarehouse
     end
 ```
 
@@ -278,11 +378,12 @@ $ curl -s http://localhost:8000 | head -1
 >
 > - [ ] `npm run dev` starts without errors
 > - [ ] The UI loads at `http://localhost:8000` with no console errors
-> - [ ] All pages render with data (static demo arrays are OK — they'll be swapped to live data in Phase 4)
-> - [ ] SQL files exist in `config/queries/` and `npm run typegen` has been run
+> - [ ] All pages render with mock data (live data swap happens in Phase 4)
 > - [ ] `docs/ui_design.md` exists and describes the application
 >
 > **Do NOT proceed to Phase 2 until local testing passes.**
+>
+> **Before moving on**, write (or append to) `apps_lakebase/$APP_NAME/.vibecoding-state.md` with resolved issues, variable values, and workarounds from this phase.
 
 #### Context for Phase 2
 
@@ -297,19 +398,45 @@ Copy the following into your new Agent thread so it has the necessary context:
 
 ---
 
-## Phase 2: Deploy (Analytics Only)
+## Phase 2: Deploy (Mock Data)
 
-In this phase, you will deploy the locally-tested application to Databricks Apps so it is accessible via a public HTTPS URL. This phase uses only the analytics (SQL warehouse) plugin — no Lakebase yet.
-
-> **Path A stops here.** If you are only building an analytics dashboard (no Lakebase), Phase 2 is your final phase.
+In this phase, you will deploy the locally-tested application to Databricks Apps so it is accessible via a public HTTPS URL. The app serves mock data only — no database is connected yet.
 
 Start a new Agent thread and use the following prompt:
 
 ---
 
-### Your Task
+### System Prompt
+
+*Instructions for the AI model*
+
+You are a DevOps engineer deploying an AppKit web application to Databricks Apps. Your goal is to deploy the locally-tested app so it is accessible via a public HTTPS URL.
+
+Key requirements:
+
+- Derive the app name from the user's Databricks identity to match `app.yaml` and `databricks.yml`
+- Validate that the app directory and config files exist and point to the correct workspace
+- Deploy using the `03-appkit-deploy` skill (config validation, build, deploy, UI verification, error diagnosis)
+- Verify the app reaches `RUNNING` state and the UI loads in a browser
+
+CLI Best Practices:
+
+- Run from `apps_lakebase/` or use `apps_lakebase/scripts/` for scripts
+- Run CLI commands outside the IDE sandbox to avoid SSL/TLS certificate errors
+
+---
+
+### Input Template
+
+*Pass as-is to output (skip LLM)*
+
+*LLM bypass enabled — This template will be returned directly to the user without AI processing*
+
+#### Your Task
 
 Deploy the locally-tested AppKit web application to Databricks Apps.
+
+**First:** Read `apps_lakebase/$APP_NAME/.vibecoding-state.md` if it exists — it contains resolved issues and variable values from prior phases.
 
 **Workspace:** `{workspace_url}`
 
@@ -317,14 +444,14 @@ Deploy the locally-tested AppKit web application to Databricks Apps.
 
 ---
 
-### Deployment Constraints
+#### Deployment Constraints
 
 - Databricks App names must use only lowercase letters, numbers, and dashes (no underscores). Use hyphens: `my-app-name` not `my_app_name`.
 - App names are max 26 characters.
 
 ---
 
-### Step 2.1: Derive App Name and Set Profile
+#### Step 2.1: Derive App Name and Set Profile
 
 Derive your app name from your username + use case. This ensures the deployed app matches your `app.yaml` and `databricks.yml` configuration.
 
@@ -338,11 +465,23 @@ APP_NAME="${APP_PREFIX}-{use_case_slug}"
 echo "Deploying app: $APP_NAME"
 ```
 
-Select a CLI profile:
+Detect (or create) a CLI profile for the target workspace:
 
 ```bash
-databricks auth profiles
-PROFILE="DEFAULT"  # <-- set to your chosen profile name
+TARGET_HOST="{workspace_url}"
+PROFILE=$(databricks auth profiles --output json 2>/dev/null \
+  | jq -r --arg host "$TARGET_HOST" \
+    '[.profiles[] | select(.host == $host)] | .[0].name // empty')
+
+if [ -z "$PROFILE" ]; then
+  echo "No profile found for $TARGET_HOST — creating one..."
+  databricks auth login --host "$TARGET_HOST"
+  PROFILE=$(databricks auth profiles --output json 2>/dev/null \
+    | jq -r --arg host "$TARGET_HOST" \
+      '[.profiles[] | select(.host == $host)] | .[0].name // empty')
+fi
+
+echo "Using profile: $PROFILE"
 ```
 
 Verify the app directory exists and `databricks.yml` points to the target workspace:
@@ -352,7 +491,7 @@ ls apps_lakebase/$APP_NAME/databricks.yml
 grep "host:" apps_lakebase/$APP_NAME/databricks.yml
 ```
 
-If deploying to a different workspace than where you scaffolded in Phase 1, update `databricks.yml` to match your target workspace, update the `sql_warehouse_id` variable for the new workspace, and clear old bundle state:
+If deploying to a different workspace than where you scaffolded in Phase 1, update `databricks.yml` to match your target workspace and clear old bundle state:
 
 ```bash
 rm -rf apps_lakebase/$APP_NAME/.databricks
@@ -360,32 +499,62 @@ rm -rf apps_lakebase/$APP_NAME/.databricks
 
 ---
 
-### Step 2.2: Deploy
+#### Step 2.1b: Pre-flight Build Check
 
-Read and follow the `appkit-deploy` skill at `@apps_lakebase/skills/appkit-deploy/SKILL.md`. Run all skill commands from the `apps_lakebase/` directory.
+Run a local build before deploying to surface code issues early:
+
+```bash
+cd apps_lakebase/$APP_NAME
+npm run build
+```
+
+If this fails with TypeScript errors (e.g., unused imports, type mismatches), fix them now. These are code quality issues from Phase 1, not deploy problems.
+
+> **Typegen errors are expected.** If you see `TABLE_OR_VIEW_NOT_FOUND` during the build, these come from SQL queries referencing tables that don't exist in the target workspace yet. They are non-blocking — the app runs with mock data and these errors do not affect deployment.
+
+---
+
+#### Step 2.2: Deploy
+
+Read and follow the `03-appkit-deploy` skill at `@apps_lakebase/skills/03-appkit-deploy/SKILL.md`. Run all skill commands from the `apps_lakebase/` directory.
 
 The skill covers: config validation, build, deploy, UI verification, error diagnosis (3-iteration fix loop), and workspace app limit handling.
 
 ---
 
-### What It Produces
+#### Summary
 
-- A running Databricks App accessible at `https://$APP_NAME.<workspace-region>.databricks.com`
-- Service principal provisioned automatically for the app
-- SQL warehouse queries executing in the cloud (same as local, but authenticated via the app's SP)
+- [ ] The Databricks App is deployed and running
+- [ ] The web UI loads in browser (React application, not an error page)
+- [ ] No errors in the app logs
+- [ ] Mock data renders correctly in all components
+
+---
+
+### How to Use
+
+1. Copy the **Input Template** section above
+2. Replace `{workspace_url}` and `{use_case_slug}` with your values
+3. Paste into Cursor or Copilot
+4. The code assistant will:
+   - Derive your app name and validate config
+   - Deploy the app to Databricks Apps using the deploy skill
+   - Verify the app is running and accessible
+
+**Note:** This step deploys the mock-data app from Phase 1. For Lakebase integration (live data), continue to Phases 3-5.
 
 ---
 
 ### Expected Output
 
-**Terminal output — `databricks apps deploy`:**
+**Terminal output — deploy sequence:**
 
 ```
 $ cd apps_lakebase/$APP_NAME
+$ databricks bundle deploy --profile $PROFILE
 $ databricks apps deploy --profile $PROFILE
 
 Deploying app 'prashanth-s-bookings'...
-Uploading source code... done
 Building application... done
 Starting application... done
 
@@ -400,12 +569,10 @@ App deployed successfully!
 graph LR
     User["User Browser<br/>(HTTPS)"] --> DatabricksApps["Databricks Apps<br/>(Managed Hosting)"]
     DatabricksApps --> AppKit["AppKit Server<br/>(Node.js)"]
-    AppKit --> SQLWarehouse["SQL Warehouse"]
 
     subgraph cloud [Databricks Cloud]
         DatabricksApps
         AppKit
-        SQLWarehouse
     end
 ```
 
@@ -424,13 +591,15 @@ graph LR
 }
 ```
 
+> **Note:** You may see `"state": null` immediately after deploy. This is normal — verify with `compute_status.state: "ACTIVE"` and check logs for a healthy server startup.
+
 **App logs — healthy startup:**
 
-Log format varies by AppKit version. Look for messages confirming the analytics plugin loaded and the server is listening on port 8000. Absence of ERROR-level messages indicates a healthy startup.
+Log format varies by AppKit version. Look for messages confirming the server is listening on port 8000. Absence of ERROR-level messages indicates a healthy startup.
 
 **What you should see in the browser:**
 
-The same dashboard UI from Phase 1, now accessible at a public HTTPS URL. Data loads from the SQL warehouse via the app's service principal — no local machine required.
+The same mock-data UI from Phase 1, now accessible at a public HTTPS URL — no local machine required.
 
 ---
 
@@ -441,11 +610,11 @@ The same dashboard UI from Phase 1, now accessible at a public HTTPS URL. Data l
 > - [ ] The Databricks App is deployed and in `RUNNING` state
 > - [ ] The web UI loads in browser at the app URL (React application, not an error page)
 > - [ ] No errors in the app logs (`databricks apps logs $APP_NAME`)
-> - [ ] SQL queries execute successfully (data loads in the UI, not empty tables) — *manual browser verification; check app logs for query errors if unable to open the browser*
+> - [ ] Mock data renders correctly in all components
 >
-> **Path A complete!** If you are not adding Lakebase, you are done.
+> **Continue to Phase 3** to set up a Lakebase project for live data.
 >
-> **Path B: Continue to Phase 3** to set up a Lakebase project.
+> **Before moving on**, append to `apps_lakebase/$APP_NAME/.vibecoding-state.md` with resolved issues, variable values, and workarounds from this phase.
 
 #### Context for Phase 3
 
@@ -461,7 +630,7 @@ Copy the following into your new Agent thread so it has the necessary context:
 
 ---
 
-## Phase 3: Setup Lakebase Project [Path B only]
+## Phase 3: Setup Lakebase Project
 
 In this phase, you will create and configure a Lakebase (managed PostgreSQL) project so the AppKit application can connect to a transactional database in subsequent phases. This is an infrastructure setup step — no application code changes are made here.
 
@@ -469,9 +638,39 @@ Start a new Agent thread and use the following prompt:
 
 ---
 
-### Your Task
+### System Prompt
+
+*Instructions for the AI model*
+
+You are a database engineer setting up Lakebase (PostgreSQL) infrastructure for a web application. Your goal is to create and configure a Lakebase project so the AppKit application can connect to a transactional database in subsequent phases.
+
+Key requirements:
+
+- Read the `databricks-lakebase` agent skill before running any `databricks postgres` commands
+- Create a Lakebase project with a production branch and primary endpoint
+- Retrieve the endpoint hostname (`LAKEBASE_HOST`) for use in Phase 4
+- Optimize compute settings (0.5-2.0 CU, 300s scale-to-zero) to save cost during development
+- Verify the endpoint reaches `ACTIVE` state before proceeding
+- Do NOT guess CLI syntax — use `databricks postgres <subcommand> -h` to discover exact flags
+
+CLI Best Practices:
+
+- Run from `apps_lakebase/` or use `apps_lakebase/scripts/` for scripts
+- Run CLI commands outside the IDE sandbox to avoid SSL/TLS certificate errors
+
+---
+
+### Input Template
+
+*Pass as-is to output (skip LLM)*
+
+*LLM bypass enabled — This template will be returned directly to the user without AI processing*
+
+#### Your Task
 
 Create and configure a Lakebase (PostgreSQL) project so the AppKit application can connect to a transactional database in subsequent phases.
+
+**First:** Read `apps_lakebase/$APP_NAME/.vibecoding-state.md` if it exists — it contains resolved issues and variable values from prior phases.
 
 **Workspace:** `{workspace_url}`
 
@@ -479,7 +678,7 @@ Create and configure a Lakebase (PostgreSQL) project so the AppKit application c
 
 ---
 
-### Skill Reference
+#### Skill Reference
 
 Before running any `databricks postgres` commands, read the `databricks-lakebase` agent skill (installed via Databricks Agent Skills). If the skill is not available locally, fetch it from:
 https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-lakebase/SKILL.md
@@ -492,14 +691,9 @@ It is the authoritative reference for:
 
 **Do NOT guess CLI syntax.** Use `databricks postgres <subcommand> -h` to discover exact flags, positional arguments, and JSON spec fields before constructing commands.
 
-### CLI Best Practices
-
-- Run from `apps_lakebase/` or use `apps_lakebase/scripts/` for scripts
-- Run CLI commands outside the IDE sandbox to avoid SSL/TLS certificate errors
-
 ---
 
-### Step 3.1: Verify Authentication
+#### Step 3.1: Verify Authentication
 
 Ensure your CLI is authenticated to the correct workspace. This may already be done from Phase 1 — verify and re-authenticate if needed:
 
@@ -507,64 +701,75 @@ Ensure your CLI is authenticated to the correct workspace. This may already be d
 databricks auth login --host {workspace_url}
 ```
 
-Select a CLI profile:
+Detect (or create) a CLI profile for the target workspace:
 
 ```bash
-databricks auth profiles
-PROFILE="DEFAULT"  # <-- set to your chosen profile name
-```
+TARGET_HOST="{workspace_url}"
+PROFILE=$(databricks auth profiles --output json 2>/dev/null \
+  | jq -r --arg host "$TARGET_HOST" \
+    '[.profiles[] | select(.host == $host)] | .[0].name // empty')
 
-> **Important:** The CLI profile must point to the workspace where Lakebase is enabled. If you used a different profile in Phase 1, update `PROFILE` accordingly.
+if [ -z "$PROFILE" ]; then
+  echo "No profile found for $TARGET_HOST — creating one..."
+  databricks auth login --host "$TARGET_HOST"
+  PROFILE=$(databricks auth profiles --output json 2>/dev/null \
+    | jq -r --arg host "$TARGET_HOST" \
+      '[.profiles[] | select(.host == $host)] | .[0].name // empty')
+fi
+
+echo "Using profile: $PROFILE"
+```
 
 ---
 
-### Step 3.2: Create Lakebase Project
+#### Step 3.2: Create Lakebase Project
 
 Each workshop participant creates their own Lakebase project. This gives you full database access with no permission issues.
 
 ```bash
-databricks postgres create-project {user_app_name} \
-  --json '{"spec": {"display_name": "{user_app_name}"}}' \
-  --profile $PROFILE
+# Check if project already exists (idempotent — safe to re-run)
+EXISTS=$(databricks postgres list-projects --output json --profile $PROFILE \
+  | jq -r '[.[] | select(.name | endswith("/{user_app_name}"))] | length')
+
+if [ "$EXISTS" -gt 0 ]; then
+  echo "Project {user_app_name} already exists — skipping creation, proceeding to Step 3.3."
+else
+  databricks postgres create-project {user_app_name} \
+    --json '{"spec": {"display_name": "{user_app_name}"}}' \
+    --profile $PROFILE
+fi
 ```
 
-This is a long-running operation — the CLI waits for completion by default. It auto-provisions:
+If the project is newly created, the CLI waits for completion by default. It auto-provisions:
 - A `production` branch
 - A `primary` read-write endpoint (1 CU min/max, scale-to-zero enabled)
 - A `databricks_postgres` default database
 
-**If a Lakebase project already exists** (e.g., created via the Databricks UI), discover it:
-
-```bash
-databricks postgres list-projects --profile $PROFILE
-databricks postgres list-endpoints projects/{user_app_name}/branches/production --output json --profile $PROFILE
-```
-
 ---
 
-### Step 3.3: Get Endpoint Hostname
+#### Step 3.3: Get Endpoint Hostname
 
 Retrieve the endpoint hostname — this becomes your `{LAKEBASE_HOST}`:
 
 ```bash
-databricks postgres get-endpoint \
+LAKEBASE_HOST=$(databricks postgres get-endpoint \
   projects/{user_app_name}/branches/production/endpoints/primary \
-  --output json --profile $PROFILE
+  --output json --profile $PROFILE | jq -r '.status.hosts.host')
+echo "LAKEBASE_HOST=$LAKEBASE_HOST"
 ```
 
-From the JSON output, copy the value of `status.hosts.host` — this is your `LAKEBASE_HOST`.
-
-Example: `my-project-abc123.lakebase.cloud.databricks.com`
+Example output: `LAKEBASE_HOST=my-project-abc123.lakebase.cloud.databricks.com`
 
 Record this value — you will need it in Phase 4 (Lakebase wiring).
 
 ---
 
-### Step 3.4: Optimize Compute and Enable Scale-to-Zero
+#### Step 3.4: Optimize Compute and Enable Scale-to-Zero
 
 Reduce the minimum compute units and set a suspend timeout to save cost during development:
 
 ```bash
+# "spec" is the UPDATE_MASK positional arg — tells the API which top-level field to patch
 databricks postgres update-endpoint \
   projects/{user_app_name}/branches/production/endpoints/primary spec \
   --json '{"spec": {"endpoint_type": "ENDPOINT_TYPE_READ_WRITE", "autoscaling_limit_min_cu": 0.5, "autoscaling_limit_max_cu": 2.0, "suspend_timeout_duration": "300s"}}' \
@@ -576,11 +781,17 @@ This configures:
 - **Max CU:** 2.0 (sufficient for development/workshop use)
 - **Suspend timeout:** 300s (scales to zero after 5 minutes of inactivity)
 
+> **Note:** New endpoints default to `suspend_timeout_duration: "0s"` (always on, no auto-suspend). This step enables cost-saving auto-suspend.
+
 ---
 
-### Step 3.5: Verify Project Ready
+#### Step 3.5: Verify Project Ready
 
-Confirm the endpoint is active and reachable:
+Verify the output from Step 3.4 shows:
+- `status.state` is `ACTIVE` (or `READY`)
+- `status.hosts.host` is populated
+
+If you need to re-check independently:
 
 ```bash
 databricks postgres get-endpoint \
@@ -588,21 +799,47 @@ databricks postgres get-endpoint \
   --output json --profile $PROFILE
 ```
 
-Verify:
-- `status.state` is `ACTIVE` (or `READY`)
-- `status.hosts.host` is populated
-
-If the endpoint is not yet active, wait and re-check. New projects typically reach `ACTIVE` state within 1-2 minutes.
+New projects typically reach `ACTIVE` state within 30 seconds (up to 2 minutes in rare cases).
 
 If errors occur, consult the troubleshooting table in the `databricks-lakebase` agent skill — it covers `PERMISSION_DENIED`, credential issues, protected branches, and long-running operation timeouts.
 
 ---
 
-### What It Produces
+#### Summary
 
-- A Lakebase Postgres Autoscaling project named `{user_app_name}`
-- An active `primary` read-write endpoint on the `production` branch
-- Optimized compute settings (0.5-2.0 CU, 300s scale-to-zero)
+Your project is now ready. Record these values for Phase 4:
+
+| Output | Value |
+|--------|-------|
+| **Project name** | `{user_app_name}` |
+| **Endpoint name** | `projects/{user_app_name}/branches/production/endpoints/primary` |
+| **LAKEBASE_HOST** | *(the hostname from Step 3.3)* |
+
+---
+
+#### Checklist
+
+- [ ] Databricks CLI authenticated and profile selected
+- [ ] Lakebase project `{user_app_name}` created (or existing project discovered)
+- [ ] Endpoint hostname (`LAKEBASE_HOST`) captured from Step 3.3
+- [ ] Compute optimized: min 0.5 CU, max 2.0 CU, 300s suspend timeout
+- [ ] Endpoint status is `ACTIVE`
+
+---
+
+### How to Use
+
+1. Copy the **Input Template** section above
+2. Replace `{workspace_url}` and `{user_app_name}` with your values
+3. Paste into Cursor or Copilot
+4. The code assistant will:
+   - Verify authentication
+   - Create a Lakebase project with a production endpoint
+   - Retrieve and display the endpoint hostname
+   - Optimize compute settings for development
+   - Verify the endpoint is active
+
+**Note:** This step creates the Lakebase infrastructure only. Wiring the app to Lakebase happens in Phase 4.
 
 ---
 
@@ -655,6 +892,8 @@ $ databricks postgres get-endpoint projects/{user_app_name}/branches/production/
 > - [ ] Endpoint status is `ACTIVE`
 >
 > **Do NOT proceed to Phase 4 until the Lakebase endpoint is active.**
+>
+> **Before moving on**, append to `apps_lakebase/$APP_NAME/.vibecoding-state.md` with resolved issues, variable values, and workarounds from this phase.
 
 #### Context for Phase 4
 
@@ -671,19 +910,48 @@ Copy the following into your new Agent thread so it has the necessary context:
 
 ---
 
-## Phase 4: Wire Lakebase Backend [Path B only]
+## Phase 4: Wire Lakebase Backend
 
-In this phase, you will add the Lakebase (managed PostgreSQL) plugin to the AppKit project, create database tables and seed data, build API routes for CRUD operations, and complete the switch from static demo data to live data. This phase focuses on local development and testing.
+In this phase, you will add the Lakebase (managed PostgreSQL) plugin to the AppKit project, create database tables and seed data, build API routes for all data operations, and replace all static mock data with Lakebase-backed API calls. This phase focuses on code changes and local testing with mock fallback data. Deployment and live Lakebase verification happen in Phase 5.
 
-> **Prerequisite:** Phase 3 must be complete. The app must have been deployed at least once so the Service Principal exists and can create database objects.
+> **Prerequisite:** Phase 3 must be complete.
 
 Start a new Agent thread and use the following prompt:
 
 ---
 
-### Your Task
+### System Prompt
 
-Wire the AppKit web application to a Lakebase database so the UI displays real data from both a SQL warehouse (analytics/reporting) and Lakebase PostgreSQL (transactional CRUD). This step focuses on local development and testing.
+*Instructions for the AI model*
+
+You are a full-stack developer wiring a Lakebase PostgreSQL backend into an AppKit web application. Follow the `05-appkit-lakebase-wiring` skill for all reusable patterns (database design, API routes, frontend hooks, testing). Use the PRD to derive application-specific tables, routes, and seed data.
+
+Key requirements:
+
+- Install `@databricks/lakebase` and register the plugin in `server/server.ts`
+- Configure `app.yaml` environment variables for Lakebase Autoscaling (static values, not `valueFrom`)
+- Derive a user-scoped schema name from `$APP_NAME` (hyphens to underscores) instead of hardcoding `app`
+- Follow the `05-appkit-lakebase-wiring` skill for DDL patterns, API route architecture, frontend hooks, and testing
+- Do NOT deploy in this phase — deployment happens in Phase 5
+
+CLI Best Practices:
+
+- Run from `apps_lakebase/` or use `apps_lakebase/scripts/` for scripts
+- Run CLI commands outside the IDE sandbox to avoid SSL/TLS certificate errors
+
+---
+
+### Input Template
+
+*Pass as-is to output (skip LLM)*
+
+*LLM bypass enabled — This template will be returned directly to the user without AI processing*
+
+#### Your Task
+
+Wire the AppKit web application to a Lakebase database so the UI fetches data from Lakebase PostgreSQL via Express API routes. Lakebase is the sole data source — there is no SQL warehouse in this flow. This phase focuses on code changes and local testing with mock fallback data. Deployment and live data verification happen in Phase 5.
+
+**First:** Read `apps_lakebase/$APP_NAME/.vibecoding-state.md` if it exists — it contains resolved issues and variable values from prior phases.
 
 **Workspace:** `{workspace_url}`
 
@@ -699,30 +967,43 @@ Wire the AppKit web application to a Lakebase database so the UI displays real d
 
 ---
 
-### Part A: Add the Lakebase Plugin
+#### Part A: Add the Lakebase Plugin
 
-Add the Lakebase plugin to the AppKit project. For additional details beyond what's covered here, see `@apps_lakebase/skills/appkit-plugin-add/references/plugin-lakebase.md`.
+Read `@apps_lakebase/skills/04-appkit-plugin-add/references/plugin-lakebase.md` for additional details.
 
-#### Step 4.A1: Install the Package
+##### Step 4.A0: Derive Schema Name
+
+Derive a user-scoped Lakebase schema name from `$APP_NAME`. This prevents collisions when multiple workshop participants share the same Lakebase database.
+
+```bash
+# Convert APP_NAME hyphens to underscores for PostgreSQL schema name
+# e.g., prashanth-s-booking-app -> prashanth_s_booking_app
+DB_SCHEMA=$(echo "$APP_NAME" | tr '-' '_')
+echo "Lakebase schema: $DB_SCHEMA"
+```
+
+This schema name is used in all DDL, API route queries, and SQL grants throughout this phase.
+
+##### Step 4.A1: Install the Package
 
 ```bash
 cd apps_lakebase/$APP_NAME
 npm install @databricks/lakebase
 ```
 
-#### Step 4.A2: Register the Plugin
+##### Step 4.A2: Register the Plugin
 
-In `server/server.ts`, add `lakebase` to the existing plugin list:
+In `server/server.ts`, add `lakebase` to the plugin list:
 
 ```typescript
-import { createApp, server, analytics, lakebase } from "@databricks/appkit";
+import { createApp, server, lakebase } from "@databricks/appkit";
 
 await createApp({
-  plugins: [server(), lakebase(), analytics()],
+  plugins: [server(), lakebase()],
 });
 ```
 
-#### Step 4.A3: Configure Environment Variables
+##### Step 4.A3: Configure Environment Variables
 
 **For local development** — add to `.env` in the app root (`apps_lakebase/$APP_NAME/.env`):
 
@@ -731,6 +1012,7 @@ LAKEBASE_ENDPOINT=projects/{user_app_name}/branches/production/endpoints/primary
 PGHOST={LAKEBASE_HOST}
 PGDATABASE=databricks_postgres
 PGSSLMODE=require
+DB_SCHEMA=<value of $DB_SCHEMA from Step A0>
 ```
 
 **For deployment** — add to `app.yaml`:
@@ -738,26 +1020,26 @@ PGSSLMODE=require
 ```yaml
 env:
   - name: LAKEBASE_ENDPOINT
-    valueFrom: postgres
+    value: 'projects/{user_app_name}/branches/production/endpoints/primary'
+  - name: PGHOST
+    value: '{LAKEBASE_HOST}'
+  - name: PGDATABASE
+    value: 'databricks_postgres'
+  - name: PGSSLMODE
+    value: 'require'
+  - name: DB_SCHEMA
+    value: '<value of $DB_SCHEMA from Step A0>'
 ```
 
-When deployed with a `postgres` database resource, `PGHOST`, `PGDATABASE`, `PGSSLMODE`, `PGUSER`, `PGPORT`, and `PGAPPNAME` are auto-injected by the platform. Only `LAKEBASE_ENDPOINT` must be set explicitly.
+This workshop uses static env vars because the Lakebase project was created via CLI (Phase 3) without a bundle postgres resource. If you scaffolded with `databricks apps init --features lakebase` instead, use `valueFrom: postgres` (see [upstream docs](https://databricks.github.io/appkit/docs/plugins/lakebase#environment-variables)). Do NOT set `PGUSER` or `PGPASSWORD` — the plugin handles OAuth token rotation automatically.
 
-#### Step 4.A4: Add Postgres Resource to databricks.yml
+##### Step 4.A4: Verify databricks.yml (No Lakebase Resource Needed)
 
-Since the app was scaffolded with `--features analytics` only, the `databricks.yml` does not include a Lakebase resource. Add the `postgres` resource so that `databricks apps deploy` provisions Lakebase access for the Service Principal:
+For Lakebase Autoscaling, the `databricks.yml` does **not** require a Lakebase resource. The project was created in Phase 3 via CLI, and the app connects via the environment variables in `app.yaml` (Step A3). No changes to `databricks.yml` are needed in this step.
 
-```yaml
-resources:
-  - name: postgres
-    postgres:
-      branch: projects/{user_app_name}/branches/production
-      permission: CAN_CONNECT_AND_CREATE
-```
+If you see a `resources:` section in `databricks.yml` from scaffolding (e.g., `sql-warehouse`), leave it as-is. Do **not** add the old `postgres:` resource format (with `branch:` / `database:` / `permission:` fields) — that is for Lakebase Provisioned. For bundle-managed Autoscaling lifecycle, use `postgres_project`/`postgres_branch`/`postgres_endpoint` resources (CLI v0.287.0+) — see the [plugin-lakebase reference](skills/04-appkit-plugin-add/references/plugin-lakebase.md). This workshop skips bundle resources for simplicity.
 
-Add this under the existing `resources:` section in `databricks.yml` (alongside the `sql-warehouse` resource). Without this, the deployed app's Service Principal will not have Lakebase connectivity.
-
-#### Step 4.A5: Verify
+##### Step 4.A5: Verify
 
 ```bash
 cd apps_lakebase/$APP_NAME
@@ -768,356 +1050,94 @@ This must complete without import or module errors for `@databricks/lakebase`. I
 
 ---
 
-### Part B: Wire UI to Backend
+#### Part B: Wire UI to Backend
 
-Write the backend DDL, API routes, and frontend data fetching code **before** deploying. The deploy in Part C will run this code on the Service Principal's first boot.
+Read `@apps_lakebase/skills/05-appkit-lakebase-wiring/SKILL.md` and follow **Steps 1-3**. Use your PRD to derive the specific tables, API routes, and seed data.
 
-#### B1: Create Database Schema and Seed Data
+The skill covers:
 
-In `server/server.ts`, after plugin initialization, use `AppKit.lakebase.query()` to create tables and seed data. Design DDL and seed data based on the PRD's data requirements.
+- **Step 1** — Database schema design: PRD-to-schema methodology, PostgreSQL type conventions, idempotent DDL, count-check seed pattern. Also read `@apps_lakebase/skills/05-appkit-lakebase-wiring/references/database-design-guide.md` for normalization rules and data type guidance.
+- **Step 2** — API routes: `server.extend()` pattern, `{ data, source }` response contract, mock fallback, health endpoint, Express import prohibition
+- **Step 3** — Frontend wiring: `useLakebaseData` hook, `ConnectionStatus` component, defensive data handling (DECIMAL coercion, DATE coercion, snake_case mapping)
 
-```typescript
-const AppKit = await createApp({
-  plugins: [server(), lakebase(), analytics()],
-});
-
-// DDL — create tables (idempotent)
-await AppKit.lakebase.query(`CREATE SCHEMA IF NOT EXISTS app`);
-await AppKit.lakebase.query(`
-  CREATE TABLE IF NOT EXISTS app.orders (
-    id SERIAL PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL,
-    amount DECIMAL(10, 2) NOT NULL,
-    status VARCHAR(50) DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-// DML — seed data (idempotent, count-check pattern)
-const seedCheck = await AppKit.lakebase.query(`SELECT count(*) AS cnt FROM app.orders`);
-if (parseInt(seedCheck.rows[0].cnt) === 0) {
-  await AppKit.lakebase.query(`
-    INSERT INTO app.orders (user_id, amount, status) VALUES
-      ('demo-user', 99.99, 'completed'),
-      ('alice', 45.00, 'pending'),
-      ('bob', 72.50, 'completed')
-  `);
-  console.log("[Lakebase] Seed data inserted");
-}
-```
-
-Use `CREATE TABLE IF NOT EXISTS` for DDL idempotency. For seed data, use a **count-check pattern** (`SELECT count(*)` → insert only if empty) rather than `ON CONFLICT DO NOTHING`, which does not prevent duplicates when using SERIAL primary keys without unique constraints on data columns.
-
-#### B2: Add API Routes for Lakebase CRUD
-
-AppKit Lakebase is **server-side only** — there are no frontend hooks like `useAnalyticsQuery` for Lakebase. Use `server.extend()` to add Express routes.
-
-When using `server.extend()`, you must pass `autoStart: false` to the `server()` plugin and call `AppKit.server.start()` manually after registering routes:
-
-```typescript
-const AppKit = await createApp({
-  plugins: [server({ autoStart: false }), lakebase(), analytics()],
-});
-
-AppKit.server.extend((app) => {
-  // Health endpoint
-  app.get("/api/health/lakebase", async (req, res) => {
-    try {
-      await AppKit.lakebase.query("SELECT 1");
-      res.json({ status: "connected", source: "live" });
-    } catch (err) {
-      res.json({ status: "disconnected", error: String(err), source: "mock" });
-    }
-  });
-
-  // Data endpoint with fallback
-  app.get("/api/orders", async (req, res) => {
-    try {
-      const result = await AppKit.lakebase.query("SELECT * FROM app.orders ORDER BY created_at DESC");
-      console.log(`[Lakebase] /api/orders returned ${result.rows.length} rows`);
-      res.json({ data: result.rows, source: "live" });
-    } catch (err) {
-      console.warn(`[Lakebase] /api/orders failed, falling back to mock data: ${err}`);
-      res.json({ data: [{ id: 1, user_id: "demo", amount: 99.99, status: "mock" }], source: "mock" });
-    }
-  });
-});
-
-await AppKit.server.start();
-```
-
-**Each API route must:**
-- Return `{ data: [...], source: "live" }` on success
-- Fall back to `{ data: [...], source: "mock" }` if Lakebase is unavailable
-- Log the query being executed and the result row count (or error details)
-
-**Include a health endpoint:** `GET /api/health/lakebase` returning connection status and source.
-
-**Recommended: Create a `useLakebaseData` hook** to avoid duplicating `useState`/`useEffect`/`fetch` boilerplate on every page:
-
-```tsx
-import { useState, useEffect } from "react";
-
-function useLakebaseData<T>(endpoint: string) {
-  const [data, setData] = useState<T[]>([]);
-  const [source, setSource] = useState<"live" | "mock" | "loading">("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch(endpoint)
-      .then((res) => res.json())
-      .then((json) => {
-        setData(json.data ?? []);
-        setSource(json.source ?? "mock");
-      })
-      .catch((err) => {
-        setError(String(err));
-        setSource("mock");
-      });
-  }, [endpoint]);
-
-  return { data, source, error };
-}
-```
-
-Usage: `const { data, source, error } = useLakebaseData<Order>("/api/orders");`
-
-#### B3: Replace Static Data with Live Sources
-
-**Decide what goes where — data architecture:**
-
-| Data Category | Where It Lives | Frontend Pattern | Examples |
-|--------------|---------------|-----------------|----------|
-| **Analytics / Reporting** (read-only aggregations, dashboards, charts) | SQL Warehouse | `useAnalyticsQuery("queryKey", params)` | Revenue trends, user counts, status breakdowns |
-| **Transactional / CRUD** (data users create, update, or delete) | Lakebase | `fetch('/api/...')` or `useLakebaseData()` | Bookings, reviews, user profiles, orders |
-
-**Rule of thumb:** If the UI has a "Create", "Edit", or "Delete" button for the data, it belongs in Lakebase. If it's a read-only chart or dashboard metric, it stays on the SQL warehouse.
-
-**Replace static demo data with live data sources:**
-
-- For **SQL warehouse reads** (analytics/reporting): Replace static `data` props with `useAnalyticsQuery("queryKey", params)` using SQL files in `config/queries/`
-- For **Lakebase CRUD reads** (transactional data): Replace static `data` with `fetch('/api/...')` calls (or the `useLakebaseData` hook) to the Express routes from B2
-
-> **Note:** AppKit chart components (`BarChart`, `AreaChart`, `DonutChart`, `DataTable`) that use the `queryKey` prop are bound to the analytics plugin. Keep these on SQL warehouse queries. Only convert pages that fetch data manually (using `useAnalyticsQuery` with `data`/`loading`/`error` destructuring or static arrays) to Lakebase API fetch calls.
-
-**Add a ConnectionStatus component:**
-
-Create a component that shows the data source on every page:
-
-```tsx
-function ConnectionStatus({ source, context }: { source: "live" | "mock" | "loading"; context?: string }) {
-  if (source === "loading") return <span>{context ? `Loading ${context}...` : "Loading..."}</span>;
-  if (source === "live") return <span className="text-green-600">Live Data{context ? ` — ${context}` : ""}</span>;
-  return <span className="text-yellow-600">Mock Data{context ? ` — ${context}` : ""}</span>;
-}
-```
-
-Place this at the **top of every page** that fetches data from Lakebase so users clearly see whether they're viewing live or mock data. Pass a `context` string describing the specific data being loaded for that page (e.g., `context="orders"`, `context="bookings"`, `context="user profiles"`).
-
-**Defensive data handling** — prevent runtime errors:
-
-- Initialize arrays with `[]`, not `undefined`
-- Use optional chaining: `data?.slice()`, `data?.map()`
-- Provide fallbacks: `(data ?? []).map(...)` or `data || []`
-- Check before rendering: `{data && data.map(...)}`
-- **PostgreSQL DECIMAL→string coercion:** Lakebase (via `node-pg`) returns `DECIMAL`/`NUMERIC` columns as strings (e.g., `"189.00"` not `189`). Always coerce with `Number(row.amount)` before arithmetic or comparisons — otherwise `a + b` produces string concatenation (`"73" + "51" = "7351"`) instead of addition.
-
-#### Connection Resilience
-
-AppKit's Lakebase plugin handles most resilience automatically:
-
-- **OAuth token rotation:** 1-hour tokens with 2-minute refresh buffer (automatic)
-- **Token caching:** Minimizes API calls (automatic)
-- **OpenTelemetry instrumentation:** Query duration, pool connections, token refresh (automatic)
-
-Configure pool settings for additional resilience:
-
-```typescript
-await createApp({
-  plugins: [
-    lakebase({
-      pool: {
-        max: 10,
-        connectionTimeoutMillis: 5000,
-        idleTimeoutMillis: 30000,
-      },
-    }),
-  ],
-});
-```
-
-Add try/catch with fallback to mock data in every Express route handler (as shown in B2). Log failures at WARNING level.
+When deployed in Phase 5, the Service Principal will run this code on first boot to create database objects.
 
 ---
 
-### Part C: Deploy and Configure Permissions
+#### Build Gate
 
-Now that the code is written (Part B), deploy so the Service Principal runs the DDL and creates database objects on first boot.
-
-Your app runs as a service principal. When created with the Lakebase resource (via `databricks.yml`), the Service Principal automatically gets `CONNECT_AND_CREATE` permission — it can connect and create new objects but cannot access existing schemas or tables.
-
-#### Step 4.C1: Deploy the App
+Before proceeding, verify the app builds cleanly:
 
 ```bash
 cd apps_lakebase/$APP_NAME
-databricks apps deploy --profile $PROFILE
+npm run build   # Must pass with zero errors
 ```
 
-The Service Principal creates and owns all database objects (schemas, tables, sequences) on startup. This is required before local development can work.
-
-#### Step 4.C2: Get Service Principal ID (for reference)
-
-```bash
-databricks apps get $APP_NAME --output json --profile $PROFILE | jq -r '.service_principal_id'
-```
-
-Save this — you may need it for troubleshooting.
-
-#### Step 4.C3: Verify app.yaml Has Correct Env Vars
-
-Confirm `app.yaml` has the Lakebase endpoint configured:
-
-```bash
-grep "LAKEBASE_ENDPOINT" apps_lakebase/$APP_NAME/app.yaml
-```
-
-You should see:
-
-```yaml
-env:
-  - name: LAKEBASE_ENDPOINT
-    valueFrom: postgres
-```
-
-Do NOT set `PGUSER` or `PGPASSWORD` — the plugin handles OAuth token rotation automatically.
-
-#### Step 4.C4: Grant Local Development Permissions
-
-To run `npm run dev` locally against the deployed Lakebase database, grant permissions to your own Databricks identity. Connect to the Lakebase database and run this SQL:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS databricks_auth;
-
-DO $$
-DECLARE
-  subject TEXT := '<YOUR_EMAIL>';  -- Your Databricks email (e.g. name@company.com)
-  schema TEXT := 'app';
-BEGIN
-  PERFORM databricks_create_role(subject, 'USER');
-  EXECUTE format('GRANT CONNECT ON DATABASE "databricks_postgres" TO %I', subject);
-  EXECUTE format('GRANT ALL ON SCHEMA %s TO %I', schema, subject);
-  EXECUTE format('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA %s TO %I', schema, subject);
-  EXECUTE format('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA %s TO %I', schema, subject);
-  EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %s GRANT ALL ON TABLES TO %I', schema, subject);
-  EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %s GRANT ALL ON SEQUENCES TO %I', schema, subject);
-END $$;
-```
-
-Replace `<YOUR_EMAIL>` with your actual Databricks login email.
-
-**How to run this SQL** — choose one method:
-
-1. **Lakebase SQL Console** — open the Lakebase project in the Databricks UI (Compute > Lakebase Postgres > your project), click the branch, and use the built-in SQL editor.
-
-2. **`psql` with OAuth credentials:**
-   ```bash
-   # Generate short-lived credentials
-   CREDS=$(databricks postgres generate-database-credential --profile $PROFILE)
-   PGUSER=$(echo "$CREDS" | jq -r '.username')
-   PGPASSWORD=$(echo "$CREDS" | jq -r '.password')
-
-   # Connect
-   PGPASSWORD=$PGPASSWORD psql -h {LAKEBASE_HOST} -U $PGUSER -d databricks_postgres --set=sslmode=require
-   ```
-
-3. **Temporary admin route** — add a one-time Express route in `server.ts` that executes the SQL via `AppKit.lakebase.query()`, deploy, hit the endpoint once, then remove the route.
-
-After granting, `npm run dev` will authenticate using your Databricks OAuth identity.
-
-#### Permission Error Patterns
-
-If you see these errors:
-
-- `role "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" does not exist` — The Service Principal or your identity lacks a Lakebase role. Re-deploy the app (Step 4.C1) so the SP creates objects, or re-run the SQL grant (Step 4.C4) for your own identity.
-- `Connection attempt 1/5 failed (scale-to-zero wake?)` — Normal for the first connection after an idle period. Lakebase autoscaling instances scale to zero. Wait and retry.
-- `permission denied for sequence` — Re-deploy the app so the Service Principal re-creates objects (it owns them), or manually grant via SQL: `GRANT ALL ON ALL SEQUENCES IN SCHEMA app TO "<service-principal-id>";`
+Fix any TypeScript, ESM, or import errors now. Each deploy cycle takes 3-5 minutes — catching errors locally saves significant time.
 
 ---
 
-### Part D: Local Build and Test
+#### Part C: Local Build and Test
 
-Run all commands from the app directory (`apps_lakebase/$APP_NAME/`).
+Follow **Step 4** of the `05-appkit-lakebase-wiring` skill. In summary:
 
-#### Build and Run
+1. `npm run build` — must pass with zero errors
+2. `npm run dev` — verify UI loads with mock fallback data
+3. `curl` health and data endpoints — confirm mock responses
 
-```bash
-cd apps_lakebase/$APP_NAME
-npm run dev
-```
-
-#### Verify
-
-Open `http://localhost:8000` in your browser and check:
-
-- The UI loads correctly
-- Navigation works between pages
-- ConnectionStatus indicator shows data source ("Live Data" or "Mock Data")
-- Backend API endpoints respond (check browser dev tools Network tab)
-- No console errors
-
-#### Test API Endpoints
-
-```bash
-curl -s "http://localhost:8000/api/health/lakebase" | jq .
-```
-
-Expected: `{ "status": "connected", "source": "live" }` (or `"disconnected"` / `"mock"` if Lakebase is unavailable — the app should still work with mock fallback data).
+> **Note:** Lakebase is not connected yet — all API endpoints will return `"source": "mock"`. This is expected. Live data verification happens in Phase 5 after deployment.
 
 ---
 
-### What It Produces
+### How to Use
 
-- `@databricks/lakebase` plugin integrated into the AppKit project
-- Database schema and seed data (DDL/DML in `server/server.ts`)
-- Backend API routes for all CRUD operations with live/mock fallback
-- `GET /api/health/lakebase` health endpoint
-- ConnectionStatus component on all data-driven pages
-- All static demo data replaced with live query-driven data
+1. Copy the **Input Template** section above
+2. Replace `{workspace_url}`, `{user_app_name}`, and `{LAKEBASE_HOST}` with your values
+3. Paste into Cursor or Copilot
+4. The code assistant will:
+   - Install and configure the Lakebase plugin
+   - Read the `05-appkit-lakebase-wiring` skill for patterns
+   - Design database schema from the PRD
+   - Build API routes with live/mock fallback
+   - Replace all static mock data with API calls
+   - Verify the app runs locally with mock fallback data
+
+**Note:** This phase writes all Lakebase code and tests locally with mock data. Deployment and live data verification happen in Phase 5.
 
 ---
 
 ### Expected Output
 
-**Architecture — Dual Data Sources:**
+**Architecture — Local Development with Lakebase Plugin:**
 
 ```mermaid
 graph LR
     Browser["Browser<br/>localhost:8000"] --> AppKit["AppKit Backend<br/>(Node.js/Express)"]
-    AppKit -->|"useAnalyticsQuery()"| SQLWarehouse["SQL Warehouse<br/>(Analytics reads)"]
-    AppKit -->|"AppKit.lakebase.query()"| Lakebase["Lakebase<br/>(CRUD writes)"]
+    AppKit -.->|"Lakebase unavailable<br/>(not deployed yet)"| Lakebase["Lakebase PostgreSQL"]
+    AppKit -->|"Mock fallback"| MockData["Mock Data<br/>(in-code fallback)"]
 
     subgraph local [Local Machine]
         Browser
         AppKit
+        MockData
     end
 
     subgraph cloud [Databricks Cloud]
-        SQLWarehouse
         Lakebase
     end
 ```
 
-**API health check — Lakebase connected:**
+**API health check — mock fallback (expected before deployment):**
 
 ```json
 $ curl -s http://localhost:8000/api/health/lakebase | jq .
 {
-  "status": "connected",
-  "source": "live"
+  "status": "disconnected",
+  "source": "mock"
 }
 ```
 
-**API data endpoint — live data:**
+**API data endpoint — mock fallback data:**
 
 ```json
 $ curl -s http://localhost:8000/api/orders | jq .
@@ -1125,55 +1145,57 @@ $ curl -s http://localhost:8000/api/orders | jq .
   "data": [
     {
       "id": 1,
-      "user_id": "demo-user",
+      "user_id": "demo",
       "amount": 99.99,
-      "status": "completed",
-      "created_at": "2026-04-10T14:45:00.000Z"
+      "status": "mock"
     }
   ],
-  "source": "live"
+  "source": "mock"
 }
 ```
 
-**Before/After — The Phase 1 to Phase 2 Switch:**
+**Before/After — The Phase 1 to Phase 4 Code Change:**
 
 ```
-BEFORE (Phase 1 — static demo data):          AFTER (Phase 4 — live Lakebase data):
+BEFORE (Phase 1 — hardcoded arrays):          AFTER (Phase 4 — API-backed with fallback):
 ┌────────────────────────────────┐             ┌────────────────────────────────┐
-│  ⚠ Mock Data — orders         │             │  ✓ Live Data — orders          │
+│  (no data source indicator)    │             │  ⚠ Mock Data — orders          │
 │                                │             │                                │
-│  id │ user   │ amount │ status │             │  id │ user   │ amount │ status │
-│  ───┼────────┼────────┼────────│             │  ───┼────────┼────────┼────────│
-│  1  │ demo   │ $99.99 │ mock   │             │  1  │ demo-  │ $99.99 │ compl- │
-│     │        │        │        │             │  2  │ user   │ $45.00 │ eted   │
-│  (hardcoded static array)      │             │  3  │ alice  │ $72.50 │ pend-  │
-│                                │             │  (live from Lakebase)  │ ing    │
+│  const data = [                │             │  useLakebaseData("/api/orders") │
+│    { id: 1, ... },            │             │  → fetch → try Lakebase        │
+│    { id: 2, ... },            │             │  → catch → mock fallback       │
+│  ];                            │             │                                │
+│  (hardcoded in component)      │             │  (API-driven, ready for live)  │
 └────────────────────────────────┘             └────────────────────────────────┘
 ```
 
-**Terminal output — `npm run dev` with Lakebase:**
+After Phase 5 deployment, the ConnectionStatus switches from "Mock Data" to "Live Data" and all endpoints return `"source": "live"`.
 
-Output format varies by AppKit version. Look for confirmation that the server is running on port 8000, both the analytics and Lakebase plugins loaded, and the ConnectionPool initialized. You should see your DDL statements executing successfully and `[Lakebase]`-prefixed query logs with row counts.
+**Terminal output — `npm run dev` with Lakebase plugin:**
+
+Output format varies by AppKit version. Look for confirmation that the server is running on port 8000 and the Lakebase plugin loaded. You may see connection warnings (e.g., `Connection attempt failed`) — this is expected before deployment. The mock fallback ensures the app remains functional.
 
 ---
 
 ### Checkpoint
 
-> **Validate before proceeding.** This is a critical integration point. Verify thoroughly:
+> **Validate before proceeding.** Verify the code changes are complete:
 >
-> - [ ] `@databricks/lakebase` is in `package.json` and `npm run build` succeeds
-> - [ ] `lakebase()` is registered in `server/server.ts`
-> - [ ] `.env` has `LAKEBASE_ENDPOINT`, `PGHOST`, `PGDATABASE`, `PGSSLMODE`
-> - [ ] `app.yaml` has `LAKEBASE_ENDPOINT` with `valueFrom: postgres`
-> - [ ] `databricks.yml` has the `postgres` resource with the correct branch path
-> - [ ] App deployed once so Service Principal owns DB objects
-> - [ ] Local dev permissions granted (SQL grant for your email)
-> - [ ] `GET /api/health/lakebase` returns `{ "status": "connected", "source": "live" }`
-> - [ ] All data API endpoints return `"source": "live"` with actual rows
-> - [ ] ConnectionStatus shows "Live Data" on all data pages
-> - [ ] No static demo data arrays remain in the frontend code
+> - [ ] `@databricks/lakebase` installed in `package.json`
+> - [ ] `lakebase()` registered in `server/server.ts` plugins
+> - [ ] `DB_SCHEMA` derived from `$APP_NAME` and used in all DDL, queries, and grants
+> - [ ] `.env` and `app.yaml` configured with all PG env vars (static values)
+> - [ ] `databricks.yml` unchanged (no postgres resource for Autoscaling)
+> - [ ] DDL and seed data are idempotent (skill Step 1)
+> - [ ] API routes return `{ data, source }` with mock fallback (skill Step 2)
+> - [ ] `useLakebaseData` hook and `ConnectionStatus` component created (skill Step 3)
+> - [ ] All static mock data replaced with API calls
+> - [ ] DECIMAL/DATE coercion and snake_case mapping handled
+> - [ ] `npm run build` passes; `npm run dev` runs with mock data
 >
-> **Do NOT proceed to Phase 5 until all Lakebase endpoints return live data locally.**
+> **Do NOT proceed to Phase 5 until local testing passes with mock data.**
+>
+> **Before moving on**, append to `apps_lakebase/$APP_NAME/.vibecoding-state.md` with resolved issues, variable values, and workarounds from this phase.
 
 #### Context for Phase 5
 
@@ -1183,14 +1205,14 @@ Copy the following into your new Agent thread so it has the necessary context:
 > - **CLI profile:** `$PROFILE` (e.g., `DEFAULT`)
 > - **Workspace:** `{workspace_url}`
 > - **Lakebase project:** `{user_app_name}`
-> - All Lakebase API endpoints return `"source": "live"` locally
-> - `app.yaml` has `LAKEBASE_ENDPOINT` with `valueFrom: postgres`
+> - All Lakebase API endpoints return `"source": "mock"` with fallback data locally (live data after deploy)
+> - `app.yaml` has static `value:` entries for Lakebase env vars (LAKEBASE_ENDPOINT, PGHOST, PGDATABASE, PGSSLMODE, DB_SCHEMA)
 
 ---
 
 ---
 
-## Phase 5: Deploy and E2E Test with Lakebase [Path B only]
+## Phase 5: Deploy and E2E Test with Lakebase
 
 In this phase, you will deploy the Lakebase-wired application to Databricks Apps and run comprehensive end-to-end testing — verifying API correctness, Lakebase connectivity in production, log health, and connection resilience after idle periods.
 
@@ -1198,26 +1220,57 @@ Start a new Agent thread and use the following prompt:
 
 ---
 
-### Your Task
+### System Prompt
 
-Deploy the locally-tested web application to Databricks Apps and run comprehensive end-to-end testing to verify Lakebase connectivity, API correctness, and idle resilience.
+*Instructions for the AI model*
+
+You are a QA engineer deploying and running end-to-end tests for an AppKit web application with Lakebase. Your goal is to deploy the Lakebase-wired app to Databricks Apps (where the Service Principal creates database objects on first boot), verify Lakebase connectivity and API correctness, and test connection resilience after idle periods.
+
+Key requirements:
+
+- Validate Lakebase config in `app.yaml` before deploying
+- Deploy using the `03-appkit-deploy` skill (SP creates schema/tables on first boot)
+- Test all backend API endpoints with bearer token authentication
+- Check app logs for healthy Lakebase connections
+- Fix Lakebase-specific errors (up to 3 iterations)
+- Optionally grant local dev permissions for post-deploy local testing
+- Run the critical idle connection test (3-5 minutes idle, then re-test)
+
+CLI Best Practices:
+
+- Run from `apps_lakebase/` or use `apps_lakebase/scripts/` for scripts
+- Run CLI commands outside the IDE sandbox to avoid SSL/TLS certificate errors
+
+---
+
+### Input Template
+
+*Pass as-is to output (skip LLM)*
+
+*LLM bypass enabled — This template will be returned directly to the user without AI processing*
+
+#### Your Task
+
+Deploy the Lakebase-wired web application to Databricks Apps and run comprehensive end-to-end testing. This is the first deploy with Lakebase code — the Service Principal will create the database schema, tables, and seed data on startup.
+
+**First:** Read `apps_lakebase/$APP_NAME/.vibecoding-state.md` if it exists — it contains resolved issues and variable values from prior phases.
 
 **Workspace:** `{workspace_url}`
 
 **Working directory:** All app paths and commands use the `apps_lakebase/` folder. The scaffolded AppKit app lives at `apps_lakebase/$APP_NAME/`.
 
-**Prerequisite:** Complete the Lakebase wiring step (Phase 4) first. Local testing must pass before deployment.
+**Prerequisite:** Complete the Lakebase wiring step (Phase 4) first. Local testing must pass with mock fallback data before deployment.
 
 ---
 
-### Deployment Constraints
+#### Deployment Constraints
 
 - Databricks App names must use only lowercase letters, numbers, and dashes (no underscores). Use hyphens: `my-app-name` not `my_app_name`.
 - App names are max 26 characters.
 
 ---
 
-### Step 5.1: Set Variables and Validate Lakebase Config
+#### Step 5.1: Set Variables and Validate Lakebase Config
 
 Derive your app name and select a CLI profile:
 
@@ -1229,56 +1282,102 @@ LASTINITIAL=$(echo "$EMAIL" | cut -d'@' -f1 | cut -d'.' -f2 | cut -c1)
 APP_PREFIX="${FIRSTNAME}-${LASTINITIAL}"
 APP_NAME="${APP_PREFIX}-{use_case_slug}"
 
-databricks auth profiles
-PROFILE="DEFAULT"  # <-- set to your chosen profile name
+TARGET_HOST="{workspace_url}"
+PROFILE=$(databricks auth profiles --output json 2>/dev/null \
+  | jq -r --arg host "$TARGET_HOST" \
+    '[.profiles[] | select(.host == $host)] | .[0].name // empty')
+
+if [ -z "$PROFILE" ]; then
+  echo "No profile found for $TARGET_HOST — creating one..."
+  databricks auth login --host "$TARGET_HOST"
+  PROFILE=$(databricks auth profiles --output json 2>/dev/null \
+    | jq -r --arg host "$TARGET_HOST" \
+      '[.profiles[] | select(.host == $host)] | .[0].name // empty')
+fi
+
+echo "Using profile: $PROFILE"
 ```
 
-Verify `app.yaml` has the Lakebase-specific environment binding (in addition to the generic checks the deploy skill performs):
+Verify `app.yaml` has the Lakebase-specific environment variables (in addition to the generic checks the deploy skill performs):
 
 ```bash
-grep "LAKEBASE_ENDPOINT" apps_lakebase/$APP_NAME/app.yaml
+grep -E "LAKEBASE_ENDPOINT|PGHOST|PGDATABASE|DB_SCHEMA" apps_lakebase/$APP_NAME/app.yaml
 ```
 
-You should see `LAKEBASE_ENDPOINT` with `valueFrom: postgres`. If missing, add it before deploying:
-
-```yaml
-env:
-  - name: LAKEBASE_ENDPOINT
-    valueFrom: postgres
-```
+You should see static `value:` entries for `LAKEBASE_ENDPOINT`, `PGHOST`, `PGDATABASE`, `PGSSLMODE`, and `DB_SCHEMA`. If missing, add them before deploying (see Phase 4, Step A3). This workshop uses static values (see Phase 4, Step A3). `valueFrom: postgres` is valid when using `databricks apps init` or bundle-managed resources, but is not used in this workshop path.
 
 ---
 
-### Step 5.2: Deploy
+#### Step 5.2: Deploy (SP Creates Database Objects)
 
-Read and follow the `appkit-deploy` skill at `@apps_lakebase/skills/appkit-deploy/SKILL.md`. Run all skill commands from the `apps_lakebase/` directory.
+Read and follow the `03-appkit-deploy` skill at `@apps_lakebase/skills/03-appkit-deploy/SKILL.md`. Run all skill commands from the `apps_lakebase/` directory.
 
 The skill covers: config validation, build, deploy, UI verification, error diagnosis (3-iteration fix loop), and workspace app limit handling.
 
-After the skill completes, capture the app URL for subsequent testing:
+This is the first deploy with Lakebase code. The Service Principal runs the DDL in `server.ts` on startup, creating the schema, tables, and seed data. The SP owns all database objects it creates.
+
+**Timing:** First deploys take 3-5 minutes (npm install runs on the platform). Redeployments take 1-3 minutes. Use `databricks apps logs $APP_NAME --follow --profile $PROFILE` to stream logs in real-time instead of polling repeatedly.
+
+**Important:** Always use `databricks apps deploy` — never `databricks apps start` — to push code changes. `apps start` only resumes a stopped app without updating code, and may hang if compute is in STOPPED state.
+
+> **Service Principal permissions:** If the SP encounters permission errors on first deploy (e.g., `permission denied for schema`), grant via the Lakebase SQL Editor:
+>
+> ```sql
+> CREATE EXTENSION IF NOT EXISTS databricks_auth;
+> SELECT databricks_create_role('<SP_CLIENT_ID>', 'service_principal');
+> GRANT CONNECT ON DATABASE databricks_postgres TO "<SP_CLIENT_ID>";
+> GRANT CREATE, USAGE ON SCHEMA public TO "<SP_CLIENT_ID>";
+> ```
+>
+> Get the SP client ID from: `databricks apps get $APP_NAME --output json --profile $PROFILE | jq -r '.service_principal_id'`
+
+After the skill completes, verify the app status is RUNNING before testing:
 
 ```bash
+# Verify app is running before testing
+databricks apps get $APP_NAME --output json --profile $PROFILE | jq '{status: .status.state, compute: .compute_status.state, url: .url}'
+
 APP_URL=$(databricks apps get $APP_NAME --output json --profile $PROFILE | jq -r '.url')
 echo "App URL: $APP_URL"
 ```
 
+The primary readiness signal is `compute_status.state: ACTIVE`. `status.state` may remain `null` in some CLI versions or workspace configurations — this is normal and does not indicate a problem. If `compute` is not `ACTIVE`, wait 30 seconds and re-check.
+
+**Warning:** `databricks bundle deploy` resets the app's resource list to match `databricks.yml`. If no code changes are needed since Phase 4, you may skip redeployment — the app is already running.
+
 ---
 
-### Step 5.3: Test All Backend APIs
+#### Rule: Before Testing ANY API Endpoint
 
-Test the Lakebase health endpoint and all data endpoints:
+1. Read `server/server.ts` (or equivalent) to identify all registered routes, HTTP methods, and request body schemas
+2. For POST/PUT endpoints, extract exact field names from the INSERT/UPDATE SQL statements
+3. Construct test payloads that match the actual code — do NOT guess based on REST conventions
+4. Only test routes that actually exist in the code
+
+DO NOT guess request body fields or assume standard REST endpoints exist (e.g., `GET /api/bookings` may not exist even if `POST /api/bookings` does).
+
+---
+
+#### Step 5.3: Test All Backend APIs
+
+Databricks Apps require authentication. Get a bearer token, then test:
 
 ```bash
+TOKEN=$(databricks auth token --profile $PROFILE | jq -r '.access_token')
+AUTH_HEADER="Authorization: Bearer $TOKEN"
+
 # Health endpoint
-curl -s "$APP_URL/api/health/lakebase" | jq .
+curl -s -H "$AUTH_HEADER" "$APP_URL/api/health/lakebase" | jq .
 
 # Test each data endpoint used by your UI pages.
 # Replace with your actual API endpoints:
-curl -s "$APP_URL/api/orders" | jq .
-# curl -s "$APP_URL/api/bookings" | jq .
-# curl -s "$APP_URL/api/listings" | jq .
+curl -s -H "$AUTH_HEADER" "$APP_URL/api/orders" | jq .
+# curl -s -H "$AUTH_HEADER" "$APP_URL/api/bookings" | jq .
+# curl -s -H "$AUTH_HEADER" "$APP_URL/api/listings" | jq .
 # ... add all endpoints that fetch from Lakebase
 ```
+
+If `curl` returns HTML (a login page) or 401, the token may have expired. Re-run the `TOKEN=...` line to refresh it.
 
 **Verify each response includes:**
 
@@ -1290,7 +1389,7 @@ If any endpoint returns `"source": "mock"`, there is a Lakebase connection issue
 
 ---
 
-### Step 5.4: Check Logs for Lakebase Connections
+#### Step 5.4: Check Logs for Lakebase Connections
 
 ```bash
 databricks apps logs $APP_NAME --tail-lines 100 --search lakebase --profile $PROFILE
@@ -1310,7 +1409,7 @@ databricks apps logs $APP_NAME --tail-lines 100 --profile $PROFILE | grep -i lak
 
 ---
 
-### Step 5.5: Fix Lakebase Errors (up to 3 iterations)
+#### Step 5.5: Fix Lakebase Errors (up to 3 iterations)
 
 If Lakebase-specific errors occur (the deploy skill already handles generic AppKit errors), check the logs:
 
@@ -1318,36 +1417,41 @@ If Lakebase-specific errors occur (the deploy skill already handles generic AppK
 databricks apps logs $APP_NAME --tail-lines 100 --profile $PROFILE
 ```
 
-#### Lakebase-Specific Errors
+##### Lakebase-Specific Errors
 
 | Error | Cause | Fix |
 |-------|-------|-----|
 | `ERR_MODULE_NOT_FOUND` for `@databricks/lakebase` | Package not installed | Verify `@databricks/lakebase` is in `package.json` dependencies; redeploy |
-| `LAKEBASE_ENDPOINT is not set` or `PGHOST is not set` | Missing env vars in `app.yaml` | Add `LAKEBASE_ENDPOINT` with `valueFrom: postgres` to `app.yaml`; redeploy |
-| `role "xxxxxxxx-xxxx-..." does not exist` | Service Principal lacks Lakebase role | Re-deploy the app so the SP re-creates and owns objects. See Phase 4 Permission Error Patterns |
-| `permission denied for sequence` | SP lacks GRANT on sequences for SERIAL columns | Re-deploy the app so the SP re-creates objects, or grant manually: `GRANT ALL ON ALL SEQUENCES IN SCHEMA app TO "<sp-id>";` |
+| `LAKEBASE_ENDPOINT is not set` or `PGHOST is not set` | Missing env vars in `app.yaml` | Add static `value:` entries for `LAKEBASE_ENDPOINT`, `PGHOST`, `PGDATABASE`, `PGSSLMODE` to `app.yaml` (see Phase 4, Step A3); redeploy |
+| `role "xxxxxxxx-xxxx-..." does not exist` | Service Principal lacks Lakebase role | Re-deploy the app so the SP re-creates and owns objects. If the SP was just created, grant via SQL (see Step 5.2 callout) |
+| `permission denied for sequence` | SP lacks GRANT on sequences for SERIAL columns | Re-deploy the app so the SP re-creates objects, or grant manually: `GRANT ALL ON ALL SEQUENCES IN SCHEMA <DB_SCHEMA> TO "<sp-id>";` |
 | `Connection attempt 1/5 failed` | Normal on first request — Lakebase autoscaling cold start | Wait and retry. The connection pool handles retries automatically |
-| `token's identity did not match` | OAuth token mismatch | Verify `app.yaml` has `LAKEBASE_ENDPOINT` with `valueFrom: postgres`; do NOT set `PGUSER` or `PGPASSWORD` manually |
+| `token's identity did not match` | OAuth token mismatch | Verify `app.yaml` has correct static env vars; do NOT set `PGUSER` or `PGPASSWORD` manually |
+| `permission denied for schema` / `must be owner of schema` | Schema owned by another identity (e.g., from a prior deploy or local dev) | Drop the schema (`DROP SCHEMA <DB_SCHEMA> CASCADE;`) from the Lakebase SQL Console and redeploy so the SP re-creates it |
+
+> **Note:** If you previously ran an older version of Phase 4 that deployed the app, you may have schema ownership conflicts. Drop the schema and redeploy to let the SP recreate it cleanly.
 
 **Fix cycle:**
 
 1. Identify the error from logs
 2. Apply the fix in `apps_lakebase/$APP_NAME/`
-3. Redeploy: `cd apps_lakebase/$APP_NAME && databricks apps deploy --profile $PROFILE`
-4. Re-check logs and re-test endpoints
+3. Redeploy: `cd apps_lakebase/$APP_NAME && databricks bundle deploy --profile $PROFILE && databricks apps deploy $APP_NAME --profile $PROFILE`
+4. Wait for the app to reach RUNNING state (stream logs with `databricks apps logs $APP_NAME --follow --profile $PROFILE`)
+5. Re-test endpoints
 
 Repeat up to 3 times. If errors persist after 3 attempts, report them for manual investigation.
 
 ---
 
-### Step 5.6: Idle Connection Test (CRITICAL)
+#### Step 5.6: Idle Connection Test (CRITICAL)
 
 After confirming all endpoints return `"source": "live"`, wait 3-5 minutes without interacting with the app. Lakebase autoscaling instances may scale to zero during idle periods.
 
 After waiting, reload the app in your browser and re-test:
 
 ```bash
-curl -s "$APP_URL/api/health/lakebase" | jq .
+TOKEN=$(databricks auth token --profile $PROFILE | jq -r '.access_token')
+curl -s -H "Authorization: Bearer $TOKEN" "$APP_URL/api/health/lakebase" | jq .
 ```
 
 **Expected:** Still returns `"source": "live"`. The AppKit Lakebase plugin handles automatic OAuth token refresh and connection pool recovery.
@@ -1358,26 +1462,105 @@ If it returns `"source": "mock"` or the health check shows `"disconnected"`, che
 databricks apps logs $APP_NAME --tail-lines 50 --profile $PROFILE
 ```
 
-The connection pool should recover automatically after the autoscaling instance wakes. If it does not recover after 2-3 page reloads, verify pool settings in `server.ts`:
+The connection pool should recover automatically after the autoscaling instance wakes. If it does not recover after 2-3 page reloads, verify pool settings configured in Phase 4 (`lakebase({ pool: { ... } })` in `server.ts`).
 
-```typescript
-lakebase({
-  pool: {
-    max: 10,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 30000,
-  },
-})
+---
+
+#### Step 5.7: Grant Local Development Permissions (Optional)
+
+After deployment, you can optionally grant your Databricks identity access to the Lakebase database for local development against live data. This is useful for debugging and iterating locally after Phase 5.
+
+**Option 1: `databricks_superuser` via Lakebase UI (recommended — simpler)**
+
+1. Open the Lakebase Autoscaling UI (Compute > Lakebase Postgres > your project)
+2. Navigate to the Branch Overview page for `production`
+3. Click **Add role** (or **Edit role** if your OAuth role already exists)
+4. Select your Databricks identity as the principal and check the **`databricks_superuser`** system role
+
+This grants full DML access (read/write) to all objects in the branch. `databricks_superuser` has DML access but NOT DDL (create schema/table) — the SP already created objects during deploy. Reference: [AppKit Lakebase docs - Local development](https://databricks.github.io/appkit/docs/plugins/lakebase#local-development)
+
+**Option 2: Fine-grained SQL grants (for schema-level control)**
+
+If you need per-schema permissions instead of superuser, connect to the Lakebase database and run this SQL:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS databricks_auth;
+
+DO $$
+DECLARE
+  subject TEXT := '<YOUR_EMAIL>';     -- Your Databricks email (e.g. name@company.com)
+  schema TEXT := '<DB_SCHEMA>';       -- From Phase 4, Step A0 (e.g. 'prashanth_s_booking_app')
+BEGIN
+  PERFORM databricks_create_role(subject, 'USER');
+  EXECUTE format('GRANT CONNECT ON DATABASE "databricks_postgres" TO %I', subject);
+  EXECUTE format('GRANT ALL ON SCHEMA %s TO %I', schema, subject);
+  EXECUTE format('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA %s TO %I', schema, subject);
+  EXECUTE format('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA %s TO %I', schema, subject);
+  EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %s GRANT ALL ON TABLES TO %I', schema, subject);
+  EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %s GRANT ALL ON SEQUENCES TO %I', schema, subject);
+END $$;
+```
+
+Replace `<YOUR_EMAIL>` with your actual Databricks login email and `<DB_SCHEMA>` with the value from Phase 4, Step A0. Reference: [upstream fine-grained permissions](https://databricks.github.io/appkit/docs/plugins/lakebase#fine-grained-permissions)
+
+**How to run this SQL** — choose one method:
+
+1. **Lakebase SQL Console** — open the Lakebase project in the Databricks UI (Compute > Lakebase Postgres > your project), click the branch, and use the built-in SQL editor.
+
+2. **`psql` with OAuth credentials:**
+   ```bash
+   # Generate short-lived credentials (endpoint path is a REQUIRED positional argument)
+   ENDPOINT="projects/{user_app_name}/branches/production/endpoints/primary"
+   CREDS=$(databricks postgres generate-database-credential "$ENDPOINT" \
+     --profile $PROFILE --output json)
+   PGUSER="$(databricks current-user me --output json --profile $PROFILE | jq -r '.userName')"
+   PGPASSWORD=$(echo "$CREDS" | jq -r '.token')
+
+   # Connect
+   PGPASSWORD=$PGPASSWORD psql -h {LAKEBASE_HOST} -U $PGUSER -d databricks_postgres --set=sslmode=require
+   ```
+
+After granting, verify local connectivity:
+
+```bash
+cd apps_lakebase/$APP_NAME
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+npm run dev
+# In another terminal:
+curl -s http://localhost:8000/api/health/lakebase | jq .
+# Expected: { "status": "connected", "source": "live" }
 ```
 
 ---
 
-### What It Produces
+#### Summary
 
-- Production deployment with Lakebase + Analytics on Databricks Apps
-- Verified API endpoints returning live data from Lakebase
-- Confirmed connection resilience after idle periods
-- Clean app logs with no errors
+- [ ] Databricks App is deployed and running
+- [ ] Web UI is accessible at the app URL (React application, not an error page)
+- [ ] ConnectionStatus shows "Live Data" (connected to Lakebase)
+- [ ] `GET /api/health/lakebase` returns `{ "status": "connected", "source": "live" }`
+- [ ] All data API endpoints return `"source": "live"` with real data from Lakebase
+- [ ] No errors in the app logs
+- [ ] Idle connection test passes (still "Live Data" after 3-5 minutes idle)
+
+---
+
+### How to Use
+
+1. Copy the **Input Template** section above
+2. Replace `{workspace_url}` and `{use_case_slug}` with your values
+3. Paste into Cursor or Copilot
+4. The code assistant will:
+   - Validate Lakebase config in `app.yaml`
+   - Deploy the app (SP creates database objects on first boot)
+   - Read server.ts to identify actual routes before testing
+   - Test all backend API endpoints with bearer token auth
+   - Check logs for healthy Lakebase connections
+   - Fix any Lakebase-specific errors (up to 3 iterations)
+   - Optionally grant local dev permissions
+   - Run the idle connection test
+
+**Note:** This is the final step. After this, your AppKit application is fully deployed with Lakebase backend verified end-to-end.
 
 ---
 
@@ -1405,7 +1588,7 @@ $ curl -s "$APP_URL/api/orders" | jq .
 
 **App logs — healthy Lakebase connections:**
 
-Log format varies by AppKit version. Check `databricks apps logs $APP_NAME --tail-lines 30 --profile $PROFILE` for: Analytics and Lakebase plugins loaded, ConnectionPool initialized, DDL executed, server listening on port 8000, and `[Lakebase]`-prefixed query logs. Absence of ERROR-level messages indicates a healthy startup.
+Log format varies by AppKit version. Check `databricks apps logs $APP_NAME --tail-lines 30 --profile $PROFILE` for: Lakebase plugin loaded, ConnectionPool initialized, DDL executed, server listening on port 8000, and `[Lakebase]`-prefixed query logs. Absence of ERROR-level messages indicates a healthy startup.
 
 **Idle connection test timeline:**
 
@@ -1429,14 +1612,12 @@ T+5:00  ───── Reload browser + re-test
 graph LR
     User["User Browser<br/>(HTTPS)"] --> DatabricksApps["Databricks Apps<br/>(Managed Hosting)"]
     DatabricksApps --> AppKit["AppKit Server<br/>(Node.js)"]
-    AppKit -->|"Analytics queries"| SQLWarehouse["SQL Warehouse"]
-    AppKit -->|"CRUD operations"| Lakebase["Lakebase PostgreSQL"]
+    AppKit -->|"All data operations"| Lakebase["Lakebase PostgreSQL"]
     AppKit -.->|"OAuth token refresh<br/>(automatic, every 58min)"| TokenService["Databricks Auth"]
 
     subgraph cloud [Databricks Cloud]
         DatabricksApps
         AppKit
-        SQLWarehouse
         Lakebase
         TokenService
     end
@@ -1455,11 +1636,10 @@ graph LR
 │  /api/health/lakebase        │  PASS ✓  │  source: live          │
 │  /api/orders                 │  PASS ✓  │  3 rows, source: live  │
 │  App logs — no errors        │  PASS ✓  │  ConnectionPool OK     │
-│  SQL warehouse queries       │  PASS ✓  │  Analytics data loaded │
 │  Idle test (5 min)           │  PASS ✓  │  Auto-recovered        │
 │  ConnectionStatus UI         │  PASS ✓  │  Shows "Live Data"     │
 ├──────────────────────────────┼──────────┼────────────────────────┤
-│  TOTAL                       │  8/8 ✓   │  All tests passed      │
+│  TOTAL                       │  7/7 ✓   │  All tests passed      │
 └──────────────────────────────┴──────────┴────────────────────────┘
 ```
 
@@ -1475,10 +1655,9 @@ graph LR
 > - [ ] `GET /api/health/lakebase` returns `{ "status": "connected", "source": "live" }`
 > - [ ] All data API endpoints return `"source": "live"` with real data from Lakebase
 > - [ ] No errors in the app logs
-> - [ ] SQL warehouse queries execute successfully (analytics data loads in the UI)
 > - [ ] Idle connection test passes (still "Live Data" after 3-5 minutes idle)
 >
-> **Congratulations!** Your AppKit application is deployed, connected to both SQL Warehouse and Lakebase, and verified end-to-end.
+> **Congratulations!** Your AppKit application is deployed with Lakebase and verified end-to-end.
 
 ---
 
@@ -1490,34 +1669,35 @@ Combined verification across all phases:
 
 ### Phase 1 — Scaffold & Build
 - [ ] Databricks CLI authenticated and `APP_NAME` set
-- [ ] AppKit project scaffolded inside `apps_lakebase/` with analytics plugin
-- [ ] SQL files exist in `config/queries/` for every data need from the PRD
-- [ ] `npm run typegen` run and types generated
-- [ ] Frontend implements key pages with type-safe data fetching
+- [ ] AppKit project scaffolded inside `apps_lakebase/` as a blank app (no plugins)
+- [ ] Frontend implements key pages with mock data
 - [ ] `npm run dev` runs cleanly at `http://localhost:8000`
 
 ### Phase 2 — Deploy
 - [ ] Databricks App deployed and in `RUNNING` state
 - [ ] Web UI loads at the app URL
-- [ ] SQL queries execute successfully in the cloud
+- [ ] Mock data renders correctly
 
-### Phase 3 — Lakebase Setup (Path B)
+### Phase 3 — Lakebase Setup
 - [ ] Lakebase project created (or existing project discovered)
 - [ ] Endpoint hostname (`LAKEBASE_HOST`) captured
 - [ ] Compute optimized: min 0.5 CU, max 2.0 CU, 300s suspend timeout
 - [ ] Endpoint status is `ACTIVE`
 
-### Phase 4 — Lakebase Wiring (Path B)
+### Phase 4 — Lakebase Wiring (Code Only)
 - [ ] `@databricks/lakebase` installed and registered
-- [ ] Environment variables configured (`.env` + `app.yaml`)
-- [ ] `databricks.yml` has `postgres` resource with correct branch path
+- [ ] `DB_SCHEMA` derived from `$APP_NAME` and used in all DDL/queries/grants
+- [ ] Environment variables configured with static values (`.env` + `app.yaml`)
+- [ ] `databricks.yml` unchanged (no postgres resource for Autoscaling)
 - [ ] DDL and seed data run idempotently (count-check pattern)
-- [ ] All API routes return `{ data, source }` with live/mock fallback
+- [ ] All API routes return `{ data, source }` with mock fallback
 - [ ] ConnectionStatus component on all data pages
-- [ ] All static demo data replaced with live data
+- [ ] All static mock data replaced with API calls
+- [ ] `npm run dev` runs with mock fallback data
 
-### Phase 5 — E2E Test (Path B)
+### Phase 5 — Deploy + E2E Test
+- [ ] App deployed and Service Principal creates database objects
 - [ ] All API endpoints return `"source": "live"` in production
 - [ ] App logs show healthy Lakebase connections
 - [ ] Idle connection test passes (3-5 minutes)
-- [ ] Final verification dashboard: 8/8 tests passed
+- [ ] Final verification dashboard: 7/7 tests passed

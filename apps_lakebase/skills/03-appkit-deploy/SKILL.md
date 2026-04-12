@@ -1,5 +1,5 @@
 ---
-name: appkit-deploy
+name: 03-appkit-deploy
 description: >
   Deploy a Databricks AppKit application to Databricks Apps. Covers config
   validation, build verification, deployment, UI verification, error diagnosis
@@ -9,6 +9,7 @@ description: >
   "databricks apps deploy", "fix deploy error", "app won't start".
 license: Apache-2.0
 compatibility: Requires a built AppKit project with Node.js v22+ and Databricks CLI >= 0.295.0
+allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"
@@ -34,8 +35,8 @@ Deploy an AppKit project to Databricks Apps, verify it runs, and fix common erro
 - Diagnosing and fixing deploy failures
 - Freeing workspace app slots when the limit is reached
 
-**Not for scaffolding.** Use `appkit-scaffold` to create a new project.
-**Not for building features.** Use `appkit-build` to implement UI and backend code.
+**Not for scaffolding.** Use `01-appkit-scaffold` to create a new project.
+**Not for building features.** Use `02-appkit-build` to implement UI and backend code.
 
 ## Prerequisites
 
@@ -45,6 +46,7 @@ Before deploying, ensure:
 - `$APP_NAME` and `$PROFILE` are set by the calling prompt
 - The app directory contains `app.yaml` and `databricks.yml`
 - If deploying to a **different workspace** than where the app was scaffolded: update the `host` in `databricks.yml`, update `sql_warehouse_id` for the new workspace, and remove stale bundle state with `rm -rf $APP_NAME/.databricks`
+- If no CLI profile exists for the target workspace, create one with `databricks auth login --host <workspace-url>` (NOT `databricks configure`, which requires interactive token input and fails in automated/agent contexts)
 
 ---
 
@@ -131,17 +133,27 @@ If there are TypeScript or build errors, fix them before proceeding.
 
 ## Step 3: Deploy
 
+Deploying requires **two commands** — one to sync local source to the workspace, one to trigger the app run:
+
 ```bash
 cd $APP_NAME
+
+# 1. Upload local files to workspace
+databricks bundle deploy --profile $PROFILE
+
+# 2. Trigger build + restart from uploaded source
 databricks apps deploy --profile $PROFILE
 ```
 
-This single command runs the full pipeline:
-1. Builds the frontend (`npm run build`)
-2. Deploys the bundle to the workspace
-3. Starts the app
+> **WARNING:** `databricks apps deploy` alone does NOT upload local file changes.
+> It triggers a build-and-run from whatever source is already in the workspace path.
+> Always run `databricks bundle deploy` first to sync your latest code.
 
-Wait for completion — typically 1-3 minutes for redeployments, up to 5 minutes for first deploys.
+For Lakebase Autoscaling, use `postgres_project`/`postgres_branch`/`postgres_endpoint` resources (CLI v0.287.0+) if you want bundle-managed project lifecycle. For Lakebase Provisioned, use `database_instance` + `app.resources[].database` (CLI v0.265.0+). Do not mix the two models. `bundle deploy` manages all declared resources — no manual REST API calls needed.
+
+> **Resource-sensitive deploys:** `databricks bundle deploy` resets the app's resource list to match `databricks.yml`. If resources were added outside the bundle (e.g., via REST API), a bundle deploy removes them. To push code without resetting resources, use `databricks apps deploy` alone (it rebuilds from the already-synced workspace source). If no code changes are needed, skip redeployment entirely.
+
+Wait for completion — typically 1-3 minutes for redeployments, 3-5 minutes for first deploys. Do not treat longer waits as failures until 7+ minutes have elapsed.
 
 Verify the app is running before proceeding:
 
@@ -149,19 +161,21 @@ Verify the app is running before proceeding:
 databricks apps get $APP_NAME --output json --profile $PROFILE | jq '{status: .status.state, compute: .compute_status.state}'
 ```
 
-If `compute` is not `ACTIVE` or `status` is not `RUNNING`, wait 30 seconds and re-check. Use `databricks apps logs $APP_NAME --follow --profile $PROFILE` to stream logs in real-time instead of polling repeatedly.
+> **Note:** `status.state` may be `null` for up to 60 seconds after deployment even when the app is healthy. The definitive health signal is `compute_status.state: "ACTIVE"` plus clean logs showing the server is listening. If `compute` is `ACTIVE` but `status` is `null`, the app is running — proceed to Step 4.
 
-For faster iteration after the first deploy, use `--skip-build` if the code hasn't changed:
+If `compute` is not `ACTIVE`, wait 30 seconds and re-check. Use `databricks apps logs $APP_NAME --follow --profile $PROFILE` to stream logs in real-time instead of polling repeatedly.
+
+For faster iteration after the first deploy, use `--skip-build` on the `apps deploy` command if only config changed:
 
 ```bash
-databricks apps deploy --skip-build --profile $PROFILE
+databricks bundle deploy --profile $PROFILE && databricks apps deploy --skip-build --profile $PROFILE
 ```
 
 ---
 
 ## Step 4: Verify UI Loads
 
-Get the deployed app URL:
+Run `bash scripts/verify-deploy.sh $APP_NAME $PROFILE` to automate status polling, URL retrieval, and health check. Or verify manually:
 
 ```bash
 APP_URL=$(databricks apps get $APP_NAME --output json --profile $PROFILE | jq -r '.url')
@@ -171,6 +185,19 @@ echo "App URL: $APP_URL"
 Open `$APP_URL` in a browser. You should see the React application with your pages and components — not an error page or JSON.
 
 If the page shows an error or doesn't load, proceed to Step 5.
+
+---
+
+## Testing Deployed App APIs
+
+Databricks Apps require authentication for all API requests. Generate a bearer token before testing:
+
+```bash
+TOKEN=$(databricks auth token --profile $PROFILE | jq -r '.access_token')
+curl -s -H "Authorization: Bearer $TOKEN" "$APP_URL/api/health" | jq .
+```
+
+If `curl` returns HTML (a login page) or 401, the token has expired. Re-run the `TOKEN=...` line to refresh it. Tokens are short-lived (~1 hour).
 
 ---
 
@@ -186,8 +213,8 @@ If errors exist:
 
 1. Identify the error from the log output
 2. Apply the fix in the app directory
-3. Redeploy: `databricks apps deploy --profile $PROFILE`
-   - For config-only changes (e.g., fixing `app.yaml` env vars or `databricks.yml` resources), use `--skip-build` to save 1-2 minutes: `databricks apps deploy --skip-build --profile $PROFILE`
+3. Redeploy: `databricks bundle deploy --profile $PROFILE && databricks apps deploy --profile $PROFILE`
+   - For config-only changes (e.g., `app.yaml` or `databricks.yml`), use: `databricks bundle deploy --profile $PROFILE && databricks apps deploy --skip-build --profile $PROFILE`
 4. Check logs again
 
 If no errors: deployment is successful.
@@ -203,6 +230,9 @@ Repeat up to 3 times. If errors persist after 3 attempts, report them for manual
 | Connection refused / timeout on SQL queries | SQL warehouse starting up or stopped | Wait 30s and retry; check warehouse is running in the workspace |
 | TypeScript / build errors during deploy | Compilation issues in `server/` or `client/` | Run `npm run build` locally, fix errors, redeploy |
 | `ERR_MODULE_NOT_FOUND` for `@databricks/appkit` | Dependencies not installed | Verify `package.json` lists `@databricks/appkit` and `@databricks/appkit-ui`; redeploy |
+| `databricks apps restart` -> command not found | `restart` subcommand does not exist | Always redeploy: `databricks bundle deploy && databricks apps deploy`. There is no restart command. |
+| App loses resources after `stop` then `start` | `stop`/`start` cycle detaches manually-attached resources (e.g., postgres) | Avoid `stop`/`start` for apps with non-bundle resources. Redeploy instead. |
+| `databricks api put/patch` with complex JSON silently fails | The CLI `api` subcommand does not reliably handle nested JSON payloads | Use `curl` with bearer token for REST API calls that require complex JSON bodies |
 
 The calling prompt may define additional plugin-specific errors (e.g., Lakebase connection or permission errors). Check those if the errors above don't match.
 
@@ -236,8 +266,9 @@ If the limit error persists, repeat with the next oldest stopped app — but sto
 | Task | Command |
 |------|---------|
 | Build | `npm run build` |
-| Deploy | `databricks apps deploy --profile $PROFILE` |
-| Deploy (skip build) | `databricks apps deploy --skip-build --profile $PROFILE` |
+| Sync code to workspace | `databricks bundle deploy --profile $PROFILE` |
+| Deploy (full) | `databricks bundle deploy --profile $PROFILE && databricks apps deploy --profile $PROFILE` |
+| Deploy (skip build) | `databricks bundle deploy --profile $PROFILE && databricks apps deploy --skip-build --profile $PROFILE` |
 | Get app URL | `databricks apps get $APP_NAME --output json --profile $PROFILE \| jq -r '.url'` |
 | Stream logs | `databricks apps logs $APP_NAME --tail-lines 100 --profile $PROFILE` |
 | Follow logs live | `databricks apps logs $APP_NAME --follow --profile $PROFILE` |

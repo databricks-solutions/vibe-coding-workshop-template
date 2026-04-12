@@ -94,3 +94,6 @@ data_product_accelerator/docs/development/02_seed_section_input_prompts.sql
 
 # AppKit prompts (inlined into apps_lakebase/Instructions.md)
 apps_lakebase/prompts/
+
+#Lessons learnt
+retrospectives

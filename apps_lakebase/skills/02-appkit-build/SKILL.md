@@ -1,15 +1,17 @@
 ---
-name: appkit-build
+name: 02-appkit-build
 description: >
   Build full-stack UI and backend features on a Databricks AppKit project from a PRD
   or feature spec. Covers SQL query design, type generation, React frontend with
   AppKit UI components, backend plugin wiring, and distinctive visual design. Use
   when asked to implement a UI, build features from a PRD, create pages or dashboards,
-  add components, or develop the frontend/backend of an existing AppKit app. Triggers
-  on "build UI", "implement PRD", "create dashboard", "add page", "build features",
-  "implement design", "create components", "build app from PRD", "develop frontend".
+  add components, develop the frontend/backend of an existing AppKit app, build with
+  mock data, or use static data for visual prototyping. Triggers on "build UI",
+  "implement PRD", "create dashboard", "add page", "build features", "implement
+  design", "create components", "build app from PRD", "develop frontend", "mock data",
+  "static data", "two-phase data".
 license: Apache-2.0
-compatibility: Requires an existing AppKit project scaffolded via appkit-scaffold skill, Node.js v22+, Databricks CLI >= 0.295.0
+compatibility: Requires an existing AppKit project scaffolded via 01-appkit-scaffold skill, Node.js v22+, Databricks CLI >= 0.295.0
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"
@@ -35,22 +37,22 @@ Implement full-stack UI and backend features on an already-scaffolded AppKit pro
 - Adding SQL queries and wiring them to type-safe React hooks
 - Creating a visually distinctive, production-grade frontend
 
-**Not for scaffolding.** Use `appkit-scaffold` to create a new project first.
-**Not for adding plugins.** Use `appkit-plugin-add` to register new plugins.
+**Not for scaffolding.** Use `01-appkit-scaffold` to create a new project first.
+**Not for adding plugins.** Use `04-appkit-plugin-add` to register new plugins.
 
 ---
 
 ## Before You Begin
 
-**This skill has two upstream masters. Always check them for the latest patterns BEFORE building.**
+**This skill has two upstream masters. Check them when possible — recommended but not blocking.**
 
 1. **Databricks Apps skill (source of truth for AppKit workflow):**
    Fetch the latest from https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps
-   This is the authoritative reference for project structure, SQL queries, frontend patterns, and development workflow.
+   If accessible, check the "Breaking Changes" and "New Patterns" sections.
 
 2. **Anthropic frontend-design skill (inspiration for design quality):**
    Fetch the latest from https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md
-   Use this for aesthetic direction — distinctive, production-grade UI that avoids generic AI aesthetics.
+   Skim for new aesthetic examples. Skip if latency-constrained.
 
 **Additional live docs (always prefer over bundled references):**
 
@@ -67,6 +69,8 @@ Key upstream doc pages:
 - Architecture: https://databricks.github.io/appkit/docs/architecture
 
 The bundled references below are fallbacks when live docs cannot be reached.
+
+> **Workshop Mode (blank app):** If you are following the AppKit+Lakebase workshop (Phase 1) and scaffolded a blank app without plugins, skip Step 2 (SQL Queries) and the `analytics()` plugin references in Step 4. Use static mock data arrays instead of `useAnalyticsQuery`. The backend only needs `server()` — no `analytics()` plugin. All SQL/typegen sections are not applicable until the Lakebase plugin is added in Phase 4.
 
 ---
 
@@ -165,6 +169,12 @@ await appkit.server.start();
 
 ---
 
+## Step 4b: TypeScript Validation Gate
+
+**You MUST run `npx tsc --noEmit` and fix all errors before proceeding to Step 5.** TypeScript errors in the backend will cascade to the frontend build and cause deploy failures. Fix them now while the scope is small.
+
+---
+
 ## Step 5: Build the Frontend
 
 Implement components in `client/src/`. Start with `App.tsx`.
@@ -244,6 +254,27 @@ npx @databricks/appkit docs "appkit-ui API reference"
 npx @databricks/appkit docs "./docs/api/appkit-ui/data/DataTable.md"
 ```
 
+### Chart Components Quick Reference
+
+Available chart components from `@databricks/appkit-ui`:
+
+| Component | Key Props | Use Case |
+|-----------|-----------|----------|
+| `BarChart` | `xKey`, `yKey`, `colors`, `height`, `title` | Categorical comparison |
+| `LineChart` | `xKey`, `yKey`, `colors`, `height` | Trends over time |
+| `AreaChart` | `xKey`, `yKey`, `colors`, `height` | Volume trends |
+| `PieChart` | `nameKey`, `valueKey`, `colors` | Part-of-whole |
+| `DonutChart` | `nameKey`, `valueKey`, `colors` | Part-of-whole (with center) |
+| `ScatterChart` | `xKey`, `yKey`, `colors` | Correlation |
+
+All accept either `data` (static array) for Phase 1 or `queryKey` + `parameters` for Phase 2.
+
+For the full list with all props, inspect the type definitions:
+
+```bash
+ls node_modules/@databricks/appkit-ui/dist/charts/
+```
+
 ### Routing
 
 The scaffold generates react-router v7 with `createBrowserRouter`. For multi-page apps, set up routing in `App.tsx`:
@@ -311,6 +342,7 @@ Common runtime surprises that cause bugs or confusion:
 | `import type` required with `verbatimModuleSyntax` | Separate type-only imports or build fails |
 | Chart components accept both `data` (static) and `queryKey` (query-driven) props | Use `data` for Phase 1 static data, `queryKey` + `params` for Phase 2 |
 | `npx @databricks/appkit docs` search matches section headings only | Use full doc path for specific component lookups |
+| `npm run dev` triggers typegen via `predev` hook | `TABLE_OR_VIEW_NOT_FOUND` errors are expected if custom queries reference tables that don't exist yet. Not blocking. |
 
 ---
 
@@ -324,12 +356,13 @@ Before declaring the build complete:
 - [ ] Loading/error/empty states on every data component
 - [ ] `tests/smoke.spec.ts` selectors updated for your app
 - [ ] Static demo data renders correctly (swap to live data happens in Phase 4 — Lakebase wiring)
+- [ ] `npx tsc --noEmit` passes with zero TypeScript errors (catches unused imports, missing types that block deployment)
 - [ ] `npm run dev` runs cleanly at `http://localhost:8000`
 
 ---
 
 ## What's Next: Deploying
 
-Once local testing passes, deploy to Databricks Apps using the `appkit-deploy` skill at `@apps_lakebase/skills/appkit-deploy/SKILL.md`. The calling prompt (`02-deploy.md` or `05-e2e-test.md`) will set variables and invoke the skill.
+Once local testing passes, deploy to Databricks Apps using the `03-appkit-deploy` skill at `@apps_lakebase/skills/03-appkit-deploy/SKILL.md`. The calling prompt (`02-deploy.md` or `05-e2e-test.md`) will set variables and invoke the skill.
 
 See the [AppKit App Management docs](https://databricks.github.io/appkit/docs/app-management) for advanced deploy options.

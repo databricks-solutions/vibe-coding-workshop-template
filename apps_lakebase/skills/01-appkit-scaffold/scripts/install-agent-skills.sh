@@ -86,6 +86,18 @@ install_ide_extra() {
 
 # --- Main ---
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  echo "Usage: bash scripts/install-agent-skills.sh"
+  echo ""
+  echo "Installs Databricks Agent Skills for AI coding assistants."
+  echo "  - Clones skills into .agents/skills/databricks-skills (all IDEs)"
+  echo "  - Optionally runs IDE-native install for Cursor/Claude Code"
+  echo ""
+  echo "Prerequisites: git, Databricks CLI >= 0.295.0, Node.js v22+"
+  echo "Idempotent: safe to run multiple times."
+  exit 0
+fi
+
 check_databricks_cli
 check_node
 

@@ -38,20 +38,21 @@ cd my-project
 
 #### Path A: Build and Deploy a Databricks App
 
-Build a full-stack TypeScript app on Databricks AppKit, guided by 5 agent skills:
+Build a full-stack TypeScript app on Databricks AppKit, guided by 6 agent skills:
 
 1. Read the workshop guide: [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md)
 2. Open your AI coding assistant and prompt:
 
 ```
-I want to build a Databricks App. Read @apps_lakebase/skills/appkit-scaffold/SKILL.md and scaffold a new AppKit project.
+I want to build a Databricks App. Read @apps_lakebase/skills/01-appkit-scaffold/SKILL.md and scaffold a new AppKit project.
 ```
 
-3. Follow the 4-phase workflow in Instructions.md:
-   - **Phase 1:** Scaffold + build UI from a PRD (uses `appkit-scaffold` and `appkit-build` skills)
-   - **Phase 2:** Deploy to Databricks Apps (uses `appkit-deploy` skill)
-   - **Phase 3:** Wire Lakebase PostgreSQL backend (uses `appkit-lakebase-navigator` skill)
-   - **Phase 4:** End-to-end verification
+3. Follow the 5-phase workflow in Instructions.md:
+   - **Phase 1:** Scaffold + build UI from a PRD, test locally (uses `01-appkit-scaffold` and `02-appkit-build` skills)
+   - **Phase 2:** Deploy to Databricks Apps with mock data (uses `03-appkit-deploy` skill)
+   - **Phase 3:** Setup Lakebase project (uses `00-appkit-navigator` skill)
+   - **Phase 4:** Wire Lakebase backend locally (uses `04-appkit-plugin-add` and `05-appkit-lakebase-wiring` skills)
+   - **Phase 5:** Deploy + E2E test with Lakebase (uses `03-appkit-deploy` skill)
 
 #### Path B: Build an End-to-End Data Pipeline
 
@@ -85,14 +86,15 @@ vibe-coding-workshop-template/
 ├── SECURITY.md                     # Security policy
 ├── env.example                     # Environment variable template
 │
-├── apps_lakebase/                  # Databricks AppKit Workshop (5 agent skills)
-│   ├── Instructions.md             #   Comprehensive 4-phase workshop guide
+├── apps_lakebase/                  # Databricks AppKit Workshop (6 agent skills)
+│   ├── Instructions.md             #   Comprehensive 5-phase workshop guide
 │   └── skills/                     #   Agent skills for the full app lifecycle
-│       ├── appkit-scaffold/        #     Scaffold new AppKit projects (+ agent skills install)
-│       ├── appkit-build/           #     Build UI + backend from a PRD
-│       ├── appkit-deploy/          #     Deploy to Databricks Apps
-│       ├── appkit-plugin-add/      #     Add plugins (Lakebase, Analytics, Genie, Files)
-│       └── appkit-lakebase-navigator/ #  Wire Lakebase PostgreSQL backend
+│       ├── 00-appkit-navigator/    #     Entry-point navigator (read first)
+│       ├── 01-appkit-scaffold/     #     Scaffold new AppKit projects (+ agent skills install)
+│       ├── 02-appkit-build/        #     Build UI + backend from a PRD
+│       ├── 03-appkit-deploy/       #     Deploy to Databricks Apps
+│       ├── 04-appkit-plugin-add/   #     Add plugins (Lakebase, Analytics, Genie, Files)
+│       └── 05-appkit-lakebase-wiring/ #  Wire Lakebase DDL, API routes, frontend hooks
 │
 ├── data_product_accelerator/       # 59 Agent Skills for End-to-End Data Products
 │   ├── AGENTS.md                   #   Detailed skill routing table
@@ -177,25 +179,26 @@ See [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART
 
 ---
 
-## Databricks AppKit Workshop (5 Agent Skills)
+## Databricks AppKit Workshop (6 Agent Skills)
 
-The `apps_lakebase/` directory contains **5 agent skills** and a comprehensive workshop guide for building full-stack TypeScript apps on [Databricks AppKit](https://databricks.github.io/appkit/). The app is **not pre-built** — it gets scaffolded at runtime via `databricks apps init` and built iteratively with your AI coding assistant.
+The `apps_lakebase/` directory contains **6 agent skills** and a comprehensive workshop guide for building full-stack TypeScript apps on [Databricks AppKit](https://databricks.github.io/appkit/). The app is **not pre-built** — it gets scaffolded at runtime via `databricks apps init` and built iteratively with your AI coding assistant.
 
 **What gets built:**
 - Full-stack TypeScript app (React + Tailwind CSS frontend, AppKit backend)
 - SQL Warehouse integration for analytics queries
-- Optional Lakebase (managed PostgreSQL) persistence
+- Lakebase (managed PostgreSQL) persistence (wired in phases 3-5)
 - Deployed to Databricks Apps with hot reload for local dev
 
 ### Workshop Skills
 
 | Skill | Purpose |
 |-------|---------|
-| `appkit-scaffold` | Scaffold new AppKit projects with plugins (analytics, lakebase, genie, files) |
-| `appkit-build` | Build UI and backend from a PRD — components, queries, type generation |
-| `appkit-deploy` | Deploy to Databricks Apps, validate configuration |
-| `appkit-plugin-add` | Add plugins to an existing AppKit project |
-| `appkit-lakebase-navigator` | Wire Lakebase PostgreSQL backend for transactional data |
+| `00-appkit-navigator` | Entry-point navigator — routes tasks to the correct skill |
+| `01-appkit-scaffold` | Scaffold new AppKit projects with plugins (analytics, lakebase, genie, files) |
+| `02-appkit-build` | Build UI and backend from a PRD — components, queries, type generation |
+| `03-appkit-deploy` | Deploy to Databricks Apps, validate configuration |
+| `04-appkit-plugin-add` | Add plugins to an existing AppKit project |
+| `05-appkit-lakebase-wiring` | Wire Lakebase DDL, Express API routes, frontend hooks, mock fallback |
 
 ### Local Development (after scaffolding)
 
@@ -233,25 +236,31 @@ The `agentic-framework/` directory provides prompts and patterns for building **
 
 ## How Deployment Works
 
-After scaffolding your AppKit app, deployment uses the Databricks CLI:
+After scaffolding your AppKit app, the 5-phase workflow progresses from mock data to a fully wired Lakebase backend:
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                   AppKit Deployment Process                       │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  1. BUILD          2. VALIDATE         3. DEPLOY                  │
-│  ────────────      ────────────        ────────────               │
-│  npm run build     databricks apps     databricks apps            │
-│  (client + server) validate            deploy --profile <P>       │
-│                                                                   │
-│  client/dist/ + server/ ──► Validation ──► Databricks Apps URL   │
-│                                                                   │
-│  4. LAKEBASE (optional)                                           │
-│  ──────────────────────                                           │
-│  Wire PostgreSQL via appkit-lakebase-navigator skill              │
-│                                                                   │
-└──────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    AppKit Workshop Phases                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Phase 1: SCAFFOLD + BUILD     Phase 2: DEPLOY (mock data)         │
+│  ────────────────────────      ──────────────────────────           │
+│  databricks apps init          npm run build                        │
+│  Build UI from PRD             databricks apps deploy --profile <P> │
+│  npm run dev (localhost:8000)  Verify at Databricks Apps URL        │
+│                                                                     │
+│  Phase 3: SETUP LAKEBASE       Phase 4: WIRE LAKEBASE              │
+│  ──────────────────────        ─────────────────────               │
+│  Create Lakebase project       Add Lakebase plugin (skill 04)      │
+│  Configure endpoint + compute  DDL, API routes, frontend (skill 05)│
+│  Record host in state file     Test locally with mock fallback      │
+│                                                                     │
+│  Phase 5: DEPLOY + E2E TEST                                        │
+│  ────────────────────────                                           │
+│  databricks apps deploy (with Lakebase config)                      │
+│  Verify live data end-to-end                                        │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Files in the Generated App
@@ -264,7 +273,7 @@ After scaffolding your AppKit app, deployment uses the Databricks CLI:
 | `client/src/` | React + Tailwind CSS frontend |
 | `package.json` | Node.js dependencies |
 
-See the `appkit-deploy` skill for the full deployment workflow.
+See the `03-appkit-deploy` skill for the full deployment workflow.
 
 ---
 
@@ -299,14 +308,14 @@ After scaffolding, your generated AppKit app is a full-stack TypeScript project.
 
 ### Adding Backend Routes
 
-Edit `server/server.ts` in your generated app directory to add tRPC routes or custom endpoints. See the `appkit-build` skill for patterns.
+Edit `server/server.ts` in your generated app directory to add tRPC routes or custom endpoints. See the `02-appkit-build` skill for patterns.
 
 ### Adding Plugins
 
-Use the `appkit-plugin-add` skill to add capabilities:
+Use the `04-appkit-plugin-add` skill to add capabilities:
 
 ```
-Read @apps_lakebase/skills/appkit-plugin-add/SKILL.md and add the Lakebase plugin to my app.
+Read @apps_lakebase/skills/04-appkit-plugin-add/SKILL.md and add the Lakebase plugin to my app.
 ```
 
 Available plugins: `analytics`, `lakebase`, `genie`, `files`
@@ -368,7 +377,7 @@ npm run dev
 ## Resources
 
 - [PRE-REQUISITES.md](PRE-REQUISITES.md) — Workshop prerequisites checklist
-- [AppKit Workshop Guide](apps_lakebase/Instructions.md) — 4-phase Databricks App guide
+- [AppKit Workshop Guide](apps_lakebase/Instructions.md) — 5-phase Databricks App guide
 - [Data Product Accelerator QUICKSTART](data_product_accelerator/QUICKSTART.md) — 9-stage pipeline guide
 - [Databricks AppKit Documentation](https://databricks.github.io/appkit/) — AppKit SDK reference
 - [Databricks Apps Documentation](https://docs.databricks.com/dev-tools/databricks-apps/)

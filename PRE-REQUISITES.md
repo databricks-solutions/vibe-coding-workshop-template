@@ -19,7 +19,8 @@
 | 7 | Provision IDE licenses / AI model access | Admin + Participant | Varies |
 | 8 | Access to Claude Sonnet 4.5 (or higher) | Participant | 10 min |
 | 9 | Install the Databricks CLI | Participant | 10 min |
-| 10 | Authenticate to the workspace and validate connectivity | Participant | 10 min |
+| 10 | Install Node.js v22+ and Git | Participant | 10 min |
+| 11 | Authenticate to the workspace and validate connectivity | Participant | 10 min |
 
 ---
 
@@ -216,11 +217,37 @@ You should see output like `Databricks CLI v0.x.x`. Any recent version is accept
 
 ---
 
-### 10. Authenticate to the Workspace and Validate Connectivity
+### 10. Install Node.js v22+ and Git
+
+The AppKit workshop (Path A) requires **Node.js v22+** for scaffolding and running Databricks Apps locally. **Git** is required for cloning the template and installing agent skills.
+
+#### Node.js
+
+Download and install from [nodejs.org](https://nodejs.org/) (LTS recommended).
+
+```bash
+node --version
+```
+
+You should see `v22.x.x` or higher.
+
+#### Git
+
+Download and install from [git-scm.com](https://git-scm.com/) if not already present.
+
+```bash
+git --version
+```
+
+> **Note:** If you are only following Path B (Data Product Accelerator) and not building a Databricks App, Node.js is not required. Git is still needed for cloning the template.
+
+---
+
+### 11. Authenticate to the Workspace and Validate Connectivity
 
 Once the CLI is installed, configure it to connect to your workshop workspace.
 
-#### Step 10a: Generate a Personal Access Token (PAT)
+#### Step 11a: Generate a Personal Access Token (PAT)
 
 1. Log in to your Databricks workspace in a browser.
 2. Click your **user icon** (top-right corner) > **Settings**.
@@ -229,7 +256,7 @@ Once the CLI is installed, configure it to connect to your workshop workspace.
 5. Provide a comment (e.g., `workshop-token`) and set an expiration (e.g., 7 days).
 6. **Copy the token immediately** — you won't be able to see it again.
 
-#### Step 10b: Configure the Databricks CLI
+#### Step 11b: Configure the Databricks CLI
 
 Open a terminal in your IDE and run:
 
@@ -242,9 +269,9 @@ When prompted, enter:
 | Prompt | Value |
 |---|---|
 | **Databricks Host** | `https://<your-workspace-url>` (provided by workshop organizer) |
-| **Personal Access Token** | The token you generated in Step 10a |
+| **Personal Access Token** | The token you generated in Step 11a |
 
-#### Step 10c: Validate Connectivity
+#### Step 11c: Validate Connectivity
 
 Run the following command to confirm authentication:
 
@@ -296,6 +323,8 @@ Use this checklist to confirm everything is ready:
 - [ ] AI-powered IDE installed and licensed
 - [ ] Claude Sonnet 4.5 (or higher) model accessible in IDE
 - [ ] Databricks CLI installed (`databricks --version` works)
+- [ ] Node.js v22+ installed (`node --version` returns v22+) — required for Path A (AppKit)
+- [ ] Git installed (`git --version` works)
 - [ ] CLI authenticated (`databricks auth env --profile DEFAULT` returns valid credentials)
 - [ ] Workspace accessible (`databricks workspace list / --profile DEFAULT` returns results)
 - [ ] Workshop App URL loads successfully in browser

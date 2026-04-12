@@ -1,5 +1,5 @@
 ---
-name: appkit-plugin-add
+name: 04-appkit-plugin-add
 description: >
   Add plugins to an existing Databricks AppKit project. Covers Lakebase (PostgreSQL),
   Analytics (SQL queries + dashboards), Genie (natural language AI/BI), and Files
@@ -9,7 +9,8 @@ description: >
   file uploads, or extend an AppKit project with new capabilities. Triggers on
   "add plugin", "add lakebase", "add analytics", "add genie", "add files plugin",
   "integrate postgres", "add database", "add dashboards", "add file browser",
-  "extend app", "connect genie space".
+  "extend app", "connect genie space". Not for creating a Lakebase project or
+  managing Lakebase via CLI -- use the databricks-lakebase agent skill for that.
 license: Apache-2.0
 compatibility: Requires an existing AppKit project with Node.js v22+ and Databricks CLI >= 0.295.0
 metadata:
@@ -35,7 +36,7 @@ Add Lakebase, Analytics, Genie, or Files plugins to a Databricks AppKit project 
 - Integrating PostgreSQL (Lakebase), SQL dashboards (Analytics), natural language queries (Genie), or file management (Files)
 - Extending an app that was scaffolded blank or needs an additional plugin
 
-**Not for scaffolding a new app.** To create a new AppKit project (blank or with plugins), use the `appkit-scaffold` skill instead.
+**Not for scaffolding a new app.** To create a new AppKit project (blank or with plugins), use the `01-appkit-scaffold` skill instead.
 
 ---
 
