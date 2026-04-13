@@ -359,6 +359,7 @@ Common runtime surprises that cause bugs or confusion:
 | `npm run dev` triggers typegen via `predev` hook | `TABLE_OR_VIEW_NOT_FOUND` errors are expected if custom queries reference tables that don't exist yet. Not blocking. |
 | `getByText`/`getByRole` matches multiple elements (Playwright strict mode) | Use `data-testid` selectors; add `data-testid` attributes to key elements during page creation |
 | Escaped quotes in JSX attributes (`placeholder='I\'m...'`) crash Vite/rolldown parser | Use double-quoted attributes or JSX expressions: `placeholder={"I'm..."}` |
+| AppKit AST-grep linter blocks `as any` and `as unknown as T` | Avoid type assertions; use proper type imports or leave parameters untyped for inference. `databricks apps validate` runs these rules but `npm run build` does not |
 
 ---
 

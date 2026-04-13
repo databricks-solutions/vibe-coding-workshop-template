@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vibe Coding Workshop Explorer</title>
+<title>Vibe-to-Value Workshop Training</title>
 <style>
 :root {
   --bg:#0f1318; --surface:#171d26; --surface2:#1e2532; --border:#2d3548;
@@ -66,42 +66,42 @@ button{font-family:inherit;}
 /* ==================== MODE 1: GALAXY MAP ==================== */
 #galaxy{position:relative;height:calc(100vh - 53px);overflow:hidden;}
 #starfield{position:absolute;inset:0;z-index:0;}
-.galaxy-content{position:relative;z-index:1;padding:24px;height:100%;overflow:auto;}
-.galaxy-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-dim);margin-bottom:12px;padding-left:4px;}
-.galaxy-section{margin-bottom:32px;}
-.galaxy-section h2{font-size:14px;font-weight:700;margin-bottom:4px;}
-.galaxy-section .subtitle{font-size:11px;color:var(--text-dim);margin-bottom:16px;}
+.galaxy-content{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:center;padding:48px 48px;height:100%;overflow:auto;max-width:1200px;margin:0 auto;gap:44px;}
+.galaxy-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.8px;color:var(--text-dim);margin-bottom:8px;padding-left:4px;}
+.galaxy-section{margin-bottom:0;padding-top:8px;border-top:1px solid color-mix(in srgb, var(--text-dim) 15%, transparent);}
+.galaxy-section h2{font-size:20px;font-weight:800;margin-bottom:5px;}
+.galaxy-section .subtitle{font-size:12px;color:var(--text-dim);margin-bottom:18px;}
 
-.pipeline-flow{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px;}
-.stage-cluster{display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;}
-.stage-node{width:64px;height:64px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px solid var(--border);background:var(--surface);cursor:pointer;transition:all .3s;position:relative;}
-.stage-node:hover{transform:scale(1.12);border-color:var(--cyan);box-shadow:0 0 20px var(--cyan-dim);}
-.stage-node .sn-num{font-size:16px;font-weight:800;line-height:1;}
-.stage-node .sn-label{font-size:7px;font-weight:600;text-transform:uppercase;color:var(--text-dim);line-height:1;margin-top:2px;text-align:center;max-width:56px;overflow:hidden;}
-.stage-arrow{color:var(--text-muted);font-size:18px;margin-top:18px;animation:pulse-arrow 2s infinite;}
+.pipeline-flow{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px;justify-content:center;}
+.stage-cluster{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;}
+.stage-node{width:84px;height:84px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2.5px solid var(--border);background:var(--surface);cursor:pointer;transition:all .3s;position:relative;}
+.stage-node:hover{transform:scale(1.12);border-color:var(--cyan);box-shadow:0 0 24px var(--cyan-dim);}
+.stage-node .sn-num{font-size:22px;font-weight:800;line-height:1;}
+.stage-node .sn-label{font-size:8.5px;font-weight:600;text-transform:uppercase;color:var(--text-dim);line-height:1.1;margin-top:3px;text-align:center;max-width:70px;overflow:hidden;}
+.stage-arrow{color:var(--text-muted);font-size:22px;margin-top:28px;animation:pulse-arrow 2s infinite;}
 @keyframes pulse-arrow{0%,100%{opacity:.3}50%{opacity:1}}
-.worker-dots{display:flex;gap:2px;justify-content:center;flex-wrap:wrap;max-width:72px;}
-.worker-dot{width:6px;height:6px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);cursor:pointer;transition:all .2s;}
+.worker-dots{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;max-width:90px;}
+.worker-dot{width:8px;height:8px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);cursor:pointer;transition:all .2s;}
 .worker-dot:hover{transform:scale(1.8);background:var(--gold);}
 
-.phase-flow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
-.phase-node{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .3s;text-align:center;}
-.phase-node:hover{border-color:var(--green);box-shadow:0 0 16px var(--green-dim);transform:translateY(-2px);}
-.phase-node .pn-num{font-size:14px;font-weight:800;color:var(--green);}
-.phase-node .pn-label{font-size:9px;color:var(--text-dim);margin-top:2px;}
+.phase-flow{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px;justify-content:center;}
+.phase-node{padding:12px 24px;border-radius:12px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .3s;text-align:center;}
+.phase-node:hover{border-color:var(--green);box-shadow:0 0 18px var(--green-dim);transform:translateY(-2px);}
+.phase-node .pn-num{font-size:18px;font-weight:800;color:var(--green);}
+.phase-node .pn-label{font-size:11px;color:var(--text-dim);margin-top:3px;}
 
-.common-spine{display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;}
-.common-chip{padding:4px 10px;border-radius:12px;background:var(--green-dim);border:1px solid rgba(52,199,89,.25);font-size:10px;font-weight:600;color:var(--green);cursor:pointer;transition:all .2s;}
+.common-spine{display:flex;gap:10px;flex-wrap:wrap;padding:12px 18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;justify-content:center;}
+.common-chip{padding:6px 14px;border-radius:14px;background:var(--green-dim);border:1px solid rgba(52,199,89,.25);font-size:12px;font-weight:600;color:var(--green);cursor:pointer;transition:all .2s;}
 .common-chip:hover{background:var(--green);color:#000;}
 
-.agentic-nodes{display:flex;gap:8px;flex-wrap:wrap;}
-.agentic-node{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .3s;font-size:11px;}
-.agentic-node:hover{border-color:var(--teal);box-shadow:0 0 16px var(--teal-dim);}
+.agentic-nodes{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+.agentic-node{padding:12px 22px;border-radius:12px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .3s;font-size:13px;}
+.agentic-node:hover{border-color:var(--teal);box-shadow:0 0 18px var(--teal-dim);}
 
-.stats-bar{display:flex;gap:24px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:20px;}
+.stats-bar{display:flex;gap:40px;padding:18px 32px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;justify-content:center;}
 .stat{text-align:center;}
-.stat .stat-num{font-size:24px;font-weight:800;color:var(--cyan);}
-.stat .stat-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;}
+.stat .stat-num{font-size:32px;font-weight:800;color:var(--cyan);}
+.stat .stat-label{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.6px;}
 
 /* Stage colors */
 .sc-1{border-color:var(--purple);} .sc-1 .sn-num{color:var(--purple);}
@@ -134,7 +134,7 @@ button{font-family:inherit;}
 .tour-step-info.hl{color:var(--cyan);font-weight:600;}
 .speed-ctl{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);margin-left:auto;}
 .speed-ctl input{width:60px;accent-color:var(--cyan);}
-.tour-body{display:grid;grid-template-columns:480px 1fr;flex:1;overflow:hidden;}
+.tour-body{display:grid;grid-template-columns:520px 1fr;flex:1;overflow:hidden;}
 .tour-tree-wrap{overflow:auto;padding:20px 16px 100px 28px;border-right:1px solid var(--border);}
 @media(max-width:900px){.tour-body{grid-template-columns:1fr;grid-template-rows:40% 1fr;}.tour-tree-wrap{border-right:none;border-bottom:1px solid var(--border);}}
 
@@ -290,38 +290,73 @@ body.light .dp-code{background:var(--code-bg);color:#1B1F24;}
 .dp-btn.secondary:hover{border-color:var(--cyan);}
 
 /* ==================== MODE 4: PLATFORM ACADEMY ==================== */
-#academy{padding:24px;}
-.academy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
-.academy-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;transition:all .3s;}
-.academy-card:hover{border-color:var(--blue);box-shadow:0 0 20px var(--blue-dim);}
-.ac-header{padding:16px;cursor:pointer;display:flex;align-items:center;gap:12px;}
-.ac-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0;}
-.ac-title{font-size:14px;font-weight:700;}
-.ac-subtitle{font-size:10px;color:var(--text-dim);}
-.ac-chevron{margin-left:auto;font-size:12px;color:var(--text-muted);transition:transform .3s;}
-.ac-chevron.open{transform:rotate(180deg);}
-.ac-body{max-height:0;overflow:hidden;transition:max-height .5s ease;}
-.ac-body.open{max-height:2000px;}
-.ac-content{padding:0 16px 16px;font-size:12px;line-height:1.6;}
-.ac-content h5{font-size:11px;font-weight:700;color:var(--cyan);margin:12px 0 6px;text-transform:uppercase;letter-spacing:.5px;}
-.ac-content table{width:100%;border-collapse:collapse;margin:8px 0;}
-.ac-content th{text-align:left;padding:6px 8px;background:var(--surface2);font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;}
-.ac-content td{padding:6px 8px;border-top:1px solid var(--border);font-size:11px;}
-.ac-content code{background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:10px;font-family:'SF Mono',monospace;}
-.ac-content pre{background:var(--surface2);border-radius:6px;padding:10px;font-family:'SF Mono',monospace;font-size:10px;line-height:1.5;overflow-x:auto;margin:8px 0;}
-.ac-diagram{background:var(--surface2);border-radius:8px;padding:12px;margin:8px 0;text-align:center;font-family:'SF Mono',monospace;font-size:10px;line-height:1.8;color:var(--text-dim);}
+#academy.active{display:grid;grid-template-columns:240px 1fr;height:calc(100vh - 53px);overflow:hidden;padding:0;}
+.acad-sidebar{overflow-y:auto;padding:20px 12px;border-right:1px solid var(--border);background:var(--surface);}
+.acad-sidebar h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-muted);padding:0 10px;margin-bottom:10px;}
+.acad-nav{display:flex;flex-direction:column;gap:2px;}
+.acad-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:all .15s;border:1px solid transparent;font-size:12px;color:var(--text-dim);}
+.acad-nav-item:hover{background:var(--surface2);color:var(--text);}
+.acad-nav-item.active{background:var(--cyan-dim);border-color:var(--cyan);color:var(--text);font-weight:600;}
+.acad-nav-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.acad-nav-title{font-size:12px;line-height:1.2;}
+.acad-nav-sub{font-size:9px;color:var(--text-muted);line-height:1.2;margin-top:1px;}
+
+.acad-main{overflow-y:auto;padding:0;background:var(--bg);}
+.acad-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);text-align:center;}
+.acad-empty h2{font-size:18px;font-weight:600;margin-bottom:6px;color:var(--text-dim);}
+.acad-empty p{font-size:12px;}
+
+/* Module header banner */
+.acad-hero{padding:32px 40px 24px;border-bottom:1px solid var(--border);background:var(--surface);}
+.acad-hero-top{display:flex;align-items:center;gap:14px;margin-bottom:8px;}
+.acad-hero-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;}
+.acad-hero h2{font-size:22px;font-weight:800;line-height:1.2;}
+.acad-hero .acad-hero-sub{font-size:13px;color:var(--text-dim);margin-top:2px;}
+
+/* Content sections */
+.acad-sections{padding:24px 40px 48px;max-width:820px;}
+.acad-section{margin-bottom:28px;animation:tdFade .4s ease both;}
+.acad-section:nth-child(2){animation-delay:.05s;}
+.acad-section:nth-child(3){animation-delay:.1s;}
+.acad-section:nth-child(4){animation-delay:.15s;}
+.acad-section:nth-child(5){animation-delay:.2s;}
+.acad-section h5{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--border);display:flex;align-items:center;gap:8px;}
+.acad-section h5::before{content:'';width:3px;height:16px;border-radius:2px;background:var(--cyan);flex-shrink:0;}
+.acad-section p{font-size:13px;line-height:1.7;color:var(--text-dim);margin-bottom:10px;}
+.acad-section p strong{color:var(--text);}
+.acad-section p code{background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:11px;font-family:'SF Mono','Fira Code',monospace;color:var(--purple);}
+.acad-section p em{color:var(--text);font-style:italic;}
+
+/* Tables — card style */
+.acad-section table{width:100%;border-collapse:separate;border-spacing:0;margin:12px 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:12px;}
+.acad-section th{text-align:left;padding:10px 14px;background:var(--surface2);font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
+.acad-section td{padding:10px 14px;border-top:1px solid var(--border);vertical-align:top;line-height:1.5;}
+.acad-section td code{background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:10px;font-family:'SF Mono',monospace;color:var(--purple);}
+.acad-section tr:first-child td{border-top:none;}
+.acad-section tr:hover td{background:var(--surface);}
+
+/* Code blocks */
+.acad-section pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px;font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:11.5px;line-height:1.65;overflow-x:auto;margin:12px 0;color:var(--text);}
+
+/* Flow diagrams */
+.ac-diagram{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin:12px 0;text-align:center;font-family:'SF Mono','Fira Code',monospace;font-size:11.5px;line-height:2;color:var(--text-dim);}
 .ac-diagram .hl{color:var(--cyan);font-weight:700;}
 .ac-diagram .hl-g{color:var(--green);font-weight:700;}
 .ac-diagram .hl-p{color:var(--purple);font-weight:700;}
 .ac-diagram .hl-o{color:var(--orange);font-weight:700;}
-.quiz-section{margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);}
-.quiz-section h5{margin:0 0 8px!important;display:flex;align-items:center;gap:6px;}
-.quiz-q{margin-bottom:10px;}
-.quiz-q p{font-size:11px;font-weight:600;margin-bottom:4px;}
-.quiz-opt{padding:5px 10px;margin:2px 0;border-radius:5px;font-size:10px;cursor:pointer;transition:all .2s;border:1px solid transparent;}
-.quiz-opt:hover{background:var(--surface);border-color:var(--border);}
-.quiz-opt.correct{background:var(--green-dim);border-color:var(--green);color:var(--green);}
-.quiz-opt.wrong{background:var(--red-dim);border-color:var(--red);color:var(--red);opacity:.6;}
+
+/* Quiz section */
+.acad-quiz{margin-top:32px;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;}
+.acad-quiz h4{font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.acad-quiz h4::before{content:'✦';color:var(--gold);}
+.quiz-q{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.quiz-q:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+.quiz-q p{font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text);}
+.quiz-opts{display:flex;flex-direction:column;gap:4px;}
+.quiz-opt{padding:10px 14px;border-radius:8px;font-size:12px;cursor:pointer;transition:all .15s;border:1px solid var(--border);background:var(--bg);}
+.quiz-opt:hover{background:var(--surface2);border-color:var(--text-muted);}
+.quiz-opt.correct{background:var(--green-dim);border-color:var(--green);color:var(--green);font-weight:600;}
+.quiz-opt.wrong{background:var(--red-dim);border-color:var(--red);color:var(--red);opacity:.5;}
 .quiz-opt.revealed{pointer-events:none;}
 
 /* Scrollbar */
@@ -347,9 +382,6 @@ body.light .td-header{background:linear-gradient(135deg,var(--surface) 0%,var(--
 body.light .td-code{background:transparent;}
 body.light .dp-panel{background:var(--surface);border-color:var(--border);}
 body.light .dp-code{background:var(--code-bg);color:#1B1F24;}
-body.light .academy-nav{background:var(--surface);border-right-color:var(--border);}
-body.light .amod-item.active{background:var(--cyan-dim);color:var(--cyan);}
-body.light .academy-body{background:var(--bg);}
 body.light .quiz-opt{border-color:var(--border);}
 body.light .quiz-opt:hover{background:var(--surface2);}
 body.light .arch-diagram{background:var(--code-bg);color:#1B1F24;}
@@ -368,8 +400,17 @@ body.light .common-chip:hover{background:var(--green);color:#fff;}
 body.light .common-spine{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
 body.light .stats-bar{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
 body.light .worker-dot{background:rgba(199,136,0,.15);border-color:var(--gold);}
-body.light .academy-card{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
-body.light .academy-card:hover{box-shadow:0 4px 16px rgba(43,108,176,.1);}
+body.light .acad-sidebar{background:#FAFBFC;}
+body.light .acad-nav-item.active{background:rgba(226,55,29,.06);border-color:var(--cyan);}
+body.light .acad-hero{background:#FAFBFC;}
+body.light .acad-section table{border-color:#E5E7EB;}
+body.light .acad-section th{background:#F3F4F6;}
+body.light .acad-section tr:hover td{background:#F9FAFB;}
+body.light .acad-section pre{background:#F4F5F7;border-color:#E5E7EB;color:#1B1F24;}
+body.light .ac-diagram{background:#F9FAFB;border-color:#E5E7EB;}
+body.light .acad-quiz{background:#FAFBFC;border-color:#E5E7EB;}
+body.light .quiz-opt{background:#fff;border-color:#E5E7EB;}
+body.light .quiz-opt:hover{background:#F3F4F6;border-color:#D1D5DB;}
 body.light .detail-panel{background:#fff;}
 body.light .dp-header{background:var(--surface);}
 body.light .dp-btn.primary{color:#fff;}
@@ -383,7 +424,7 @@ body.light .tour-card.active{box-shadow:0 4px 16px rgba(226,55,29,.15);}
 
 <!-- ===== APP HEADER ===== -->
 <div class="app-header">
-  <h1><span>⬡</span> Workshop Explorer</h1>
+  <h1><span>⬡</span> Vibe-to-Value Workshop Training</h1>
   <div class="mode-tabs">
     <button class="mode-tab active" onclick="switchMode('galaxy')">Galaxy Map</button>
     <button class="mode-tab" onclick="switchMode('tours')">Guided Tours</button>
@@ -404,31 +445,31 @@ body.light .tour-card.active{box-shadow:0 4px 16px rgba(226,55,29,.15);}
       <div class="stat"><div class="stat-num">65</div><div class="stat-label">Agent Skills</div></div>
       <div class="stat"><div class="stat-num">9</div><div class="stat-label">Pipeline Stages</div></div>
       <div class="stat"><div class="stat-num">5</div><div class="stat-label">App Phases</div></div>
-      <div class="stat"><div class="stat-num">8</div><div class="stat-label">Platform Modules</div></div>
+      <div class="stat"><div class="stat-num">14</div><div class="stat-label">Platform Modules</div></div>
       <div class="stat"><div class="stat-num">3</div><div class="stat-label">Guided Tours</div></div>
     </div>
 
     <!-- DPA Galaxy -->
-    <div class="galaxy-section">
-      <div class="galaxy-label">Data Product Accelerator</div>
+    <div class="galaxy-section" style="text-align:center;">
+      <div class="galaxy-label" style="text-align:center;">Data Product Accelerator</div>
       <h2>The 9-Stage Design-First Pipeline</h2>
       <div class="subtitle">Click any stage to explore. Dots below show worker skills.</div>
       <div class="pipeline-flow" id="pipelineFlow"></div>
-      <div class="galaxy-label" style="margin-top:16px">Cross-Cutting Common Skills (8)</div>
+      <div class="galaxy-label" style="text-align:center;">Cross-Cutting Common Skills (8)</div>
       <div class="common-spine" id="commonSpine"></div>
     </div>
 
     <!-- AppKit Galaxy -->
-    <div class="galaxy-section">
-      <div class="galaxy-label">AppKit + Lakebase</div>
+    <div class="galaxy-section" style="text-align:center;">
+      <div class="galaxy-label" style="text-align:center;">AppKit + Lakebase</div>
       <h2>The 5-Phase App Lifecycle</h2>
       <div class="subtitle">From scaffold to production with live data.</div>
       <div class="phase-flow" id="phaseFlow"></div>
     </div>
 
     <!-- Agentic Galaxy -->
-    <div class="galaxy-section">
-      <div class="galaxy-label">Agentic Framework</div>
+    <div class="galaxy-section" style="text-align:center;">
+      <div class="galaxy-label" style="text-align:center;">Agentic Framework</div>
       <h2>Multi-Agent Build Framework</h2>
       <div class="subtitle">Agent prompts for building multi-agent systems.</div>
       <div class="agentic-nodes" id="agenticNodes"></div>
@@ -472,10 +513,10 @@ body.light .tour-card.active{box-shadow:0 4px 16px rgba(226,55,29,.15);}
 
 <!-- ===== MODE 4: PLATFORM ACADEMY ===== -->
 <div class="mode-panel" id="academy">
-  <div class="galaxy-label">Platform Academy</div>
-  <h2 style="margin-bottom:4px;">Learn the Building Blocks</h2>
-  <p style="font-size:12px;color:var(--text-dim);margin-bottom:20px;">Six interactive modules covering the Databricks platform components that power the workshop. Click to expand.</p>
-  <div class="academy-grid" id="academyGrid"></div>
+  <div class="acad-sidebar" id="acadSidebar"></div>
+  <div class="acad-main" id="acadMain">
+    <div class="acad-empty"><h2>Select a module</h2><p>Choose a topic from the sidebar to start learning.</p></div>
+  </div>
 </div>
 
 <!-- ===== DETAIL PANEL (MODE 3) ===== -->
@@ -1103,6 +1144,218 @@ DATABRICKS_VOLUME_UPLOADS=/Volumes/catalog/schema/uploads
 <h5>Why This Matters for Workshops</h5><p>Workshop attendees don't need to learn 59 skills. They type one natural language prompt, the AI reads AGENTS.md, routes to the right skill, and executes. The skill ensures consistency, correctness, and best practices automatically.</p>
 <div class="ac-diagram"><span class="hl">Human prompt</span> → <span class="hl-p">AI reads AGENTS.md</span> → <span class="hl-o">routes to skill</span> → <span class="hl-g">executes steps</span> → <span class="hl">production code</span></div>`,
    quiz:[{q:'Why use orchestrator/worker instead of one big skill?',opts:['It looks more organized','Limits context window token usage','The AI requires it'],answer:1},{q:'What is Tier 1 in progressive disclosure?',opts:['The main orchestrator','AGENTS.md (auto-loaded entry point)','The worker skills'],answer:1},{q:'What file format are Agent Skills written in?',opts:['JSON','YAML','Markdown (SKILL.md)'],answer:2}]},
+
+  {id:'dq-expectations',title:'Data Quality with SDP Expectations',subtitle:'Enforce data contracts inside your ETL pipeline',icon:'✓',color:'#e04545',
+   content:`<h5>What are SDP Expectations?</h5><p>Expectations are data quality rules declared directly on your SDP (formerly DLT) pipeline tables. They evaluate a SQL Boolean expression on every record and either <strong>warn</strong>, <strong>drop</strong>, or <strong>fail</strong> based on severity.</p>
+<h5>The Three Actions</h5><table><tr><th>Action</th><th>Decorator</th><th>On Violation</th><th>Pipeline</th></tr><tr><td>Warn</td><td><code>@dlt.expect_all({...})</code></td><td>Row kept, metric logged</td><td>Continues</td></tr><tr><td>Drop</td><td><code>@dlt.expect_all_or_drop({...})</code></td><td>Row removed silently</td><td>Continues</td></tr><tr><td>Fail</td><td><code>@dlt.expect_or_fail(...)</code></td><td>Pipeline stops</td><td>Halted</td></tr></table>
+<p><strong>Best practice:</strong> Use <code>expect_all_or_drop</code> for critical rules and <code>expect_all</code> for warnings. Avoid <code>expect_or_fail</code> — it stops the entire pipeline when a single bad record appears.</p>
+<h5>The Delta Rules Table Pattern</h5><p>Instead of hardcoding rules in each notebook, store them in a central <strong>Unity Catalog Delta table</strong>:</p>
+<pre>CREATE TABLE IF NOT EXISTS {catalog}.{schema}.dq_rules (
+  table_name    STRING    COMMENT 'Silver table this rule applies to',
+  rule_name     STRING    COMMENT 'Stable identifier, e.g. valid_amount',
+  constraint_sql STRING   COMMENT 'SQL boolean: amount > 0',
+  severity      STRING    COMMENT 'critical or warning',
+  description   STRING,
+  CONSTRAINT pk PRIMARY KEY (table_name, rule_name) NOT ENFORCED
+) USING DELTA CLUSTER BY AUTO;</pre>
+<div class="ac-diagram"><span class="hl">Delta dq_rules table</span> → <span class="hl-p">dq_rules_loader.py</span> → <span class="hl-g">@dlt.expect_all_or_drop(rules)</span><br>UPDATE dq_rules → next pipeline run picks up changes → zero redeploy</div>
+<h5>Runtime Loader Pattern</h5><pre>def get_critical_rules(table_name):
+    df = spark.sql(f"""
+      SELECT rule_name, constraint_sql
+      FROM {catalog}.{schema}.dq_rules
+      WHERE table_name = '{table_name}'
+        AND severity = 'critical'
+    """).toPandas()
+    return dict(zip(df.rule_name, df.constraint_sql))
+
+@dlt.table(name="silver_transactions")
+@dlt.expect_all_or_drop(get_critical_rules("silver_transactions"))
+def silver_transactions():
+    return dlt.read_stream("bronze_transactions")</pre>
+<h5>Quarantine Tables</h5><p>Rows that fail critical rules go to a separate quarantine table for investigation, not lost forever:</p>
+<div class="ac-diagram"><span class="hl">Bronze stream</span> → <span class="hl-p">Silver (clean rows)</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↘ <span class="hl-o">Quarantine (failed rows + reason + timestamp)</span></div>
+<h5>Pipeline Edition Requirement</h5><p><strong>ADVANCED edition is mandatory</strong> for expectations. CORE and PRO do not support <code>@dlt.expect*</code> decorators. Set <code>edition: ADVANCED</code> in your pipeline configuration.</p>
+<h5>Optional: DQX Framework</h5><p>For richer diagnostics beyond pass/fail, the <strong>Databricks Labs DQX</strong> library adds <code>_error</code>/<code>_warning</code> columns, dataset-level checks (uniqueness, FK integrity, outliers), and YAML/Delta-driven rule definitions. Use it when DLT expectations alone are not enough.</p>`,
+   quiz:[{q:'Which expectation action is recommended for critical rules?',opts:['expect_all (warn)','expect_all_or_drop','expect_or_fail'],answer:1},{q:'Where should DQ rules be stored?',opts:['Hardcoded in each notebook','A central Delta table in Unity Catalog','A JSON config file'],answer:1},{q:'What DLT pipeline edition is required for expectations?',opts:['CORE','PRO','ADVANCED'],answer:2},{q:'What happens to rows that fail critical rules in the recommended pattern?',opts:['They are deleted forever','They go to a quarantine table','The pipeline stops'],answer:1}]},
+
+  {id:'lakehouse-monitoring',title:'Lakehouse Monitoring',subtitle:'Profile, detect drift, and alert on your data',icon:'📊',color:'#e07b39',
+   content:`<h5>What is Lakehouse Monitoring?</h5><p>A unified data quality monitoring service built into Unity Catalog. It creates <strong>monitors</strong> on Delta tables that automatically compute statistics, detect distribution drift, and generate dashboards — no external tools needed.</p>
+<h5>Monitor Types</h5><table><tr><th>Type</th><th>Config</th><th>Best For</th><th>Key Setting</th></tr><tr><td>Time Series</td><td><code>TimeSeriesConfig</code></td><td>Fact tables with timestamps</td><td><code>timestamp_column</code> + <code>granularity</code></td></tr><tr><td>Snapshot</td><td><code>SnapshotConfig</code></td><td>Dimension tables, reference data</td><td>Point-in-time comparison</td></tr><tr><td>Inference</td><td><code>InferenceLogConfig</code></td><td>ML model request logs</td><td><code>model_id_col</code> + <code>prediction_col</code></td></tr></table>
+<h5>Output Tables</h5><p>Each monitor produces two output tables in a dedicated monitoring schema:</p>
+<div class="ac-diagram"><span class="hl">Gold table</span> → <span class="hl-p">Monitor refresh</span> → <span class="hl-g">*_profile_metrics</span> (summary stats)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ <span class="hl-o">*_drift_metrics</span> (distribution changes)</div>
+<h5>Creating a Monitor (Python SDK)</h5><pre>from databricks.sdk.service.dataquality import (
+    Monitor, DataProfilingConfig, TimeSeriesConfig,
+    AggregationGranularity, CronSchedule
+)
+
+monitor = w.data_quality.create_monitor(monitor=Monitor(
+    object_type="table",
+    object_id=table_uuid,
+    data_profiling_config=DataProfilingConfig(
+        output_schema_id=monitoring_schema_uuid,
+        time_series_config=TimeSeriesConfig(
+            timestamp_column="event_date",
+            granularity=AggregationGranularity.DAY
+        ),
+        schedule=CronSchedule(
+            cron_expression="0 0 6 * * ?",
+            timezone="America/New_York"
+        )
+    )
+))</pre>
+<h5>Custom Business Metrics</h5><p>Beyond built-in statistics, you can define custom metrics that track business KPIs directly:</p>
+<table><tr><th>Metric Type</th><th>Purpose</th><th>Example</th></tr><tr><td>AGGREGATE</td><td>Single value per window</td><td>Total revenue, avg order value</td></tr><tr><td>DERIVED</td><td>Computed from aggregates</td><td>Revenue per user = revenue / users</td></tr><tr><td>DRIFT</td><td>Measures distribution shift</td><td>Chi-squared test on category column</td></tr></table>
+<h5>Schema-Level Anomaly Detection</h5><p>A separate capability that monitors an <strong>entire schema</strong> for freshness (was the table updated on time?) and completeness (did the expected number of rows arrive?):</p>
+<div class="ac-diagram"><span class="hl">Schema-level monitor</span> → ML baselines → <span class="hl-o">Freshness alerts</span> + <span class="hl-g">Completeness alerts</span><br>Results in: <code>system.data_quality_monitoring.table_results</code></div>
+<h5>The Full Observability Stack</h5><div class="ac-diagram"><span class="hl">Lakehouse Monitors</span> (table profiling + drift)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-p">Anomaly Detection</span> (schema freshness + completeness)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-g">AI/BI Dashboards</span> (visual health view)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-o">SQL Alerts</span> (threshold-triggered notifications)</div>`,
+   quiz:[{q:'What two output tables does a Lakehouse Monitor produce?',opts:['input_metrics and output_metrics','profile_metrics and drift_metrics','source_metrics and target_metrics'],answer:1},{q:'Which monitor type is best for fact tables with timestamps?',opts:['Snapshot','Inference','Time Series'],answer:2},{q:'What does schema-level anomaly detection check for?',opts:['SQL syntax errors','Freshness and completeness','Column data types'],answer:1},{q:'Which SDK module is used for the current monitoring API?',opts:['databricks.sdk.service.catalog','databricks.sdk.service.dataquality','databricks.sdk.service.monitoring'],answer:1}]},
+
+  {id:'metric-views',title:'UC Metric Views',subtitle:'Semantic layer — define metrics once, query everywhere',icon:'📐',color:'#6366f1',
+   content:`<h5>What are Metric Views?</h5><p>Metric Views are first-class Unity Catalog objects that define a <strong>semantic layer</strong> — reusable business metric definitions (measures, dimensions, joins) that any tool can query consistently. Define "Revenue" once, and Genie, dashboards, notebooks, and alerts all use the same formula.</p>
+<h5>How They Differ from Regular Views</h5><table><tr><th>Feature</th><th>Regular View</th><th>Metric View</th></tr><tr><td>Definition</td><td>SQL SELECT statement</td><td>YAML with measures + dimensions</td></tr><tr><td>Aggregation</td><td>Locked at creation time</td><td>Dynamic — query any dimension at runtime</td></tr><tr><td>Joins</td><td>Manual in each query</td><td>Declared once, auto-applied</td></tr><tr><td>Governance</td><td>UC permissions</td><td>UC permissions + semantic metadata</td></tr><tr><td>AI Integration</td><td>None</td><td>Genie, AI/BI natively understand measures</td></tr></table>
+<h5>YAML Definition Structure</h5><pre>CREATE OR REPLACE VIEW catalog.schema.mv_sales
+WITH METRICS
+LANGUAGE YAML
+COMMENT 'Sales metrics across all dimensions'
+AS $$
+version: "1.1"
+source: catalog.schema.fact_sales
+dimensions:
+  - name: region
+    expr: region
+  - name: product_category
+    expr: product_category
+measures:
+  - name: total_revenue
+    expr: "SUM(amount)"
+    description: "Total revenue in USD"
+    format:
+      type: number_currency
+  - name: order_count
+    expr: "COUNT(*)"
+  - name: avg_order_value
+    expr: "MEASURE(total_revenue) / MEASURE(order_count)"
+    description: "Revenue per order"
+joins:
+  - source_column: customer_id
+    target: catalog.schema.dim_customer
+    target_column: customer_id
+    type: left
+$$;</pre>
+<h5>Querying with MEASURE()</h5><pre>-- Metric Views use MEASURE() function
+SELECT region,
+       MEASURE(total_revenue),
+       MEASURE(avg_order_value)
+FROM catalog.schema.mv_sales
+GROUP BY region;
+
+-- Cannot use SELECT * — must name dimensions + MEASURE()</pre>
+<h5>How Metric Views Power Genie</h5><div class="ac-diagram"><span class="hl">Metric View</span> (semantic definitions)<br>&nbsp;&nbsp;&nbsp;&nbsp;↓ primary asset<br><span class="hl-p">TVFs</span> (parameterized access patterns)<br>&nbsp;&nbsp;&nbsp;&nbsp;↓ secondary asset<br><span class="hl-g">Raw Tables</span> (last resort)<br>&nbsp;&nbsp;&nbsp;&nbsp;↓ all feed into<br><span class="hl-o">Genie Space</span> (NL → SQL with semantic awareness)</div>
+<h5>Key Constraints</h5><table><tr><th>Rule</th><th>Details</th></tr><tr><td>YAML version</td><td>Must be <code>"1.1"</code> (requires DBR 17.2+)</td></tr><tr><td>Join targets</td><td>First-level joins must reference <code>source</code> — no chained/transitive joins</td></tr><tr><td>Composability</td><td>Measures can reference other measures via <code>MEASURE(other)</code></td></tr><tr><td>Materialization</td><td>Optional experimental feature for heavy workloads</td></tr></table>`,
+   quiz:[{q:'How are Metric Views defined?',opts:['SQL SELECT statement','YAML with measures and dimensions','JSON configuration'],answer:1},{q:'How do you query a measure in a Metric View?',opts:['SELECT total_revenue','SELECT MEASURE(total_revenue)','SELECT SUM(amount)'],answer:1},{q:'What is the priority order for Genie data assets?',opts:['Tables → TVFs → Metric Views','Metric Views → TVFs → Tables','TVFs → Metric Views → Tables'],answer:1},{q:'Can Metric View measures reference other measures?',opts:['No, each must be independent','Yes, via MEASURE(other_measure)','Only with subqueries'],answer:1}]},
+
+  {id:'asset-bundles',title:'Databricks Asset Bundles (DABs)',subtitle:'Infrastructure-as-code for Databricks resources',icon:'📦',color:'#059669',
+   content:`<h5>What are Asset Bundles?</h5><p>Databricks Asset Bundles (DABs) let you define jobs, pipelines, dashboards, and alerts as <strong>version-controlled YAML</strong>. Deploy across dev/staging/prod with a single <code>databricks bundle deploy</code> command.</p>
+<h5>Project Structure</h5><pre>my-project/
+├── databricks.yml          # Bundle root config
+├── resources/
+│   ├── jobs/
+│   │   ├── bronze_job.yml  # Job definitions
+│   │   ├── silver_job.yml
+│   │   └── gold_job.yml
+│   ├── pipelines/
+│   │   └── dlt_pipeline.yml
+│   └── dashboards/
+│       └── monitoring.yml
+├── src/                    # Notebooks and Python files
+│   ├── bronze/
+│   ├── silver/
+│   └── gold/
+└── .databricksbundle/      # Generated (gitignored)</pre>
+<h5>Key Concepts</h5><table><tr><th>Concept</th><th>What It Does</th></tr><tr><td>Environments V4</td><td>Serverless compute — <strong>mandatory</strong>, never use older versions</td></tr><tr><td>Targets</td><td>dev / staging / prod with variable substitution</td></tr><tr><td><code>notebook_task</code></td><td>Preferred task type — pass parameters via <code>base_parameters</code></td></tr><tr><td><code>dbutils.widgets.get()</code></td><td>Read parameters inside notebooks (not <code>argparse</code>)</td></tr></table>
+<h5>Job YAML Pattern</h5><pre>resources:
+  jobs:
+    silver_pipeline_job:
+      name: "[&dollar;{bundle.target}] Silver Pipeline"
+      environments:
+        - environment_key: "default"
+          spec:
+            environment_version: "4"
+      tasks:
+        - task_key: run_silver
+          environment_key: default
+          notebook_task:
+            notebook_path: ../src/silver/transform.py
+            base_parameters:
+              catalog: "&dollar;{var.catalog}"
+              schema: "&dollar;{var.schema}"</pre>
+<h5>Deployment Workflow</h5><div class="ac-diagram"><span class="hl">databricks bundle validate</span> → <span class="hl-p">databricks bundle deploy -t dev</span> → <span class="hl-g">databricks bundle run job_name -t dev</span><br>&nbsp;&nbsp;&nbsp;(checks YAML)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(syncs to workspace)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(executes the job)</div>
+<h5>Hierarchical Job Pattern</h5><p>Complex pipelines use a hierarchy: <strong>atomic jobs</strong> (single task) → <strong>composite jobs</strong> (multiple related tasks) → <strong>orchestrator job</strong> (runs composites in dependency order).</p>
+<div class="ac-diagram"><span class="hl">Orchestrator Job</span><br>&nbsp;&nbsp;├── <span class="hl-p">Bronze Composite</span> (setup_dq → create_tables → load_data)<br>&nbsp;&nbsp;├── <span class="hl-p">Silver Composite</span> (dlt_pipeline → validate)<br>&nbsp;&nbsp;└── <span class="hl-g">Gold Composite</span> (merge_dims → merge_facts → verify_grain)</div>`,
+   quiz:[{q:'What environment version is mandatory for DAB jobs?',opts:['V2','V3','V4'],answer:2},{q:'How do notebooks read DAB parameters?',opts:['argparse','dbutils.widgets.get()','sys.argv'],answer:1},{q:'What command deploys a bundle to dev?',opts:['databricks deploy --env dev','databricks bundle deploy -t dev','databricks push dev'],answer:1},{q:'What is the preferred task type for DAB jobs?',opts:['python_task','spark_submit_task','notebook_task'],answer:2}]},
+
+  {id:'ml-pipelines',title:'ML Pipelines on Unity Catalog',subtitle:'Feature engineering, training, and batch inference',icon:'🧪',color:'#8b5cf6',
+   content:`<h5>End-to-End ML on the Lakehouse</h5><p>Databricks provides a complete ML lifecycle: feature tables in Unity Catalog, experiment tracking with MLflow, model registration in UC, and batch inference — all governed and versioned.</p>
+<h5>The ML Pipeline Stages</h5><div class="ac-diagram"><span class="hl">Gold Tables</span> → <span class="hl-p">Feature Engineering</span> → <span class="hl-g">Training + Experiments</span> → <span class="hl-o">UC Model Registry</span> → <span class="hl">Batch Inference</span></div>
+<h5>Feature Engineering</h5><p>Feature Store creates <strong>feature tables</strong> in Unity Catalog that maintain consistency between training and serving:</p>
+<pre>from databricks.feature_engineering import FeatureEngineeringClient
+
+fe = FeatureEngineeringClient()
+
+# Create feature table from Gold table
+fe.create_table(
+    name="catalog.schema.customer_features",
+    primary_keys=["customer_id"],
+    df=feature_df,
+    description="Customer behavioral features"
+)
+
+# Training with automatic feature lookup
+training_set = fe.create_training_set(
+    df=label_df,
+    feature_lookups=[FeatureLookup(
+        table_name="catalog.schema.customer_features",
+        lookup_key="customer_id"
+    )],
+    label="churn"
+)</pre>
+<h5>MLflow Experiment Tracking</h5><table><tr><th>What is Logged</th><th>How</th><th>Why</th></tr><tr><td>Parameters</td><td><code>mlflow.log_param()</code></td><td>Hyperparameter comparison</td></tr><tr><td>Metrics</td><td><code>mlflow.log_metric()</code></td><td>Model performance tracking</td></tr><tr><td>Artifacts</td><td><code>mlflow.log_artifact()</code></td><td>Feature importance plots, SHAP</td></tr><tr><td>Model</td><td><code>mlflow.sklearn.log_model()</code></td><td>Reproducible model packaging</td></tr></table>
+<h5>Unity Catalog Model Registry</h5><pre># Register model in Unity Catalog
+mlflow.set_registry_uri("databricks-uc")
+model_uri = f"runs:/{run.info.run_id}/model"
+mv = mlflow.register_model(model_uri, "catalog.schema.churn_model")
+
+# Promote to production alias
+client = mlflow.tracking.MlflowClient()
+client.set_registered_model_alias(
+    "catalog.schema.churn_model", "production", mv.version
+)</pre>
+<h5>Batch Inference Pattern</h5><div class="ac-diagram"><span class="hl">Feature Table</span> + <span class="hl-p">Registered Model (@production)</span> → <span class="hl-g">fe.score_batch()</span> → <span class="hl-o">Predictions Table</span></div>
+<p>The <code>score_batch</code> method ensures the same feature transformations used in training are applied during inference — no training/serving skew.</p>
+<h5>Deployment with Asset Bundles</h5><pre># Three DAB jobs form the ML pipeline:
+databricks bundle run ml_feature_pipeline_job -t dev   # Create features
+databricks bundle run ml_training_pipeline_job -t dev   # Train models
+databricks bundle run ml_inference_pipeline_job -t dev  # Score batch</pre>`,
+   quiz:[{q:'What prevents training/serving skew in Databricks ML?',opts:['Manual feature alignment','Feature Store with score_batch()','Copying training code to serving'],answer:1},{q:'Where are production models registered?',opts:['Local MLflow server','Unity Catalog Model Registry','S3 bucket'],answer:1},{q:'What does fe.score_batch() do?',opts:['Trains a new model','Applies the registered model with consistent features','Evaluates model metrics'],answer:1},{q:'How are ML pipelines deployed to production?',opts:['Manual notebook runs','Databricks Asset Bundle jobs','Cron scripts on a VM'],answer:1}]},
+
+  {id:'genai-agents',title:'GenAI Agents & ResponsesAgent',subtitle:'Build AI agents with tools, memory, and evaluation',icon:'🤖',color:'#ec4899',
+   content:`<h5>What is ResponsesAgent?</h5><p>ResponsesAgent is Databricks' recommended framework for building production AI agents. It wraps an LLM with tools, memory, and guardrails — and packages everything as an <strong>MLflow pyfunc model</strong> for deployment on Model Serving.</p>
+<h5>The Hybrid Architecture</h5><div class="ac-diagram"><span class="hl">User Query</span><br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-p">ResponsesAgent (Orchestrator)</span><br>&nbsp;&nbsp;&nbsp;├── Intent Classifier → routes to domains<br>&nbsp;&nbsp;&nbsp;├── Memory Manager → short + long-term state<br>&nbsp;&nbsp;&nbsp;└── Tool Dispatch → executes actions<br>&nbsp;&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-g">Genie Space A</span>&nbsp;&nbsp;<span class="hl-g">Genie Space B</span><br>(Sales data)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Inventory data)</div>
+<h5>Agent Components</h5><table><tr><th>Component</th><th>Purpose</th><th>Technology</th></tr><tr><td>LLM</td><td>Reasoning and response generation</td><td>Foundation Model API (Claude, GPT, DBRX)</td></tr><tr><td>Tools</td><td>Actions the agent can take</td><td>Python functions with type hints</td></tr><tr><td>Memory</td><td>Conversation state persistence</td><td>Lakebase PostgreSQL (CheckpointSaver)</td></tr><tr><td>Guardrails</td><td>Safety and quality boundaries</td><td>Input/output validators</td></tr></table>
+<h5>Lakebase Memory Pattern</h5><p>Conversations are stateful across sessions using Lakebase:</p>
+<pre># CheckpointSaver stores conversation state in Lakebase
+# Each turn: user message → agent reasoning → tool calls → response
+# All persisted with session_id for resumption
+
+# Schema:
+# sessions(session_id, user_id, created_at, metadata)
+# messages(message_id, session_id, role, content, timestamp)
+# tool_results(result_id, message_id, tool_name, result, latency)</pre>
+<h5>MLflow GenAI Evaluation</h5><p>Before deploying, evaluate agent quality with LLM-as-judge scorers:</p>
+<table><tr><th>Scorer</th><th>What It Measures</th></tr><tr><td>Faithfulness</td><td>Are answers grounded in retrieved context?</td></tr><tr><td>Relevance</td><td>Does the response answer the question?</td></tr><tr><td>Harmfulness</td><td>Could the response cause harm?</td></tr><tr><td>Tool Selection</td><td>Did the agent pick the right tool?</td></tr><tr><td>Custom Domain</td><td>Business-specific quality criteria</td></tr></table>
+<h5>Deployment Pipeline</h5><div class="ac-diagram"><span class="hl">Build Agent</span> → <span class="hl-p">Evaluate (MLflow)</span> → Quality Gate (pass?) → <span class="hl-g">Register Model (UC)</span> → <span class="hl-o">Serve Endpoint</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="hl">Production Monitoring</span> (sample scoring, drift, latency)</div>
+<h5>Production Monitoring</h5><p>Deployed agents are continuously monitored: registered scorers evaluate a sample of production requests, detecting quality drift, latency spikes, and hallucination patterns over time.</p>`,
+   quiz:[{q:'What framework is recommended for building Databricks agents?',opts:['LangChain only','ResponsesAgent (MLflow pyfunc)','Custom Flask API'],answer:1},{q:'Where does agent conversation memory persist?',opts:['Browser localStorage','Lakebase PostgreSQL','In-memory only'],answer:1},{q:'What must pass before an agent is deployed?',opts:['Manual code review','MLflow evaluation quality gate','Unit tests only'],answer:1},{q:'What is the role of LLM-as-judge scorers?',opts:['Train the model','Evaluate agent response quality automatically','Generate test data'],answer:1}]},
 ];
 
 // (Prompt Lab removed)
@@ -1553,21 +1806,55 @@ function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(
 function copyPrompt(id){const s=SKILL_MAP[id];if(!s||!s.prompt)return;navigator.clipboard.writeText(s.prompt).then(()=>{const btns=document.querySelectorAll('.dp-btn.primary');btns.forEach(b=>{if(b.textContent==='Copy Prompt'){b.textContent='Copied!';setTimeout(()=>{b.textContent='Copy Prompt';},2000);}});});}
 
 // ======================== MODE 4: PLATFORM ACADEMY ========================
+let activeAcadModule = null;
 function initAcademy(){
-  const grid=document.getElementById('academyGrid');
-  grid.innerHTML=ACADEMY.map(m=>{
-    const quizHtml=m.quiz?`<div class="quiz-section"><h5>Quiz Yourself</h5>${m.quiz.map((q,qi)=>`<div class="quiz-q"><p>${qi+1}. ${q.q}</p>${q.opts.map((o,oi)=>`<div class="quiz-opt" onclick="checkQuiz(this,${oi},${q.answer})">${o}</div>`).join('')}</div>`).join('')}</div>`:'';
-    return `<div class="academy-card" id="ac-${m.id}"><div class="ac-header" onclick="toggleAcademy('${m.id}')"><div class="ac-icon" style="background:${m.color}22;color:${m.color}">${m.icon}</div><div><div class="ac-title">${m.title}</div><div class="ac-subtitle">${m.subtitle}</div></div><div class="ac-chevron" id="ach-${m.id}">▼</div></div><div class="ac-body" id="acb-${m.id}"><div class="ac-content">${m.content}${quizHtml}</div></div></div>`;
-  }).join('');
+  const sidebar = document.getElementById('acadSidebar');
+  sidebar.innerHTML = '<h3>Platform Academy</h3><div class="acad-nav">' +
+    ACADEMY.map(m =>
+      `<div class="acad-nav-item" data-mod="${m.id}" onclick="selectAcadModule('${m.id}')">` +
+        `<div class="acad-nav-icon" style="background:${m.color}15;color:${m.color}">${m.icon}</div>` +
+        `<div><div class="acad-nav-title">${m.title}</div><div class="acad-nav-sub">${m.subtitle}</div></div>` +
+      `</div>`
+    ).join('') + '</div>';
 }
-function toggleAcademy(id){
-  const body=document.getElementById('acb-'+id);
-  const chev=document.getElementById('ach-'+id);
-  body.classList.toggle('open');chev.classList.toggle('open');
+function selectAcadModule(id){
+  const m = ACADEMY.find(a => a.id === id);
+  if(!m) return;
+  activeAcadModule = id;
+  document.querySelectorAll('.acad-nav-item').forEach(n => n.classList.toggle('active', n.dataset.mod === id));
+  const main = document.getElementById('acadMain');
+  const sections = splitAcadContent(m.content);
+  const quizHtml = m.quiz ? renderAcadQuiz(m.quiz) : '';
+  main.innerHTML =
+    `<div class="acad-hero"><div class="acad-hero-top"><div class="acad-hero-icon" style="background:${m.color}15;color:${m.color}">${m.icon}</div><div><h2>${m.title}</h2><div class="acad-hero-sub">${m.subtitle}</div></div></div></div>` +
+    `<div class="acad-sections">${sections}${quizHtml}</div>`;
+  main.scrollTop = 0;
 }
-function openAcademyModule(id){switchMode('academy');setTimeout(()=>{const body=document.getElementById('acb-'+id);if(body&&!body.classList.contains('open'))toggleAcademy(id);document.getElementById('ac-'+id)?.scrollIntoView({behavior:'smooth'});},100);}
+function splitAcadContent(html){
+  const parts = html.split(/<h5>/g);
+  if(parts.length <= 1) return '<div class="acad-section">' + html + '</div>';
+  let out = '';
+  if(parts[0].trim()) out += '<div class="acad-section">' + parts[0] + '</div>';
+  for(let i=1;i<parts.length;i++){
+    const endTag = parts[i].indexOf('</h5>');
+    if(endTag === -1){ out += '<div class="acad-section"><h5>' + parts[i] + '</div>'; continue; }
+    const title = parts[i].substring(0, endTag);
+    const body = parts[i].substring(endTag + 5);
+    out += `<div class="acad-section"><h5>${title}</h5>${body}</div>`;
+  }
+  return out;
+}
+function renderAcadQuiz(quiz){
+  return '<div class="acad-quiz"><h4>Test Your Knowledge</h4>' +
+    quiz.map((q,qi) =>
+      `<div class="quiz-q"><p>${qi+1}. ${q.q}</p><div class="quiz-opts">${q.opts.map((o,oi) =>
+        `<div class="quiz-opt" onclick="checkQuiz(this,${oi},${q.answer})">${o}</div>`
+      ).join('')}</div></div>`
+    ).join('') + '</div>';
+}
+function openAcademyModule(id){switchMode('academy');setTimeout(()=>selectAcadModule(id),50);}
 function checkQuiz(el,idx,answer){
-  const parent=el.parentElement;
+  const parent=el.closest('.quiz-opts');
   parent.querySelectorAll('.quiz-opt').forEach((o,i)=>{o.classList.add('revealed');o.classList.add(i===answer?'correct':'wrong');});
 }
 

@@ -171,6 +171,8 @@ if (parseInt(seedCheck.rows[0].cnt) === 0) {
 }
 ```
 
+> **Apostrophe escaping:** If seed data contains apostrophes (e.g., `chef's kitchen`), use double single quotes in raw SQL: `'chef''s kitchen'`. Alternatively, use parameterized inserts (`$1, $2`) which handle escaping automatically — see the Decision Defaults table.
+
 For multi-table seed patterns with foreign keys, see [references/multi-table-example.md](references/multi-table-example.md).
 
 ### 1f. Mock Data Strategy
@@ -205,31 +207,26 @@ When using `server.extend()`, pass `autoStart: false` to the `server()` plugin a
 ```typescript
 import { createApp, server, lakebase } from "@databricks/appkit";
 
-const hasLakebase = Boolean(process.env.LAKEBASE_ENDPOINT);
 const AppKit = await createApp({
-  plugins: hasLakebase
-    ? [server({ autoStart: false }), lakebase()]
-    : [server({ autoStart: false })],
+  plugins: [server({ autoStart: false }), lakebase()],
 });
 
 const DB_SCHEMA = process.env.DB_SCHEMA || "app";
 
 // DDL + seed (from Step 1) ...
 
-AppKit.server.extend((app: any) => {
+AppKit.server.extend((app) => {
   // Register routes here (Steps 2b-2d)
 });
 
 await AppKit.server.start();
 ```
 
-> **Gotcha — `lakebase()` crashes without `LAKEBASE_ENDPOINT`.** The plugin throws `ConfigurationError` during `createApp()` if the env var is missing. This always happens in local dev before the first deploy (the platform injects the var at runtime). The conditional pattern above lets the app start with mock fallback data locally. Routes should check `AppKit.lakebase` before querying — see Step 2c for the try/catch pattern that falls back to mock data when the pool is undefined.
+> **Local dev without `LAKEBASE_ENDPOINT`:** The `lakebase()` plugin may log connection warnings when `LAKEBASE_ENDPOINT` is not set (e.g., local dev before first deploy). This does not crash the server — the plugin initializes gracefully, and individual route handlers fall back to mock data via try/catch (see Step 2c). Use `npm run build` for local validation. `npm run dev` may show connection errors in the console, which is expected.
 
 > **Gotcha — `autoStart: false` is required.** Without it, the server starts before `extend()` runs and routes are never registered. Always pass `server({ autoStart: false })` and call `AppKit.server.start()` after all routes are defined.
 
-> **Gotcha — Do NOT type-annotate the `app` parameter with `Express`.** Importing `Express` from the `express` module and writing `(app: Express) =>` causes a type mismatch (`TS2345`). AppKit's `server.extend()` expects its own internal `Application` type. Use `(app: any)` to satisfy strict mode, or omit the annotation entirely and let TypeScript infer it. You can still import `Request` and `Response` types for route handler parameters.
-
-> **Prefer using the `app` parameter in `server.extend((app: any) => { ... })`.** Express is bundled inside `@databricks/appkit`. For GET routes, no additional import is needed. Avoid importing Express solely for routing since `app` already provides it. The `: any` annotation prevents `tsc -b` strict-mode errors (`Parameter 'app' implicitly has an 'any' type`).
+> **Gotcha — Do NOT annotate `app` with `: any` or `: Express`.** AppKit's AST-grep linter blocks `any` annotations (`no-as-any` rule), and importing `Express` from the `express` module causes TS2345 (type mismatch with AppKit's internal type). Leave `app` untyped in `server.extend((app) => { ... })` — TypeScript infers the correct type from the callback signature. For route handler parameters, import and use `Request` and `Response` types from `express`.
 
 ### 2b. Response Contract
 
@@ -247,7 +244,9 @@ Every data endpoint must return this shape:
 Every route follows try/catch with mock fallback:
 
 ```typescript
-app.get("/api/orders", async (req, res) => {
+import type { Request, Response } from "express";
+
+app.get("/api/orders", async (req: Request, res: Response) => {
   try {
     const result = await AppKit.lakebase.query(
       `SELECT * FROM ${DB_SCHEMA}.orders ORDER BY created_at DESC`
@@ -300,7 +299,7 @@ app.get("/api/health/lakebase", async (req, res) => {
 If your app has POST or PUT routes, add JSON body parsing. Express is bundled inside AppKit — access it exclusively via the `app` parameter in `server.extend()`:
 
 ```typescript
-AppKit.server.extend((app: any) => {
+AppKit.server.extend((app) => {
   app.use((req, _res, next) => {
     if (req.headers["content-type"]?.includes("application/json") && !req.body) {
       let raw = "";
@@ -463,13 +462,14 @@ Detailed callouts are embedded inline at the relevant step. This table is a comp
 | `ON CONFLICT DO NOTHING` with identity PKs | Count-check seed pattern | 1e |
 | `import express` / `require("express")` | Use `server.extend((app))` + inline parser | 2e |
 | Missing `autoStart: false` | Pass to `server()` plugin | 2a |
-| `lakebase()` crashes without `LAKEBASE_ENDPOINT` | Conditional plugin registration: `Boolean(process.env.LAKEBASE_ENDPOINT)` | 2a |
+| Lakebase connection warnings in local dev | Expected; plugin initializes but queries fail. Routes fall back to mock data via try/catch | 2a |
 | DECIMAL columns → strings | `Number()` in mappers | 3d |
 | DATE columns → Date objects | `.toISOString().slice(0,10)` | 3d |
 | `queryKey` on chart components | Use `data` prop instead | 3c |
 | Port 8000 in use | `lsof -ti:8000 \| xargs kill -9` | 4b |
 | Old `postgres:` resource format | Use `postgres_project`/`postgres_branch`/`postgres_endpoint` | Prerequisites |
 | Stale endpoint hostname in `.env` | Re-fetch: `databricks postgres get-endpoint ...` | Prerequisites |
+| AppKit AST-grep linter blocks `as any` and `as unknown as T` | Avoid type assertions; use proper type imports or leave parameters untyped for inference. `databricks apps validate` runs these rules but `npm run build` does not | 2a |
 | SP permission errors on deploy | Verify bundle resource bindings in `databricks.yml` | Prerequisites |
 
 ---
