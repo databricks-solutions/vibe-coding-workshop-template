@@ -327,6 +327,20 @@ Verify at `http://localhost:8000`:
 - Data queries return results (loading → data flow)
 - All interactive elements respond
 
+### Smoke Test Selectors
+
+Update `tests/smoke.spec.ts` to use `data-testid` selectors instead of text/role selectors. Add `data-testid` attributes to the primary heading and at least one content element per page:
+
+```tsx
+<h1 data-testid="hero-heading">Find your perfect stay</h1>
+```
+
+```typescript
+await expect(page.getByTestId('hero-heading')).toBeVisible();
+```
+
+Text and role selectors break when the UI adds duplicate content (e.g., a second heading with the same text). `data-testid` selectors are immune to copy changes and ARIA ambiguity.
+
 ---
 
 ## Known Gotchas
@@ -343,6 +357,8 @@ Common runtime surprises that cause bugs or confusion:
 | Chart components accept both `data` (static) and `queryKey` (query-driven) props | Use `data` for scaffold-step static data, `queryKey` + `params` for query-driven mode |
 | `npx @databricks/appkit docs` search matches section headings only | Use full doc path for specific component lookups |
 | `npm run dev` triggers typegen via `predev` hook | `TABLE_OR_VIEW_NOT_FOUND` errors are expected if custom queries reference tables that don't exist yet. Not blocking. |
+| `getByText`/`getByRole` matches multiple elements (Playwright strict mode) | Use `data-testid` selectors; add `data-testid` attributes to key elements during page creation |
+| Escaped quotes in JSX attributes (`placeholder='I\'m...'`) crash Vite/rolldown parser | Use double-quoted attributes or JSX expressions: `placeholder={"I'm..."}` |
 
 ---
 
@@ -354,10 +370,11 @@ Before declaring the build complete:
 - [ ] `npm run typegen` has been run after all SQL files are finalized
 - [ ] All query parameters wrapped in `useMemo`
 - [ ] Loading/error/empty states on every data component
-- [ ] `tests/smoke.spec.ts` selectors updated for your app
+- [ ] `tests/smoke.spec.ts` uses `data-testid` selectors (not text/role); key elements have `data-testid` attributes
 - [ ] Static demo data renders correctly (swap to live data happens in the **Wire Lakebase Backend** step)
 - [ ] `npx tsc --noEmit` passes with zero TypeScript errors (catches unused imports, missing types that block deployment)
 - [ ] `npm run dev` runs cleanly at `http://localhost:8000`
+- [ ] `databricks apps validate --profile $PROFILE` passes (catches strict-mode TS errors and smoke test regressions that `npm run build` alone misses)
 
 ---
 

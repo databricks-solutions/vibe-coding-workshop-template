@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe Coding Workshop Explorer</title>
+<style>
+:root {
+  --bg:#0f1318; --surface:#171d26; --surface2:#1e2532; --border:#2d3548;
+  --text:#e8eaf0; --text-dim:#7c8494; --text-muted:#515b6e;
+  --cyan:#FF3621; --cyan-dim:rgba(255,54,33,.12);
+  --green:#00A972; --green-dim:rgba(0,169,114,.12);
+  --gold:#EBA000; --gold-dim:rgba(235,160,0,.12);
+  --purple:#8B5CF6; --purple-dim:rgba(139,92,246,.12);
+  --orange:#FF6E42; --orange-dim:rgba(255,110,66,.12);
+  --red:#FF3621; --red-dim:rgba(255,54,33,.12);
+  --teal:#1B9E8A; --teal-dim:rgba(27,158,138,.12);
+  --pink:#E879A8; --blue:#4A90D9; --blue-dim:rgba(74,144,217,.12);
+  --bronze:#CD853F;
+  --code-bg:#171d26;
+}
+body.light {
+  --bg:#FFFFFF; --surface:#F7F8FA; --surface2:#EEF0F4; --border:#DDE0E6;
+  --text:#1B1F24; --text-dim:#5F6B7A; --text-muted:#8E99A8;
+  --cyan:#E2371D; --cyan-dim:rgba(226,55,29,.08);
+  --green:#00875A; --green-dim:rgba(0,135,90,.08);
+  --gold:#C78800; --gold-dim:rgba(199,136,0,.08);
+  --purple:#6D3DC9; --purple-dim:rgba(109,61,201,.08);
+  --orange:#D4570A; --orange-dim:rgba(212,87,10,.08);
+  --red:#E2371D; --red-dim:rgba(226,55,29,.08);
+  --teal:#0E7C6B; --teal-dim:rgba(14,124,107,.08);
+  --pink:#C44D80; --blue:#2B6CB0; --blue-dim:rgba(43,108,176,.08);
+  --bronze:#9A6324;
+  --code-bg:#F0F2F5;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh;transition:background .3s,color .3s;}
+a{color:var(--cyan);text-decoration:none;}
+button{font-family:inherit;}
+
+/* Header */
+.app-header{padding:16px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:300;transition:background .3s;}
+.app-header h1{font-size:18px;font-weight:700;letter-spacing:-.3px;white-space:nowrap;}
+.app-header h1 span{color:var(--cyan);}
+.mode-tabs{display:flex;gap:4px;margin-left:16px;}
+.mode-tab{background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);padding:6px 14px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.mode-tab:hover{border-color:var(--cyan);color:var(--text);}
+.mode-tab.active{background:var(--cyan);border-color:var(--cyan);color:#000;}
+.search-box{margin-left:auto;position:relative;}
+.search-box input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 12px 6px 30px;border-radius:7px;font-size:12px;width:200px;outline:none;}
+.search-box input:focus{border-color:var(--cyan);}
+.search-box::before{content:'⌕';position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-dim);font-size:13px;}
+.search-results{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:300px;overflow-y:auto;z-index:400;display:none;}
+.search-results.open{display:block;}
+.sr-item{padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.sr-item:hover{background:var(--surface2);}
+.sr-item .sr-type{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;text-transform:uppercase;}
+/* Theme toggle */
+.theme-toggle{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s;flex-shrink:0;}
+.theme-toggle:hover{border-color:var(--cyan);background:var(--cyan-dim);}
+
+/* Mode panels */
+.mode-panel{display:none;height:calc(100vh - 53px);overflow:auto;}
+.mode-panel.active{display:block;}
+
+/* ==================== MODE 1: GALAXY MAP ==================== */
+#galaxy{position:relative;height:calc(100vh - 53px);overflow:hidden;}
+#starfield{position:absolute;inset:0;z-index:0;}
+.galaxy-content{position:relative;z-index:1;padding:24px;height:100%;overflow:auto;}
+.galaxy-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-dim);margin-bottom:12px;padding-left:4px;}
+.galaxy-section{margin-bottom:32px;}
+.galaxy-section h2{font-size:14px;font-weight:700;margin-bottom:4px;}
+.galaxy-section .subtitle{font-size:11px;color:var(--text-dim);margin-bottom:16px;}
+
+.pipeline-flow{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px;}
+.stage-cluster{display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;}
+.stage-node{width:64px;height:64px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px solid var(--border);background:var(--surface);cursor:pointer;transition:all .3s;position:relative;}
+.stage-node:hover{transform:scale(1.12);border-color:var(--cyan);box-shadow:0 0 20px var(--cyan-dim);}
+.stage-node .sn-num{font-size:16px;font-weight:800;line-height:1;}
+.stage-node .sn-label{font-size:7px;font-weight:600;text-transform:uppercase;color:var(--text-dim);line-height:1;margin-top:2px;text-align:center;max-width:56px;overflow:hidden;}
+.stage-arrow{color:var(--text-muted);font-size:18px;margin-top:18px;animation:pulse-arrow 2s infinite;}
+@keyframes pulse-arrow{0%,100%{opacity:.3}50%{opacity:1}}
+.worker-dots{display:flex;gap:2px;justify-content:center;flex-wrap:wrap;max-width:72px;}
+.worker-dot{width:6px;height:6px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);cursor:pointer;transition:all .2s;}
+.worker-dot:hover{transform:scale(1.8);background:var(--gold);}
+
+.phase-flow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+.phase-node{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .3s;text-align:center;}
+.phase-node:hover{border-color:var(--green);box-shadow:0 0 16px var(--green-dim);transform:translateY(-2px);}
+.phase-node .pn-num{font-size:14px;font-weight:800;color:var(--green);}
+.phase-node .pn-label{font-size:9px;color:var(--text-dim);margin-top:2px;}
+
+.common-spine{display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;}
+.common-chip{padding:4px 10px;border-radius:12px;background:var(--green-dim);border:1px solid rgba(52,199,89,.25);font-size:10px;font-weight:600;color:var(--green);cursor:pointer;transition:all .2s;}
+.common-chip:hover{background:var(--green);color:#000;}
+
+.agentic-nodes{display:flex;gap:8px;flex-wrap:wrap;}
+.agentic-node{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .3s;font-size:11px;}
+.agentic-node:hover{border-color:var(--teal);box-shadow:0 0 16px var(--teal-dim);}
+
+.stats-bar{display:flex;gap:24px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:20px;}
+.stat{text-align:center;}
+.stat .stat-num{font-size:24px;font-weight:800;color:var(--cyan);}
+.stat .stat-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;}
+
+/* Stage colors */
+.sc-1{border-color:var(--purple);} .sc-1 .sn-num{color:var(--purple);}
+.sc-2{border-color:var(--bronze);} .sc-2 .sn-num{color:var(--bronze);}
+.sc-3{border-color:var(--teal);} .sc-3 .sn-num{color:var(--teal);}
+.sc-4{border-color:var(--purple);} .sc-4 .sn-num{color:var(--purple);}
+.sc-5{border-color:var(--gold);} .sc-5 .sn-num{color:var(--gold);}
+.sc-6{border-color:var(--blue);} .sc-6 .sn-num{color:var(--blue);}
+.sc-6b{border-color:var(--orange);} .sc-6b .sn-num{color:var(--orange);font-size:12px;}
+.sc-7{border-color:var(--red);} .sc-7 .sn-num{color:var(--red);}
+.sc-8{border-color:var(--pink);} .sc-8 .sn-num{color:var(--pink);}
+.sc-9{border-color:var(--teal);} .sc-9 .sn-num{color:var(--teal);}
+.sc-8{border-color:var(--pink);} .sc-8 .sn-num{color:var(--pink);}
+.sc-9{border-color:var(--cyan);} .sc-9 .sn-num{color:var(--cyan);}
+
+/* ==================== MODE 2: GUIDED TOURS ==================== */
+#tours.active{display:flex;flex-direction:column;height:calc(100vh - 53px);}
+.tour-picker{display:flex;gap:12px;padding:16px 24px;border-bottom:1px solid var(--border);background:var(--surface);}
+.tour-card{flex:1;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);cursor:pointer;transition:all .3s;}
+.tour-card:hover{border-color:var(--cyan);transform:translateY(-2px);}
+.tour-card.active{border-color:var(--cyan);box-shadow:0 0 20px var(--cyan-dim);}
+.tour-card h3{font-size:13px;margin-bottom:4px;}
+.tour-card p{font-size:10px;color:var(--text-dim);}
+.tour-controls{display:flex;align-items:center;gap:10px;padding:10px 24px;background:var(--surface);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);}
+.tour-controls button{background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;}
+.tour-controls button:hover{border-color:var(--cyan);}
+.tour-controls button.active{background:var(--cyan);color:#000;border-color:var(--cyan);}
+.tour-sep{width:1px;height:20px;background:var(--border);flex-shrink:0;}
+.tour-step-info{font-size:11px;color:var(--text-dim);min-width:100px;text-align:center;}
+.tour-step-info.hl{color:var(--cyan);font-weight:600;}
+.speed-ctl{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);margin-left:auto;}
+.speed-ctl input{width:60px;accent-color:var(--cyan);}
+.tour-body{display:grid;grid-template-columns:480px 1fr;flex:1;overflow:hidden;}
+.tour-tree-wrap{overflow:auto;padding:20px 16px 100px 28px;border-right:1px solid var(--border);}
+@media(max-width:900px){.tour-body{grid-template-columns:1fr;grid-template-rows:40% 1fr;}.tour-tree-wrap{border-right:none;border-bottom:1px solid var(--border);}}
+
+/* Tour detail pane */
+.tour-detail{overflow-y:auto;padding:0;background:var(--bg);}
+.tour-detail::-webkit-scrollbar{width:4px;}
+.td-inner{padding:20px 24px 40px;animation:tdFade .35s ease;}
+@keyframes tdFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.td-header{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.td-header-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+.td-name{font-size:20px;font-weight:800;letter-spacing:-.3px;}
+.td-badge{font-size:9px;padding:3px 10px;border-radius:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.td-desc{font-size:13px;color:var(--text-dim);line-height:1.5;}
+.td-narration{font-size:12px;line-height:1.6;margin-top:8px;color:var(--text);padding:8px 12px;background:var(--surface2);border-radius:6px;}
+.td-narration .hl{color:var(--cyan);font-weight:600;}
+.td-narration .hl-g{color:var(--green);font-weight:600;}
+.td-narration .hl-y{color:var(--gold);font-weight:600;}
+
+.td-rationale{margin-bottom:16px;padding:14px 16px;border-left:3px solid var(--cyan);background:var(--cyan-dim);border-radius:0 8px 8px 0;animation:tdFade .5s ease .1s both;}
+.td-rationale h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--cyan);margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.td-rationale h4::before{content:'◆';font-size:7px;}
+.td-rationale p{font-size:12px;line-height:1.7;color:var(--text-dim);}
+.td-rationale em{color:var(--text);font-style:normal;font-weight:600;}
+
+.td-flow{margin-bottom:16px;animation:tdFade .5s ease .15s both;}
+.td-flow h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:8px;}
+.td-flow-diagram{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.td-flow-col{display:flex;flex-direction:column;gap:4px;}
+.td-flow-col.inputs .td-pill{background:var(--purple-dim);border:1px solid rgba(147,112,219,.3);color:var(--purple);}
+.td-flow-col.outputs .td-pill{background:var(--green-dim);border:1px solid rgba(52,199,89,.3);color:var(--green);}
+.td-pill{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;white-space:nowrap;}
+.td-flow-arrow{font-size:20px;color:var(--text-muted);padding:0 4px;animation:arrowPulse 2s infinite;}
+@keyframes arrowPulse{0%,100%{opacity:.4;transform:translateX(0)}50%{opacity:1;transform:translateX(3px)}}
+
+.td-code{margin-bottom:16px;position:relative;animation:tdFade .5s ease .2s both;}
+.td-code h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:8px;}
+.td-code-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:11px;line-height:1.6;overflow-x:auto;white-space:pre;position:relative;}
+body.light .td-code-block{color:#1B1F24;}
+body.light .td-code-block .kw{color:#6D3DC9;}
+body.light .td-code-block .str{color:#00875A;}
+body.light .td-code-block .fn{color:#E2371D;}
+body.light .td-code-block .cm{color:#8E99A8;}
+body.light .td-code-block .dec{color:#C78800;}
+body.light .dp-code{background:var(--code-bg);color:#1B1F24;}
+.td-code-block .kw{color:var(--purple);font-weight:600;}
+.td-code-block .fn{color:var(--cyan);}
+.td-code-block .str{color:var(--green);}
+.td-code-block .dec{color:var(--gold);}
+.td-code-block .cm{color:var(--text-muted);font-style:italic;}
+.td-code-copy{position:absolute;top:28px;right:8px;background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);padding:3px 8px;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;transition:all .2s;}
+.td-code-copy:hover{color:var(--cyan);border-color:var(--cyan);}
+.td-code-copy.copied{color:var(--green);border-color:var(--green);}
+
+.td-workers{margin-bottom:16px;animation:tdFade .5s ease .25s both;}
+.td-workers h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;}
+.td-worker-map{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.td-hub{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;border:2px solid var(--purple);background:var(--purple-dim);color:var(--purple);flex-shrink:0;position:relative;}
+.td-hub::after{content:'';position:absolute;right:-8px;top:50%;width:8px;height:1px;background:var(--border);}
+.td-worker-chip{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;background:var(--gold-dim);border:1px solid rgba(245,166,35,.25);color:var(--gold);cursor:pointer;transition:all .2s;position:relative;}
+.td-worker-chip:hover{background:var(--gold);color:#000;transform:translateY(-1px);}
+.td-deps-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.td-dep-chip{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;background:var(--green-dim);border:1px solid rgba(52,199,89,.25);color:var(--green);cursor:pointer;transition:all .2s;}
+.td-dep-chip:hover{background:var(--green);color:#000;}
+.td-dep-label{font-size:9px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
+
+.td-actions{display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--border);margin-top:4px;}
+.td-actions .dp-btn{padding:8px 16px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid var(--border);}
+
+.td-welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px;color:var(--text-dim);}
+.td-welcome h3{font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;}
+.td-welcome p{font-size:12px;line-height:1.6;max-width:300px;}
+
+.td-summary{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 24px;}
+.td-summary h3{font-size:18px;font-weight:800;margin-bottom:12px;color:var(--cyan);}
+.td-summary p{font-size:13px;line-height:1.7;color:var(--text-dim);max-width:400px;margin-bottom:16px;}
+.td-progress{display:flex;gap:4px;align-items:center;}
+.td-progress-dot{width:10px;height:10px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);transition:all .3s;}
+.td-progress-dot.done{background:var(--cyan);border-color:var(--cyan);}
+.td-progress-dot.current{background:var(--gold);border-color:var(--gold);box-shadow:0 0 8px var(--gold-dim);}
+
+/* Tour tree (reuses 11-skill-hierarchy-tree patterns) */
+.ttree ul{list-style:none;padding-left:0;}
+.ttree > ul{padding-left:0;}
+.ttree li{position:relative;padding-left:26px;}
+.ttree li::before{content:'';position:absolute;left:0;top:0;width:1px;height:100%;background:var(--border);transition:background .5s;}
+.ttree li::after{content:'';position:absolute;left:0;top:16px;width:20px;height:1px;background:var(--border);transition:background .5s;}
+.ttree li:last-child::before{height:16px;}
+.ttree li.lit::before,.ttree li.lit::after{background:var(--cyan);}
+.tnode{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;margin:3px 0;border:1px solid var(--border);border-radius:7px;background:var(--surface);cursor:pointer;transition:all .4s;max-width:460px;font-size:12px;}
+.tnode:hover{border-color:#3d4255;}
+.tnode .icon{width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0;}
+.tnode .name{font-weight:600;white-space:nowrap;}
+.tnode .tag{font-size:8px;padding:1px 6px;border-radius:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.tnode .meta{font-size:9px;color:var(--text-dim);margin-left:auto;font-family:'SF Mono','Fira Code',monospace;white-space:nowrap;}
+.tnode .chevron{font-size:9px;color:var(--text-muted);transition:transform .3s;}
+.tnode .chevron.open{transform:rotate(90deg);}
+.tnode.visited{border-color:var(--cyan);box-shadow:0 0 6px var(--cyan-dim);}
+.tnode.visited .name{color:var(--cyan);}
+.tnode.active-node{border-color:var(--cyan);box-shadow:0 0 18px var(--cyan-dim);transform:translateX(3px);}
+.tnode.active-node .name{color:var(--cyan);font-weight:700;}
+.tnode.active-node::before{content:'';position:absolute;inset:-3px;border:2px solid var(--cyan);border-radius:10px;animation:ring-pulse 1.4s ease-in-out infinite;pointer-events:none;}
+.tnode.user-selected{border-color:var(--gold);box-shadow:0 0 14px var(--gold-dim);transform:translateX(3px);background:var(--surface2);}
+.tnode.user-selected .name{color:var(--gold);font-weight:700;}
+@keyframes ring-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.type-orchestrator .icon{background:var(--purple-dim);color:var(--purple);}
+.type-orchestrator .tag{background:var(--purple-dim);color:var(--purple);}
+.type-worker .icon{background:var(--gold-dim);color:var(--gold);}
+.type-worker .tag{background:var(--gold-dim);color:var(--gold);}
+.type-common .icon{background:var(--green-dim);color:var(--green);}
+.type-common .tag{background:var(--green-dim);color:var(--green);}
+.type-entry .icon{background:var(--cyan-dim);color:var(--cyan);}
+.type-entry .tag{background:var(--cyan-dim);color:var(--cyan);}
+.type-manifest .icon{background:var(--gold-dim);color:var(--gold);}
+.type-manifest .tag{background:var(--gold-dim);color:var(--gold);}
+.type-ref .icon{background:var(--orange-dim);color:var(--orange);}
+.type-ref .tag{background:var(--orange-dim);color:var(--orange);}
+.ttree li.collapsed>ul{max-height:0;overflow:hidden;opacity:0;transition:max-height .4s,opacity .3s;}
+.ttree li.expanded>ul{max-height:3000px;opacity:1;transition:max-height .6s,opacity .4s .1s;}
+.tier-badge{position:fixed;right:20px;bottom:80px;padding:5px 12px;border-radius:7px;font-size:10px;font-weight:700;border:1px solid var(--border);background:var(--surface);z-index:200;transition:all .4s;display:none;}
+.tier-badge.show{display:block;}
+.tier-badge.t1{border-color:var(--cyan);color:var(--cyan);}
+.tier-badge.t2{border-color:var(--purple);color:var(--purple);}
+.tier-badge.t3{border-color:var(--gold);color:var(--gold);}
+.tier-badge.t4{border-color:var(--orange);color:var(--orange);}
+
+/* ==================== MODE 3: SKILL DEEP DIVE ==================== */
+.detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:none;animation:fadeIn .2s;}
+.detail-overlay.open{display:block;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.detail-panel{position:fixed;top:0;right:0;width:520px;max-width:90vw;height:100vh;background:var(--bg);border-left:1px solid var(--border);z-index:501;overflow-y:auto;transform:translateX(100%);transition:transform .3s ease;padding:0;}
+.detail-panel.open{transform:translateX(0);}
+.dp-header{padding:20px;border-bottom:1px solid var(--border);background:var(--surface);}
+.dp-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;}
+.dp-close:hover{color:var(--text);}
+.dp-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.dp-badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.dp-badge{font-size:9px;padding:2px 8px;border-radius:10px;font-weight:700;text-transform:uppercase;}
+.dp-desc{font-size:12px;color:var(--text-dim);line-height:1.5;}
+.dp-section{padding:16px 20px;border-bottom:1px solid var(--border);}
+.dp-section h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin-bottom:8px;}
+.dp-keywords{display:flex;gap:4px;flex-wrap:wrap;}
+.dp-kw{padding:3px 8px;border-radius:4px;background:var(--surface2);font-size:10px;color:var(--text-dim);}
+.dp-deps{display:flex;flex-direction:column;gap:4px;}
+.dp-dep{padding:6px 10px;border-radius:6px;background:var(--surface2);font-size:11px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;}
+.dp-dep:hover{background:var(--surface);border-color:var(--cyan);}
+.dp-dep .dd-icon{width:14px;height:14px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;}
+.dp-code{background:var(--surface);border-radius:8px;padding:12px;font-family:'SF Mono','Fira Code',monospace;font-size:11px;line-height:1.5;overflow-x:auto;white-space:pre;color:var(--text-dim);}
+.dp-actions{display:flex;gap:8px;padding:16px 20px;}
+.dp-btn{padding:8px 16px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid var(--border);}
+.dp-btn.primary{background:var(--cyan);color:#000;border-color:var(--cyan);}
+.dp-btn.primary:hover{box-shadow:0 0 16px var(--cyan-dim);}
+.dp-btn.secondary{background:var(--surface2);color:var(--text);}
+.dp-btn.secondary:hover{border-color:var(--cyan);}
+
+/* ==================== MODE 4: PLATFORM ACADEMY ==================== */
+#academy{padding:24px;}
+.academy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
+.academy-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;transition:all .3s;}
+.academy-card:hover{border-color:var(--blue);box-shadow:0 0 20px var(--blue-dim);}
+.ac-header{padding:16px;cursor:pointer;display:flex;align-items:center;gap:12px;}
+.ac-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0;}
+.ac-title{font-size:14px;font-weight:700;}
+.ac-subtitle{font-size:10px;color:var(--text-dim);}
+.ac-chevron{margin-left:auto;font-size:12px;color:var(--text-muted);transition:transform .3s;}
+.ac-chevron.open{transform:rotate(180deg);}
+.ac-body{max-height:0;overflow:hidden;transition:max-height .5s ease;}
+.ac-body.open{max-height:2000px;}
+.ac-content{padding:0 16px 16px;font-size:12px;line-height:1.6;}
+.ac-content h5{font-size:11px;font-weight:700;color:var(--cyan);margin:12px 0 6px;text-transform:uppercase;letter-spacing:.5px;}
+.ac-content table{width:100%;border-collapse:collapse;margin:8px 0;}
+.ac-content th{text-align:left;padding:6px 8px;background:var(--surface2);font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;}
+.ac-content td{padding:6px 8px;border-top:1px solid var(--border);font-size:11px;}
+.ac-content code{background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:10px;font-family:'SF Mono',monospace;}
+.ac-content pre{background:var(--surface2);border-radius:6px;padding:10px;font-family:'SF Mono',monospace;font-size:10px;line-height:1.5;overflow-x:auto;margin:8px 0;}
+.ac-diagram{background:var(--surface2);border-radius:8px;padding:12px;margin:8px 0;text-align:center;font-family:'SF Mono',monospace;font-size:10px;line-height:1.8;color:var(--text-dim);}
+.ac-diagram .hl{color:var(--cyan);font-weight:700;}
+.ac-diagram .hl-g{color:var(--green);font-weight:700;}
+.ac-diagram .hl-p{color:var(--purple);font-weight:700;}
+.ac-diagram .hl-o{color:var(--orange);font-weight:700;}
+.quiz-section{margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);}
+.quiz-section h5{margin:0 0 8px!important;display:flex;align-items:center;gap:6px;}
+.quiz-q{margin-bottom:10px;}
+.quiz-q p{font-size:11px;font-weight:600;margin-bottom:4px;}
+.quiz-opt{padding:5px 10px;margin:2px 0;border-radius:5px;font-size:10px;cursor:pointer;transition:all .2s;border:1px solid transparent;}
+.quiz-opt:hover{background:var(--surface);border-color:var(--border);}
+.quiz-opt.correct{background:var(--green-dim);border-color:var(--green);color:var(--green);}
+.quiz-opt.wrong{background:var(--red-dim);border-color:var(--red);color:var(--red);opacity:.6;}
+.quiz-opt.revealed{pointer-events:none;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--text-muted);}
+
+/* ===== LIGHT MODE OVERRIDES ===== */
+body.light #starfield{opacity:1;}
+body.light .mode-tab.active{color:#fff;}
+body.light .stat-num{color:var(--cyan);}
+body.light .pipeline-node:hover,body.light .pipeline-node.active{box-shadow:0 4px 20px rgba(226,55,29,.15);}
+body.light .stage-detail{border:1px solid var(--border);}
+body.light .app-header{box-shadow:0 1px 4px rgba(0,0,0,.06);}
+body.light .tnode{background:var(--surface);border-color:var(--border);}
+body.light .tnode:hover{background:var(--surface2);border-color:var(--cyan);}
+body.light .tnode.active-node{background:#FFF5F3;border-color:var(--cyan);}
+body.light .tnode.visited{background:var(--surface2);border-color:var(--green);}
+body.light .tnode.user-selected{background:#FFF9EC;border-color:var(--gold);}
+body.light .tour-tree-wrap{background:var(--surface);border-right-color:var(--border);}
+body.light .td-header{background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);}
+body.light .td-code{background:transparent;}
+body.light .dp-panel{background:var(--surface);border-color:var(--border);}
+body.light .dp-code{background:var(--code-bg);color:#1B1F24;}
+body.light .academy-nav{background:var(--surface);border-right-color:var(--border);}
+body.light .amod-item.active{background:var(--cyan-dim);color:var(--cyan);}
+body.light .academy-body{background:var(--bg);}
+body.light .quiz-opt{border-color:var(--border);}
+body.light .quiz-opt:hover{background:var(--surface2);}
+body.light .arch-diagram{background:var(--code-bg);color:#1B1F24;}
+body.light .td-flow-arrow{color:var(--text-dim);}
+body.light .worker-chip,body.light .dep-chip{border-color:var(--border);}
+body.light .worker-chip:hover,body.light .dep-chip:hover{background:var(--cyan-dim);border-color:var(--cyan);}
+body.light .tour-tab{background:var(--surface);}
+body.light .tour-tab.active{background:var(--cyan);color:#fff;}
+body.light .tour-controls{box-shadow:0 1px 3px rgba(0,0,0,.04);}
+body.light .stage-node{background:#fff;border-width:2px;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+body.light .stage-node:hover{box-shadow:0 4px 16px rgba(226,55,29,.12);}
+body.light .phase-node{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+body.light .agentic-node{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+body.light .common-chip{background:rgba(0,135,90,.08);border-color:rgba(0,135,90,.2);}
+body.light .common-chip:hover{background:var(--green);color:#fff;}
+body.light .common-spine{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+body.light .stats-bar{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+body.light .worker-dot{background:rgba(199,136,0,.15);border-color:var(--gold);}
+body.light .academy-card{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+body.light .academy-card:hover{box-shadow:0 4px 16px rgba(43,108,176,.1);}
+body.light .detail-panel{background:#fff;}
+body.light .dp-header{background:var(--surface);}
+body.light .dp-btn.primary{color:#fff;}
+body.light .dp-btn.primary:hover{box-shadow:0 4px 16px rgba(226,55,29,.2);}
+body.light .tour-card{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+body.light .tour-card:hover{box-shadow:0 4px 16px rgba(226,55,29,.08);}
+body.light .tour-card.active{box-shadow:0 4px 16px rgba(226,55,29,.15);}
+</style>
+</head>
+<body class="light">
+
+<!-- ===== APP HEADER ===== -->
+<div class="app-header">
+  <h1><span>⬡</span> Workshop Explorer</h1>
+  <div class="mode-tabs">
+    <button class="mode-tab active" onclick="switchMode('galaxy')">Galaxy Map</button>
+    <button class="mode-tab" onclick="switchMode('tours')">Guided Tours</button>
+    <button class="mode-tab" onclick="switchMode('academy')">Platform Academy</button>
+  </div>
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search skills..." oninput="onSearch(this.value)" onfocus="onSearch(this.value)" onblur="setTimeout(()=>closeSearch(),200)">
+    <div class="search-results" id="searchResults"></div>
+  </div>
+  <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Switch to dark mode">☾</button>
+</div>
+
+<!-- ===== MODE 1: GALAXY MAP ===== -->
+<div class="mode-panel active" id="galaxy">
+  <canvas id="starfield"></canvas>
+  <div class="galaxy-content">
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-num">65</div><div class="stat-label">Agent Skills</div></div>
+      <div class="stat"><div class="stat-num">9</div><div class="stat-label">Pipeline Stages</div></div>
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">App Phases</div></div>
+      <div class="stat"><div class="stat-num">8</div><div class="stat-label">Platform Modules</div></div>
+      <div class="stat"><div class="stat-num">3</div><div class="stat-label">Guided Tours</div></div>
+    </div>
+
+    <!-- DPA Galaxy -->
+    <div class="galaxy-section">
+      <div class="galaxy-label">Data Product Accelerator</div>
+      <h2>The 9-Stage Design-First Pipeline</h2>
+      <div class="subtitle">Click any stage to explore. Dots below show worker skills.</div>
+      <div class="pipeline-flow" id="pipelineFlow"></div>
+      <div class="galaxy-label" style="margin-top:16px">Cross-Cutting Common Skills (8)</div>
+      <div class="common-spine" id="commonSpine"></div>
+    </div>
+
+    <!-- AppKit Galaxy -->
+    <div class="galaxy-section">
+      <div class="galaxy-label">AppKit + Lakebase</div>
+      <h2>The 5-Phase App Lifecycle</h2>
+      <div class="subtitle">From scaffold to production with live data.</div>
+      <div class="phase-flow" id="phaseFlow"></div>
+    </div>
+
+    <!-- Agentic Galaxy -->
+    <div class="galaxy-section">
+      <div class="galaxy-label">Agentic Framework</div>
+      <h2>Multi-Agent Build Framework</h2>
+      <div class="subtitle">Agent prompts for building multi-agent systems.</div>
+      <div class="agentic-nodes" id="agenticNodes"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODE 2: GUIDED TOURS ===== -->
+<div class="mode-panel" id="tours">
+  <div class="tour-picker">
+    <div class="tour-card active" onclick="selectTour('a')" id="tc-a">
+      <h3>Tour A: Schema to Production</h3>
+      <p>Walk through all 9 DPA stages — from schema CSV to GenAI agents</p>
+    </div>
+    <div class="tour-card" onclick="selectTour('b')" id="tc-b">
+      <h3>Tour B: PRD to Deployed App</h3>
+      <p>Build and deploy a Databricks App in 5 phases with Lakebase</p>
+    </div>
+    <div class="tour-card" onclick="selectTour('c')" id="tc-c">
+      <h3>Tour C: The Full Picture</h3>
+      <p>Both paths converge — data pipeline meets the application layer</p>
+    </div>
+  </div>
+  <div class="tour-controls">
+    <button id="tourPlayBtn" onclick="tourTogglePlay()">▶ Play</button>
+    <button onclick="tourReset()">↺ Reset</button>
+    <button onclick="tourPrev()">◀ Prev</button>
+    <button onclick="tourNext()">Next ▶</button>
+    <span class="tour-sep"></span>
+    <button id="treeExpandBtn" onclick="toggleTreeAll()">⊞ Expand All</button>
+    <div class="tour-step-info" id="tourStepInfo">Select a tour</div>
+    <div class="speed-ctl"><label>Speed</label><input type="range" id="tourSpeed" min="1" max="5" value="3" oninput="tourUpdSpeed()"><span id="tourSpdLbl">1x</span></div>
+  </div>
+  <div class="tour-body">
+    <div class="tour-tree-wrap"><div class="ttree" id="tourTree"></div></div>
+    <div class="tour-detail" id="tourDetail">
+      <div class="td-welcome"><h3>Select a Tour</h3><p>Pick a tour above, then press <strong>Play</strong> or <strong>Next</strong> to walk through the skill tree. Each step reveals design choices and rationale here.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODE 4: PLATFORM ACADEMY ===== -->
+<div class="mode-panel" id="academy">
+  <div class="galaxy-label">Platform Academy</div>
+  <h2 style="margin-bottom:4px;">Learn the Building Blocks</h2>
+  <p style="font-size:12px;color:var(--text-dim);margin-bottom:20px;">Six interactive modules covering the Databricks platform components that power the workshop. Click to expand.</p>
+  <div class="academy-grid" id="academyGrid"></div>
+</div>
+
+<!-- ===== DETAIL PANEL (MODE 3) ===== -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel"></div>
+
+<script>
+// ======================== DATA MODEL ========================
+const SKILLS = [
+  // --- DPA: Gold Design (Stage 1) ---
+  {id:'gold-00',name:'Gold Layer Design',domain:'gold',component:'dpa',type:'orchestrator',stage:1,
+   desc:'End-to-end orchestrator for designing Gold layer schemas with ERDs, YAML files, lineage tracking, and business documentation.',
+   keywords:['Gold design','dimensional model','ERD','YAML schema','schema CSV'],
+   workers:['gold-dw-01','gold-dw-02','gold-dw-03','gold-dw-04','gold-dw-05','gold-dw-06','gold-dw-07'],
+   commonDeps:['common-expert','common-naming'],emits:['gold_layer_design/yaml/*.yaml','gold_layer_design/erd_master.md'],
+   code:'clustering: auto\ntable_properties:\n  delta.enableChangeDataFeed: "true"\n  delta.enableRowTracking: "true"\n  layer: "gold"',
+   rationale:'<em>Design-first architecture</em>: the Gold layer is designed as a dimensional model before any Bronze or Silver code is written. This inverts the traditional "ingest first, model later" approach. Discovering a grain mismatch after building 15 Silver pipelines means rework across every layer. By designing Gold first, the schema CSV drives the entire pipeline shape top-down — catching errors when they cost minutes, not days.',
+   prompt:'Please design the Gold layer using\n@data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md'},
+  {id:'gold-dw-01',name:'Grain Definition',domain:'gold',component:'dpa',type:'worker',stage:1,desc:'Decides the grain (granularity) of each fact table using a decision tree: transaction grain (one row per event), periodic snapshot (one row per time period), or accumulating snapshot (one row per lifecycle with milestone timestamps).',keywords:['grain','fact granularity'],workers:[],commonDeps:[],
+   code:'-- Transaction grain: one row per booking event\nCREATE TABLE fact_bookings (\n  booking_key bigint,\n  guest_key bigint,\n  property_key bigint,\n  date_key int,\n  revenue numeric(10,2)\n);\n-- Accumulating: one row per booking lifecycle\nCREATE TABLE fact_booking_lifecycle (\n  booking_key bigint,\n  created_date_key int,\n  confirmed_date_key int,  -- NULL until confirmed\n  checked_in_date_key int  -- NULL until check-in\n);',
+   rationale:'Grain is the <em>single most important modeling decision</em>. Getting it wrong means either losing detail (too coarse) or creating massive tables (too fine). The decision tree considers: Is there a natural event? → transaction. Need time-series snapshots? → periodic. Need to track milestones? → accumulating.'},
+  {id:'gold-dw-02',name:'Dimension Patterns',domain:'gold',component:'dpa',type:'worker',stage:1,desc:'Implements dimension table patterns: SCD Type 1 (overwrite), SCD Type 2 (history with effective dates), role-playing dimensions (same table, multiple FK roles), junk dimensions (flag consolidation), and degenerate dimensions (fact-embedded attributes).',keywords:['dimension','SCD','role-playing'],workers:[],commonDeps:[],
+   code:'-- SCD Type 2: track history with effective dates\nALTER TABLE dim_customer ADD COLUMNS (\n  effective_from DATE,\n  effective_to DATE,\n  is_current BOOLEAN\n);\n-- Role-playing: same dim_date used for multiple FKs\n-- fact_bookings.check_in_date_key → dim_date\n-- fact_bookings.check_out_date_key → dim_date',
+   rationale:'SCD Type 2 is the <em>default for business-critical dimensions</em> because losing history means losing the ability to analyze trends. Role-playing dimensions avoid table duplication — one dim_date table serves check-in, check-out, booking, and cancellation dates.'},
+  {id:'gold-dw-03',name:'Fact Table Patterns',domain:'gold',component:'dpa',type:'worker',stage:1,desc:'Handles measure additivity (additive, semi-additive, non-additive), factless facts for event tracking, and bridge tables for many-to-many relationships.',keywords:['fact','measure','additivity'],workers:[],commonDeps:[],
+   code:'-- Semi-additive: can SUM across dimensions but not time\n-- balance can be summed across accounts but not dates\nSELECT property_key, MAX(occupancy_rate) -- not SUM!\nFROM fact_daily_occupancy\nGROUP BY property_key;\n\n-- Factless fact: records events with no measures\nCREATE TABLE fact_guest_checkin (\n  guest_key bigint,\n  property_key bigint,\n  checkin_date_key int  -- no measures, just the event\n);',
+   rationale:'Additivity determines which aggregation functions are valid. Using SUM on a non-additive measure like "occupancy rate" produces nonsense. The skill enforces correct aggregation annotations in the YAML schema so downstream queries and Metric Views use the right functions.'},
+  {id:'gold-dw-04',name:'Conformed Dimensions',domain:'gold',component:'dpa',type:'worker',stage:1,desc:'Builds the bus matrix showing which dimensions are shared across fact tables, enabling drill-across queries. Ensures dimension keys and attributes are identical everywhere they appear.',keywords:['conformed','bus matrix','drill-across'],workers:[],commonDeps:[],
+   code:'-- Bus Matrix (conceptual)\n--                  dim_date  dim_guest  dim_property\n-- fact_bookings       ✓         ✓          ✓\n-- fact_payments       ✓         ✓\n-- fact_reviews        ✓         ✓          ✓\n\n-- Drill-across: join facts via conformed dims\nSELECT d.guest_name, SUM(b.revenue), AVG(r.rating)\nFROM fact_bookings b\nJOIN fact_reviews r ON b.guest_key = r.guest_key\nJOIN dim_guest d ON b.guest_key = d.guest_key\nGROUP BY d.guest_name;',
+   rationale:'Conformed dimensions are what make a <em>data warehouse</em> instead of a collection of siloed tables. Without them, joining fact_bookings to fact_reviews requires complex mapping logic. With them, it is a simple key join.'},
+  {id:'gold-dw-05',name:'ERD Diagrams',domain:'gold',component:'dpa',type:'worker',stage:1,desc:'Generates three levels of ERD diagrams in Mermaid markdown: master ERD (all tables), domain ERDs (per subject area), and summary ERD (fact-dimension relationships only). These become the visual contract for stakeholder review.',keywords:['ERD','diagram'],workers:[],commonDeps:[],
+   code:'erDiagram\n  dim_guest ||--o{ fact_bookings : "guest_key"\n  dim_property ||--o{ fact_bookings : "property_key"\n  dim_date ||--o{ fact_bookings : "date_key"\n  fact_bookings }o--|| dim_booking_type : "type_key"',
+   rationale:'ERDs serve as the <em>visual contract</em> between data engineers and business stakeholders. Non-technical reviewers can spot missing relationships, incorrect cardinalities, and naming issues in a diagram far more easily than in YAML or SQL.'},
+  {id:'gold-dw-06',name:'Table Documentation',domain:'gold',component:'dpa',type:'worker',stage:1,desc:'Creates a business onboarding guide with plain-English descriptions of every table and column, plus a column lineage CSV tracing each Gold column back to its Bronze/Silver source.',keywords:['documentation','lineage'],workers:[],commonDeps:[],
+   rationale:'Lineage CSV enables automated <em>impact analysis</em>: if a Bronze source column changes type, you can instantly find every Gold column that depends on it. The business guide means new team members can understand the model without reading SQL.'},
+  {id:'gold-dw-07',name:'Design Validation',domain:'gold',component:'dpa',type:'worker',stage:1,desc:'Cross-validates three artifacts: YAML schemas (source of truth) ↔ ERD diagrams (visual) ↔ lineage CSV (traceability). Catches mismatches like a column in the YAML that is missing from the ERD, or a lineage reference to a non-existent source column.',keywords:['validation','cross-check'],workers:[],commonDeps:[],
+   rationale:'Three independent representations of the same model should agree. If they don\'t, one of them is wrong — and it\'s much cheaper to fix now than after writing 15 Silver pipelines.'},
+  // --- DPA: Bronze (Stage 2) ---
+  {id:'bronze-00',name:'Bronze Layer Setup',domain:'bronze',component:'dpa',type:'orchestrator',stage:2,
+   desc:'Bronze layer creation for testing and demos with Faker data, DDLs, and Asset Bundle jobs.',
+   keywords:['Bronze','test data','Faker','demo data'],workers:['bronze-01'],
+   commonDeps:['common-bundles','common-props','common-schema','common-imports','common-ops'],
+   code:"CREATE TABLE {catalog}.{schema}.{table}\n  (...) USING DELTA\n  CLUSTER BY AUTO\n  TBLPROPERTIES (\n    'delta.enableChangeDataFeed' = 'true',\n    'layer' = 'bronze'\n  )",
+   rationale:'Bronze creates <em>realistic test data</em> using Faker — not random noise. Configurable corruption rates let you prove that downstream Silver DQ rules actually catch problems. The tables mirror production schemas exactly so every downstream pipeline works without modification when you swap in real sources later.',
+   prompt:'Create the Bronze layer with test data.\nRead @data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md'},
+  {id:'bronze-01',name:'Faker Data Generation',domain:'bronze',component:'dpa',type:'worker',stage:2,desc:'Synthetic data with configurable corruption rates.',keywords:['Faker','synthetic','corruption'],workers:[],commonDeps:[]},
+  // --- DPA: Silver (Stage 3) ---
+  {id:'silver-00',name:'Silver Layer Setup',domain:'silver',component:'dpa',type:'orchestrator',stage:3,
+   desc:'Silver SDP/DLT pipelines with Delta table DQ rules, quarantine patterns, and monitoring views.',
+   keywords:['Silver','DLT','SDP','expectations','data quality'],workers:['silver-01','silver-02'],
+   commonDeps:['common-bundles','common-props','common-constraints','common-imports','common-ops'],
+   code:"rules = load_rules('silver_bookings', 'critical')\n\n@dlt.table(cluster_by_auto=True)\n@dlt.expect_all_or_drop(rules)\ndef silver_bookings():\n    return dlt.read_stream('bronze_bookings')",
+   rationale:'DQ rules live in <em>Delta tables instead of code</em> because business rules change faster than deployment cycles. An analyst can UPDATE a rule row — no CI/CD needed. The quarantine pattern ensures bad rows are captured, not silently dropped, so data stewards can investigate and fix root causes upstream.',
+   prompt:'Build Silver DLT pipelines.\nRead @data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md'},
+  {id:'silver-01',name:'DLT Expectations',domain:'silver',component:'dpa',type:'worker',stage:3,desc:'Implements the Delta-table-based DQ rules pattern: rules stored in a Delta table, loaded at runtime, applied with @dlt.expect_all_or_drop(). Rules can be updated with a SQL UPDATE — no code change, no redeploy.',keywords:['DLT','expectations','DQ'],workers:[],commonDeps:[],
+   code:'# Load rules from Delta table at runtime\nrules = load_rules("silver_bookings", "critical")\n\n@dlt.table(cluster_by_auto=True)\n@dlt.expect_all_or_drop(rules)\ndef silver_bookings():\n    return dlt.read_stream("bronze_bookings")',
+   rationale:'Storing rules in a Delta table instead of code means <em>data stewards can update rules without engineering PRs</em>. A new rule like "booking_amount > 0" is a SQL INSERT, not a code change. The pipeline picks it up on the next run.'},
+  {id:'silver-02',name:'DQX Patterns',domain:'silver',component:'dpa',type:'worker',stage:3,desc:'Advanced DQX (Data Quality eXtensions) framework for reusable, composable quality checks: null checks, range checks, referential integrity, regex patterns, and custom SQL expressions.',keywords:['DQX','validation'],workers:[],commonDeps:[],
+   code:'# DQX rule definitions (YAML-driven)\nrules:\n  - column: email\n    check: regex\n    pattern: "^[^@]+@[^@]+\\\\.[^@]+$"\n  - column: booking_amount\n    check: range\n    min: 0\n    max: 999999\n  - column: guest_id\n    check: referential_integrity\n    ref_table: dim_guest\n    ref_column: guest_key',
+   rationale:'DQX provides <em>composable quality primitives</em> beyond simple expect(). Referential integrity checks catch orphaned FKs before they reach Gold. Regex checks catch malformed emails, phone numbers, and IDs at the Silver layer.'},
+  // --- DPA: Gold Implementation (Stage 4) ---
+  {id:'gold-01',name:'Gold Layer Setup',domain:'gold',component:'dpa',type:'orchestrator',stage:4,
+   desc:'Implements Gold tables from YAML schemas: DDLs, MERGE scripts, constraints, validation.',
+   keywords:['Gold tables','merge scripts','Gold setup'],workers:['gold-pw-01','gold-pw-02','gold-pw-03','gold-pw-04','gold-pw-05'],
+   commonDeps:['common-bundles','common-props','common-constraints','common-imports'],
+   code:"MERGE INTO gold.dim_customer t\nUSING silver_customer s\nON t.customer_key = s.customer_key\nWHEN MATCHED THEN UPDATE SET ...\nWHEN NOT MATCHED THEN INSERT ...",
+   rationale:'Gold implementation is <em>YAML-driven, not hand-coded</em>. The YAML schemas from Stage 1 are the single source of truth — DDLs, MERGE scripts, and validation queries are all generated from them. This guarantees schema consistency and means changes to the dimensional model propagate automatically without manually editing SQL in multiple places.',
+   prompt:'Implement Gold tables.\nRead @data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md'},
+  {id:'gold-pw-01',name:'YAML Table Setup',domain:'gold',component:'dpa',type:'worker',stage:4,desc:'Generates CREATE TABLE DDLs from YAML schemas. Each YAML file defines columns, types, constraints, clustering keys, and table properties. The DDLs include COMMENT ON for every column.',keywords:['YAML','DDL'],workers:[],commonDeps:[],
+   code:'CREATE TABLE IF NOT EXISTS gold.dim_guest (\n  guest_key BIGINT NOT NULL,\n  guest_name STRING NOT NULL,\n  email STRING,\n  loyalty_tier STRING,\n  effective_from DATE,\n  effective_to DATE,\n  is_current BOOLEAN\n)\nCLUSTER BY AUTO\nTBLPROPERTIES (\n  \'delta.enableChangeDataFeed\' = \'true\',\n  \'layer\' = \'gold\'\n);',
+   rationale:'YAML-driven DDLs mean the <em>schema is code-reviewed, version-controlled, and diffable</em>. Any column addition is a YAML change, not a manual ALTER TABLE that someone forgets to document.'},
+  {id:'gold-pw-02',name:'Merge Patterns',domain:'gold',component:'dpa',type:'worker',stage:4,desc:'Implements SCD Type 1 (overwrite), SCD Type 2 (insert new row with effective dates), and accumulating snapshot MERGE statements. Handles WHEN MATCHED, WHEN NOT MATCHED, and WHEN NOT MATCHED BY SOURCE.',keywords:['MERGE','SCD'],workers:[],commonDeps:[],
+   code:'MERGE INTO gold.dim_guest t\nUSING staging.dim_guest_updates s\nON t.guest_key = s.guest_key AND t.is_current = true\nWHEN MATCHED AND t.hash != s.hash THEN\n  UPDATE SET is_current = false, effective_to = current_date()\nWHEN NOT MATCHED THEN\n  INSERT (guest_key, guest_name, email, effective_from, is_current)\n  VALUES (s.guest_key, s.guest_name, s.email, current_date(), true);',
+   rationale:'MERGE is the <em>workhorse of Gold updates</em>. SCD Type 2 is used for dimensions where history matters (guest profile changes). SCD Type 1 is used where only the latest value matters. The hash comparison avoids needless updates when nothing changed.'},
+  {id:'gold-pw-03',name:'Deduplication',domain:'gold',component:'dpa',type:'worker',stage:4,desc:'Implements ROW_NUMBER-based deduplication strategies for handling duplicate records from source systems. Uses deterministic ordering and configurable tiebreak columns.',keywords:['dedup','duplicate'],workers:[],commonDeps:[],
+   code:'WITH ranked AS (\n  SELECT *, ROW_NUMBER() OVER (\n    PARTITION BY booking_id\n    ORDER BY updated_at DESC, _ingest_ts DESC\n  ) AS rn\n  FROM silver.bookings\n)\nSELECT * FROM ranked WHERE rn = 1;',
+   rationale:'Source systems often emit duplicates (retry logic, CDC replays). ROW_NUMBER with deterministic ordering ensures <em>exactly one row per business key</em>. The ORDER BY uses updated_at first (business timestamp) and _ingest_ts second (system tiebreak).'},
+  {id:'gold-pw-04',name:'Grain Validation',domain:'gold',component:'dpa',type:'worker',stage:4,desc:'Verifies fact table grain integrity by checking that the declared grain columns produce a unique combination. Detects duplicate grains before data reaches downstream consumers.',keywords:['grain validation'],workers:[],commonDeps:[],
+   code:'-- Grain check: should return 0 rows\nSELECT booking_key, COUNT(*) as cnt\nFROM gold.fact_bookings\nGROUP BY booking_key\nHAVING cnt > 1;',
+   rationale:'A violated grain means aggregations will double-count. This check runs as a <em>post-load validation step</em> and fails the pipeline if duplicates are found — catching the problem at load time rather than in a dashboard.'},
+  {id:'gold-pw-05',name:'Schema Validation',domain:'gold',component:'dpa',type:'worker',stage:4,desc:'Cross-checks the actual DDL in Unity Catalog against the YAML schema definition. Catches column drift (added/removed/renamed columns, type changes) between what the YAML says and what actually exists.',keywords:['schema validation'],workers:[],commonDeps:[],
+   rationale:'Schema drift happens when someone runs an ad-hoc ALTER TABLE without updating the YAML. This validator ensures the <em>YAML remains the single source of truth</em> by flagging any discrepancy.'},
+  // --- DPA: Planning (Stage 5) ---
+  {id:'planning-00',name:'Project Planning',domain:'planning',component:'dpa',type:'orchestrator',stage:5,
+   desc:'Generates YAML manifest contracts for downstream stages 6-9.',
+   keywords:['planning','architecture plan','manifest'],workers:[],
+   commonDeps:['common-expert'],emits:['plans/manifests/*.yaml'],
+   rationale:'The <em>plan-as-contract</em> pattern: Stage 5 emits YAML manifests that downstream stages 6-9 consume as input contracts. This decouples stages — each stage only reads its manifest and produces its output. It also makes the pipeline resumable: if Stage 7 fails, you restart from the Stage 7 manifest without re-running stages 1-6.',
+   prompt:'Create a project plan.\nRead @data_product_accelerator/skills/planning/00-project-planning/SKILL.md'},
+  // --- DPA: Semantic Layer (Stage 6) ---
+  {id:'semantic-00',name:'Semantic Layer Setup',domain:'semantic',component:'dpa',type:'orchestrator',stage:6,
+   desc:'Metric Views, TVFs, and Genie Spaces on top of Gold tables.',
+   keywords:['semantic layer','metric view','TVF','Genie Space'],workers:['semantic-01','semantic-02','semantic-03','semantic-04'],
+   commonDeps:['common-bundles','common-imports'],
+   rationale:'The semantic layer sits <em>between Gold tables and consumers</em> — it provides business-meaningful definitions (Metric Views) and parameterized access patterns (TVFs) so analysts and Genie Spaces never need to understand the raw dimensional model. This separation means the Gold schema can evolve without breaking BI dashboards or NL query experiences.',
+   prompt:'Build the semantic layer.\nRead @data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md'},
+  {id:'semantic-01',name:'Metric Views',domain:'semantic',component:'dpa',type:'worker',stage:6,desc:'Creates Metric Views — pre-computed business definitions on top of Gold tables. They encode formulas like "RevPAR = revenue / available_rooms" so Genie and dashboards use the correct calculation without needing to know the underlying model.',keywords:['metric view','semantic'],workers:[],commonDeps:[],
+   code:'CREATE MATERIALIZED VIEW gold.mv_monthly_revenue AS\nSELECT\n  d.year_month,\n  p.property_name,\n  SUM(f.revenue) AS total_revenue,\n  SUM(f.revenue) / SUM(f.available_rooms) AS revpar,\n  SUM(f.revenue) / SUM(f.rooms_sold) AS adr\nFROM gold.fact_bookings f\nJOIN gold.dim_date d ON f.date_key = d.date_key\nJOIN gold.dim_property p ON f.property_key = p.property_key\nGROUP BY d.year_month, p.property_name;',
+   rationale:'Metric Views are the <em>semantic contract</em> between the data team and consumers. When "revenue" is defined once in a Metric View, Genie, dashboards, and apps all use the same formula — no more "my number doesn\'t match yours" conversations.'},
+  {id:'semantic-02',name:'Table-Valued Functions',domain:'semantic',component:'dpa',type:'worker',stage:6,desc:'Parameterized SQL functions that accept input arguments (e.g., date ranges, property IDs) and return a filtered/computed result set. TVFs sit between Metric Views and raw tables in Genie\'s priority order.',keywords:['TVF','function'],workers:[],commonDeps:[],
+   code:'CREATE FUNCTION gold.fn_revenue_by_period(\n  start_date DATE, end_date DATE\n)\nRETURNS TABLE (\n  property_name STRING,\n  revenue DECIMAL(12,2),\n  booking_count BIGINT\n)\nRETURN\n  SELECT p.property_name, SUM(f.revenue), COUNT(*)\n  FROM gold.fact_bookings f\n  JOIN gold.dim_property p ON f.property_key = p.property_key\n  JOIN gold.dim_date d ON f.date_key = d.date_key\n  WHERE d.full_date BETWEEN start_date AND end_date\n  GROUP BY p.property_name;',
+   rationale:'TVFs let Genie answer parameterized questions like "revenue last quarter" without writing complex date logic. The AI just calls fn_revenue_by_period(\'2024-01-01\', \'2024-03-31\') — cleaner, faster, and more reliable than generating the full SQL.'},
+  {id:'semantic-03',name:'Genie Space Patterns',domain:'semantic',component:'dpa',type:'worker',stage:6,desc:'Designs Genie Spaces with three components: Agent Instructions (business context in ≤20 lines), Data Assets (Metric Views + TVFs + tables in priority order), and Benchmark Questions (expected Q→SQL pairs for validation).',keywords:['Genie Space','instructions'],workers:[],commonDeps:[],platform:'genie',
+   code:'# Agent Instructions (≤20 lines, highest impact)\nYou are a hotel analytics assistant.\nKey terms:\n- "RevPAR" = Revenue Per Available Room\n- "ADR" = Average Daily Rate\n- "Occupancy" = rooms_sold / available_rooms\nWhen asked about "top hotels", rank by RevPAR.\nAll monetary values are in USD.\nUse mv_monthly_revenue for trend questions.',
+   rationale:'Agent Instructions are the <em>single highest-impact lever</em> for Genie quality. They provide the business context that transforms a generic SQL engine into a domain expert. Without them, Genie has to guess what "top" means, what currency to use, and which tables to prefer.'},
+  {id:'semantic-04',name:'Genie Export/Import API',domain:'semantic',component:'dpa',type:'worker',stage:6,desc:'Programmatic Genie Space deployment using the REST API. Export a space as JSON, version-control it, and import it to other workspaces. Enables CI/CD for Genie Spaces.',keywords:['Genie API','export','import'],workers:[],commonDeps:[],
+   code:'# Export Genie Space as JSON\ndatabricks api get /api/2.0/genie/spaces/{space_id} > space.json\n\n# Import to another workspace\ndatabricks api post /api/2.0/genie/spaces --json @space.json',
+   rationale:'Treating Genie Spaces as <em>code artifacts</em> (export → commit → review → import) brings the same rigor to analytics configuration that software engineering applies to code. Changes to instructions or data assets go through PR review.'},
+  // --- DPA: Genie Optimization (Stage 6b) ---
+  {id:'genie-opt-00',name:'Genie Optimization',domain:'semantic',component:'dpa',type:'orchestrator',stage:'6b',
+   desc:'Autonomous optimization loop: benchmark → evaluate → optimize → apply → re-evaluate.',
+   keywords:['Genie accuracy','benchmark','optimize'],workers:['genie-opt-01','genie-opt-02','genie-opt-03','genie-opt-04'],commonDeps:[],
+   rationale:'Genie accuracy is <em>measurable and improvable</em> through a closed-loop cycle: generate benchmark questions, evaluate Genie\'s SQL against expected answers, optimize metadata and instructions, re-evaluate. This turns "the AI gets it wrong sometimes" from a vague complaint into a systematic improvement process with quantified accuracy scores.'},
+  {id:'genie-opt-01',name:'Benchmark Generator',domain:'semantic',component:'dpa',type:'worker',stage:'6b',desc:'Generates benchmark question sets with expected SQL answers. Covers common, edge, and adversarial questions. Each benchmark includes the natural language question, expected SQL, and the expected result shape.',keywords:['benchmark'],workers:[],commonDeps:[],
+   code:'benchmarks:\n  - question: "What was total revenue last quarter?"\n    expected_sql: "SELECT SUM(revenue) FROM mv_monthly_revenue WHERE year_month BETWEEN ..."\n    category: "aggregation"\n  - question: "Top 5 hotels by occupancy"\n    expected_sql: "SELECT property_name, AVG(occupancy) ..."\n    category: "ranking"',
+   rationale:'You can\'t improve what you can\'t measure. Benchmarks turn <em>subjective "Genie is bad"</em> into quantified accuracy scores (e.g., 73% correct SQL → 91% after optimization).'},
+  {id:'genie-opt-02',name:'Benchmark Evaluator',domain:'semantic',component:'dpa',type:'worker',stage:'6b',desc:'Runs benchmark questions against the live Genie Space, compares generated SQL to expected SQL, scores for correctness (does it return the right answer?) and repeatability (does it give the same answer every time?).',keywords:['evaluator','accuracy'],workers:[],commonDeps:[],
+   rationale:'Repeatability matters as much as correctness. If Genie answers the same question differently each time, users lose trust even if the average is correct.'},
+  {id:'genie-opt-03',name:'Metadata Optimizer',domain:'semantic',component:'dpa',type:'worker',stage:'6b',desc:'Analyzes benchmark failures and generates metadata improvements: better COMMENT ON for ambiguous columns, more specific Agent Instructions, additional TVFs for common question patterns.',keywords:['metadata','optimizer'],workers:[],commonDeps:[],
+   rationale:'Most Genie failures trace back to <em>missing context</em>, not AI limitations. A column called "amt" with no comment forces Genie to guess. Adding "COMMENT: Total booking amount in USD including taxes" fixes it.'},
+  {id:'genie-opt-04',name:'Optimization Applier',domain:'semantic',component:'dpa',type:'worker',stage:'6b',desc:'Applies metadata optimizations via the Genie API (update instructions, add table comments, register new TVFs), then re-runs benchmarks to measure improvement.',keywords:['apply','API'],workers:[],commonDeps:[],
+   rationale:'The <em>closed loop</em> (benchmark → optimize → re-benchmark) is what makes this systematic. Without re-benchmarking, you can\'t confirm that the optimization actually helped — it might have fixed one question while breaking two others.'},
+  // --- DPA: Observability (Stage 7) ---
+  {id:'monitor-00',name:'Observability Setup',domain:'monitoring',component:'dpa',type:'orchestrator',stage:7,
+   desc:'Lakehouse monitors, AI/BI dashboards, SQL alerts, anomaly detection.',
+   keywords:['monitoring','dashboard','alert','observability'],workers:['monitor-01','monitor-02','monitor-03','monitor-04'],commonDeps:['common-bundles'],
+   rationale:'Observability is <em>built in, not bolted on</em>. Lakehouse monitors track row counts, schema drift, and freshness at the table level. SQL alerts fire when thresholds are breached. AI/BI dashboards give stakeholders a single pane of glass. This "defense in depth" catches problems that Silver DQ rules miss — like upstream sources going silent or unexpected schema changes.',
+   prompt:'Set up observability.\nRead @data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md'},
+  {id:'monitor-01',name:'Lakehouse Monitoring',domain:'monitoring',component:'dpa',type:'worker',stage:7,desc:'Creates Lakehouse Monitors on Gold tables that track row counts over time, detect schema drift (column additions/removals/type changes), and monitor data distribution for anomalies.',keywords:['monitor','drift'],workers:[],commonDeps:[],
+   code:'-- Create a table monitor\nCREATE MONITOR gold.fact_bookings_monitor\nAS SELECT * FROM gold.fact_bookings\nWITH SCHEDULE (CRON "0 */6 * * *")\nQUALITY RULES (\n  row_count_check: COUNT(*) > 0,\n  freshness_check: MAX(updated_at) > current_timestamp() - INTERVAL 24 HOURS\n);',
+   rationale:'Lakehouse Monitors provide <em>always-on table health</em>. Unlike batch DQ checks that run during pipeline execution, monitors run on a schedule and catch problems even when the pipeline didn\'t run — like a source going silent.'},
+  {id:'monitor-02',name:'AI/BI Dashboards',domain:'monitoring',component:'dpa',type:'worker',stage:7,desc:'Builds Lakeview dashboards for data health visibility: pipeline run status, DQ rule pass rates, table freshness heatmaps, and row count trends. Provides a single pane of glass for data stakeholders.',keywords:['dashboard','Lakeview'],workers:[],commonDeps:[],
+   rationale:'Dashboards transform raw monitoring data into <em>stakeholder-readable insights</em>. A "data health" dashboard showing green/yellow/red for each table is far more actionable than log files or email alerts.'},
+  {id:'monitor-03',name:'SQL Alerting',domain:'monitoring',component:'dpa',type:'worker',stage:7,desc:'Creates SQL-based alerts that fire when business-critical thresholds are breached: zero new bookings in 24h, revenue drops >20% day-over-day, DQ failure rate exceeds 5%. Sends notifications via email, Slack, or PagerDuty.',keywords:['alert','SQL'],workers:[],commonDeps:[],
+   code:'-- Alert: no new bookings in 24 hours\nCREATE ALERT gold.alert_booking_drought\nWITH SCHEDULE (CRON "0 * * * *")\nAS SELECT COUNT(*) as recent\n   FROM gold.fact_bookings\n   WHERE created_at > current_timestamp() - INTERVAL 24 HOURS\nWHEN recent = 0\nTHEN NOTIFY("booking-alerts@company.com");',
+   rationale:'SQL alerts catch <em>business-level problems</em> that table monitors miss. A table can be perfectly healthy (rows exist, schema unchanged) while the business is broken (no new bookings). Alert thresholds should be set with domain knowledge.'},
+  {id:'monitor-04',name:'Anomaly Detection',domain:'monitoring',component:'dpa',type:'worker',stage:7,desc:'Detects statistical anomalies in data patterns: freshness violations (table not updated when expected), completeness drops (NULL rate spikes), volume anomalies (10x more/fewer rows than usual), and distribution shifts.',keywords:['anomaly','freshness','stale'],workers:[],commonDeps:[],
+   rationale:'Anomaly detection catches <em>problems that fixed thresholds miss</em>. A table that normally gets 10K rows per day suddenly getting 1M rows is a problem — but a simple "row count > 0" check won\'t catch it. Statistical baselines detect deviations from normal patterns.'},
+  // --- DPA: ML (Stage 8) ---
+  {id:'ml-00',name:'ML Pipeline Setup',domain:'ml',component:'dpa',type:'orchestrator',stage:8,
+   desc:'MLflow experiments, model training, inference pipelines.',
+   keywords:['MLflow','ML model','training','inference'],workers:[],commonDeps:['common-bundles','common-imports'],
+   rationale:'ML pipelines consume <em>Gold tables as feature sources</em>, ensuring that training data has already passed through Bronze ingestion, Silver DQ, and Gold dimensional modeling. MLflow provides experiment tracking, model versioning, and a model registry — so every model in production is traceable back to the exact data and code that created it.',
+   prompt:'Set up ML pipelines.\nRead @data_product_accelerator/skills/ml/00-ml-pipeline-setup/SKILL.md'},
+  // --- DPA: GenAI (Stage 9) ---
+  {id:'genai-00',name:'GenAI Agents Setup',domain:'genai',component:'dpa',type:'orchestrator',stage:9,
+   desc:'Build, evaluate, deploy, and monitor GenAI agents with ResponsesAgent.',
+   keywords:['GenAI agent','ResponsesAgent','AI agent'],
+   workers:['genai-01','genai-02','genai-03','genai-04','genai-05','genai-06','genai-07','genai-08'],
+   commonDeps:['common-bundles','common-imports'],
+   rationale:'GenAI agents are the <em>capstone of the data product</em>. They sit on top of the entire medallion architecture — using Gold tables for retrieval, Genie Spaces for NL analytics, Lakebase for conversation memory, and MLflow for evaluation. The 8 workers cover the full agent lifecycle: build → evaluate → deploy → monitor, with LLM-judge scoring to catch regressions before they reach users.',
+   prompt:'Build GenAI agents.\nRead @data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md'},
+  {id:'genai-01',name:'ResponsesAgent Patterns',domain:'genai',component:'dpa',type:'worker',stage:9,desc:'Builds agents using Databricks ResponsesAgent — the recommended agent framework. Includes tool definition, predict_stream for streaming, and AI Playground for interactive testing before deployment.',keywords:['ResponsesAgent'],workers:[],commonDeps:[],
+   code:'from databricks.agents import ResponsesAgent\n\nagent = ResponsesAgent(\n  model="databricks-claude-sonnet-4-6",\n  tools=[search_tool, sql_tool],\n  instructions="You are a hotel analytics assistant..."\n)\n\n# Streaming inference\nfor event in agent.predict_stream(messages):\n  print(event)',
+   rationale:'ResponsesAgent provides a <em>unified interface</em> for building agents with tool-calling, streaming, and conversation history. It wraps the Foundation Model API with Databricks-specific features like MLflow tracing and model serving integration.'},
+  {id:'genai-02',name:'MLflow GenAI Evaluation',domain:'genai',component:'dpa',type:'worker',stage:9,desc:'Evaluates agent quality using MLflow\'s GenAI evaluation framework with LLM-judge scorers. Measures faithfulness, relevance, harmfulness, and custom domain-specific scores.',keywords:['evaluation','LLM judge'],workers:[],commonDeps:[],
+   code:'import mlflow\n\nresults = mlflow.genai.evaluate(\n  model=agent,\n  data=eval_dataset,\n  scorers=[\n    mlflow.genai.scorers.Faithfulness(),\n    mlflow.genai.scorers.Relevance(),\n    CustomDomainScorer()\n  ]\n)',
+   rationale:'LLM-judge evaluation provides <em>automated quality gates</em> for agents. Instead of manual review, scorers quantify whether answers are faithful to source data, relevant to the question, and safe. This enables CI/CD: reject deployments where quality drops below threshold.'},
+  {id:'genai-03',name:'Lakebase Memory',domain:'genai',component:'dpa',type:'worker',stage:9,desc:'Implements stateful conversation memory using Lakebase PostgreSQL. The CheckpointSaver pattern stores conversation state, tool results, and agent reasoning steps so conversations can be resumed across sessions.',keywords:['memory','Lakebase','stateful'],workers:[],commonDeps:[],platform:'lakebase',
+   code:'CREATE TABLE agent_memory (\n  session_id TEXT NOT NULL,\n  turn_idx INT NOT NULL,\n  role TEXT NOT NULL,\n  content JSONB NOT NULL,\n  tool_calls JSONB,\n  created_at TIMESTAMPTZ DEFAULT now(),\n  PRIMARY KEY (session_id, turn_idx)\n);',
+   rationale:'Stateless agents forget everything between requests. Lakebase memory enables <em>multi-turn conversations</em> where the agent remembers previous questions, tool results, and user preferences across sessions — essential for complex analytical workflows.'},
+  {id:'genai-04',name:'Prompt Registry',domain:'genai',component:'dpa',type:'worker',stage:9,desc:'Stores versioned prompts in Unity Catalog so prompt changes are tracked, diffable, and rollback-able. Each prompt version gets a timestamp and author, enabling A/B testing between prompt versions.',keywords:['prompt','registry','versioning'],workers:[],commonDeps:[],
+   rationale:'Prompt engineering is <em>iterative and non-deterministic</em>. Without versioning, you can\'t tell which prompt produced last week\'s good results. The registry makes prompts first-class artifacts with the same rigor as code.'},
+  {id:'genai-05',name:'Multi-Agent Genie',domain:'genai',component:'dpa',type:'worker',stage:9,desc:'Implements intent classification to route user questions to specialized sub-agents or Genie Spaces. Handles multi-step workflows where the answer requires information from multiple sources.',keywords:['multi-agent','orchestration'],workers:[],commonDeps:[],
+   rationale:'Not every question should go to the same agent. "Revenue last quarter" goes to Genie, "cancel my booking" goes to a CRUD agent, "explain this anomaly" goes to an analytics agent. Intent classification is the <em>router that makes this seamless</em>.'},
+  {id:'genai-06',name:'Deployment Automation',domain:'genai',component:'dpa',type:'worker',stage:9,desc:'Implements CI/CD for agent deployment: automated evaluation → quality gate → model registration → serving endpoint update. Prevents deploying agents that score below quality thresholds.',keywords:['deploy','CI/CD'],workers:[],commonDeps:[],
+   rationale:'Manual agent deployment is risky — a bad prompt change can degrade quality for all users. Automated deployment with <em>evaluation gates</em> ensures only quality-approved agents reach production.'},
+  {id:'genai-07',name:'Production Monitoring',domain:'genai',component:'dpa',type:'worker',stage:9,desc:'Monitors deployed agents using registered scorers that evaluate a sample of production requests. Detects quality drift (accuracy dropping over time), latency spikes, and hallucination patterns.',keywords:['production','monitoring','drift'],workers:[],commonDeps:[],
+   rationale:'Agent quality can degrade <em>without any code changes</em> — underlying data changes, user behavior shifts, or model updates can all cause drift. Production monitoring catches these before users complain.'},
+  {id:'genai-08',name:'MLflow GenAI Foundation',domain:'genai',component:'dpa',type:'worker',stage:9,desc:'Sets up MLflow tracing for GenAI: automatic logging of LLM calls, tool invocations, latency, token counts, and cost. Provides the observability foundation for all other GenAI workers.',keywords:['MLflow','tracing','GenAI'],workers:[],commonDeps:[],
+   code:'import mlflow\n\n# Enable automatic tracing\nmlflow.set_experiment("/genai/hotel-agent")\nmlflow.genai.autolog()\n\n# Every LLM call is now traced:\n# - input/output tokens\n# - latency\n# - tool calls\n# - cost estimate',
+   rationale:'Tracing is the <em>foundation of GenAI observability</em>. Without it, debugging "why did the agent give a wrong answer?" requires reproducing the exact conversation. With tracing, every LLM call, tool invocation, and decision point is logged and inspectable.'},
+  // --- DPA: Common Skills ---
+  {id:'common-expert',name:'Databricks Expert Agent',domain:'common',component:'dpa',type:'common',desc:'Core SA behavior, "Extract Don\'t Generate" principle.',keywords:['expert','extract'],workers:[],commonDeps:[],
+   rationale:'The "Extract Don\'t Generate" principle means the AI <em>reads existing SKILL.md files and follows their instructions</em> rather than improvising from training data. This ensures every output matches Databricks best practices — not the AI\'s potentially outdated knowledge. It\'s the foundation that makes all other skills reliable.'},
+  {id:'common-naming',name:'Naming & Tagging Standards',domain:'common',component:'dpa',type:'common',desc:'snake_case, COMMENTs, PII tags, budget policies.',keywords:['naming','tagging','PII'],workers:[],commonDeps:[],
+   rationale:'Consistent naming is <em>loaded into every stage</em> because inconsistency compounds: a column called "cust_id" in Bronze and "customer_key" in Gold creates join confusion. The always-on pattern ensures every table, column, and tag follows the same conventions from the first DDL to the last dashboard.'},
+  {id:'common-bundles',name:'Asset Bundles',domain:'common',component:'dpa',type:'common',desc:'Generates Databricks Asset Bundle (DAB) YAML for deploying jobs, pipelines, and resources. Uses Serverless compute, Environments V4 for dev/staging/prod promotion, and the databricks.yml schema.',keywords:['bundle','DAB','deploy'],workers:[],commonDeps:[],
+   code:'# databricks.yml\nbundle:\n  name: hotel-data-product\nresources:\n  pipelines:\n    silver_pipeline:\n      target: "silver"\n      serverless: true\n      catalog: production\n      configuration:\n        "pipelines.channel": "PREVIEW"',
+   rationale:'Asset Bundles make infrastructure <em>declarative and version-controlled</em>. Instead of clicking through UIs, you define jobs/pipelines as YAML and deploy with "databricks bundle deploy". This enables GitOps — every infrastructure change goes through PR review.'},
+  {id:'common-ops',name:'Autonomous Operations',domain:'common',component:'dpa',type:'common',desc:'The self-healing loop: Deploy → Poll status → Diagnose errors → Apply fix → Redeploy. The AI reads logs, identifies common failure patterns, and applies targeted fixes without human intervention.',keywords:['autonomous','self-heal','troubleshoot'],workers:[],commonDeps:[],
+   rationale:'Most deployment failures follow <em>predictable patterns</em>: missing permissions, wrong warehouse ID, typo in table name. The autonomous loop recognizes these patterns from error logs and applies the known fix automatically — turning 30-minute debugging sessions into 30-second auto-repairs.'},
+  {id:'common-imports',name:'Python Imports',domain:'common',component:'dpa',type:'common',desc:'Standardizes Python import patterns for Databricks notebooks: sys.path setup for shared modules, relative imports within packages, and the pure-Python module pattern for unit-testable code.',keywords:['import','sys.path'],workers:[],commonDeps:[],
+   code:'# Standard pattern for notebook imports\nimport sys\nsys.path.append("/Workspace/Repos/project/src")\nfrom utils.dq_rules import load_rules\nfrom utils.merge_patterns import scd_type2_merge',
+   rationale:'Inconsistent imports are the #1 cause of <em>"works in my notebook, fails in production"</em> errors. This skill enforces a standard pattern so shared modules work identically in notebooks, jobs, and local development.'},
+  {id:'common-props',name:'Table Properties',domain:'common',component:'dpa',type:'common',desc:'Defines mandatory TBLPROPERTIES for every table: Change Data Feed (incremental processing), Row Tracking (MV refresh), Auto-Optimize (file compaction), and custom tags (layer, domain, owner).',keywords:['TBLPROPERTIES','CDF'],workers:[],commonDeps:[],
+   code:"TBLPROPERTIES (\n  'delta.enableChangeDataFeed' = 'true',\n  'delta.enableRowTracking' = 'true',\n  'delta.autoOptimize.optimizeWrite' = 'true',\n  'delta.autoOptimize.autoCompact' = 'true',\n  'layer' = 'gold',\n  'domain' = 'bookings'\n)",
+   rationale:'Table properties are <em>set once and forgotten</em> — but missing one has cascading consequences. Without CDF, downstream incremental processing must full-scan. Without Row Tracking, Materialized Views fail to refresh. This skill ensures nothing is missed.'},
+  {id:'common-schema',name:'Schema Management',domain:'common',component:'dpa',type:'common',desc:'Standardizes CREATE SCHEMA IF NOT EXISTS with governance metadata: owner, description, and layer tags. Ensures consistent namespace structure across catalog → schema → table.',keywords:['schema','governance'],workers:[],commonDeps:[],
+   code:"CREATE SCHEMA IF NOT EXISTS production.gold\nCOMMENT 'Gold layer dimensional model for hotel bookings'\nMANAGED LOCATION 's3://bucket/gold'\nWITH DBPROPERTIES ('layer' = 'gold', 'domain' = 'bookings');"},
+  {id:'common-constraints',name:'UC Constraints',domain:'common',component:'dpa',type:'common',desc:'Adds PRIMARY KEY and FOREIGN KEY constraints to Gold tables in Unity Catalog. Uses informational constraints (not enforced) that optimize query plans and document relationships for data consumers.',keywords:['constraint','PK','FK'],workers:[],commonDeps:[],
+   code:'ALTER TABLE gold.fact_bookings\n  ADD CONSTRAINT pk_bookings PRIMARY KEY (booking_key);\nALTER TABLE gold.fact_bookings\n  ADD CONSTRAINT fk_guest FOREIGN KEY (guest_key)\n  REFERENCES gold.dim_guest (guest_key);',
+   rationale:'UC constraints are <em>informational, not enforced</em> — but they serve two critical purposes: the query optimizer uses them for join elimination, and tools like Genie read them to understand table relationships without needing explicit documentation.'},
+  // --- AppKit Skills ---
+  {id:'appkit-00',name:'AppKit Navigator',domain:'appkit',component:'appkit',type:'entry',phase:0,desc:'Routing skill for AppKit + Lakebase tasks. Routes to the correct specialized skill.',keywords:['AppKit','navigate','route'],workers:[],commonDeps:[],
+   rationale:'A single <em>entry-point router</em> skill prevents the AI from loading all 6 AppKit skills at once. It reads the user\'s intent (scaffold? deploy? wire?) and loads only the relevant skill — keeping the context window small and the AI focused on one phase at a time.'},
+  {id:'appkit-01',name:'Scaffold App',domain:'appkit',component:'appkit',type:'orchestrator',phase:1,
+   desc:'Scaffold new AppKit projects using databricks apps init with blank or plugin-enabled templates.',
+   keywords:['scaffold','create app','init','new app'],workers:[],commonDeps:[],
+   code:"databricks apps init --template default\ncd $APP_NAME && npm install\nnpm run dev",
+   rationale:'The <em>blank template + plugin pattern</em> means you start with nothing and add capabilities incrementally. Unlike monolithic starters, your app only carries what it uses. The scaffold creates the canonical file structure (server/, client/, config/queries/) that all other skills expect — deviating from it breaks the toolchain.',
+   prompt:'Scaffold a new AppKit app.\nRead @apps_lakebase/skills/01-appkit-scaffold/SKILL.md',platform:'appkit'},
+  {id:'appkit-02',name:'Build from PRD',domain:'appkit',component:'appkit',type:'orchestrator',phase:1,
+   desc:'Build full-stack UI and backend from a PRD with mock data, design quality, and AppKit UI components.',
+   keywords:['build UI','PRD','components','mock data'],workers:[],commonDeps:[],
+   code:'const MOCK_BOOKINGS = [\n  { id: 1, guest: "Alice", amount: 450 },\n];\n\nfunction BookingList() {\n  return MOCK_BOOKINGS.map(b =>\n    <BookingCard key={b.id} booking={b} />);\n}',
+   rationale:'Building with <em>mock data arrays first</em> decouples UI development from backend readiness. You can ship a beautiful, fully functional UI to stakeholders for review while Lakebase is still being set up. The mock arrays are later swapped for live API calls with zero component changes — the shape of the data is already correct.',
+   prompt:'Build the UI from the PRD.\nRead @apps_lakebase/skills/02-appkit-build/SKILL.md',platform:'appkit'},
+  {id:'appkit-03',name:'Deploy App',domain:'appkit',component:'appkit',type:'orchestrator',phase:2,
+   desc:'Deploy AppKit app to Databricks Apps: validate, build, deploy, verify, fix loop.',
+   keywords:['deploy','push','ship app'],workers:[],commonDeps:[],
+   code:'npm run build\ndatabricks apps validate --profile $PROFILE\ndatabricks apps deploy --profile $PROFILE',
+   rationale:'The deploy skill uses an <em>autonomous validate-deploy-verify-fix loop</em>. It doesn\'t just push code — it checks the build, validates app.yaml, deploys, waits for health checks, and if something fails, reads the logs and attempts a fix automatically. This turns the typical "deploy and pray" into a self-healing cycle.',
+   prompt:'Deploy the app.\nRead @apps_lakebase/skills/03-appkit-deploy/SKILL.md',platform:'apps'},
+  {id:'appkit-04',name:'Add Plugin',domain:'appkit',component:'appkit',type:'orchestrator',phase:4,
+   desc:'Add Lakebase, Analytics, Genie, or Files plugins to an existing AppKit project.',
+   keywords:['add plugin','lakebase','analytics','genie','files'],workers:[],commonDeps:[],
+   code:'import { createApp, server, lakebase }\n  from "@databricks/appkit";\n\nawait createApp({\n  plugins: [server(), lakebase()],\n});',
+   rationale:'AppKit\'s <em>plugin architecture</em> is composable: analytics() for read-only SQL, lakebase() for CRUD, genie() for NL queries, files() for volume uploads. Each plugin registers its own middleware and routes. You pick exactly the data access patterns your app needs — nothing more.',
+   prompt:'Add the Lakebase plugin.\nRead @apps_lakebase/skills/04-appkit-plugin-add/SKILL.md',platform:'lakebase'},
+  {id:'appkit-05',name:'Wire Lakebase',domain:'appkit',component:'appkit',type:'orchestrator',phase:4,
+   desc:'Wire Lakebase backend: DDL, CRUD APIs, useLakebaseData hook, ConnectionStatus, mock fallback.',
+   keywords:['wire lakebase','DDL','CRUD','backend'],workers:[],commonDeps:[],
+   code:'appkit.server.extend((app) => {\n  app.get("/api/bookings", async (req, res) => {\n    try {\n      const result = await appkit.lakebase.query(\n        `SELECT * FROM ${DB_SCHEMA}.bookings`);\n      res.json({ data: result.rows, source: "live" });\n    } catch {\n      res.json({ data: MOCK, source: "mock" });\n    }\n  });\n});',
+   rationale:'The wiring pattern uses a <em>mock fallback</em>: every API endpoint tries Lakebase first and falls back to the mock data array if the connection fails. This means the app never shows a blank screen — it gracefully degrades. The useLakebaseData() hook on the frontend shows a ConnectionStatus badge so users know whether they\'re seeing live or mock data.',
+   prompt:'Wire Lakebase backend.\nRead @apps_lakebase/skills/05-appkit-lakebase-wiring/SKILL.md',platform:'lakebase'},
+  // --- Agentic Framework ---
+  {id:'af-loop',name:'FM Agent Loop',domain:'agentic',component:'agentic',type:'orchestrator',desc:'Implements the core tool-calling loop with Databricks Foundation Models: send message → LLM generates tool calls → execute tools → return results → repeat until done. Handles streaming, error recovery, and conversation history.',keywords:['agent loop','tool-calling','Foundation Model'],workers:[],commonDeps:[],
+   code:'while not done:\n  response = fm.predict(messages, tools=tool_defs)\n  for tool_call in response.tool_calls:\n    result = execute_tool(tool_call)\n    messages.append(tool_result(result))\n  if response.content:\n    done = True  # Final answer',
+   rationale:'The agent loop is the <em>fundamental building block</em> of all AI agents. Every multi-step workflow — from data analysis to code generation — follows this pattern. Understanding it deeply is essential for building reliable agents.'},
+  {id:'af-prd',name:'PRD Analyzer',domain:'agentic',component:'agentic',type:'worker',desc:'Extracts structured requirements from Product Requirement Documents: user stories, data needs, API endpoints, UI components, and acceptance criteria. Outputs a machine-readable spec that other agents consume.',keywords:['PRD','requirements'],workers:[],commonDeps:[],
+   rationale:'PRDs are written for humans but consumed by AI. The analyzer bridges this gap by extracting <em>structured, actionable requirements</em> from free-form text — so the build agent knows exactly what to create.'},
+  {id:'af-scaffold',name:'Skill Scaffolder',domain:'agentic',component:'agentic',type:'worker',desc:'Creates new SKILL.md files following the AgentSkills.io specification: metadata (name, version, triggers), context, inputs, numbered steps, output contract, and references.',keywords:['scaffold skill'],workers:[],commonDeps:[],
+   rationale:'SKILL.md is a <em>structured contract between humans and AI</em>. The scaffolder ensures every new skill follows the same format, making skills discoverable, composable, and reliable across any AI coding assistant.'},
+  {id:'af-tool',name:'Tool Builder',domain:'agentic',component:'agentic',type:'worker',desc:'Builds Python tool functions for agents: input/output schemas, error handling, rate limiting, and automatic parameter validation. Tools become callable functions that agents invoke during the FM loop.',keywords:['build tool'],workers:[],commonDeps:[],
+   code:'@tool(description="Search hotel bookings by guest name")\ndef search_bookings(\n  guest_name: str,\n  limit: int = 10\n) -> list[dict]:\n  return db.sql(f"SELECT * FROM gold.fact_bookings\n    WHERE guest_name ILIKE \'%{guest_name}%\'\n    LIMIT {limit}").to_dict()'},
+  {id:'af-test',name:'Agent Tester',domain:'agentic',component:'agentic',type:'worker',desc:'Tests agent behavior with scenario-based test suites: given input X, the agent should call tool Y with parameters Z and produce answer W. Validates both the tool-calling sequence and the final output quality.',keywords:['test agent'],workers:[],commonDeps:[],
+   rationale:'Agent testing is harder than unit testing because <em>outputs are non-deterministic</em>. The tester uses LLM-judge evaluation and structural assertions (did the agent call the right tools?) to create reliable, repeatable test suites.'},
+];
+
+const SKILL_MAP = {};
+SKILLS.forEach(s => SKILL_MAP[s.id] = s);
+
+const STAGES = [
+  {num:'1',label:'Gold Design',sc:'sc-1',orch:'gold-00'},
+  {num:'2',label:'Bronze',sc:'sc-2',orch:'bronze-00'},
+  {num:'3',label:'Silver',sc:'sc-3',orch:'silver-00'},
+  {num:'4',label:'Gold Impl',sc:'sc-4',orch:'gold-01'},
+  {num:'5',label:'Planning',sc:'sc-5',orch:'planning-00'},
+  {num:'6',label:'Semantic',sc:'sc-6',orch:'semantic-00'},
+  {num:'6b',label:'Genie Opt',sc:'sc-6b',orch:'genie-opt-00'},
+  {num:'7',label:'Observ.',sc:'sc-7',orch:'monitor-00'},
+  {num:'8',label:'ML',sc:'sc-8',orch:'ml-00'},
+  {num:'9',label:'GenAI',sc:'sc-9',orch:'genai-00'},
+];
+
+const PHASES = [
+  {num:1,label:'Scaffold + Build',skills:['appkit-01','appkit-02']},
+  {num:2,label:'Deploy Mock',skills:['appkit-03']},
+  {num:3,label:'Setup Lakebase',skills:[]},
+  {num:4,label:'Wire Backend',skills:['appkit-04','appkit-05']},
+  {num:5,label:'Deploy + E2E',skills:['appkit-03']},
+];
+
+// ======================== TOUR DATA ========================
+const TOURS = {
+  a: {
+    name:'Schema to Production',
+    tree: buildDPATree(),
+    steps: [
+      {expand:['ta-root'],activate:['ta-n-root'],narration:'The IDE auto-loads <span class="hl">AGENTS.md</span> — the universal entry point for any AI coding assistant.',tier:[1,'Tier 1: Entry'],
+       designRationale:'A single entry file means <em>any IDE</em> (Cursor, Claude Code, Copilot, Windsurf) discovers the framework automatically. No special configuration, no plugin install — just open the repo and the AI knows where to start. This is the "zero-friction onboarding" principle.',
+       inputOutput:{inputs:['repo root'],outputs:['AGENTS.md','skill-navigator']}},
+      {expand:['ta-nav'],activate:['ta-n-nav'],narration:'The <span class="hl">Skill Navigator</span> matches keywords to find the right orchestrator or worker skill.',tier:[1,'Tier 1: Routing'],
+       designRationale:'Keyword-based routing keeps the AI\'s context window <em>small and focused</em>. Instead of loading all 59 skills (~100K tokens), the navigator matches your request to 1-2 relevant skills (~4-8K tokens). This is the "progressive disclosure" pattern — load only what you need, when you need it.',
+       inputOutput:{inputs:['user prompt','keywords'],outputs:['matched skill path']}},
+      {expand:['ta-common'],activate:['ta-n-common'],narration:'Two <span class="hl-g">always-on common skills</span> are loaded first: expert-agent and naming-standards.',tier:[1,'Tier 1: Core'],
+       skillIds:['common-expert','common-naming'],
+       designRationale:'These two skills are loaded <em>into every stage, unconditionally</em>. Expert-agent enforces the "Extract Don\'t Generate" principle (read the SKILL.md, don\'t improvise). Naming-standards ensures snake_case, COMMENTs, and PII tags are consistent from first DDL to last dashboard. Together they cost only ~4K tokens — a small price for universal consistency.',
+       inputOutput:{inputs:['always loaded'],outputs:['consistent behavior','naming conventions']}},
+      {expand:['ta-s1'],activate:['ta-n-s1'],narration:'<span class="hl">Stage 1: Gold Design</span> — reads the schema CSV and creates dimensional models, ERDs, and YAML schemas.',tier:[2,'Tier 2: Orchestrator'],
+       skillIds:['gold-00'],
+       inputOutput:{inputs:['schema CSV','naming standards'],outputs:['YAML schemas','ERD diagrams','lineage CSV','business docs']}},
+      {activate:['ta-n-s1-w1','ta-n-s1-w2','ta-n-s1-w3','ta-n-s1-w4'],narration:'Four design workers — <span class="hl-y">grain-definition</span>, <span class="hl-y">dimension-patterns</span>, <span class="hl-y">fact-tables</span>, <span class="hl-y">conformed-dims</span>.',tier:[3,'Tier 3: Workers'],
+       skillIds:['gold-dw-01','gold-dw-02','gold-dw-03','gold-dw-04'],
+       designRationale:'Each worker handles one <em>specific dimensional modeling concern</em>. Grain definition decides transaction vs. periodic vs. accumulating snapshot. Dimension patterns handle SCD types, role-playing, junk. Fact patterns handle measure additivity. Conformed dimensions enforce the bus matrix. Splitting them means the AI can focus deeply on one pattern at a time instead of juggling all four.',
+       inputOutput:{inputs:['schema CSV','Gold design context'],outputs:['grain decisions','dimension specs','fact specs','bus matrix']}},
+      {activate:['ta-n-s1-w5','ta-n-s1-w6','ta-n-s1-w7'],narration:'ERD diagrams, table documentation, and design validation complete Gold Design.',tier:[3,'Tier 3: Workers'],
+       skillIds:['gold-dw-05','gold-dw-06','gold-dw-07'],
+       designRationale:'The final three workers are <em>quality assurance</em>: ERDs make the model visually reviewable, documentation creates a business onboarding guide, and validation cross-checks YAML ↔ ERD ↔ lineage to catch inconsistencies before any code is generated.',
+       inputOutput:{inputs:['dimension + fact specs'],outputs:['ERD markdown','biz docs','validation report']}},
+      {expand:['ta-s2'],activate:['ta-n-s2'],narration:'<span class="hl">Stage 2: Bronze</span> — creates source tables with Faker-generated test data.',tier:[2,'Tier 2: Orchestrator'],
+       skillIds:['bronze-00'],
+       inputOutput:{inputs:['Gold YAML schemas'],outputs:['Bronze DDLs','Faker notebooks','Asset Bundle jobs']}},
+      {activate:['ta-n-s2-w1'],narration:'<span class="hl-y">Faker Data Generation</span> worker creates realistic synthetic data with configurable corruption rates.',tier:[3,'Tier 3: Worker'],
+       skillIds:['bronze-01'],
+       designRationale:'Corruption rates are <em>configurable per column</em> — you can inject 5% nulls in email fields, 2% invalid dates, 10% duplicate IDs. This proves your Silver DQ rules actually catch real-world problems, not just handle happy-path data. The corruption config is stored alongside the schema so it\'s reproducible.',
+       inputOutput:{inputs:['Bronze DDLs','corruption config'],outputs:['Faker Python notebook','test data']}},
+      {expand:['ta-s3'],activate:['ta-n-s3'],narration:'<span class="hl">Stage 3: Silver</span> — SDP/DLT pipelines with Delta table DQ rules.',tier:[2,'Tier 2: Orchestrator'],
+       skillIds:['silver-00'],
+       inputOutput:{inputs:['Bronze tables','Gold YAML schemas'],outputs:['Silver DLT pipelines','DQ rules table','quarantine views']}},
+      {activate:['ta-n-s3-w1','ta-n-s3-w2'],narration:'<span class="hl-y">DLT Expectations</span> and <span class="hl-y">DQX Patterns</span> — runtime-updateable data quality rules.',tier:[3,'Tier 3: Workers'],
+       skillIds:['silver-01','silver-02'],
+       designRationale:'Two DQ approaches for different needs: <em>DLT Expectations</em> use @dlt.expect_all_or_drop() with rules loaded from a Delta table — updateable at runtime without redeployment. <em>DQX Patterns</em> add advanced validation (cross-table checks, statistical bounds, referential integrity) for complex data quality requirements that go beyond single-row rules.',
+       inputOutput:{inputs:['Bronze tables','DQ rule definitions'],outputs:['clean Silver tables','quarantine tables','DQ metrics']}},
+      {expand:['ta-s4'],activate:['ta-n-s4'],narration:'<span class="hl">Stage 4: Gold Implementation</span> — materializes YAML designs as Delta tables with MERGE scripts.',tier:[2,'Tier 2: Orchestrator'],
+       skillIds:['gold-01'],
+       inputOutput:{inputs:['Gold YAML schemas','Silver tables'],outputs:['Gold DDLs','MERGE scripts','constraint SQL','validation notebooks']}},
+      {activate:['ta-n-s4-w1','ta-n-s4-w2','ta-n-s4-w3'],narration:'Pipeline workers: <span class="hl-y">YAML table setup</span>, <span class="hl-y">merge patterns</span>, <span class="hl-y">deduplication</span>.',tier:[3,'Tier 3: Workers'],
+       skillIds:['gold-pw-01','gold-pw-02','gold-pw-03'],
+       designRationale:'The YAML-to-DDL pipeline is <em>deterministic and auditable</em>. YAML table setup translates schema definitions to CREATE TABLE statements. Merge patterns generate SCD Type 1/2 MERGE SQL from the YAML\'s change_type field. Deduplication adds ROW_NUMBER-based dedup as a safety net. Each worker generates SQL that can be reviewed before execution.',
+       inputOutput:{inputs:['YAML schemas','Silver tables'],outputs:['CREATE TABLE DDLs','MERGE SQL','dedup SQL']}},
+      {expand:['ta-s5'],activate:['ta-n-s5'],narration:'<span class="hl">Stage 5: Planning</span> — generates YAML manifest contracts for downstream stages 6-9.',tier:[2,'Tier 2: Orchestrator'],
+       skillIds:['planning-00'],
+       inputOutput:{inputs:['Gold tables','project requirements'],outputs:['YAML manifests for stages 6-9']}},
+      {expand:['ta-s6'],activate:['ta-n-s6'],narration:'<span class="hl">Stage 6: Semantic Layer</span> — Metric Views, TVFs, and Genie Spaces.',tier:[2,'Tier 2: Orchestrator'],
+       skillIds:['semantic-00'],
+       inputOutput:{inputs:['Gold tables','planning manifests'],outputs:['Metric Views','TVFs','Genie Space JSON','benchmark questions']}},
+      {activate:['ta-n-s6-w1','ta-n-s6-w2','ta-n-s6-w3'],narration:'Workers: <span class="hl-y">metric-views</span>, <span class="hl-y">TVFs</span>, <span class="hl-y">Genie Space patterns</span>.',tier:[3,'Tier 3: Workers'],
+       skillIds:['semantic-01','semantic-02','semantic-03'],
+       designRationale:'The three data asset types serve <em>different query patterns</em>: Metric Views provide pre-defined business metrics (revenue, churn rate) that Genie can reference by name. TVFs handle parameterized queries ("show me bookings for customer X in month Y"). Tables are the raw fallback. Genie prioritizes them in that order — Metric Views first, because they carry the most business context.',
+       inputOutput:{inputs:['Gold tables','agent instructions'],outputs:['CREATE METRIC VIEW SQL','CREATE FUNCTION SQL','Genie Space config']}},
+      {expand:['ta-s7'],activate:['ta-n-s7'],narration:'<span class="hl">Stage 7: Observability</span> — monitors, dashboards, alerts, anomaly detection.',tier:[2,'Tier 2: Orchestrator'],
+       skillIds:['monitor-00'],
+       inputOutput:{inputs:['Gold tables','Silver tables','planning manifests'],outputs:['Lakehouse monitors','Lakeview dashboards','SQL alerts']}},
+      {expand:['ta-s8'],activate:['ta-n-s8'],narration:'<span class="hl">Stage 8: ML</span> — MLflow experiments, model training, inference pipelines.',tier:[2,'Tier 2: Orchestrator'],
+       skillIds:['ml-00'],
+       inputOutput:{inputs:['Gold feature tables','planning manifests'],outputs:['MLflow experiments','registered models','inference pipelines']}},
+      {expand:['ta-s9'],activate:['ta-n-s9'],narration:'<span class="hl">Stage 9: GenAI Agents</span> — the deepest branch with 8 specialized workers.',tier:[2,'Tier 2: Orchestrator'],
+       skillIds:['genai-00'],
+       inputOutput:{inputs:['Gold tables','Genie Spaces','Lakebase','MLflow models'],outputs:['ResponsesAgent','evaluation harness','deployment config','monitoring']}},
+      {activate:['ta-n-s9-w1','ta-n-s9-w2','ta-n-s9-w3','ta-n-s9-w4'],narration:'Workers: <span class="hl-y">ResponsesAgent</span>, <span class="hl-y">evaluation</span>, <span class="hl-y">Lakebase memory</span>, <span class="hl-y">prompt registry</span>.',tier:[3,'Tier 3: Workers'],
+       skillIds:['genai-01','genai-02','genai-03','genai-04'],
+       designRationale:'Four workers cover the GenAI core loop: <em>ResponsesAgent</em> handles tool-calling and streaming. <em>Evaluation</em> uses LLM-judge scorers to quantify quality. <em>Lakebase Memory</em> persists conversation state via CheckpointSaver. <em>Prompt Registry</em> versions prompts in Unity Catalog so you can A/B test and roll back without code changes.',
+       inputOutput:{inputs:['agent config','tools','data assets'],outputs:['working agent','eval scores','memory tables','versioned prompts']}},
+      {narration:'<strong>Full pipeline traversal complete!</strong> From schema CSV to production GenAI agents in 9 stages with 59 skills.',tier:[1,'Complete'],
+       summary:true},
+    ]
+  },
+  b: {
+    name:'PRD to Deployed App',
+    tree: buildAppKitTree(),
+    steps: [
+      {expand:['tb-root'],activate:['tb-n-root'],narration:'<span class="hl">AppKit Navigator</span> — the entry point for all Databricks App tasks.',tier:[1,'Tier 1: Entry'],
+       skillIds:['appkit-00'],
+       inputOutput:{inputs:['user intent'],outputs:['matched skill']}},
+      {expand:['tb-p1'],activate:['tb-n-p1'],narration:'<span class="hl">Phase 1: Scaffold + Build</span> — authenticate, scaffold, build UI from PRD.',tier:[2,'Tier 2: Phase 1'],
+       designRationale:'Phase 1 combines scaffolding and building because they\'re <em>always done together</em>. You never scaffold without immediately building — the blank template is useless on its own. Combining them means one prompt produces a working app with mock data, ready for stakeholder review.',
+       inputOutput:{inputs:['PRD document','workspace URL'],outputs:['project files','mock UI','server routes']}},
+      {activate:['tb-n-p1-s1'],narration:'<span class="hl-y">01-appkit-scaffold</span> — creates the project structure: server/, client/, config/queries/.',tier:[3,'Tier 3: Skill'],
+       skillIds:['appkit-01'],
+       inputOutput:{inputs:['template choice','app name'],outputs:['server/server.ts','client/src/App.tsx','config/queries/','app.yaml']}},
+      {activate:['tb-n-p1-s2'],narration:'<span class="hl-y">02-appkit-build</span> — build UI from PRD with mock data arrays. Design quality matters!',tier:[3,'Tier 3: Skill'],
+       skillIds:['appkit-02'],
+       inputOutput:{inputs:['PRD','scaffolded project'],outputs:['React components','mock data arrays','styled pages']}},
+      {expand:['tb-p2'],activate:['tb-n-p2'],narration:'<span class="hl">Phase 2: Deploy Mock</span> — first deployment with static mock data.',tier:[2,'Tier 2: Phase 2'],
+       designRationale:'Deploying with mock data <em>first</em> validates the entire infrastructure pipeline (build, validate, deploy, health check) before introducing database complexity. If the app can\'t deploy with static data, adding Lakebase won\'t help — you\'d be debugging two things at once.',
+       inputOutput:{inputs:['built app','app.yaml'],outputs:['deployed app URL','health check status']}},
+      {activate:['tb-n-p2-s1'],narration:'<span class="hl-y">03-appkit-deploy</span> — npm run build → databricks apps validate → databricks apps deploy.',tier:[3,'Tier 3: Skill'],
+       skillIds:['appkit-03'],
+       inputOutput:{inputs:['app source code'],outputs:['deployed app','Service Principal','env vars']}},
+      {expand:['tb-p3'],activate:['tb-n-p3'],narration:'<span class="hl">Phase 3: Setup Lakebase</span> — create project, branch, endpoint via CLI.',tier:[2,'Tier 2: Phase 3'],
+       designRationale:'Lakebase setup is a <em>separate phase</em> because it involves infrastructure provisioning (create project → create branch → create endpoint) that\'s distinct from code changes. The git-like model (projects → branches → endpoints) means you can have dev/staging/prod branches of your database, just like code.',
+       inputOutput:{inputs:['workspace URL','app name'],outputs:['Lakebase project','endpoint URL','OAuth credentials']}},
+      {expand:['tb-p4'],activate:['tb-n-p4'],narration:'<span class="hl">Phase 4: Wire Backend</span> — add plugin, design schema, build CRUD APIs.',tier:[2,'Tier 2: Phase 4'],
+       designRationale:'Wiring is split into <em>two distinct skills</em>: plugin-add (configure the connection) and lakebase-wiring (design schema + build APIs). This separation means you can add the plugin without committing to a specific schema — useful when the data model is still being discussed with stakeholders.',
+       inputOutput:{inputs:['Lakebase endpoint','app code','data requirements'],outputs:['DDL scripts','API routes','frontend hooks','ConnectionStatus']}},
+      {activate:['tb-n-p4-s1'],narration:'<span class="hl-y">04-appkit-plugin-add</span> — register lakebase() plugin in server.ts.',tier:[3,'Tier 3: Skill'],
+       skillIds:['appkit-04'],
+       inputOutput:{inputs:['server.ts','plugin choice'],outputs:['updated server.ts','plugin config']}},
+      {activate:['tb-n-p4-s2'],narration:'<span class="hl-y">05-appkit-lakebase-wiring</span> — DDL, API routes, useLakebaseData hook, mock fallback.',tier:[3,'Tier 3: Skill'],
+       skillIds:['appkit-05'],
+       inputOutput:{inputs:['data requirements','Lakebase connection'],outputs:['DDL scripts','CRUD API routes','useLakebaseData hook','ConnectionStatus']}},
+      {expand:['tb-p5'],activate:['tb-n-p5'],narration:'<span class="hl">Phase 5: Deploy + E2E</span> — deploy with Lakebase, SP creates DB objects, verify live data.',tier:[2,'Tier 2: Phase 5'],
+       designRationale:'The final deploy includes <em>automatic database initialization</em>: the Service Principal runs DDL scripts on first startup, creating tables if they don\'t exist. E2E verification checks that the app serves live data (not mock), that writes persist across page refreshes, and that the ConnectionStatus badge shows "live".',
+       inputOutput:{inputs:['wired app','DDL scripts','Lakebase endpoint'],outputs:['production app with live data','E2E test results']}},
+      {narration:'<strong>App lifecycle complete!</strong> From PRD to production Databricks App with Lakebase in 5 phases.',tier:[1,'Complete'],
+       summary:true},
+    ]
+  },
+  c: {
+    name:'The Full Picture',
+    tree: buildConvergenceTree(),
+    steps: [
+      {expand:['tc-root'],activate:['tc-n-root'],narration:'<span class="hl">Two paths, one destination.</span> Data pipeline + application layer = complete data product.',tier:[1,'Tier 1: Overview'],
+       designRationale:'A <em>complete data product</em> has both a data pipeline (Path B) that builds the analytical foundation, and an application (Path A) that makes it accessible to users. Neither path alone is sufficient — data without a UI is inaccessible, and an app without data is empty. The two paths can be built in parallel by different teams.',
+       inputOutput:{inputs:['schema CSV','PRD'],outputs:['production data product']}},
+      {expand:['tc-pathb'],activate:['tc-n-pathb'],narration:'<span class="hl">Path B</span> builds the data foundation — Gold tables, semantic layer, ML models, GenAI agents.',tier:[2,'Tier 2: Pipeline'],
+       designRationale:'The data pipeline follows a <em>9-stage progression</em> where each stage builds on the previous one\'s output. Gold tables provide the dimensional model. The semantic layer adds business meaning. ML adds predictions. GenAI adds natural language interaction. Each layer increases the data\'s accessibility and value.',
+       inputOutput:{inputs:['schema CSV'],outputs:['Gold tables','Metric Views','Genie Spaces','ML models','GenAI agents']}},
+      {activate:['tc-n-gold','tc-n-semantic','tc-n-genie'],narration:'Gold tables power <span class="hl-y">Metric Views</span> and <span class="hl-y">Genie Spaces</span> for natural language analytics.',tier:[3,'Tier 3: Assets'],
+       designRationale:'These three outputs are what the <em>application layer consumes</em>. Gold tables provide structured data for dashboards and reports. Metric Views provide pre-computed business metrics. Genie Spaces allow natural language queries. Each serves a different user persona: analysts query Gold, executives read Metric Views, and everyone uses Genie.',
+       inputOutput:{inputs:['9-stage pipeline'],outputs:['Gold tables','Metric Views','Genie Spaces']}},
+      {expand:['tc-patha'],activate:['tc-n-patha'],narration:'<span class="hl">Path A</span> builds the user-facing app that queries the data foundation.',tier:[2,'Tier 2: App'],
+       designRationale:'The AppKit application is <em>a thin UI layer</em> on top of the data foundation. It doesn\'t duplicate any data processing — it queries Gold tables for dashboards, calls Genie Spaces for NL analytics, and uses Lakebase only for app-specific state (user preferences, saved views, session data).',
+       inputOutput:{inputs:['PRD','data foundation'],outputs:['Databricks App with live data']}},
+      {activate:['tc-n-analytics','tc-n-genieplugin','tc-n-lakebase'],narration:'The app connects via plugins: <span class="hl-y">analytics()</span> → Gold tables, <span class="hl-y">genie()</span> → Genie Spaces, <span class="hl-y">lakebase()</span> → app state.',tier:[3,'Tier 3: Plugins'],
+       designRationale:'Three plugins, three <em>distinct data access patterns</em>: analytics() runs read-only SQL against a SQL Warehouse for dashboards. genie() streams NL-to-SQL conversations via Genie Spaces. lakebase() handles CRUD for transactional app state. This separation of concerns means each data flow is optimized for its use case.',
+       inputOutput:{inputs:['Gold tables','Genie Spaces','Lakebase DB'],outputs:['dashboards','NL chat','CRUD state']}},
+      {narration:'<strong>The complete picture:</strong> Path B builds the data, Path A builds the experience. Together, a production data product with a beautiful frontend.',tier:[1,'Complete'],
+       summary:true},
+    ]
+  }
+};
+
+function buildDPATree(){
+  return `<ul>
+<li id="ta-root" class="collapsed"><div class="tnode type-entry" id="ta-n-root" data-skill="" data-toggle="ta-root"><div class="icon" style="background:var(--cyan-dim);color:var(--cyan)">A</div><div class="name">AGENTS.md</div><div class="tag" style="background:var(--cyan-dim);color:var(--cyan)">entry</div><div class="chevron">▶</div></div>
+<ul>
+<li id="ta-nav" class="collapsed"><div class="tnode type-entry" id="ta-n-nav" data-skill="" data-toggle="ta-nav"><div class="icon" style="background:var(--cyan-dim);color:var(--cyan)">N</div><div class="name">skill-navigator</div><div class="tag" style="background:var(--cyan-dim);color:var(--cyan)">router</div><div class="chevron">▶</div></div>
+<ul>
+<li id="ta-common" class="collapsed"><div class="tnode type-common" id="ta-n-common" data-skill="" data-toggle="ta-common"><div class="icon">C</div><div class="name">Common Skills (always loaded)</div><div class="tag">core</div><div class="meta">~4K tokens</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-common" data-skill="common-expert"><div class="icon">C</div><div class="name">databricks-expert-agent</div><div class="tag">common</div></div></li><li><div class="tnode type-common" data-skill="common-naming"><div class="icon">C</div><div class="name">naming-tagging-standards</div><div class="tag">common</div></div></li></ul></li>
+<li id="ta-s1" class="collapsed"><div class="tnode type-orchestrator" id="ta-n-s1" data-skill="gold-00" data-toggle="ta-s1"><div class="icon">1</div><div class="name">Stage 1: Gold Design</div><div class="tag">orchestrator</div><div class="meta">7 workers</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="ta-n-s1-w1" data-skill="gold-dw-01"><div class="icon">W</div><div class="name">01-grain-definition</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s1-w2" data-skill="gold-dw-02"><div class="icon">W</div><div class="name">02-dimension-patterns</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s1-w3" data-skill="gold-dw-03"><div class="icon">W</div><div class="name">03-fact-table-patterns</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s1-w4" data-skill="gold-dw-04"><div class="icon">W</div><div class="name">04-conformed-dimensions</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s1-w5" data-skill="gold-dw-05"><div class="icon">W</div><div class="name">05-erd-diagrams</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s1-w6" data-skill="gold-dw-06"><div class="icon">W</div><div class="name">06-table-documentation</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s1-w7" data-skill="gold-dw-07"><div class="icon">W</div><div class="name">07-design-validation</div><div class="tag">worker</div></div></li></ul></li>
+<li id="ta-s2" class="collapsed"><div class="tnode type-orchestrator" id="ta-n-s2" data-skill="bronze-00" data-toggle="ta-s2"><div class="icon">2</div><div class="name">Stage 2: Bronze</div><div class="tag">orchestrator</div><div class="meta">1 worker</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="ta-n-s2-w1" data-skill="bronze-01"><div class="icon">W</div><div class="name">01-faker-data-generation</div><div class="tag">worker</div></div></li></ul></li>
+<li id="ta-s3" class="collapsed"><div class="tnode type-orchestrator" id="ta-n-s3" data-skill="silver-00" data-toggle="ta-s3"><div class="icon">3</div><div class="name">Stage 3: Silver</div><div class="tag">orchestrator</div><div class="meta">2 workers</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="ta-n-s3-w1" data-skill="silver-01"><div class="icon">W</div><div class="name">01-dlt-expectations</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s3-w2" data-skill="silver-02"><div class="icon">W</div><div class="name">02-dqx-patterns</div><div class="tag">worker</div></div></li></ul></li>
+<li id="ta-s4" class="collapsed"><div class="tnode type-orchestrator" id="ta-n-s4" data-skill="gold-01" data-toggle="ta-s4"><div class="icon">4</div><div class="name">Stage 4: Gold Implementation</div><div class="tag">orchestrator</div><div class="meta">5 workers</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="ta-n-s4-w1" data-skill="gold-pw-01"><div class="icon">W</div><div class="name">01-yaml-table-setup</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s4-w2" data-skill="gold-pw-02"><div class="icon">W</div><div class="name">02-merge-patterns</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s4-w3" data-skill="gold-pw-03"><div class="icon">W</div><div class="name">03-deduplication</div><div class="tag">worker</div></div></li></ul></li>
+<li id="ta-s5" class="collapsed"><div class="tnode type-orchestrator" id="ta-n-s5" data-skill="planning-00" data-toggle="ta-s5"><div class="icon">5</div><div class="name">Stage 5: Planning</div><div class="tag">orchestrator</div><div class="meta">emits manifests</div></div></li>
+<li id="ta-s6" class="collapsed"><div class="tnode type-orchestrator" id="ta-n-s6" data-skill="semantic-00" data-toggle="ta-s6"><div class="icon">6</div><div class="name">Stage 6: Semantic Layer</div><div class="tag">orchestrator</div><div class="meta">4 workers</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="ta-n-s6-w1" data-skill="semantic-01"><div class="icon">W</div><div class="name">01-metric-views</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s6-w2" data-skill="semantic-02"><div class="icon">W</div><div class="name">02-table-valued-functions</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s6-w3" data-skill="semantic-03"><div class="icon">W</div><div class="name">03-genie-space-patterns</div><div class="tag">worker</div></div></li></ul></li>
+<li id="ta-s7" class="collapsed"><div class="tnode type-orchestrator" id="ta-n-s7" data-skill="monitor-00" data-toggle="ta-s7"><div class="icon">7</div><div class="name">Stage 7: Observability</div><div class="tag">orchestrator</div><div class="meta">4 workers</div></div></li>
+<li id="ta-s8" class="collapsed"><div class="tnode type-orchestrator" id="ta-n-s8" data-skill="ml-00" data-toggle="ta-s8"><div class="icon">8</div><div class="name">Stage 8: ML Pipeline</div><div class="tag">orchestrator</div></div></li>
+<li id="ta-s9" class="collapsed"><div class="tnode type-orchestrator" id="ta-n-s9" data-skill="genai-00" data-toggle="ta-s9"><div class="icon">9</div><div class="name">Stage 9: GenAI Agents</div><div class="tag">orchestrator</div><div class="meta">8 workers</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="ta-n-s9-w1" data-skill="genai-01"><div class="icon">W</div><div class="name">01-responses-agent</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s9-w2" data-skill="genai-02"><div class="icon">W</div><div class="name">02-mlflow-evaluation</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s9-w3" data-skill="genai-03"><div class="icon">W</div><div class="name">03-lakebase-memory</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="ta-n-s9-w4" data-skill="genai-04"><div class="icon">W</div><div class="name">04-prompt-registry</div><div class="tag">worker</div></div></li></ul></li>
+</ul></li></ul></li></ul>`;
+}
+
+function buildAppKitTree(){
+  return `<ul>
+<li id="tb-root" class="collapsed"><div class="tnode type-entry" id="tb-n-root" data-skill="appkit-00" data-toggle="tb-root"><div class="icon" style="background:var(--cyan-dim);color:var(--cyan)">N</div><div class="name">00-appkit-navigator</div><div class="tag" style="background:var(--cyan-dim);color:var(--cyan)">router</div><div class="chevron">▶</div></div>
+<ul>
+<li id="tb-p1" class="collapsed"><div class="tnode type-orchestrator" id="tb-n-p1" data-skill="appkit-01" data-toggle="tb-p1"><div class="icon">1</div><div class="name">Phase 1: Scaffold + Build</div><div class="tag">phase</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tb-n-p1-s1" data-skill="appkit-01"><div class="icon">S</div><div class="name">01-appkit-scaffold</div><div class="tag">skill</div><div class="meta">databricks apps init</div></div></li><li><div class="tnode type-worker" id="tb-n-p1-s2" data-skill="appkit-02"><div class="icon">B</div><div class="name">02-appkit-build</div><div class="tag">skill</div><div class="meta">PRD → mock UI</div></div></li></ul></li>
+<li id="tb-p2" class="collapsed"><div class="tnode type-orchestrator" id="tb-n-p2" data-skill="appkit-03" data-toggle="tb-p2"><div class="icon">2</div><div class="name">Phase 2: Deploy Mock</div><div class="tag">phase</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tb-n-p2-s1" data-skill="appkit-03"><div class="icon">D</div><div class="name">03-appkit-deploy</div><div class="tag">skill</div><div class="meta">validate + deploy</div></div></li></ul></li>
+<li id="tb-p3" class="collapsed"><div class="tnode type-entry" id="tb-n-p3" data-skill="" data-toggle="tb-p3"><div class="icon" style="background:var(--teal-dim);color:var(--teal)">L</div><div class="name">Phase 3: Setup Lakebase</div><div class="tag" style="background:var(--teal-dim);color:var(--teal)">CLI</div><div class="meta">databricks lakebase</div></div></li>
+<li id="tb-p4" class="collapsed"><div class="tnode type-orchestrator" id="tb-n-p4" data-skill="appkit-04" data-toggle="tb-p4"><div class="icon">4</div><div class="name">Phase 4: Wire Backend</div><div class="tag">phase</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tb-n-p4-s1" data-skill="appkit-04"><div class="icon">P</div><div class="name">04-appkit-plugin-add</div><div class="tag">skill</div><div class="meta">lakebase() plugin</div></div></li><li><div class="tnode type-worker" id="tb-n-p4-s2" data-skill="appkit-05"><div class="icon">W</div><div class="name">05-appkit-lakebase-wiring</div><div class="tag">skill</div><div class="meta">DDL + CRUD + hooks</div></div></li></ul></li>
+<li id="tb-p5" class="collapsed"><div class="tnode type-orchestrator" id="tb-n-p5" data-skill="appkit-03" data-toggle="tb-p5"><div class="icon">5</div><div class="name">Phase 5: Deploy + E2E</div><div class="tag">phase</div><div class="meta">live data verification</div></div></li>
+</ul></li></ul>`;
+}
+
+function buildConvergenceTree(){
+  return `<ul>
+<li id="tc-root" class="collapsed"><div class="tnode type-entry" id="tc-n-root" data-skill="" data-toggle="tc-root"><div class="icon" style="background:var(--cyan-dim);color:var(--cyan)">★</div><div class="name">Complete Data Product</div><div class="tag" style="background:var(--cyan-dim);color:var(--cyan)">convergence</div><div class="chevron">▶</div></div>
+<ul>
+<li id="tc-pathb" class="collapsed"><div class="tnode type-orchestrator" id="tc-n-pathb" data-skill="gold-00" data-toggle="tc-pathb"><div class="icon">B</div><div class="name">Path B: Data Pipeline</div><div class="tag">9 stages</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-manifest" id="tc-n-gold" data-skill="gold-01"><div class="icon">→</div><div class="name">Gold Tables (dimensional model)</div><div class="tag">output</div></div></li><li><div class="tnode type-manifest" id="tc-n-semantic" data-skill="semantic-00"><div class="icon">→</div><div class="name">Semantic Layer (Metric Views)</div><div class="tag">output</div></div></li><li><div class="tnode type-manifest" id="tc-n-genie" data-skill="semantic-03"><div class="icon">→</div><div class="name">Genie Spaces (NL analytics)</div><div class="tag">output</div></div></li></ul></li>
+<li id="tc-patha" class="collapsed"><div class="tnode type-orchestrator" id="tc-n-patha" data-skill="appkit-00" data-toggle="tc-patha" style="border-color:var(--green)"><div class="icon" style="background:var(--green-dim);color:var(--green)">A</div><div class="name">Path A: Databricks App</div><div class="tag" style="background:var(--green-dim);color:var(--green)">5 phases</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tc-n-analytics" data-skill="appkit-04"><div class="icon">→</div><div class="name">analytics() → Gold Tables</div><div class="tag">plugin</div></div></li><li><div class="tnode type-worker" id="tc-n-genieplugin" data-skill="semantic-03"><div class="icon">→</div><div class="name">genie() → Genie Spaces</div><div class="tag">plugin</div></div></li><li><div class="tnode type-worker" id="tc-n-lakebase" data-skill="appkit-05"><div class="icon">→</div><div class="name">lakebase() → App State</div><div class="tag">plugin</div></div></li></ul></li>
+</ul></li></ul>`;
+}
+
+// ======================== PLATFORM ACADEMY DATA ========================
+const ACADEMY = [
+  {id:'apps',title:'Databricks Apps 101',subtitle:'Managed hosting for full-stack web apps',icon:'⬡',color:'var(--cyan)',
+   content:`<h5>What is Databricks Apps?</h5><p>Managed hosting for full-stack web applications that run inside the Databricks platform. Your app gets a container, a Service Principal identity, and auto-injected environment variables — zero DevOps required.</p>
+<div class="ac-diagram"><span class="hl">User Browser</span> → <span class="hl-p">Databricks Proxy (auth)</span> → <span class="hl">App Container (Node.js)</span><br>↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-g">SQL Warehouse</span>&nbsp;&nbsp;<span class="hl-g">Lakebase</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="hl-g">UC Volumes</span>&nbsp;&nbsp;<span class="hl-g">Genie Space</span></div>
+<h5>How Deployment Works</h5>
+<div class="ac-diagram"><span class="hl">databricks apps validate</span> → <span class="hl-p">databricks bundle deploy</span> → <span class="hl-g">databricks apps deploy</span><br>&nbsp;&nbsp;&nbsp;(checks app.yaml)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(syncs to workspace)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(starts container)</div>
+<p>The deploy command builds a container image from your source, sets up networking, provisions the Service Principal, injects env vars from app.yaml resources, and starts the health check loop.</p>
+<h5>Platform Constraints</h5><table><tr><th>Constraint</th><th>Value</th><th>Why it matters</th></tr><tr><td>Startup timeout</td><td>10 minutes</td><td>If your app doesn't respond to health checks in 10 min, deploy fails</td></tr><tr><td>HTTP proxy timeout</td><td>120 seconds</td><td>Long-running requests need SSE streaming, not blocking</td></tr><tr><td>Max apps/workspace</td><td>100</td><td>Enough for dev + staging + prod of many apps</td></tr><tr><td>Persistent storage</td><td>None</td><td>Use Lakebase for state, UC Volumes for files</td></tr><tr><td>Inbound auth</td><td>SSO / OBO</td><td>Users authenticate via workspace SSO, token forwarded as x-forwarded-access-token</td></tr></table>
+<h5>Auto-Injected Env Vars</h5><table><tr><th>Variable</th><th>Description</th></tr><tr><td><code>DATABRICKS_HOST</code></td><td>Workspace URL (e.g., https://myws.cloud.databricks.com)</td></tr><tr><td><code>DATABRICKS_APP_PORT</code></td><td>Port to bind (default 8000)</td></tr><tr><td><code>DATABRICKS_APP_NAME</code></td><td>App name in Databricks</td></tr><tr><td><code>DATABRICKS_CLIENT_ID</code></td><td>Service Principal client ID for API calls</td></tr><tr><td><code>DATABRICKS_CLIENT_SECRET</code></td><td>Service Principal secret (auto-rotated)</td></tr></table>
+<h5>app.yaml Resource Types</h5><pre>resources:
+  - name: sql-warehouse
+    sql_warehouse: auto      # auto-provisions a starter warehouse
+  - name: lakebase-db
+    lakebase:
+      instance: my-project   # connects to a Lakebase instance
+  - name: serving-endpoint
+    serving_endpoint: llm-endpoint  # for AI/LLM calls</pre>
+<h5>Authentication Flow</h5>
+<div class="ac-diagram"><span class="hl">User</span> → SSO login → <span class="hl-p">Proxy adds x-forwarded-access-token</span> → <span class="hl-g">App uses OBO</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="hl-o">SP fallback for missing scopes</span></div>`,
+   quiz:[{q:'What happens to files written to local disk?',opts:['Persisted across restarts','Lost on restart','Synced to UC Volumes'],answer:1},{q:'What provides the app\'s identity for API calls?',opts:['User OAuth token','Service Principal','API key'],answer:1},{q:'How do users authenticate to a Databricks App?',opts:['Username/password form','Workspace SSO (OBO)','API key in URL'],answer:1},{q:'What happens if the app doesn\'t respond to health checks in 10 minutes?',opts:['It retries indefinitely','The deploy fails','It runs without health checks'],answer:1}]},
+
+  {id:'appkit',title:'AppKit Deep Dive',subtitle:'TypeScript SDK with plugin architecture',icon:'◈',color:'var(--purple)',
+   content:`<h5>Two Packages</h5><p><code>@databricks/appkit</code> (backend: Express server, plugins, SQL queries, caching) + <code>@databricks/appkit-ui</code> (frontend: React hooks, Shadcn/Radix, ECharts). Together they handle data access, type safety, auth, and UI rendering.</p>
+<h5>Canonical Project Structure</h5><pre>my-app/
+├── server/
+│   └── server.ts          ← createApp() + plugins
+├── client/
+│   └── src/
+│       ├── App.tsx         ← root React component
+│       ├── pages/          ← route components
+│       └── components/     ← reusable UI
+├── config/
+│   └── queries/
+│       ├── getBookings.sql ← query key = filename
+│       └── getStats.sql    ← auto-generates types
+├── app.yaml                ← Databricks Apps config
+└── databricks.yml          ← DAB bundle config</pre>
+<h5>The SQL-First Dev Loop</h5><div class="ac-diagram"><span class="hl">1. Write SQL</span> → <span class="hl-p">2. npm run typegen</span> → <span class="hl-g">3. Import types</span> → <span class="hl-o">4. Build UI</span> → <span class="hl">5. npm run dev</span> → <span class="hl-g">6. Deploy</span></div>
+<p>This order is <strong>mandatory</strong>. Writing UI code before typegen means TypeScript types don't exist yet. The SQL file name becomes the query key used in hooks.</p>
+<h5>Plugin System — 5 Plugins</h5><table><tr><th>Plugin</th><th>Backend</th><th>Frontend</th></tr><tr><td><code>server()</code></td><td>Express server, static files</td><td>—</td></tr><tr><td><code>analytics()</code></td><td>SQL Warehouse queries, caching</td><td><code>useQuery()</code>, <code>useChart()</code></td></tr><tr><td><code>lakebase()</code></td><td>PostgreSQL connection pool</td><td><code>useLakebaseData()</code></td></tr><tr><td><code>genie()</code></td><td>Genie API streaming</td><td><code>&lt;GenieChat /&gt;</code></td></tr><tr><td><code>files()</code></td><td>UC Volume operations</td><td><code>&lt;FilePreview /&gt;</code></td></tr></table>
+<pre>import { createApp, server, analytics, lakebase, genie, files } from "@databricks/appkit";
+
+await createApp({
+  plugins: [server(), analytics(), lakebase(), genie(), files()],
+});</pre>
+<h5>Query Key Pattern</h5><pre>// config/queries/getTopBookings.sql
+SELECT destination, COUNT(*) as total
+FROM gold.fact_bookings
+GROUP BY destination ORDER BY total DESC LIMIT 10;
+
+// client/src/pages/Dashboard.tsx — type-safe!
+const { data } = useQuery&lt;GetTopBookings&gt;("getTopBookings");</pre>
+<h5>Design Quality Standards</h5><p>AppKit apps must meet <strong>design quality gates</strong>: proper spacing, color contrast, responsive layout, loading states, empty states, and error boundaries. The build skill enforces this as a checklist.</p>`,
+   quiz:[{q:'What does npm run typegen do?',opts:['Generates SQL files','Generates TypeScript types from SQL','Compiles TypeScript'],answer:1},{q:'Which file is the backend entry point?',opts:['client/src/App.tsx','config/queries/main.sql','server/server.ts'],answer:2},{q:'What does the SQL filename become?',opts:['A database table name','A query key for useQuery()','A REST endpoint'],answer:1},{q:'How many built-in plugins does AppKit provide?',opts:['3','5','7'],answer:1}]},
+
+  {id:'lakebase',title:'Lakebase',subtitle:'Managed PostgreSQL with OAuth — zero passwords',icon:'⛁',color:'var(--teal)',
+   content:`<h5>What is Lakebase?</h5><p>A managed PostgreSQL service on Databricks that uses OAuth instead of passwords. It auto-scales, supports git-like branching, and integrates natively with Databricks Apps via the lakebase() plugin.</p>
+<h5>The Git-Like Model</h5>
+<div class="ac-diagram"><span class="hl">Project</span> → <span class="hl-p">Branch (main)</span> → <span class="hl-g">Endpoint (compute)</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↘ <span class="hl-o">Branch (staging)</span> → <span class="hl-g">Endpoint</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↘ <span class="hl-p">Branch (dev)</span> → <span class="hl-g">Endpoint</span></div>
+<p>Just like git branches for code, you can have dev/staging/prod branches of your database. Each branch gets its own endpoint with independent compute.</p>
+<h5>Key Features</h5><table><tr><th>Feature</th><th>Detail</th><th>Why</th></tr><tr><td>OAuth Auth</td><td>1-hour tokens, auto-refresh</td><td>No passwords to rotate or leak</td></tr><tr><td>Scale-to-zero</td><td>suspend_timeout_duration</td><td>No cost when idle</td></tr><tr><td>Branching</td><td>Projects → Branches → Endpoints</td><td>Safe dev/staging isolation</td></tr><tr><td>Data Sync</td><td>Sync tables to Delta Lake</td><td>Analytics on transactional data</td></tr></table>
+<h5>CLI Provisioning Flow</h5><pre># 1. Create the project (database cluster)
+databricks lakebase projects create --name my-app-db
+
+# 2. Create a branch (or use default 'main')
+databricks lakebase branches create --project-id $PID --name dev
+
+# 3. Create an endpoint (compute)
+databricks lakebase endpoints create --project-id $PID --branch-id $BID</pre>
+<h5>When to Use Lakebase vs. SQL Warehouse</h5><table><tr><th>Pattern</th><th>Use Lakebase</th><th>Use SQL Warehouse</th></tr><tr><td>User writes data</td><td>✅ CRUD operations</td><td>❌ Read-only</td></tr><tr><td>Session/app state</td><td>✅ Transactional</td><td>❌</td></tr><tr><td>Aggregation dashboards</td><td>❌ Not optimized</td><td>✅ Columnar scans</td></tr><tr><td>Ad-hoc analytics</td><td>❌</td><td>✅ Photon engine</td></tr><tr><td>Sub-10ms latency</td><td>✅ PostgreSQL</td><td>❌ 100ms+ cold</td></tr></table>
+<h5>PostgreSQL Type Conventions</h5><table><tr><th>Use Case</th><th>Type</th><th>Never Use</th></tr><tr><td>Auto-increment ID</td><td><code>bigint generated always as identity</code></td><td>serial (deprecated)</td></tr><tr><td>Text fields</td><td><code>text</code></td><td>varchar(n) — arbitrary limits</td></tr><tr><td>Money/prices</td><td><code>numeric(10,2)</code></td><td>float — rounding errors</td></tr><tr><td>Timestamps</td><td><code>timestamptz</code></td><td>timestamp — loses timezone</td></tr><tr><td>Booleans</td><td><code>boolean</code></td><td>int — confusing semantics</td></tr></table>
+<h5>DDL Best Practice</h5><pre>CREATE TABLE IF NOT EXISTS bookings (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  guest_name text NOT NULL,
+  check_in timestamptz NOT NULL,
+  check_out timestamptz NOT NULL,
+  total_price numeric(10,2) NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'pending',
+  created_at timestamptz NOT NULL DEFAULT now()
+);</pre>`,
+   quiz:[{q:'How does Lakebase authenticate?',opts:['Username + password','OAuth token rotation','API keys'],answer:1},{q:'For money columns, use:',opts:['float','varchar','numeric(10,2)'],answer:2},{q:'When should you use SQL Warehouse instead of Lakebase?',opts:['For CRUD operations','For aggregation dashboards','For session state'],answer:1},{q:'What is the Lakebase branching model analogous to?',opts:['Docker containers','Git branches','Kubernetes pods'],answer:1}]},
+
+  {id:'sdp',title:'Spark Declarative Pipelines (SDP)',subtitle:'Declarative ETL — define WHAT, not HOW',icon:'⟳',color:'var(--gold)',
+   content:`<h5>What is SDP?</h5><p>Spark Declarative Pipelines (formerly Delta Live Tables / DLT) lets you define <em>what</em> your pipeline produces as decorated Python functions. The engine handles scheduling, retries, checkpointing, and data quality enforcement.</p>
+<h5>Three-Layer Pipeline Architecture</h5>
+<div class="ac-diagram"><span class="hl-o">Bronze (raw)</span> → <span class="hl-p">Silver (cleaned)</span> → <span class="hl-g">Gold (business)</span><br>Ingest as-is&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dedup, type, validate&nbsp;&nbsp;&nbsp;&nbsp;Dimensional model<br>append-only&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expectations enforce DQ&nbsp;&nbsp;&nbsp;MERGE for SCD</div>
+<h5>Data Quality: Delta Table Pattern</h5><p>The framework stores DQ rules in a Delta table instead of hardcoding them. This means rules can be updated with a simple SQL UPDATE — no code change, no redeploy, no PR review.</p>
+<div class="ac-diagram"><span class="hl-o">Traditional (fragile)</span>: Rules in code → PR → deploy → restart<br><span class="hl-g">Delta Table (agile)</span>: Rules in table → UPDATE query → next run picks up</div>
+<pre># Rules loaded at runtime from Delta table
+rules = load_rules("silver_bookings", "critical")
+
+@dlt.table(cluster_by_auto=True)
+@dlt.expect_all_or_drop(rules)
+def silver_bookings():
+    return dlt.read_stream("bronze_bookings")
+      .select(
+        col("booking_id").cast("long"),
+        col("guest_name").cast("string"),
+        to_timestamp("check_in_date").alias("check_in"),
+        col("total_amount").cast("decimal(10,2)")
+      )</pre>
+<h5>Expectation Types</h5><table><tr><th>Decorator</th><th>On Failure</th><th>Use When</th></tr><tr><td><code>@dlt.expect</code></td><td>Warn, keep row</td><td>Non-critical fields (e.g., optional phone)</td></tr><tr><td><code>@dlt.expect_or_drop</code></td><td>Drop row silently</td><td>Known-bad data you can discard</td></tr><tr><td><code>@dlt.expect_or_fail</code></td><td>Fail pipeline</td><td>Critical invariants (e.g., negative revenue)</td></tr><tr><td><code>@dlt.expect_all_or_drop</code></td><td>Drop if any rule fails</td><td>Batch of rules from Delta table</td></tr></table>
+<h5>Pipeline Non-Negotiables</h5><table><tr><th>Setting</th><th>Value</th><th>Reason</th></tr><tr><td>Serverless</td><td>true</td><td>No cluster management</td></tr><tr><td>Edition</td><td>ADVANCED</td><td>Required for expectations + flows</td></tr><tr><td>Photon</td><td>true</td><td>10-20x faster aggregations</td></tr><tr><td>Liquid Clustering</td><td>AUTO</td><td>Engine-managed data layout</td></tr><tr><td>Row Tracking</td><td>true</td><td>Required for MV refresh</td></tr><tr><td>Change Data Feed</td><td>true</td><td>Incremental downstream processing</td></tr></table>`,
+   quiz:[{q:'Why store DQ rules in a Delta table?',opts:['Better performance','Runtime-updateable without redeploy','Required by DLT'],answer:1},{q:'Which DLT edition is required for expectations?',opts:['CORE','PRO','ADVANCED'],answer:2},{q:'What does @dlt.expect_or_fail do when a rule fails?',opts:['Drops the row','Warns and keeps the row','Fails the entire pipeline'],answer:2},{q:'What makes Liquid Clustering different from traditional partitioning?',opts:['It uses more storage','The engine manages layout automatically','It requires manual tuning'],answer:1}]},
+
+  {id:'genie',title:'Genie Spaces',subtitle:'Natural language → SQL analytics',icon:'✦',color:'var(--orange)',
+   content:`<h5>What is Genie?</h5><p>Genie Spaces let business users ask questions in plain English and get SQL-powered answers. The AI translates natural language to SQL, executes it against a SQL Warehouse, and returns formatted results.</p>
+<h5>Three Components of a Genie Space</h5><table><tr><th>Component</th><th>Purpose</th><th>Impact on Quality</th></tr><tr><td>Agent Instructions</td><td>Business context (≤20 lines)</td><td>⬛⬛⬛⬛⬛ Highest</td></tr><tr><td>Data Assets</td><td>Tables, Metric Views, TVFs</td><td>⬛⬛⬛⬛ High</td></tr><tr><td>Benchmark Questions</td><td>Expected Q→SQL pairs</td><td>⬛⬛⬛ Medium</td></tr></table>
+<h5>Data Asset Priority</h5>
+<div class="ac-diagram"><span class="hl-g">Metric Views</span> (pre-computed, highest trust) → <span class="hl-p">TVFs</span> (parameterized) → <span class="hl-o">Tables</span> (raw)</div>
+<p>Always prefer Metric Views over raw tables. They encode business logic (e.g., "revenue = price - discount - tax") so Genie doesn't have to guess.</p>
+<h5>Writing Great Agent Instructions</h5><pre># Genie Space: Hotel Bookings Analytics
+You are an analytics assistant for a hotel chain.
+Key terms:
+- "RevPAR" = Revenue per Available Room = total_revenue / available_rooms
+- "ADR" = Average Daily Rate = room_revenue / rooms_sold
+- "Occupancy" = rooms_sold / available_rooms
+When asked about "top hotels", rank by RevPAR unless specified.
+All monetary values are in USD.</pre>
+<h5>AppKit Integration</h5><pre>// server/server.ts — register Genie plugin
+genie({ spaces: { sales: "01ef7abc-def0-..." } })
+
+// client/src/pages/Analytics.tsx — drop-in chat
+import { GenieChat } from "@databricks/appkit-ui";
+&lt;GenieChat alias="sales" height={500} /&gt;</pre>
+<div class="ac-diagram"><span class="hl">User asks question</span> → <span class="hl-p">GenieChat component</span> → <span class="hl-o">SSE stream to /api/genie/</span> → <span class="hl-g">Genie API → SQL Warehouse</span></div>
+<h5>Optimization Tips</h5><table><tr><th>Tip</th><th>Details</th></tr><tr><td>Column comments</td><td>Add COMMENT ON COLUMN with business meaning</td></tr><tr><td>Metric Views</td><td>Pre-compute complex calculations</td></tr><tr><td>Benchmark questions</td><td>Cover your top 20 most-asked questions</td></tr><tr><td>Avoid ambiguity</td><td>Define terms like "active user" explicitly</td></tr></table>`,
+   quiz:[{q:'What has the highest impact on Genie quality?',opts:['More tables','Agent Instructions','Faster warehouse'],answer:1},{q:'What order does Genie prioritize data assets?',opts:['Tables → TVFs → Views','Metric Views → TVFs → Tables','Random'],answer:1},{q:'Why prefer Metric Views over raw tables?',opts:['They are faster','They encode business logic','They use less storage'],answer:1}]},
+
+  {id:'uc',title:'Unity Catalog & Governance',subtitle:'Data governance, lineage, and access control',icon:'⊞',color:'var(--green)',
+   content:`<h5>What is Unity Catalog?</h5><p>Unity Catalog (UC) is Databricks' unified governance layer. It provides a three-level namespace, fine-grained permissions, column-level lineage tracking, and data discovery — all from a single control plane.</p>
+<h5>Three-Level Namespace</h5><div class="ac-diagram"><span class="hl">Catalog</span> → <span class="hl-p">Schema</span> → <span class="hl-g">Table / View / Volume / Function / Model</span></div>
+<pre>-- Full path: catalog.schema.object
+SELECT * FROM production.gold.fact_bookings;</pre>
+<h5>Object Types in UC</h5><table><tr><th>Object</th><th>Description</th><th>Example</th></tr><tr><td>Table</td><td>Managed or external Delta tables</td><td>gold.fact_bookings</td></tr><tr><td>View</td><td>Virtual table (SQL query)</td><td>gold.v_monthly_revenue</td></tr><tr><td>Materialized View</td><td>Pre-computed, auto-refreshed</td><td>gold.mv_daily_stats</td></tr><tr><td>Volume</td><td>File storage (managed/external)</td><td>raw.uploads</td></tr><tr><td>Function</td><td>UDFs and TVFs</td><td>gold.fn_revenue_by_period()</td></tr><tr><td>Model</td><td>MLflow registered models</td><td>ml.churn_predictor</td></tr></table>
+<h5>Table Properties (every Gold table)</h5><pre>TBLPROPERTIES (
+  'delta.enableChangeDataFeed' = 'true',
+  'delta.enableRowTracking' = 'true',
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.autoOptimize.autoCompact' = 'true',
+  'layer' = 'gold',
+  'domain' = 'bookings',
+  'owner' = 'data-engineering'
+)</pre>
+<h5>Why Each Property Matters</h5><table><tr><th>Property</th><th>Purpose</th><th>Consequence if Missing</th></tr><tr><td>Change Data Feed</td><td>Incremental downstream processing</td><td>Must full-scan for changes</td></tr><tr><td>Row Tracking</td><td>Required for MV refresh</td><td>Materialized Views won't work</td></tr><tr><td>Auto-Optimize</td><td>File compaction + write optimization</td><td>Small files accumulate, slow reads</td></tr><tr><td>Liquid Clustering</td><td>Engine-managed data layout</td><td>Manual OPTIMIZE required</td></tr><tr><td>Tags (layer, domain)</td><td>Discovery, lineage, governance</td><td>Hard to find and govern at scale</td></tr></table>
+<h5>Files Plugin (UC Volumes)</h5><pre>// app.yaml resource
+- name: volumes
+  serving_endpoint: null  # uses workspace default
+
+// Auto-discovered from env vars
+DATABRICKS_VOLUME_UPLOADS=/Volumes/catalog/schema/uploads
+
+// React: DirectoryList, FileBreadcrumb, FilePreviewPanel</pre>`,
+   quiz:[{q:'What is required for Materialized View refresh?',opts:['Change Data Feed','Row Tracking','Liquid Clustering'],answer:1},{q:'How many levels in the UC namespace?',opts:['2 (schema.table)','3 (catalog.schema.table)','4 (workspace.catalog.schema.table)'],answer:1},{q:'What happens without auto-optimize?',opts:['Tables get corrupted','Small files accumulate, reads slow down','Nothing noticeable'],answer:1}]},
+
+  {id:'medallion',title:'Medallion Architecture',subtitle:'Bronze → Silver → Gold data layering',icon:'◆',color:'var(--bronze)',
+   content:`<h5>The Three Layers</h5><p>The Medallion Architecture organizes data into three quality tiers. Each layer has a specific purpose and transformation pattern.</p>
+<div class="ac-diagram"><span class="hl-o">Bronze (raw)</span>&nbsp;&nbsp;&nbsp;→&nbsp;&nbsp;&nbsp;<span class="hl-p">Silver (validated)</span>&nbsp;&nbsp;&nbsp;→&nbsp;&nbsp;&nbsp;<span class="hl-g">Gold (business)</span><br>Ingest as-is&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Deduplicate&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dimensional model<br>Append-only&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Type cast&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MERGE for SCD<br>Schema-on-read&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Apply DQ rules&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Business aggregations<br>Full history&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Standardize names&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Conformed dimensions</div>
+<h5>Design-First Principle</h5><p>This framework designs Gold <em>first</em> and works backwards. Why? Because the Gold layer defines what questions the business can answer. If you build Bronze/Silver first, you discover schema mismatches too late.</p>
+<div class="ac-diagram"><span class="hl-o">Traditional</span>: Bronze → Silver → Gold → <span class="hl">discover grain mismatch</span> → rework<br><span class="hl-g">Design-First</span>: <span class="hl">Gold design</span> → Bronze → Silver → Gold impl → <span class="hl-g">no surprises</span></div>
+<h5>Layer Comparison</h5><table><tr><th>Aspect</th><th>Bronze</th><th>Silver</th><th>Gold</th></tr><tr><td>Source</td><td>External systems, files</td><td>Bronze tables</td><td>Silver tables</td></tr><tr><td>Format</td><td>Delta (schema-on-read)</td><td>Delta (typed, cleaned)</td><td>Delta (dimensional model)</td></tr><tr><td>DQ rules</td><td>None — ingest everything</td><td>Expectations (warn/drop/fail)</td><td>Constraints (PK/FK)</td></tr><tr><td>Update pattern</td><td>Append</td><td>SCD Type 1 (overwrite)</td><td>SCD Type 2 (history)</td></tr><tr><td>Audience</td><td>Data engineers</td><td>Analysts, ML engineers</td><td>Business users, apps</td></tr><tr><td>Naming</td><td><code>bronze_[source]</code></td><td><code>silver_[entity]</code></td><td><code>dim_/fact_[name]</code></td></tr></table>
+<h5>The 9-Stage Pipeline</h5><p>The Data Product Accelerator expands this into 9 stages that go well beyond ETL:</p>
+<div class="ac-diagram"><span class="hl-g">Gold Design</span> → <span class="hl-o">Bronze</span> → <span class="hl-p">Silver</span> → <span class="hl-g">Gold Impl</span> → <span class="hl">Planning</span> → <span class="hl-p">Semantic Layer</span> → <span class="hl-o">Observability</span> → <span class="hl-g">ML</span> → <span class="hl">GenAI</span></div>`,
+   quiz:[{q:'Why does this framework design Gold first?',opts:['It is faster to build','Catches schema mismatches before building Bronze/Silver','Gold tables are simpler'],answer:1},{q:'What DQ approach does Bronze use?',opts:['Strict expectations','No rules — ingest everything','Manual review'],answer:1},{q:'What naming convention do Gold tables follow?',opts:['gold_[name]','dim_/fact_[name]','table_[name]'],answer:1}]},
+
+  {id:'skills',title:'Agent Skills Pattern',subtitle:'How AI coding assistants navigate this repo',icon:'⚡',color:'var(--blue)',
+   content:`<h5>What are Agent Skills?</h5><p>Agent Skills are structured Markdown files (<code>SKILL.md</code>) that teach AI coding assistants <em>how</em> to perform complex multi-step tasks. Instead of the AI guessing, the skill provides the exact steps, code patterns, and guardrails.</p>
+<h5>Orchestrator / Worker Pattern</h5>
+<div class="ac-diagram"><span class="hl">AGENTS.md (entry)</span> → <span class="hl-p">skill-navigator (router)</span><br>&nbsp;&nbsp;&nbsp;&nbsp;↓ routes by keyword<br><span class="hl-g">Orchestrator SKILL.md</span> (decides which workers to call)<br>&nbsp;&nbsp;&nbsp;&nbsp;↓ delegates<br><span class="hl-o">Worker SKILL.md</span> (focused, single-purpose task)</div>
+<p>This pattern limits context window usage. Instead of loading all 59 skills (~200K tokens), the navigator loads only the relevant orchestrator (~4K tokens), which loads only the needed workers (~2K each).</p>
+<h5>Progressive Disclosure</h5><table><tr><th>Tier</th><th>Loaded When</th><th>Token Cost</th><th>Example</th></tr><tr><td>Tier 1: Entry</td><td>Always (auto-loaded)</td><td>~2K</td><td>AGENTS.md</td></tr><tr><td>Tier 2: Router</td><td>Keyword match</td><td>~4K</td><td>skill-navigator</td></tr><tr><td>Tier 3: Orchestrator</td><td>Router delegates</td><td>~4K</td><td>gold-layer-design</td></tr><tr><td>Tier 4: Worker</td><td>Orchestrator calls</td><td>~2K each</td><td>grain-definition</td></tr></table>
+<h5>Skill File Structure</h5><pre># SKILL.md
+## Metadata (name, version, triggers)
+## Context (what this skill does)
+## Inputs (what it needs)
+## Steps (numbered, explicit)
+## Output Contract (what it produces)
+## References (linked files for deep detail)</pre>
+<h5>Why This Matters for Workshops</h5><p>Workshop attendees don't need to learn 59 skills. They type one natural language prompt, the AI reads AGENTS.md, routes to the right skill, and executes. The skill ensures consistency, correctness, and best practices automatically.</p>
+<div class="ac-diagram"><span class="hl">Human prompt</span> → <span class="hl-p">AI reads AGENTS.md</span> → <span class="hl-o">routes to skill</span> → <span class="hl-g">executes steps</span> → <span class="hl">production code</span></div>`,
+   quiz:[{q:'Why use orchestrator/worker instead of one big skill?',opts:['It looks more organized','Limits context window token usage','The AI requires it'],answer:1},{q:'What is Tier 1 in progressive disclosure?',opts:['The main orchestrator','AGENTS.md (auto-loaded entry point)','The worker skills'],answer:1},{q:'What file format are Agent Skills written in?',opts:['JSON','YAML','Markdown (SKILL.md)'],answer:2}]},
+];
+
+// (Prompt Lab removed)
+
+// ======================== THEME TOGGLE ========================
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  const btn = document.getElementById('themeToggle');
+  btn.textContent = isLight ? '☾' : '☀';
+  btn.title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+  try { localStorage.setItem('ws-theme', isLight ? 'light' : 'dark'); } catch(e) {}
+  if (document.getElementById('galaxy').classList.contains('active')) initStarfield();
+}
+
+// ======================== INITIALIZATION ========================
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const saved = localStorage.getItem('ws-theme');
+    if (saved === 'dark') {
+      document.body.classList.remove('light');
+      document.getElementById('themeToggle').textContent = '☀';
+    }
+  } catch(e) {}
+  try { initGalaxy(); } catch(e) { console.error('initGalaxy:', e); }
+  try { initAcademy(); } catch(e) { console.error('initAcademy:', e); }
+  try { initStarfield(); } catch(e) { console.error('initStarfield:', e); }
+});
+
+// ======================== MODE SWITCHING ========================
+function switchMode(mode) {
+  document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(mode).classList.add('active');
+  document.querySelector(`.mode-tab[onclick="switchMode('${mode}')"]`).classList.add('active');
+  if(mode === 'galaxy') initStarfield();
+}
+
+// ======================== SEARCH ========================
+function onSearch(q) {
+  const box = document.getElementById('searchResults');
+  if (!q || q.length < 2) { box.classList.remove('open'); return; }
+  const lq = q.toLowerCase();
+  const matches = SKILLS.filter(s =>
+    s.name.toLowerCase().includes(lq) ||
+    (s.keywords && s.keywords.some(k => k.toLowerCase().includes(lq))) ||
+    (s.desc && s.desc.toLowerCase().includes(lq))
+  ).slice(0, 10);
+  if (!matches.length) { box.classList.remove('open'); return; }
+  box.innerHTML = matches.map(s => {
+    const tc = typeColor(s.type);
+    return `<div class="sr-item" onmousedown="openDetail('${s.id}')"><span class="sr-type" style="background:${tc.bg};color:${tc.fg}">${s.type}</span><span>${s.name}</span></div>`;
+  }).join('');
+  box.classList.add('open');
+}
+function closeSearch() { document.getElementById('searchResults').classList.remove('open'); }
+function typeColor(t) {
+  const m = {orchestrator:{bg:'var(--purple-dim)',fg:'var(--purple)'},worker:{bg:'var(--gold-dim)',fg:'var(--gold)'},common:{bg:'var(--green-dim)',fg:'var(--green)'},entry:{bg:'var(--cyan-dim)',fg:'var(--cyan)'},platform:{bg:'var(--blue-dim)',fg:'var(--blue)'}};
+  return m[t] || {bg:'var(--surface2)',fg:'var(--text-dim)'};
+}
+
+// ======================== MODE 1: GALAXY MAP ========================
+function initGalaxy() {
+  const pf = document.getElementById('pipelineFlow');
+  pf.innerHTML = STAGES.map((st, i) => {
+    const orch = SKILL_MAP[st.orch];
+    const wc = orch ? (orch.workers||[]).length : 0;
+    const dots = Array(wc).fill(0).map((_,j) => {
+      const wid = orch && orch.workers[j] ? orch.workers[j] : '';
+      return `<div class="worker-dot" title="${SKILL_MAP[wid]?.name||''}" onclick="event.stopPropagation();openDetail('${wid}')"></div>`;
+    }).join('');
+    return (i > 0 ? '<div class="stage-arrow">›</div>' : '') +
+      `<div class="stage-cluster"><div class="stage-node ${st.sc}" onclick="openDetail('${st.orch}')" title="${SKILL_MAP[st.orch]?.desc||''}"><div class="sn-num">${st.num}</div><div class="sn-label">${st.label}</div></div><div class="worker-dots">${dots}</div></div>`;
+  }).join('');
+
+  const cs = document.getElementById('commonSpine');
+  cs.innerHTML = SKILLS.filter(s=>s.type==='common').map(s =>
+    `<div class="common-chip" onclick="openDetail('${s.id}')" title="${s.desc}">${s.name.replace('Databricks ','').replace('databricks-','')}</div>`
+  ).join('');
+
+  const ph = document.getElementById('phaseFlow');
+  ph.innerHTML = PHASES.map((p,i) =>
+    (i>0?'<div class="stage-arrow" style="color:var(--green);margin-top:0">›</div>':'') +
+    `<div class="phase-node" onclick="openDetail('${p.skills[0]||'appkit-00'}')" title="Phase ${p.num}"><div class="pn-num">${p.num}</div><div class="pn-label">${p.label}</div></div>`
+  ).join('');
+
+  const ag = document.getElementById('agenticNodes');
+  ag.innerHTML = SKILLS.filter(s=>s.component==='agentic').map(s =>
+    `<div class="agentic-node" onclick="openDetail('${s.id}')" title="${s.desc}"><strong>${s.name}</strong></div>`
+  ).join('');
+}
+
+// ======================== STARFIELD ========================
+let starfieldRaf = null;
+function initStarfield() {
+  const c = document.getElementById('starfield');
+  if (!c) return;
+  if (starfieldRaf) cancelAnimationFrame(starfieldRaf);
+  const ctx = c.getContext('2d');
+  c.width = c.parentElement.clientWidth;
+  c.height = c.parentElement.clientHeight;
+  const isLight = document.body.classList.contains('light');
+  const stars = Array.from({length:120}, () => ({
+    x: Math.random()*c.width, y: Math.random()*c.height,
+    r: Math.random()*1.2+0.3, a: Math.random(), s: Math.random()*0.005+0.002
+  }));
+  function draw() {
+    ctx.clearRect(0,0,c.width,c.height);
+    stars.forEach(st => {
+      st.a += st.s; if(st.a>1) st.s=-Math.abs(st.s); if(st.a<0.1) st.s=Math.abs(st.s);
+      ctx.beginPath(); ctx.arc(st.x,st.y,st.r,0,Math.PI*2);
+      ctx.fillStyle = isLight ? `rgba(30,40,80,${st.a*0.12})` : `rgba(200,220,255,${st.a*0.5})`;
+      ctx.fill();
+    });
+    starfieldRaf = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ======================== MODE 2: GUIDED TOURS ========================
+let curTour = 'a', curTourStep = -1, tourPlaying = false, tourTimer = null, tourSpeedMs = 2000;
+
+function selectTour(id) {
+  curTour = id; curTourStep = -1; tourPlaying = false;
+  document.querySelectorAll('.tour-card').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tc-'+id).classList.add('active');
+  document.getElementById('tourTree').innerHTML = TOURS[id].tree;
+  document.getElementById('tourDetail').innerHTML = '<div class="td-welcome"><h3>' + TOURS[id].name + '</h3><p>Press <strong>Play</strong> or <strong>Next</strong> to walk through. Each step reveals design choices, code patterns, and rationale in this panel.</p></div>';
+  document.getElementById('tourStepInfo').textContent = `0 / ${TOURS[id].steps.length}`;
+  document.getElementById('tourPlayBtn').textContent = '▶ Play';
+}
+
+function ttoggle(liId) {
+  const li = document.getElementById(liId); if(!li) return;
+  const ch = li.querySelector(':scope > .tnode .chevron');
+  if(li.classList.contains('collapsed')){li.classList.remove('collapsed');li.classList.add('expanded');if(ch)ch.classList.add('open');}
+  else{li.classList.remove('expanded');li.classList.add('collapsed');if(ch)ch.classList.remove('open');}
+}
+function tForceExpand(id){const li=document.getElementById(id);if(!li)return;li.classList.remove('collapsed');li.classList.add('expanded');const ch=li.querySelector(':scope > .tnode .chevron');if(ch)ch.classList.add('open');}
+let treeExpanded = false;
+function toggleTreeAll(){
+  const tree = document.getElementById('tourTree');
+  if(!tree) return;
+  const btn = document.getElementById('treeExpandBtn');
+  treeExpanded = !treeExpanded;
+  tree.querySelectorAll('li.collapsed, li.expanded').forEach(li => {
+    if(treeExpanded){li.classList.remove('collapsed');li.classList.add('expanded');}
+    else{li.classList.remove('expanded');li.classList.add('collapsed');}
+    const ch = li.querySelector(':scope > .tnode .chevron');
+    if(ch){if(treeExpanded)ch.classList.add('open');else ch.classList.remove('open');}
+  });
+  btn.textContent = treeExpanded ? '⊟ Collapse All' : '⊞ Expand All';
+}
+function tActivate(id){const el=document.getElementById(id);if(!el)return;el.classList.add('active-node');el.classList.remove('visited');el.scrollIntoView({behavior:'smooth',block:'nearest'});}
+function tSetTier(tier,label){}
+
+// ======================== TREE CLICK → DETAIL PANE ========================
+document.addEventListener('click', function(e) {
+  const tnode = e.target.closest('.tnode');
+  if (!tnode) return;
+  const tree = tnode.closest('#tourTree');
+  if (!tree) return;
+
+  const toggleId = tnode.getAttribute('data-toggle');
+  if (toggleId) ttoggle(toggleId);
+
+  const skillId = tnode.getAttribute('data-skill');
+  if (skillId && SKILL_MAP[skillId]) {
+    document.querySelectorAll('#tourTree .tnode.user-selected').forEach(el => el.classList.remove('user-selected'));
+    tnode.classList.add('user-selected');
+    renderNodeDetail(skillId);
+  } else if (!skillId && tnode.querySelector('.name')) {
+    const label = tnode.querySelector('.name').textContent;
+    document.querySelectorAll('#tourTree .tnode.user-selected').forEach(el => el.classList.remove('user-selected'));
+    tnode.classList.add('user-selected');
+    renderNodeLabel(label, tnode);
+  }
+
+  e.stopPropagation();
+});
+
+function renderNodeDetail(skillId) {
+  const s = SKILL_MAP[skillId];
+  if (!s) return;
+  const detail = document.getElementById('tourDetail');
+  const tc = typeColor(s.type);
+  let html = '<div class="td-inner">';
+
+  html += '<div class="td-header">';
+  html += '<div class="td-header-top">';
+  html += `<span class="td-name">${s.name}</span>`;
+  html += `<span class="td-badge" style="background:${tc.bg};color:${tc.fg}">${s.type}</span>`;
+  if (s.stage) html += `<span class="td-badge" style="background:var(--surface2);color:var(--text-dim)">Stage ${s.stage}</span>`;
+  if (s.phase !== undefined) html += `<span class="td-badge" style="background:var(--surface2);color:var(--text-dim)">Phase ${s.phase}</span>`;
+  if (s.component) html += `<span class="td-badge" style="background:var(--surface2);color:var(--text-dim)">${s.component}</span>`;
+  html += '</div>';
+  html += `<div class="td-desc">${s.desc||''}</div>`;
+  html += '</div>';
+
+  if (s.rationale) {
+    html += `<div class="td-rationale"><h4>Design Rationale</h4><p>${s.rationale}</p></div>`;
+  }
+
+  if (s.emits) {
+    html += '<div class="td-flow"><h4>Emits (Output Artifacts)</h4><div class="td-flow-diagram"><div class="td-flow-col outputs">';
+    html += s.emits.map(e => `<div class="td-pill">${e}</div>`).join('');
+    html += '</div></div></div>';
+  }
+
+  if (s.code) {
+    html += `<div class="td-code"><h4>Key Code Pattern</h4><div class="td-code-block">${highlightCode(s.code)}</div><button class="td-code-copy" onclick="copyTdCode(this)">Copy</button></div>`;
+  }
+
+  if (s.workers && s.workers.length) {
+    html += '<div class="td-workers"><h4>Workers (' + s.workers.length + ')</h4><div class="td-worker-map">';
+    s.workers.forEach(wid => {
+      const w = SKILL_MAP[wid];
+      if (!w) return;
+      const wc = typeColor(w.type);
+      html += `<div class="td-worker-chip" style="background:${wc.bg};border-color:${wc.fg}40;color:${wc.fg}" onclick="navigateToSkill('${wid}')" title="${w.desc||''}">${w.name}</div>`;
+    });
+    html += '</div></div>';
+  }
+
+  if (s.commonDeps && s.commonDeps.length) {
+    html += '<div class="td-workers"><h4>Common Dependencies</h4><div class="td-worker-map">';
+    s.commonDeps.forEach(did => {
+      const d = SKILL_MAP[did];
+      if (!d) return;
+      html += `<div class="td-worker-chip" style="background:var(--green-dim);border-color:var(--green)40;color:var(--green)" onclick="navigateToSkill('${did}')" title="${d.desc||''}">${d.name}</div>`;
+    });
+    html += '</div></div>';
+  }
+
+  if (s.keywords && s.keywords.length) {
+    html += '<div class="td-flow"><h4>Routing Keywords</h4><div class="td-flow-diagram"><div class="td-flow-col">';
+    html += s.keywords.map(k => `<div class="td-pill" style="background:var(--surface2);border-color:var(--border);color:var(--text-dim)">${k}</div>`).join('');
+    html += '</div></div></div>';
+  }
+
+  if (s.platform) {
+    html += `<div class="td-actions"><button class="dp-btn secondary" onclick="openAcademyModule('${s.platform}')">Learn: ${s.platform}</button></div>`;
+  }
+  if (s.prompt) {
+    html += `<div class="td-actions"><button class="dp-btn primary" onclick="copyPrompt('${s.id}')">Copy Prompt</button></div>`;
+  }
+
+  html += '</div>';
+  detail.innerHTML = html;
+}
+
+function renderNodeLabel(label, tnode) {
+  const detail = document.getElementById('tourDetail');
+  const typeClass = [...tnode.classList].find(c => c.startsWith('type-')) || '';
+  const typeName = typeClass.replace('type-','') || 'node';
+  const tc = typeColor(typeName);
+  detail.innerHTML = `<div class="td-inner"><div class="td-header"><div class="td-header-top"><span class="td-name">${label}</span><span class="td-badge" style="background:${tc.bg};color:${tc.fg}">${typeName}</span></div><div class="td-desc" style="margin-top:8px">Click on child nodes to explore what is inside, or use the Guided Tour controls above to walk through step by step.</div></div></div>`;
+}
+
+function navigateToSkill(skillId) {
+  const nodes = document.querySelectorAll('#tourTree .tnode[data-skill="' + skillId + '"]');
+  if (nodes.length) {
+    const node = nodes[0];
+    const li = node.closest('li');
+    if (li) {
+      let parent = li.parentElement?.closest('li');
+      while (parent) { tForceExpand(parent.id); parent = parent.parentElement?.closest('li'); }
+    }
+    document.querySelectorAll('#tourTree .tnode.user-selected').forEach(el => el.classList.remove('user-selected'));
+    node.classList.add('user-selected');
+    node.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+  renderNodeDetail(skillId);
+}
+
+function tourApplyStep(idx){
+  document.querySelectorAll('#tourTree .tnode.active-node').forEach(el=>{el.classList.remove('active-node');el.classList.add('visited');});
+  const tour=TOURS[curTour]; if(idx<0||idx>=tour.steps.length)return;
+  const s=tour.steps[idx];
+  if(s.expand) s.expand.forEach(id=>tForceExpand(id));
+  if(s.activate) s.activate.forEach(id=>tActivate(id));
+  if(s.lit) s.lit.forEach(id=>{const li=document.getElementById(id);if(li)li.classList.add('lit');});
+  document.getElementById('tourStepInfo').textContent=`${idx+1} / ${tour.steps.length}`;
+  renderTourDetail(s, idx, tour.steps.length);
+}
+
+function renderTourDetail(step, idx, total) {
+  const detail = document.getElementById('tourDetail');
+  if (step.summary) {
+    const dots = Array.from({length:total},(_,i)=>`<div class="td-progress-dot${i<idx?' done':''}${i===idx?' current':''}"></div>`).join('');
+    detail.innerHTML = `<div class="td-summary"><h3>${step.narration}</h3><p>${step.designRationale||'You\'ve completed this tour! Try another tour, explore the Galaxy Map, or dive into Platform Academy to learn the building blocks.'}</p><div class="td-progress">${dots}</div></div>`;
+    return;
+  }
+  const skills = (step.skillIds||[]).map(id=>SKILL_MAP[id]).filter(Boolean);
+  const primary = skills[0];
+  const rationale = step.designRationale || (primary && primary.rationale) || null;
+  const io = step.inputOutput;
+  const code = primary && primary.code;
+  const tierLabel = step.tier ? step.tier[1] : '';
+  const tierNum = step.tier ? step.tier[0] : 1;
+  const tierColors = {1:'var(--cyan)',2:'var(--purple)',3:'var(--gold)',4:'var(--orange)'};
+  const tierColor = tierColors[tierNum]||'var(--cyan)';
+
+  let html = '<div class="td-inner">';
+
+  // Section A: Header
+  html += '<div class="td-header">';
+  html += '<div class="td-header-top">';
+  if (primary) {
+    const tc = typeColor(primary.type);
+    html += `<span class="td-name">${primary.name}</span>`;
+    html += `<span class="td-badge" style="background:${tc.bg};color:${tc.fg}">${primary.type}</span>`;
+    if (primary.stage) html += `<span class="td-badge" style="background:var(--surface2);color:var(--text-dim)">Stage ${primary.stage}</span>`;
+    if (primary.phase !== undefined) html += `<span class="td-badge" style="background:var(--surface2);color:var(--text-dim)">Phase ${primary.phase}</span>`;
+    html += `<span class="td-badge" style="background:${tierColor}22;color:${tierColor}">${tierLabel}</span>`;
+  } else {
+    html += `<span class="td-name" style="font-size:16px">${tierLabel}</span>`;
+    html += `<span class="td-badge" style="background:${tierColor}22;color:${tierColor}">Step ${idx+1}/${total}</span>`;
+  }
+  html += '</div>';
+  if (primary) html += `<div class="td-desc">${primary.desc}</div>`;
+  html += `<div class="td-narration">${step.narration}</div>`;
+  html += '</div>';
+
+  // Section B: Rationale
+  if (rationale) {
+    html += `<div class="td-rationale"><h4>Why This Pattern</h4><p>${rationale}</p></div>`;
+  }
+
+  // Section C: Input/Output Flow
+  if (io) {
+    html += '<div class="td-flow"><h4>Data Flow</h4><div class="td-flow-diagram">';
+    html += '<div class="td-flow-col inputs">' + io.inputs.map(i=>`<div class="td-pill">${i}</div>`).join('') + '</div>';
+    html += '<div class="td-flow-arrow">→</div>';
+    html += '<div class="td-flow-col outputs">' + io.outputs.map(o=>`<div class="td-pill">${o}</div>`).join('') + '</div>';
+    html += '</div></div>';
+  }
+
+  // Section D: Code Spotlight
+  if (code) {
+    html += `<div class="td-code"><h4>Key Code Pattern</h4><div class="td-code-block">${highlightCode(code)}</div><button class="td-code-copy" onclick="copyTdCode(this)">Copy</button></div>`;
+  }
+
+  // Section E: Workers & Dependencies Mini-Map
+  if (primary && primary.workers && primary.workers.length) {
+    html += '<div class="td-workers"><h4>Workers (' + primary.workers.length + ')</h4><div class="td-worker-map">';
+    html += `<div class="td-hub">${primary.stage||'O'}</div>`;
+    html += primary.workers.map(wid=>{
+      const w=SKILL_MAP[wid];
+      return w ? `<div class="td-worker-chip" onclick="navigateToSkill('${wid}')" title="${w.desc||''}">${w.name}</div>` : '';
+    }).join('');
+    html += '</div>';
+    if (primary.commonDeps && primary.commonDeps.length) {
+      html += '<div class="td-deps-row"><span class="td-dep-label">Deps:</span>';
+      html += primary.commonDeps.map(did=>{const d=SKILL_MAP[did];return d?`<div class="td-dep-chip" onclick="navigateToSkill('${did}')">${d.name}</div>`:'';}).join('');
+      html += '</div>';
+    }
+    html += '</div>';
+  } else if (skills.length > 1) {
+    html += '<div class="td-workers"><h4>Skills in this step (' + skills.length + ')</h4><div class="td-worker-map">';
+    html += skills.map(s=>{
+      const tc=typeColor(s.type);
+      return `<div class="td-worker-chip" style="background:${tc.bg};border-color:${tc.fg}40;color:${tc.fg}" onclick="navigateToSkill('${s.id}')" title="${s.desc||''}">${s.name}</div>`;
+    }).join('');
+    html += '</div></div>';
+  }
+
+  // Section F: Actions
+  if (primary) {
+    html += '<div class="td-actions">';
+    if (primary.prompt) html += `<button class="dp-btn primary" onclick="copyPrompt('${primary.id}')">Copy Prompt</button>`;
+    if (primary.platform) html += `<button class="dp-btn secondary" onclick="openAcademyModule('${primary.platform}')">Learn: ${primary.platform}</button>`;
+    html += '</div>';
+  }
+
+  html += '</div>';
+  detail.innerHTML = html;
+}
+
+function highlightCode(code) {
+  let h = escHtml(code);
+  const toks = [];
+  function tok(cls, txt) { const ph = '\x01' + toks.length + '\x01'; toks.push('<span class="'+cls+'">'+txt+'</span>'); return ph; }
+  h = h.replace(/(--|#|\/\/)(.*)$/gm, (_,a,b) => tok('cm', a+b));
+  h = h.replace(/(@\w+[\.\w]*)/g, (_,a) => tok('dec', a));
+  h = h.replace(/'([^']*?)'/g, (_,a) => "'"+tok('str', a)+"'");
+  h = h.replace(/"([^"]*?)"/g, (_,a) => '"'+tok('str', a)+'"');
+  const kws = /\b(SELECT|FROM|WHERE|INSERT|INTO|UPDATE|SET|DELETE|CREATE|TABLE|MERGE|USING|ON|WHEN|MATCHED|THEN|NOT|AND|OR|AS|CLUSTER|BY|AUTO|TBLPROPERTIES|ALTER|ADD|CONSTRAINT|PRIMARY KEY|FOREIGN KEY|REFERENCES|IF NOT EXISTS|DROP|import|export|const|let|var|function|return|async|await|try|catch|new|def|class|with|elif|else|if|for|in|True|False|None|COMMENT|SCHEMA|MANAGED|LOCATION|DBPROPERTIES|IDENTITY|GENERATED|ALWAYS|DEFAULT|MONITOR|SCHEDULE|CRON|QUALITY|RULES|ALERT|NOTIFY|MATERIALIZED|VIEW|RETURNS)\b/gi;
+  h = h.replace(kws, m => tok('kw', m));
+  h = h.replace(/\b(dlt|appkit|databricks|mlflow|ResponsesAgent)\b/gi, m => tok('fn', m));
+  toks.forEach((s, i) => { h = h.split('\x01'+i+'\x01').join(s); });
+  return h;
+}
+
+function copyTdCode(btn) {
+  const block = btn.previousElementSibling;
+  navigator.clipboard.writeText(block.textContent).then(()=>{
+    btn.textContent='Copied!';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},2000);
+  });
+}
+function tourNext(){const tour=TOURS[curTour];if(curTourStep<tour.steps.length-1){curTourStep++;tourApplyStep(curTourStep);}else tourStopPlay();}
+function tourPrev(){if(curTourStep<=0)return;curTourStep--;selectTour(curTour);for(let i=0;i<=curTourStep;i++){const s=TOURS[curTour].steps[i];if(s.expand)s.expand.forEach(id=>tForceExpand(id));if(i<curTourStep&&s.activate)s.activate.forEach(id=>{const el=document.getElementById(id);if(el){el.classList.add('visited');el.classList.remove('active-node');}});}tourApplyStep(curTourStep);}
+function tourTogglePlay(){if(tourPlaying)tourStopPlay();else{tourPlaying=true;document.getElementById('tourPlayBtn').textContent='⏸ Pause';document.getElementById('tourPlayBtn').classList.add('active');if(curTourStep>=TOURS[curTour].steps.length-1){selectTour(curTour);}tourTick();}}
+function tourStopPlay(){tourPlaying=false;clearTimeout(tourTimer);document.getElementById('tourPlayBtn').textContent='▶ Play';document.getElementById('tourPlayBtn').classList.remove('active');}
+function tourTick(){if(!tourPlaying)return;tourNext();if(curTourStep>=TOURS[curTour].steps.length-1){tourStopPlay();return;}tourTimer=setTimeout(tourTick,tourSpeedMs);}
+function tourReset(){tourStopPlay();selectTour(curTour);}
+function tourUpdSpeed(){const v=parseInt(document.getElementById('tourSpeed').value);const sp={1:4000,2:3000,3:2000,4:1200,5:700};const lb={1:'0.5x',2:'0.75x',3:'1x',4:'1.5x',5:'2x'};tourSpeedMs=sp[v];document.getElementById('tourSpdLbl').textContent=lb[v];}
+
+// ======================== MODE 3: SKILL DEEP DIVE ========================
+function openDetail(id) {
+  const s = SKILL_MAP[id]; if(!s) return;
+  const tc = typeColor(s.type);
+  const stageLabel = s.stage ? `Stage ${s.stage}` : (s.phase !== undefined ? `Phase ${s.phase}` : '');
+  const workers = (s.workers||[]).map(wid => {
+    const w = SKILL_MAP[wid];
+    return w ? `<div class="dp-dep" onclick="openDetail('${wid}')"><div class="dd-icon" style="background:var(--gold-dim);color:var(--gold)">W</div>${w.name}</div>` : '';
+  }).join('');
+  const deps = (s.commonDeps||[]).map(did => {
+    const d = SKILL_MAP[did];
+    return d ? `<div class="dp-dep" onclick="openDetail('${did}')"><div class="dd-icon" style="background:var(--green-dim);color:var(--green)">C</div>${d.name}</div>` : '';
+  }).join('');
+  const panel = document.getElementById('detailPanel');
+  panel.innerHTML = `
+    <div class="dp-header">
+      <button class="dp-close" onclick="closeDetail()">✕</button>
+      <div class="dp-title">${s.name}</div>
+      <div class="dp-badges">
+        <span class="dp-badge" style="background:${tc.bg};color:${tc.fg}">${s.type}</span>
+        ${stageLabel ? `<span class="dp-badge" style="background:var(--surface2);color:var(--text-dim)">${stageLabel}</span>` : ''}
+        ${s.component ? `<span class="dp-badge" style="background:var(--surface2);color:var(--text-dim)">${s.component}</span>` : ''}
+      </div>
+      <div class="dp-desc">${s.desc||''}</div>
+    </div>
+    ${s.keywords && s.keywords.length ? `<div class="dp-section"><h4>Keywords (Routing Triggers)</h4><div class="dp-keywords">${s.keywords.map(k=>`<span class="dp-kw">${k}</span>`).join('')}</div></div>` : ''}
+    ${workers ? `<div class="dp-section"><h4>Workers (${(s.workers||[]).length})</h4><div class="dp-deps">${workers}</div></div>` : ''}
+    ${deps ? `<div class="dp-section"><h4>Common Dependencies</h4><div class="dp-deps">${deps}</div></div>` : ''}
+    ${s.emits ? `<div class="dp-section"><h4>Emits</h4><div class="dp-keywords">${s.emits.map(e=>`<span class="dp-kw">${e}</span>`).join('')}</div></div>` : ''}
+    ${s.code ? `<div class="dp-section"><h4>Key Code Pattern</h4><div class="dp-code">${highlightCode(s.code)}</div></div>` : ''}
+    <div class="dp-actions">
+      ${s.prompt ? `<button class="dp-btn primary" onclick="copyPrompt('${s.id}')">Copy Prompt</button>` : ''}
+      ${s.platform ? `<button class="dp-btn secondary" onclick="closeDetail();openAcademyModule('${s.platform}')">Learn: ${s.platform}</button>` : ''}
+    </div>`;
+  document.getElementById('detailOverlay').classList.add('open');
+  panel.classList.add('open');
+}
+function closeDetail(){document.getElementById('detailOverlay').classList.remove('open');document.getElementById('detailPanel').classList.remove('open');}
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function copyPrompt(id){const s=SKILL_MAP[id];if(!s||!s.prompt)return;navigator.clipboard.writeText(s.prompt).then(()=>{const btns=document.querySelectorAll('.dp-btn.primary');btns.forEach(b=>{if(b.textContent==='Copy Prompt'){b.textContent='Copied!';setTimeout(()=>{b.textContent='Copy Prompt';},2000);}});});}
+
+// ======================== MODE 4: PLATFORM ACADEMY ========================
+function initAcademy(){
+  const grid=document.getElementById('academyGrid');
+  grid.innerHTML=ACADEMY.map(m=>{
+    const quizHtml=m.quiz?`<div class="quiz-section"><h5>Quiz Yourself</h5>${m.quiz.map((q,qi)=>`<div class="quiz-q"><p>${qi+1}. ${q.q}</p>${q.opts.map((o,oi)=>`<div class="quiz-opt" onclick="checkQuiz(this,${oi},${q.answer})">${o}</div>`).join('')}</div>`).join('')}</div>`:'';
+    return `<div class="academy-card" id="ac-${m.id}"><div class="ac-header" onclick="toggleAcademy('${m.id}')"><div class="ac-icon" style="background:${m.color}22;color:${m.color}">${m.icon}</div><div><div class="ac-title">${m.title}</div><div class="ac-subtitle">${m.subtitle}</div></div><div class="ac-chevron" id="ach-${m.id}">▼</div></div><div class="ac-body" id="acb-${m.id}"><div class="ac-content">${m.content}${quizHtml}</div></div></div>`;
+  }).join('');
+}
+function toggleAcademy(id){
+  const body=document.getElementById('acb-'+id);
+  const chev=document.getElementById('ach-'+id);
+  body.classList.toggle('open');chev.classList.toggle('open');
+}
+function openAcademyModule(id){switchMode('academy');setTimeout(()=>{const body=document.getElementById('acb-'+id);if(body&&!body.classList.contains('open'))toggleAcademy(id);document.getElementById('ac-'+id)?.scrollIntoView({behavior:'smooth'});},100);}
+function checkQuiz(el,idx,answer){
+  const parent=el.parentElement;
+  parent.querySelectorAll('.quiz-opt').forEach((o,i)=>{o.classList.add('revealed');o.classList.add(i===answer?'correct':'wrong');});
+}
+
+// (Prompt Lab removed)
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if(document.getElementById('tours').classList.contains('active')){
+    if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();tourNext();}
+    if(e.key==='ArrowLeft'){e.preventDefault();tourPrev();}
+    if(e.key==='p'||e.key==='P')tourTogglePlay();
+    if(e.key==='r'||e.key==='R')tourReset();
+  }
+  if(e.key==='Escape')closeDetail();
+});
+
+// Init default tour
+selectTour('a');
+</script>
+</body>
+</html>

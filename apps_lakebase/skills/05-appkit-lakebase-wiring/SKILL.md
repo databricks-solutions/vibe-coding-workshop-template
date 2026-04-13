@@ -52,13 +52,30 @@ Design a database schema from a PRD, build Express API routes with mock fallback
 4. `DB_SCHEMA` is set to a user-scoped name derived from `$APP_NAME` (hyphens → underscores, e.g., `prashanth_s_booking_app`)
 5. `npm run build` passes with the Lakebase plugin imported
 
-**Read the database design reference first:** Before designing your schema, read [references/database-design-guide.md](references/database-design-guide.md) for normalization rules and PostgreSQL conventions.
-
 **Upstream docs (always check for latest):**
 
 ```bash
 npx @databricks/appkit docs "lakebase"
 ```
+
+> **Build system note:** AppKit uses `tsdown` with `unbundle: true` for server compilation. Each `.ts` file in `server/` gets its own `.js` output, and relative imports between them are preserved. You can safely split `server/server.ts` into multiple files (e.g., `server/mock-data.ts`, `server/mappers.ts`) — they will resolve correctly at runtime. The entry point remains `server/server.ts`.
+
+---
+
+## Decision Defaults
+
+When multiple approaches are valid, use these defaults. Override only if the PRD demands it.
+
+| Decision | Default | Rationale |
+|----------|---------|-----------|
+| Where does mock data live? | `server/mock-data.ts` — server owns all fallback data | Client and server are separate builds; cannot import across the boundary |
+| Single server file or split? | Split if `server.ts` would exceed ~300 lines | `tsdown unbundle: true` preserves relative imports between server files (see note above) |
+| Numeric PK or text PK? | Use `text` PK if the frontend already uses formatted IDs (e.g., `"lst-001"`) everywhere; otherwise `bigint identity` | Avoids a format-conversion layer that touches every route and mapper |
+| N+1 queries or JOINs? | Application-side joins for <50 rows; SQL JOINs for larger datasets | Simpler code; performance is irrelevant at seed-data scale |
+| Client-side or server-side validation? (promos, discounts) | Keep client-side for MVP; migrate to server in a follow-up | Reduces scope of this step |
+| Dynamically generated data (available dates, time slots)? | Generate in the mapper function, not a database table | Avoids seeding hundreds of ephemeral rows |
+| Mock fallback data format? | camelCase (matching API response after mappers) | Catch block returns data in the same shape as the live path |
+| Seed data: parameterized inserts or raw SQL? | Parameterized (`$1, $2`) for values with apostrophes/special chars; raw SQL for simple numeric data | Avoids SQL injection and escaping headaches |
 
 ---
 
@@ -76,6 +93,8 @@ Read the PRD and extract:
 - **Data types** — map PRD fields to PostgreSQL types using the conventions below
 
 ### 1b. PostgreSQL Type Conventions
+
+For normalization rules, naming conventions, and additional type guidance, see [references/database-design-guide.md](references/database-design-guide.md).
 
 | PRD Concept | PostgreSQL Type | Why |
 |-------------|----------------|-----|
@@ -152,6 +171,25 @@ if (parseInt(seedCheck.rows[0].cnt) === 0) {
 }
 ```
 
+For multi-table seed patterns with foreign keys, see [references/multi-table-example.md](references/multi-table-example.md).
+
+### 1f. Mock Data Strategy
+
+When the app already has a client-side `mockData.ts` with static arrays, use this migration pattern:
+
+1. **Create `server/mock-data.ts`** with the same data in camelCase format (matching what mappers would produce from DB rows). Export typed arrays.
+2. **Import into `server/server.ts`** for use in catch-block fallbacks and as the source for seed SQL generation.
+3. **Keep `client/src/data/mockData.ts`** for type definitions, UI constants (filter options, property type lists), and utility functions. Remove the data arrays once all pages use `useLakebaseData`.
+4. **Pages switch from** `import { LISTINGS } from '../data/mockData'` **to** `useLakebaseData<Listing>('/api/listings')` — the server returns mock fallback data when Lakebase is unavailable, so the client never needs its own copy of the data.
+
+File ownership after wiring:
+
+| File | Contains | Does NOT contain |
+|------|----------|------------------|
+| `server/mock-data.ts` | All data arrays (listings, bookings, etc.) in camelCase | Type definitions, UI constants |
+| `client/src/data/mockData.ts` | Type interfaces, filter-option constants, utility functions | Data arrays (deleted after migration) |
+| `server/server.ts` | DDL, seed logic, routes importing from `mock-data.ts` | Inline mock data objects |
+
 ---
 
 ## Step 2: Build API Routes
@@ -167,22 +205,31 @@ When using `server.extend()`, pass `autoStart: false` to the `server()` plugin a
 ```typescript
 import { createApp, server, lakebase } from "@databricks/appkit";
 
+const hasLakebase = Boolean(process.env.LAKEBASE_ENDPOINT);
 const AppKit = await createApp({
-  plugins: [server({ autoStart: false }), lakebase()],
+  plugins: hasLakebase
+    ? [server({ autoStart: false }), lakebase()]
+    : [server({ autoStart: false })],
 });
 
 const DB_SCHEMA = process.env.DB_SCHEMA || "app";
 
 // DDL + seed (from Step 1) ...
 
-AppKit.server.extend((app) => {
+AppKit.server.extend((app: any) => {
   // Register routes here (Steps 2b-2d)
 });
 
 await AppKit.server.start();
 ```
 
-> **Prefer using the `app` parameter in `server.extend((app) => { ... })`.** Express is bundled inside `@databricks/appkit`. For GET routes, no additional import is needed. If you need `express.json()` for POST/PUT body parsing, adding `express` as an explicit dependency is acceptable (see Step 2e) — it adds a redundant dependency but works in production. Avoid importing Express solely for routing since `app` already provides it.
+> **Gotcha — `lakebase()` crashes without `LAKEBASE_ENDPOINT`.** The plugin throws `ConfigurationError` during `createApp()` if the env var is missing. This always happens in local dev before the first deploy (the platform injects the var at runtime). The conditional pattern above lets the app start with mock fallback data locally. Routes should check `AppKit.lakebase` before querying — see Step 2c for the try/catch pattern that falls back to mock data when the pool is undefined.
+
+> **Gotcha — `autoStart: false` is required.** Without it, the server starts before `extend()` runs and routes are never registered. Always pass `server({ autoStart: false })` and call `AppKit.server.start()` after all routes are defined.
+
+> **Gotcha — Do NOT type-annotate the `app` parameter with `Express`.** Importing `Express` from the `express` module and writing `(app: Express) =>` causes a type mismatch (`TS2345`). AppKit's `server.extend()` expects its own internal `Application` type. Use `(app: any)` to satisfy strict mode, or omit the annotation entirely and let TypeScript infer it. You can still import `Request` and `Response` types for route handler parameters.
+
+> **Prefer using the `app` parameter in `server.extend((app: any) => { ... })`.** Express is bundled inside `@databricks/appkit`. For GET routes, no additional import is needed. Avoid importing Express solely for routing since `app` already provides it. The `: any` annotation prevents `tsc -b` strict-mode errors (`Parameter 'app' implicitly has an 'any' type`).
 
 ### 2b. Response Contract
 
@@ -248,12 +295,12 @@ app.get("/api/health/lakebase", async (req, res) => {
 });
 ```
 
-### 2e. JSON Body Parsing for POST/PUT Routes
+### 2e. POST/PUT Routes (skip if your app only has GET endpoints)
 
-Express is bundled inside AppKit — access it exclusively via the `app` parameter in `server.extend()`. For JSON body parsing in POST/PUT routes, use the inline parser:
+If your app has POST or PUT routes, add JSON body parsing. Express is bundled inside AppKit — access it exclusively via the `app` parameter in `server.extend()`:
 
 ```typescript
-AppKit.server.extend((app) => {
+AppKit.server.extend((app: any) => {
   app.use((req, _res, next) => {
     if (req.headers["content-type"]?.includes("application/json") && !req.body) {
       let raw = "";
@@ -269,13 +316,11 @@ AppKit.server.extend((app) => {
 });
 ```
 
-See [references/frontend-patterns.md](references/frontend-patterns.md) for the full pattern.
+> **Gotcha — `import express`:** Do not `import express` or `require("express")` just for `express.json()`. It creates a redundant copy alongside AppKit's bundled version and may cause version conflicts. Use the inline parser above instead.
 
-> **Alternative:** `npm install express` and `import express from "express"` for `express.json()` works in both local and production environments but adds a redundant copy of Express alongside AppKit's bundled version. Prefer the inline parser above to avoid version conflicts.
+### 2f. Connection Resilience (optional)
 
-### 2f. Connection Resilience
-
-AppKit's Lakebase plugin handles OAuth token rotation and caching automatically. Configure pool settings for additional resilience:
+AppKit's Lakebase plugin handles OAuth token rotation and caching automatically. Configure pool settings only if you need additional resilience:
 
 ```typescript
 await createApp({
@@ -316,15 +361,39 @@ Usage: `const { data, source, error } = useLakebaseData<Order>("/api/orders");`
 ### 3c. Replace Static Mock Data
 
 - Replace all static `data` arrays with `useLakebaseData` hook calls
-- For AppKit chart components (`BarChart`, `AreaChart`, `DonutChart`, `DataTable`), use the `data` prop with fetched results — do NOT use `queryKey` (that requires the analytics plugin)
+- For AppKit chart components (`BarChart`, `AreaChart`, `DonutChart`, `DataTable`), use the `data` prop with fetched results
+
+> **Gotcha — `queryKey` requires the analytics plugin.** Do NOT use `queryKey` on chart components. Use the `data` prop with fetched results from `useLakebaseData` instead.
 
 ### 3d. Defensive Data Handling
 
 **You MUST read the "Defensive Data Handling" section in [references/frontend-patterns.md](references/frontend-patterns.md).** Key rules: coerce DECIMAL with `Number()`, format DATE with `.toISOString().slice(0,10)`, write mapper functions for snake_case-to-camelCase.
 
+> **Gotcha — DECIMAL columns are returned as strings** by `node-pg`. `"73" + "51"` produces `"7351"` (concatenation, not addition). Always coerce with `Number()` in mapper functions.
+
+> **Gotcha — DATE columns are returned as JS Date objects.** `String(date)` produces `"Fri May 15 2026..."`. Use `.toISOString().slice(0, 10)` for `YYYY-MM-DD` format.
+
 ### 3e. TypeScript Interfaces for Chart Compatibility
 
 **You MUST add `[key: string]: unknown` index signatures** to all interfaces passed to AppKit chart `data` props. See [references/frontend-patterns.md](references/frontend-patterns.md) for the pattern.
+
+### 3f. Post-Wiring Cleanup (optional but recommended)
+
+After all pages are wired to API calls:
+
+1. **Rename `mockData.ts`** to better reflect its new role:
+   - Move type interfaces to `client/src/data/types.ts`
+   - Move utility functions and constants to `client/src/data/constants.ts`
+   - Delete the original `mockData.ts` (or keep it as a re-export if too many imports to update)
+
+2. **Import server mapper return types from the client types:**
+   ```typescript
+   import type { Listing } from "../shared/types";
+   function mapListingRow(row: any): Listing { ... }
+   ```
+   This ensures server mapper output matches client expectations at compile time. If a `shared/` directory is not feasible, at minimum annotate mapper return types to match the client interface names.
+
+The field-name mismatch class of bugs (e.g., `image` vs `imageUrl`) is eliminated when mapper functions declare their return type explicitly.
 
 ---
 
@@ -339,7 +408,19 @@ npm run build   # Must pass with zero errors
 
 Fix TypeScript, ESM, or import errors now. Each deploy cycle takes 3-5 minutes — catching errors locally saves significant time.
 
+### 4a2. Validate (optional but recommended)
+
+Run the full AppKit validator to catch issues that `npm run build` alone misses — TypeScript strict mode errors (e.g., `app` parameter implicitly `any`), smoke test selector regressions, and resource binding problems:
+
+```bash
+databricks apps validate --profile $PROFILE
+```
+
+If the smoke test fails because of default selectors ("Minimal Databricks App", "hello world"), update `tests/smoke.spec.ts` heading and text assertions to match your app's actual content. See [testing.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/testing.md).
+
 ### 4b. Run Locally
+
+> **Gotcha — Port 8000 already in use.** Kill stale processes first to avoid `EADDRINUSE`.
 
 ```bash
 cd apps_lakebase/$APP_NAME
@@ -373,22 +454,23 @@ Mock responses confirm the fallback pattern is working. Live data verification h
 
 ---
 
-## Gotchas
+## Gotchas (Summary)
 
-These are validated by three independent agent runs ([retrospective](../../retrospectives/retrospective_lakebase_wiring.md)):
+Detailed callouts are embedded inline at the relevant step. This table is a compact reference validated by three independent agent runs.
 
-| Gotcha | Impact | Fix |
-|--------|--------|-----|
-| `ON CONFLICT DO NOTHING` doesn't prevent duplicate seeds with `identity`/`serial` PKs | Duplicate rows on every restart | Use count-check pattern (`SELECT count(*) → INSERT if 0`) |
-| `import express` or `require("express")` | Redundant dependency; may create version conflicts with AppKit's bundled Express | Use `server.extend((app) => {...})` for routes; use the inline body parser for POST/PUT JSON parsing (see Step 2e) |
-| `autoStart: false` missing when using `server.extend()` | Routes not registered; server starts before `extend()` runs | Always pass `server({ autoStart: false })` and call `AppKit.server.start()` after |
-| DECIMAL columns returned as strings | `"73" + "51" = "7351"` (concatenation, not addition) | Coerce with `Number()` in mapper functions |
-| DATE columns returned as JS Date objects | `String(date)` → `"Fri May 15 2026..."` | Use `.toISOString().slice(0, 10)` for `YYYY-MM-DD` |
-| Old `postgres:` resource format in `databricks.yml` | Rejected by bundle deployer | Use `postgres_project`/`postgres_branch`/`postgres_endpoint` resources (not the old `postgres:` format with `branch:`/`database:`/`permission:` fields) |
-| `queryKey` on chart components | Requires analytics plugin (not installed) | Use `data` prop with fetched results |
-| Stale endpoint hostname in `.env` | Silent connection failures | Re-fetch host: `databricks postgres get-endpoint ... \| jq -r '.status.hosts.host'` |
-| Port 8000 already in use | `EADDRINUSE` on `npm run dev` | `lsof -ti:8000 \| xargs kill -9 2>/dev/null \|\| true` before starting |
-| SP permission errors on first deploy | `permission denied for schema` / `role does not exist` | SP permissions are auto-granted via bundle resource binding. Verify `postgres_project`/`postgres_branch`/`postgres_endpoint` are declared in `databricks.yml`. If using static env vars fallback, grant manually (see plugin-lakebase.md Troubleshooting) |
+| Gotcha | Fix | Step |
+|--------|-----|------|
+| `ON CONFLICT DO NOTHING` with identity PKs | Count-check seed pattern | 1e |
+| `import express` / `require("express")` | Use `server.extend((app))` + inline parser | 2e |
+| Missing `autoStart: false` | Pass to `server()` plugin | 2a |
+| `lakebase()` crashes without `LAKEBASE_ENDPOINT` | Conditional plugin registration: `Boolean(process.env.LAKEBASE_ENDPOINT)` | 2a |
+| DECIMAL columns → strings | `Number()` in mappers | 3d |
+| DATE columns → Date objects | `.toISOString().slice(0,10)` | 3d |
+| `queryKey` on chart components | Use `data` prop instead | 3c |
+| Port 8000 in use | `lsof -ti:8000 \| xargs kill -9` | 4b |
+| Old `postgres:` resource format | Use `postgres_project`/`postgres_branch`/`postgres_endpoint` | Prerequisites |
+| Stale endpoint hostname in `.env` | Re-fetch: `databricks postgres get-endpoint ...` | Prerequisites |
+| SP permission errors on deploy | Verify bundle resource bindings in `databricks.yml` | Prerequisites |
 
 ---
 

@@ -30,7 +30,11 @@ await createApp({
 
 ### 3. Declare Bundle Resources in `databricks.yml`
 
-Declare `postgres_project`, `postgres_branch`, and `postgres_endpoint` resources. The bundle creates the Lakebase project on first deploy — no manual CLI project creation is needed. Autoscaling and scale-to-zero settings are declared directly in the resource YAML.
+This is a **two-phase process** because the default database ID is auto-generated and must be retrieved after the project is created.
+
+#### Phase 1: Declare the project (first deploy creates it)
+
+Declare the `postgres_projects` resource only. The platform **automatically creates** a default `production` branch with a `primary` endpoint when the project is provisioned — do NOT declare `postgres_branches` or `postgres_endpoints` for these defaults, or Terraform will fail with `branch already exists`.
 
 ```yaml
 resources:
@@ -43,27 +47,71 @@ resources:
         autoscaling_limit_min_cu: 0.5
         autoscaling_limit_max_cu: 2.0
         suspend_timeout_duration: "300s"
-
-  postgres_branches:
-    main:
-      parent: ${resources.postgres_projects.my_db.id}
-      branch_id: production
-      is_protected: false
-      no_expiry: true
-
-  postgres_endpoints:
-    primary:
-      parent: ${resources.postgres_branches.main.id}
-      endpoint_id: primary
-      endpoint_type: ENDPOINT_TYPE_READ_WRITE
-      autoscaling_limit_min_cu: 0.5
-      autoscaling_limit_max_cu: 2.0
-      suspend_timeout_duration: "300s"
 ```
+
+> **Only declare `postgres_branches` / `postgres_endpoints` for additional non-default branches.** The default `production` branch and `primary` endpoint are auto-created with the project. Declaring them causes Terraform conflicts: `Error: failed to create postgres_branch — branch already exists; branch_name:"production"`.
+
+> **Pre-existing project?** If the Lakebase project already exists (from a prior deploy or manual creation), remove the `postgres_projects` declaration from `databricks.yml` and skip to Phase 2. Bundle deploy will fail with "project already exists" if you try to re-create it.
 
 Requires Databricks CLI v0.287.0+. Reference: [DABs postgres_project docs](https://docs.databricks.com/aws/en/dev-tools/bundles/resources#postgres_project)
 
-> **Do NOT use the old `postgres:` resource format** (with `branch:` / `database:` / `permission:` fields). That format is for Lakebase Provisioned only and will be rejected by the bundle deployer for Autoscaling projects.
+#### Phase 2: Bind the app resource (after project exists)
+
+After the first deploy creates the project, retrieve the auto-generated database ID and add the `app.resources.postgres` binding to `databricks.yml`:
+
+```bash
+DB_ID=$(databricks postgres list-databases projects/$APP_NAME/branches/production \
+  --profile $PROFILE --output json | jq -r '.[0].name')
+echo "Database ID: $DB_ID"
+```
+
+Then add the `postgres` resource binding to your app definition in `databricks.yml`:
+
+```yaml
+resources:
+  apps:
+    app:
+      name: "${var.app_name}"
+      source_code_path: ./
+      resources:
+        - name: "postgres"
+          postgres:
+            branch: "projects/${var.app_name}/branches/production"
+            database: "projects/${var.app_name}/branches/production/databases/<DB_ID>"
+            permission: "CAN_CONNECT_AND_CREATE"
+```
+
+Replace `<DB_ID>` with the platform-generated ID from the command above (e.g., `db-jzmj-xj802bpntj`). This is NOT the logical name `databricks_postgres` — it is the resource path ID.
+
+Redeploy after adding the binding:
+
+```bash
+databricks apps deploy --profile $PROFILE
+```
+
+> **Why two phases?** `valueFrom: postgres` in `app.yaml` resolves against the **app's resource list** (`app.resources`), not the bundle's top-level resources (`postgres_projects`). Without `app.resources.postgres`, the platform cannot inject `LAKEBASE_ENDPOINT` and the app falls back to mock data silently. Top-level bundle resources create infrastructure; `app.resources` creates the binding. These are separate concerns.
+
+> **`bundle deploy` is destructive for resources.** `databricks apps deploy` calls `bundle deploy` internally, which reconciles the app's resource list against `databricks.yml`. Resources attached via REST API or `databricks apps update` that are not declared in `databricks.yml` are **silently removed** on every deploy.
+
+### `app.resources.postgres` Schema Reference (Lakebase Autoscaling)
+
+The public DAB docs document `app.resources.database` (Lakebase Provisioned) but not `app.resources.postgres` (Lakebase Autoscaling). The correct schema:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Must be `"postgres"` to match `valueFrom: postgres` in `app.yaml` |
+| `postgres.branch` | string | Full branch path: `projects/{project_id}/branches/{branch_id}` |
+| `postgres.database` | string | Full database path: `projects/{project_id}/branches/{branch_id}/databases/{db_id}` |
+| `postgres.permission` | string | `CAN_CONNECT_AND_CREATE` (lets SP create schemas/tables) |
+
+The `database` field requires the **platform-generated database ID** (e.g., `db-jzmj-xj802bpntj`), not the logical name `databricks_postgres`. Retrieve it via:
+
+```bash
+databricks postgres list-databases projects/$APP_NAME/branches/production \
+  --profile $PROFILE --output json | jq -r '.[0].name'
+```
+
+> **Do NOT use the old `postgres:` resource format** at the top level (with `branch:` / `database:` / `permission:` fields as a top-level bundle resource). That format is for Lakebase Provisioned only and will be rejected by the bundle deployer for Autoscaling projects. The `postgres:` block shown above is nested under `app.resources` — a different context.
 
 ### 4. Configure Environment Variables
 

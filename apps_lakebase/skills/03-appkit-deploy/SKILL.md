@@ -181,6 +181,34 @@ cd $APP_NAME && databricks apps validate --profile $PROFILE
 
 Fix any reported errors before proceeding.
 
+**Cross-validate `valueFrom` references against `databricks.yml` resources.** Every `valueFrom:` in `app.yaml` must have a matching resource declaration in `databricks.yml`. If not, `databricks apps deploy` (which runs `bundle deploy` internally) will fail to resolve the resource and the env var will be empty at runtime.
+
+```bash
+for ref in $(grep 'valueFrom:' $APP_NAME/app.yaml | awk '{print $2}'); do
+  if ! grep -q "$ref" $APP_NAME/databricks.yml 2>/dev/null; then
+    echo "ERROR: app.yaml references valueFrom: $ref but no matching resource in databricks.yml"
+    echo "  bundle deploy will strip manually-attached resources. Add the resource to databricks.yml."
+  fi
+done
+```
+
+This catches the common failure where Lakebase `postgres` resources were attached via REST API or `databricks apps update` but not declared in `databricks.yml` — `bundle deploy` resets the resource list on every deploy, stripping anything not in the bundle config.
+
+**Check for pre-existing Lakebase projects that conflict with bundle declarations.** If `databricks.yml` declares `postgres_projects` but the project already exists on the platform, `bundle deploy` will fail with a Terraform "already exists" error.
+
+```bash
+PROJECT_ID=$(grep -A2 'postgres_projects:' $APP_NAME/databricks.yml | grep 'project_id:' | awk '{print $2}' | tr -d "'" | tr -d '"')
+if [ -n "$PROJECT_ID" ]; then
+  EXISTS=$(databricks postgres list-projects --profile $PROFILE --output json 2>/dev/null \
+    | jq -e --arg pid "$PROJECT_ID" '[.[] | select(.name | contains($pid))] | length > 0' 2>/dev/null)
+  if [ "$EXISTS" = "true" ]; then
+    echo "WARNING: Lakebase project '$PROJECT_ID' already exists on the platform."
+    echo "  Remove postgres_projects (and postgres_branches/postgres_endpoints) from databricks.yml"
+    echo "  to avoid 'already exists' Terraform errors. Keep only app.resources.postgres binding."
+  fi
+fi
+```
+
 ---
 
 ## Step 2: Build
@@ -301,6 +329,7 @@ Repeat up to 3 times. If errors persist after 3 attempts, report them for manual
 | `databricks apps restart` -> command not found | `restart` subcommand does not exist | Always redeploy: `databricks apps deploy --profile $PROFILE`. There is no restart command. |
 | App loses resources after `stop` then `start` | `stop`/`start` cycle detaches manually-attached resources (e.g., postgres) | Avoid `stop`/`start` for apps with non-bundle resources. Redeploy instead. |
 | `databricks api put/patch` with complex JSON silently fails | The CLI `api` subcommand does not reliably handle nested JSON payloads | Use `curl` with bearer token for REST API calls that require complex JSON bodies |
+| `error resolving resource postgres for env LAKEBASE_ENDPOINT: resource postgres not found` | `app.yaml` uses `valueFrom: postgres` but no `postgres` resource declared in `databricks.yml`; `bundle deploy` stripped manually-attached resources | Add `postgres_project`/`postgres_branch`/`postgres_endpoint` resources to `databricks.yml` app definition; see `05-appkit-lakebase-wiring` skill prerequisites |
 | `app.yaml` syntax / validation error | Invalid YAML or bad `valueFrom` reference | Run `databricks apps validate --profile $PROFILE` to diagnose |
 | Env vars not available at startup | `command` does not run in a shell; env vars outside `app.yaml` are inaccessible | Define all needed variables in `app.yaml`'s `env` section |
 | `PERMISSION_DENIED` after deploy | SP missing permissions on declared resources | Ensure resources in `databricks.yml` have `permission` field; platform auto-grants on deploy |

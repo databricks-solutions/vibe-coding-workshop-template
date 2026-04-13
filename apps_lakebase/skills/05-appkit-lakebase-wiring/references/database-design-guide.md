@@ -111,6 +111,21 @@ CREATE TABLE booking_addons (
 - **`serial`/`SERIAL`** works but is legacy — prefer `identity` for new tables
 - **Avoid random UUID (v4)** as PK on large tables — causes index fragmentation due to random insertion order
 
+### Frontend ID Format Alignment
+
+If the frontend uses formatted string IDs (e.g., `"lst-001"`, `"bk-2024-001"`):
+
+- **Option A (recommended for existing apps):** Use `text` primary keys storing the formatted ID directly. Simpler — no conversion layer needed in routes or mappers.
+- **Option B:** Use `bigint identity` PKs and convert in mapper functions:
+  ```typescript
+  function formatId(prefix: string, id: number): string {
+    return `${prefix}-${String(id).padStart(3, '0')}`;
+  }
+  ```
+  The API returns formatted IDs; the database stores integers. Requires a parse step on incoming requests too (e.g., `"lst-001"` → `1`).
+
+**Choose Option A** if the frontend already uses formatted IDs in URL params, component keys, and cross-page navigation. Changing to numeric IDs would require updating every `useParams()` call and route definition. Choose Option B only for new apps where you control the ID format from the start.
+
 ### Indexing
 
 - **Always index foreign key columns** — without an index, JOINs and cascading deletes cause full table scans

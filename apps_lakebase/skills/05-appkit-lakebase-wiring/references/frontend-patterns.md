@@ -6,17 +6,19 @@ Reusable React hooks, components, and data-handling patterns for AppKit + Lakeba
 
 ## `useLakebaseData` Hook
 
-Create a reusable hook to avoid duplicating `useState`/`useEffect`/`fetch` boilerplate:
+Create a reusable hook to avoid duplicating `useState`/`useEffect`/`fetch` boilerplate. The hook accepts `string | null` — pass `null` to skip the fetch (useful when route params haven't resolved yet):
 
 ```tsx
 import { useState, useEffect } from "react";
 
-function useLakebaseData<T>(endpoint: string) {
+function useLakebaseData<T>(endpoint: string | null) {
   const [data, setData] = useState<T[]>([]);
   const [source, setSource] = useState<"live" | "mock" | "loading">("loading");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!endpoint) return;
+    setSource("loading");
     fetch(endpoint)
       .then((res) => res.json())
       .then((json) => {
@@ -33,7 +35,19 @@ function useLakebaseData<T>(endpoint: string) {
 }
 ```
 
-Usage: `const { data, source, error } = useLakebaseData<Order>("/api/orders");`
+**List page usage:**
+
+```typescript
+const { data: orders, source, error } = useLakebaseData<Order>("/api/orders");
+```
+
+**Detail page usage** (conditional fetch based on route param):
+
+```typescript
+const { id } = useParams();
+const { data, source } = useLakebaseData<Listing>(id ? `/api/listings/${id}` : null);
+const listing = data[0]; // detail endpoints return single-item arrays
+```
 
 ---
 
