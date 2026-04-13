@@ -51,13 +51,19 @@ resources:
 
 > **Only declare `postgres_branches` / `postgres_endpoints` for additional non-default branches.** The default `production` branch and `primary` endpoint are auto-created with the project. Declaring them causes Terraform conflicts: `Error: failed to create postgres_branch — branch already exists; branch_name:"production"`.
 
-> **Pre-existing project?** If the Lakebase project already exists (from a prior deploy or manual creation), remove the `postgres_projects` declaration from `databricks.yml` and skip to Phase 2. Bundle deploy will fail with "project already exists" if you try to re-create it.
+> **Keep `postgres_projects` during Phase 2.** After Phase 1 creates the project, Terraform state tracks the resource. The Phase 2 redeploy is idempotent — Terraform sees no diff and skips the resource. Do NOT remove `postgres_projects` between Phase 1 and Phase 2; removing a Terraform-tracked resource from config may trigger a destroy.
+>
+> **Re-running the workshop?** If the project exists from a **prior workshop run or manual CLI creation** (i.e., the current bundle's Terraform state does NOT track it), you have two options:
+> 1. Delete the existing project first (`databricks postgres delete-project projects/$APP_NAME --profile $PROFILE`), then proceed normally with Phase 1.
+> 2. Remove `postgres_projects` from `databricks.yml` and skip directly to Phase 2. This is safe because Terraform has no state for the resource — removing it from config is a no-op.
+>
+> **How to tell:** If `databricks bundle deploy` fails with `"project already exists"`, the project was created outside the current bundle's Terraform state. Use option 1 or 2 above.
 
 Requires Databricks CLI v0.287.0+. Reference: [DABs postgres_project docs](https://docs.databricks.com/aws/en/dev-tools/bundles/resources#postgres_project)
 
 #### Phase 2: Bind the app resource (after project exists)
 
-After the first deploy creates the project, retrieve the auto-generated database ID and add the `app.resources.postgres` binding to `databricks.yml`:
+After the first deploy creates the project, retrieve the auto-generated database ID and add the `app.resources.postgres` binding to `databricks.yml`. **Keep `postgres_projects` in the file** — Terraform state tracks it from Phase 1:
 
 ```bash
 DB_ID=$(databricks postgres list-databases projects/$APP_NAME/branches/production \
