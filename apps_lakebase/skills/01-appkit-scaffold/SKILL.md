@@ -121,7 +121,7 @@ After installation, confirm the skills are available. The CLI tools should respo
 databricks experimental aitools tools --help
 ```
 
-Verify the Lakebase skill is present (needed in Phase 3+):
+Verify the Lakebase skill is present (needed in the **Setup Lakebase** step and later):
 ```bash
 ls .agents/skills/databricks-skills/skills/databricks-lakebase/SKILL.md 2>/dev/null \
   && echo "Lakebase skill: OK" \

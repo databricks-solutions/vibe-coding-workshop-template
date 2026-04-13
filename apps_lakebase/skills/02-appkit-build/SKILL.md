@@ -70,7 +70,7 @@ Key upstream doc pages:
 
 The bundled references below are fallbacks when live docs cannot be reached.
 
-> **Workshop Mode (blank app):** If you are following the AppKit+Lakebase workshop (Phase 1) and scaffolded a blank app without plugins, skip Step 2 (SQL Queries) and the `analytics()` plugin references in Step 4. Use static mock data arrays instead of `useAnalyticsQuery`. The backend only needs `server()` — no `analytics()` plugin. All SQL/typegen sections are not applicable until the Lakebase plugin is added in Phase 4.
+> **Workshop Mode (blank app):** If you are following the AppKit+Lakebase workshop (**Scaffold, Build & Test** step) and scaffolded a blank app without plugins, skip Step 2 (SQL Queries) and the `analytics()` plugin references in Step 4. Use static mock data arrays instead of `useAnalyticsQuery`. The backend only needs `server()` — no `analytics()` plugin. All SQL/typegen sections are not applicable until the Lakebase plugin is added in the **Wire Lakebase Backend** step.
 
 ---
 
@@ -183,7 +183,7 @@ Implement components in `client/src/`. Start with `App.tsx`.
 
 Build the UI in two phases so you get immediate visual feedback before SQL queries are wired up.
 
-**Phase 1 — Static data for immediate visual feedback:**
+**Scaffold step — Static data for immediate visual feedback:**
 
 Use the `data` prop on AppKit data components (charts, tables) with representative sample data. This lets you build and iterate on the UI visually before wiring up live query-driven data.
 
@@ -199,7 +199,7 @@ Use the `data` prop on AppKit data components (charts, tables) with representati
 />
 ```
 
-**Phase 2 — Swap to query-driven data (final state):**
+**Later — Swap to query-driven data (final state):**
 
 Once SQL files exist in `config/queries/` and `npm run typegen` has generated types, replace static `data` with `queryKey` + `params`:
 
@@ -267,7 +267,7 @@ Available chart components from `@databricks/appkit-ui`:
 | `DonutChart` | `nameKey`, `valueKey`, `colors` | Part-of-whole (with center) |
 | `ScatterChart` | `xKey`, `yKey`, `colors` | Correlation |
 
-All accept either `data` (static array) for Phase 1 or `queryKey` + `parameters` for Phase 2.
+All accept either `data` (static array) for the scaffold step or `queryKey` + `parameters` for query-driven mode.
 
 For the full list with all props, inspect the type definitions:
 
@@ -340,7 +340,7 @@ Common runtime surprises that cause bugs or confusion:
 | Parameterless queries generate `Record<string, never>` | Pass `useMemo(() => ({}), [])` |
 | Charts are ECharts-based, not Recharts | Use props (`xKey`, `yKey`, `colors`) — not children (`<XAxis>`, `<Bar>`) |
 | `import type` required with `verbatimModuleSyntax` | Separate type-only imports or build fails |
-| Chart components accept both `data` (static) and `queryKey` (query-driven) props | Use `data` for Phase 1 static data, `queryKey` + `params` for Phase 2 |
+| Chart components accept both `data` (static) and `queryKey` (query-driven) props | Use `data` for scaffold-step static data, `queryKey` + `params` for query-driven mode |
 | `npx @databricks/appkit docs` search matches section headings only | Use full doc path for specific component lookups |
 | `npm run dev` triggers typegen via `predev` hook | `TABLE_OR_VIEW_NOT_FOUND` errors are expected if custom queries reference tables that don't exist yet. Not blocking. |
 
@@ -355,7 +355,7 @@ Before declaring the build complete:
 - [ ] All query parameters wrapped in `useMemo`
 - [ ] Loading/error/empty states on every data component
 - [ ] `tests/smoke.spec.ts` selectors updated for your app
-- [ ] Static demo data renders correctly (swap to live data happens in Phase 4 — Lakebase wiring)
+- [ ] Static demo data renders correctly (swap to live data happens in the **Wire Lakebase Backend** step)
 - [ ] `npx tsc --noEmit` passes with zero TypeScript errors (catches unused imports, missing types that block deployment)
 - [ ] `npm run dev` runs cleanly at `http://localhost:8000`
 
