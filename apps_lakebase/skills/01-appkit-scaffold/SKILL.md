@@ -96,6 +96,14 @@ git clone --depth 1 https://github.com/databricks/databricks-agent-skills .agent
 
 The `.agents/` directory is already in `.gitignore` — cloned skills are not committed to the repo.
 
+**Alternative (official CLI method):**
+
+```bash
+databricks experimental aitools install
+```
+
+This installs agent skills via the Databricks CLI. See the [AI-Assisted Development docs](https://databricks.github.io/appkit/docs/development/ai-assisted-development#installing-agent-skills).
+
 ### Optional: IDE-native install (in addition to the project clone)
 
 Some IDEs have their own plugin/skill systems that provide deeper integration. These are **optional extras** on top of the project-level install above.
@@ -143,6 +151,20 @@ databricks experimental aitools tools --help
 ```
 
 If this command fails or is not recognized, go back to Step 1 and install agent skills first. **Do not proceed without completing Step 1.**
+
+### Discover Available Plugins (Optional)
+
+Before scaffolding with plugins, inspect the available plugin manifest:
+
+```bash
+databricks apps manifest --profile <PROFILE>
+```
+
+This shows all available plugins, which are `requiredByTemplate` (mandatory — do not add to `--features`), and what `--set` resource fields each plugin requires. Plugin names and resource keys can change between AppKit versions — always derive them from the manifest rather than guessing.
+
+For blank scaffolds (no `--features`), this step is optional.
+
+Reference: [Upstream SKILL.md — App Manifest and Scaffolding](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/SKILL.md)
 
 ### Option A: Blank Scaffold (Default)
 

@@ -47,7 +47,7 @@ Design a database schema from a PRD, build Express API routes with mock fallback
 **Prerequisites — verify these before proceeding:**
 
 1. The Lakebase plugin is registered in `server/server.ts` (via `04-appkit-plugin-add`)
-2. Environment variables are configured in `.env` and `app.yaml` (`LAKEBASE_ENDPOINT`, `PGHOST`, `PGDATABASE`, `PGSSLMODE`, `DB_SCHEMA`)
+2. Environment variables are configured in `.env` and `app.yaml` (`LAKEBASE_ENDPOINT`, `PGHOST`, `PGPORT`, `PGDATABASE`, `PGSSLMODE`, `DB_SCHEMA`)
 3. `DB_SCHEMA` is set to a user-scoped name derived from `$APP_NAME` (hyphens → underscores, e.g., `prashanth_s_booking_app`)
 4. `npm run build` passes with the Lakebase plugin imported
 
@@ -130,6 +130,8 @@ await AppKit.lakebase.query(`
 `);
 ```
 
+> **Deploy-First Pattern:** DDL is written in `server.ts` so the Service Principal executes it on first deploy and becomes the owner of the schema, tables, and sequences. This is critical — if you run DDL locally first, your personal identity owns the objects and the SP cannot access them after deployment. The workshop sequence (wire code locally with mock fallback, then deploy so SP creates objects) follows this pattern. Reference: [AppKit Lakebase docs - Local development](https://databricks.github.io/appkit/docs/plugins/lakebase#local-development)
+
 ### 1e. Seed Data (Count-Check Pattern)
 
 Use a count-check pattern for idempotent seeding. Do NOT use `ON CONFLICT DO NOTHING` — it fails to prevent duplicates with `identity`/`serial` PKs that auto-generate new IDs on every insert.
@@ -155,6 +157,8 @@ if (parseInt(seedCheck.rows[0].cnt) === 0) {
 
 AppKit Lakebase is **server-side only** — there are no frontend hooks like `useAnalyticsQuery`. Use `server.extend()` to add Express routes.
 
+> **Note:** The upstream [databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) Lakebase reference uses tRPC for server-side CRUD. This skill uses `server.extend()` with Express routes for explicit control over request/response handling, which is simpler for workshop purposes. Both patterns are valid AppKit approaches. If the scaffold generated tRPC boilerplate (from `--features lakebase`), either pattern works — use whichever is already in your codebase.
+
 ### 2a. Server Setup Pattern
 
 When using `server.extend()`, pass `autoStart: false` to the `server()` plugin and call `AppKit.server.start()` manually after registering all routes:
@@ -177,7 +181,7 @@ AppKit.server.extend((app) => {
 await AppKit.server.start();
 ```
 
-> **Do NOT `import express` or `require("express")`.** Express is bundled inside `@databricks/appkit` — access it exclusively via the `app` parameter in `server.extend((app) => { ... })`. Importing Express directly may work locally but fails in production.
+> **Prefer using the `app` parameter in `server.extend((app) => { ... })`.** Express is bundled inside `@databricks/appkit`. For GET routes, no additional import is needed. If you need `express.json()` for POST/PUT body parsing, adding `express` as an explicit dependency is acceptable (see Step 2e) — it adds a redundant dependency but works in production. Avoid importing Express solely for routing since `app` already provides it.
 
 ### 2b. Response Contract
 
@@ -245,24 +249,28 @@ app.get("/api/health/lakebase", async (req, res) => {
 
 ### 2e. JSON Body Parsing for POST/PUT Routes
 
-Express body parsing requires care since Express is bundled inside AppKit:
-
-**Option A (recommended):** Add `express` as an explicit dependency and import `json()`:
-
-```bash
-npm install express
-```
+Express is bundled inside AppKit — access it exclusively via the `app` parameter in `server.extend()`. For JSON body parsing in POST/PUT routes, use the inline parser:
 
 ```typescript
-import express from "express";
-
 AppKit.server.extend((app) => {
-  app.use(express.json());
+  app.use((req, _res, next) => {
+    if (req.headers["content-type"]?.includes("application/json") && !req.body) {
+      let raw = "";
+      req.on("data", (chunk) => { raw += chunk; });
+      req.on("end", () => {
+        try { req.body = JSON.parse(raw); } catch { req.body = {}; }
+        next();
+      });
+    } else { next(); }
+  });
+
   // POST routes ...
 });
 ```
 
-For an alternative without the extra dependency, see [references/frontend-patterns.md](references/frontend-patterns.md).
+See [references/frontend-patterns.md](references/frontend-patterns.md) for the full pattern.
+
+> **Alternative:** `npm install express` and `import express from "express"` for `express.json()` works in both local and production environments but adds a redundant copy of Express alongside AppKit's bundled version. Prefer the inline parser above to avoid version conflicts.
 
 ### 2f. Connection Resilience
 
@@ -371,7 +379,7 @@ These are validated by three independent agent runs ([retrospective](../../retro
 | Gotcha | Impact | Fix |
 |--------|--------|-----|
 | `ON CONFLICT DO NOTHING` doesn't prevent duplicate seeds with `identity`/`serial` PKs | Duplicate rows on every restart | Use count-check pattern (`SELECT count(*) → INSERT if 0`) |
-| `import express` or `require("express")` | Works locally, crashes in production | Use `server.extend((app) => {...})` exclusively |
+| `import express` or `require("express")` | Redundant dependency; may create version conflicts with AppKit's bundled Express | Use `server.extend((app) => {...})` for routes; use the inline body parser for POST/PUT JSON parsing (see Step 2e) |
 | `autoStart: false` missing when using `server.extend()` | Routes not registered; server starts before `extend()` runs | Always pass `server({ autoStart: false })` and call `AppKit.server.start()` after |
 | DECIMAL columns returned as strings | `"73" + "51" = "7351"` (concatenation, not addition) | Coerce with `Number()` in mapper functions |
 | DATE columns returned as JS Date objects | `String(date)` → `"Fri May 15 2026..."` | Use `.toISOString().slice(0, 10)` for `YYYY-MM-DD` |
@@ -380,6 +388,7 @@ These are validated by three independent agent runs ([retrospective](../../retro
 | `queryKey` on chart components | Requires analytics plugin (not installed) | Use `data` prop with fetched results |
 | Stale endpoint hostname in `.env` | Silent connection failures | Re-fetch host: `databricks postgres get-endpoint ... \| jq -r '.status.hosts.host'` |
 | Port 8000 already in use | `EADDRINUSE` on `npm run dev` | `lsof -ti:8000 \| xargs kill -9 2>/dev/null \|\| true` before starting |
+| SP lacks Lakebase role on first deploy | `permission denied for schema` / `role does not exist` | Without a `postgres` resource in `databricks.yml`, the SP is NOT auto-granted access. Use `databricks postgres create-role` CLI command to grant before deploying (see plugin-lakebase.md) |
 
 ---
 

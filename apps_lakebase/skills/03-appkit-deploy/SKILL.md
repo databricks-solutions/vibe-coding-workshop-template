@@ -12,16 +12,21 @@ compatibility: Requires a built AppKit project with Node.js v22+ and Databricks 
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.1.0"
   domain: apps
   role: deploy
   standalone: true
-  last_verified: "2026-04-10"
+  last_verified: "2026-04-12"
   volatility: medium
   upstream_sources:
+    - https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/SKILL.md
+    - https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps/references/appkit
     - https://databricks.github.io/appkit/docs/app-management
     - https://databricks.github.io/appkit/docs/configuration
-    - https://github.com/databricks/databricks-agent-skills
+    - https://databricks.github.io/appkit/docs/development/project-setup
+    - https://databricks.github.io/appkit/docs/development/llm-guide
+    - https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy
+    - https://docs.databricks.com/aws/en/dev-tools/databricks-apps/app-runtime
 ---
 
 # Deploy Databricks AppKit Applications
@@ -52,13 +57,74 @@ Before deploying, ensure:
 
 ## Before You Begin
 
-**The upstream AppKit docs are the source of truth for deploy commands and options.**
+**The upstream Databricks agent-skills repo and AppKit docs are the source of truth for deploy commands, platform rules, and options.**
 
+- **Agent Skills (deploy patterns, platform rules):** https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/SKILL.md
+- **Platform guide (SP permissions, runtime constraints, errors):** https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/platform-guide.md
 - **App management:** https://databricks.github.io/appkit/docs/app-management
 - **Configuration:** https://databricks.github.io/appkit/docs/configuration
+- **AppKit docs (in-terminal):** `npx @databricks/appkit docs "app-management"`
 - **CLI help:** `databricks apps deploy --help`
 
 The bundled reference at [references/app-management.md](references/app-management.md) covers commonly used commands as a fallback when live docs cannot be reached.
+
+> **Do NOT improvise workarounds.** If a deployment fails, check the app logs and match
+> the error against the Common Errors table below. Do NOT add npm lifecycle hooks
+> (`preinstall`, `postinstall`), platform-detection conditionals, or workarounds that skip
+> the platform's build pipeline. These consistently cause cascading failures that are harder
+> to diagnose than the original error. When in doubt, consult the authoritative sources above.
+
+---
+
+## Authoritative References
+
+The [databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) repository contains the canonical AppKit deployment patterns. When in doubt, consult these references:
+
+| Topic | Reference |
+|-------|-----------|
+| AppKit scaffolding, validation, workflow | [databricks-apps SKILL.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/SKILL.md) |
+| Platform rules (SP permissions, runtime limits, common errors) | [platform-guide.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/platform-guide.md) |
+| AppKit project structure and checklists | [appkit/overview.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/appkit/overview.md) |
+| Lakebase pool, CRUD, schema ownership | [appkit/lakebase.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/appkit/lakebase.md) |
+| Smoke tests and Playwright guidance | [testing.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/testing.md) |
+| AppKit docs (in-terminal) | `npx @databricks/appkit docs "app-management"` |
+
+### Platform Constraints (from platform-guide.md)
+
+These runtime constraints affect deployment and troubleshooting:
+
+- **Startup timeout:** App must start within 10 minutes (including dependency installation)
+- **HTTP proxy timeout:** 120 seconds per request (not configurable; use WebSockets for long operations)
+- **Max apps per workspace:** 100
+- **Max file size:** 10 MB per file in bundle
+- **Filesystem:** Ephemeral — no persistent local storage; use UC Volumes or Lakebase
+- **No shell in `command`:** `app.yaml` `command` does not run in a shell; env vars outside `app.yaml` are inaccessible
+- **Graceful shutdown:** SIGTERM → 15 seconds → SIGKILL
+- **Logging:** Only stdout/stderr captured; file-based logs are lost on container recycle
+- **Destructive updates:** `bundle run` / `apps update` does full replacement and can wipe OBO scopes
+
+### Platform Build Pipeline
+
+When `databricks apps deploy` pushes code to the platform, the following sequence runs inside the container:
+
+1. **Download source** — workspace files are extracted into `/home/app/`
+2. **`npm install`** — installs dependencies from `package.json` / `package-lock.json`. Runs in **production mode** (`NODE_ENV=production`), so `devDependencies` are skipped.
+3. **`npm run build`** (if the `build` script exists) — compiles the project. `prebuild` hooks fire automatically before this step.
+4. **Run `command`** — executes the `command` from `app.yaml` (e.g., `npm run start`)
+
+**Hard timeout:** The entire sequence (steps 1-4) must complete within **10 minutes**. If npm install or build exceeds this, the deploy fails with `App process did not start within 10 minutes`.
+
+**Critical rules — do NOT violate:**
+
+- **NEVER** add `preinstall` or `postinstall` scripts that modify `node_modules` (e.g., `rm -rf node_modules`). These create infinite loops or corrupt the install.
+- **NEVER** add platform-detection conditionals (e.g., `[ "$HOME" = '/home/app' ]`) to skip build steps. The platform build pipeline is designed to work as-is.
+- **NEVER** ship pre-built `dist/` via `sync.include` and skip the build. The platform runs `npm install` in production mode and expects `build` to work with the installed dependencies.
+- **NEVER** add `rolldown-vite` or other packages with native bindings as the `vite` alias — native modules built on macOS won't load on the Linux platform container.
+- **DO** keep `devDependencies` lean. Remove test-only packages like `@playwright/test`, `sharp`, or other heavy native modules that are not needed for the build. The platform installs all `devDependencies` listed in `package.json` even in production mode if `npm run build` needs them — but heavy packages push install past the 10-minute timeout.
+- **DO** let scaffolded `prebuild` hooks run (`appkit sync`, `appkit generate-types`). These may emit warnings about `@ast-grep/napi` — the warnings are harmless and guarded by `2>/dev/null; true` in the scaffold output.
+- **DO** note that `databricks bundle deploy` (and `databricks apps deploy` which calls it internally) uses `.gitignore` patterns for file exclusion — NOT `.databricksignore`. If `.gitignore` excludes `dist/`, the build output won't be uploaded.
+
+**Authoritative source:** [Databricks Apps deploy — deployment logic](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy) and [post-deployment behavior](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/app-runtime).
 
 ---
 
@@ -109,9 +175,19 @@ grep "name:" $APP_NAME/app.yaml
 grep "name:" $APP_NAME/databricks.yml | head -1
 ```
 
+Run the AppKit validator to check `app.yaml` schema, resource bindings, and manifest validity:
+
+```bash
+cd $APP_NAME && databricks apps validate --profile $PROFILE
+```
+
+Fix any reported errors before proceeding.
+
 ---
 
 ## Step 2: Build
+
+Run `npm run build` locally to catch TypeScript and compilation errors early. The deploy pipeline rebuilds on the platform, but catching errors locally avoids a slow deploy-fail-fix cycle.
 
 ```bash
 cd $APP_NAME
@@ -123,8 +199,7 @@ This must complete without errors. A successful build produces the output refere
 Verify the build output exists before deploying:
 
 ```bash
-# Check for the file that app.yaml's command references
-ls dist/server.js 2>/dev/null || ls build/index.mjs 2>/dev/null || echo "WARNING: No build output found — check app.yaml command"
+ls build/index.mjs 2>/dev/null || ls dist/server.js 2>/dev/null || echo "WARNING: No build output found — check app.yaml command"
 ```
 
 If there are TypeScript or build errors, fix them before proceeding.
@@ -133,25 +208,24 @@ If there are TypeScript or build errors, fix them before proceeding.
 
 ## Step 3: Deploy
 
-Deploying requires **two commands** — one to sync local source to the workspace, one to trigger the app run:
+Deploy using the AppKit CLI pipeline — a single command that builds the frontend, syncs code to the workspace via bundle deploy, and starts the app:
 
 ```bash
 cd $APP_NAME
-
-# 1. Upload local files to workspace
-databricks bundle deploy --profile $PROFILE
-
-# 2. Trigger build + restart from uploaded source
 databricks apps deploy --profile $PROFILE
 ```
 
-> **WARNING:** `databricks apps deploy` alone does NOT upload local file changes.
-> It triggers a build-and-run from whatever source is already in the workspace path.
-> Always run `databricks bundle deploy` first to sync your latest code.
+This is equivalent to running `npm run build` + `databricks bundle deploy` + `databricks apps start` in sequence.
 
-For Lakebase Autoscaling, use `postgres_project`/`postgres_branch`/`postgres_endpoint` resources (CLI v0.287.0+) if you want bundle-managed project lifecycle. For Lakebase Provisioned, use `database_instance` + `app.resources[].database` (CLI v0.265.0+). Do not mix the two models. `bundle deploy` manages all declared resources — no manual REST API calls needed.
+For faster iteration after the first deploy, skip the build step:
 
-> **Resource-sensitive deploys:** `databricks bundle deploy` resets the app's resource list to match `databricks.yml`. If resources were added outside the bundle (e.g., via REST API), a bundle deploy removes them. To push code without resetting resources, use `databricks apps deploy` alone (it rebuilds from the already-synced workspace source). If no code changes are needed, skip redeployment entirely.
+```bash
+databricks apps deploy --skip-build --profile $PROFILE
+```
+
+> **Resource-sensitive deploys:** `databricks apps deploy` runs `bundle deploy` internally, which resets the app's resource list to match `databricks.yml`. If resources were added outside the bundle (e.g., via REST API), a bundle deploy removes them. In that case, sync code first with `databricks bundle deploy --profile $PROFILE`, then trigger a run separately with `databricks apps deploy --profile $PROFILE` (which rebuilds from the already-synced workspace source without resetting resources). If no code changes are needed, skip redeployment entirely.
+
+For Lakebase Autoscaling, use `postgres_project`/`postgres_branch`/`postgres_endpoint` resources (CLI v0.287.0+) if you want bundle-managed project lifecycle. For Lakebase Provisioned, use `database_instance` + `app.resources[].database` (CLI v0.265.0+). Do not mix the two models.
 
 Wait for completion — typically 1-3 minutes for redeployments, 3-5 minutes for first deploys. Do not treat longer waits as failures until 7+ minutes have elapsed.
 
@@ -164,12 +238,6 @@ databricks apps get $APP_NAME --output json --profile $PROFILE | jq '{status: .s
 > **Note:** `status.state` may be `null` for up to 60 seconds after deployment even when the app is healthy. The definitive health signal is `compute_status.state: "ACTIVE"` plus clean logs showing the server is listening. If `compute` is `ACTIVE` but `status` is `null`, the app is running — proceed to Step 4.
 
 If `compute` is not `ACTIVE`, wait 30 seconds and re-check. Use `databricks apps logs $APP_NAME --follow --profile $PROFILE` to stream logs in real-time instead of polling repeatedly.
-
-For faster iteration after the first deploy, use `--skip-build` on the `apps deploy` command if only config changed:
-
-```bash
-databricks bundle deploy --profile $PROFILE && databricks apps deploy --skip-build --profile $PROFILE
-```
 
 ---
 
@@ -213,13 +281,15 @@ If errors exist:
 
 1. Identify the error from the log output
 2. Apply the fix in the app directory
-3. Redeploy: `databricks bundle deploy --profile $PROFILE && databricks apps deploy --profile $PROFILE`
-   - For config-only changes (e.g., `app.yaml` or `databricks.yml`), use: `databricks bundle deploy --profile $PROFILE && databricks apps deploy --skip-build --profile $PROFILE`
+3. Redeploy: `databricks apps deploy --profile $PROFILE`
+   - For config-only changes (e.g., `app.yaml` or `databricks.yml`): `databricks apps deploy --skip-build --profile $PROFILE`
 4. Check logs again
 
 If no errors: deployment is successful.
 
 Repeat up to 3 times. If errors persist after 3 attempts, report them for manual investigation.
+
+> **Before diagnosing errors:** Run `npx @databricks/appkit docs "app-management"` and `databricks apps deploy --help` for the latest CLI options and deployment behavior. These are the source of truth for deploy commands.
 
 ### Common Errors
 
@@ -230,9 +300,36 @@ Repeat up to 3 times. If errors persist after 3 attempts, report them for manual
 | Connection refused / timeout on SQL queries | SQL warehouse starting up or stopped | Wait 30s and retry; check warehouse is running in the workspace |
 | TypeScript / build errors during deploy | Compilation issues in `server/` or `client/` | Run `npm run build` locally, fix errors, redeploy |
 | `ERR_MODULE_NOT_FOUND` for `@databricks/appkit` | Dependencies not installed | Verify `package.json` lists `@databricks/appkit` and `@databricks/appkit-ui`; redeploy |
-| `databricks apps restart` -> command not found | `restart` subcommand does not exist | Always redeploy: `databricks bundle deploy && databricks apps deploy`. There is no restart command. |
+| `databricks apps restart` -> command not found | `restart` subcommand does not exist | Always redeploy: `databricks apps deploy --profile $PROFILE`. There is no restart command. |
 | App loses resources after `stop` then `start` | `stop`/`start` cycle detaches manually-attached resources (e.g., postgres) | Avoid `stop`/`start` for apps with non-bundle resources. Redeploy instead. |
 | `databricks api put/patch` with complex JSON silently fails | The CLI `api` subcommand does not reliably handle nested JSON payloads | Use `curl` with bearer token for REST API calls that require complex JSON bodies |
+| `app.yaml` syntax / validation error | Invalid YAML or bad `valueFrom` reference | Run `databricks apps validate --profile $PROFILE` to diagnose |
+| Env vars not available at startup | `command` does not run in a shell; env vars outside `app.yaml` are inaccessible | Define all needed variables in `app.yaml`'s `env` section |
+| `PERMISSION_DENIED` after deploy | SP missing permissions on declared resources | Ensure resources in `databricks.yml` have `permission` field; platform auto-grants on deploy |
+| `File is larger than 10485760 bytes` | Bundled file exceeds 10 MB limit | Use `requirements.txt`/`package.json` for deps; do not bundle large artifacts |
+| 504 Gateway Timeout | Request exceeded 120s proxy timeout | Use WebSockets for long operations; SSE may be buffered |
+| OBO scopes missing after deploy | `apps update` / `bundle run` does full replacement, can wipe scopes | Re-apply OBO scopes after each deploy that modifies resources |
+| `Cannot find native binding` or `@rolldown/binding-linux-x64-gnu` | `rolldown-vite` or other native-binding package in `devDependencies` | Replace `"vite": "npm:rolldown-vite@..."` with standard `vite` in `package.json`; remove the `overrides` entry; reinstall and redeploy |
+| `App process did not start within 10 minutes` | `npm install` timed out due to heavy devDependencies | Remove `@playwright/test`, `sharp`, and other test-only / native packages from `devDependencies`; regenerate lockfile; redeploy |
+| `ENOTEMPTY: directory not empty, rename` during npm install | Stale `node_modules` from a prior failed deploy | Redeploy — the platform typically self-heals on the next attempt. If persistent, stop the app, wait 30s, then redeploy |
+| `ConfigurationError: Missing required resources: postgres` | `PGPORT` missing from `app.yaml` env section | Add `- name: PGPORT` / `value: '5432'` to `app.yaml`; redeploy |
+
+### Platform Build Behavior
+
+When `package.json` exists, the platform runs these steps during deploy:
+
+1. `npm install` — installs all dependencies (the platform manages `node_modules`)
+2. `npm run build` — runs the build script if defined
+3. Starts the app via `app.yaml`'s `command` (or `npm run start` if no command is specified)
+
+Python deps are installed from `requirements.txt` or `uv.lock` if present.
+
+**Rules:**
+
+- **NEVER add `preinstall` or `postinstall` hooks that modify or delete `node_modules`.** The platform manages dependency installation. Custom hooks that delete `node_modules` (e.g., `rm -rf node_modules` in a `preinstall` script) cause runtime `ERR_MODULE_NOT_FOUND` errors.
+- **The scaffold's `prebuild` hooks may emit warnings** (`@ast-grep/napi` not found, `appkit plugin sync` failed). These are expected — the scaffold guards them with `2>/dev/null; true`. Do NOT add additional platform-detection or skip logic (e.g., `[ "$HOME" = '/home/app' ]`).
+- **The platform builds artifacts on deploy.** Do NOT ship pre-built `dist/` or `build/` directories and skip the build. The canonical flow is: platform runs `npm install` → `npm run build` → produces build output → `app.yaml` command starts the server from that output.
+- **If `rolldown-vite` causes native binding failures** (`Cannot find native binding` or `@rolldown/binding-linux-x64-gnu` missing), replace `"vite": "npm:rolldown-vite@..."` with standard `"vite": "^7.2.4"` in `package.json` and remove the `overrides` entry. See the Common Errors table above.
 
 The calling prompt may define additional plugin-specific errors (e.g., Lakebase connection or permission errors). Check those if the errors above don't match.
 
@@ -266,9 +363,10 @@ If the limit error persists, repeat with the next oldest stopped app — but sto
 | Task | Command |
 |------|---------|
 | Build | `npm run build` |
-| Sync code to workspace | `databricks bundle deploy --profile $PROFILE` |
-| Deploy (full) | `databricks bundle deploy --profile $PROFILE && databricks apps deploy --profile $PROFILE` |
-| Deploy (skip build) | `databricks bundle deploy --profile $PROFILE && databricks apps deploy --skip-build --profile $PROFILE` |
+| Validate config | `databricks apps validate --profile $PROFILE` |
+| Deploy (full) | `databricks apps deploy --profile $PROFILE` |
+| Deploy (skip build) | `databricks apps deploy --skip-build --profile $PROFILE` |
+| Sync code only (no restart) | `databricks bundle deploy --profile $PROFILE` |
 | Get app URL | `databricks apps get $APP_NAME --output json --profile $PROFILE \| jq -r '.url'` |
 | Stream logs | `databricks apps logs $APP_NAME --tail-lines 100 --profile $PROFILE` |
 | Follow logs live | `databricks apps logs $APP_NAME --follow --profile $PROFILE` |

@@ -1,6 +1,7 @@
 # AppKit App Management Reference
 
 > **Upstream docs (always check for latest):**
+> - https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps/references
 > - https://databricks.github.io/appkit/docs/app-management
 > - https://databricks.github.io/appkit/docs/configuration
 > - `databricks apps deploy --help`
@@ -10,16 +11,16 @@
 The `app.yaml` file configures the app's runtime environment in Databricks Apps.
 
 ```yaml
-# AppKit default (scaffold output)
+# AppKit canonical command (runs the tsdown-built server output)
 command:
-  - npm
-  - run
-  - start
+  - node
+  - build/index.mjs
 
-# Legacy / alternative (verify build output path matches)
+# Alternative: delegates to package.json "start" script
 # command:
-#   - node
-#   - build/index.mjs
+#   - npm
+#   - run
+#   - start
 
 env:
   - name: DATABRICKS_WAREHOUSE_ID
@@ -33,6 +34,8 @@ env:
 | `DATABRICKS_WAREHOUSE_ID` | `sql-warehouse` | Analytics, Genie |
 | `LAKEBASE_ENDPOINT` | `postgres` | Lakebase |
 | `DATABRICKS_VOLUME_*` | `volume` | Files |
+
+> **Workshop note:** This workshop uses static `value:` entries for Lakebase env vars for explicit visibility. Production apps should use `valueFrom: postgres` via `databricks apps init --features lakebase`.
 
 ## Deploy Command
 
@@ -50,6 +53,14 @@ Runs the full pipeline: build frontend, deploy bundle, start app.
 | `--force` | Override Git branch validation |
 | `--target TARGET` | Deploy to a specific target (e.g., `prod`) |
 | `--var "key=value"` | Pass custom variables |
+
+## Validate Configuration
+
+```bash
+databricks apps validate [--profile PROFILE]
+```
+
+Checks `app.yaml` schema, resource bindings, and manifest validity before deploying.
 
 ## App Lifecycle Commands
 
@@ -140,3 +151,22 @@ DATABRICKS_HOST=https://xxx.cloud.databricks.com
 DATABRICKS_TOKEN=dapi...
 DATABRICKS_WAREHOUSE_ID=abc123...
 ```
+
+## Platform Constraints
+
+Source: [databricks-agent-skills platform-guide.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/platform-guide.md)
+
+| Constraint | Value |
+|------------|-------|
+| Startup timeout | 10 minutes (including dependency installation) |
+| HTTP proxy timeout | 120 seconds per request (not configurable) |
+| Max apps per workspace | 100 |
+| Max file size | 10 MB per file |
+| Filesystem | Ephemeral (no persistent local storage) |
+| Graceful shutdown | SIGTERM → 15s → SIGKILL |
+| Logging | stdout/stderr only; file-based logs lost on recycle |
+
+| Compute Size | RAM | vCPU | DBU/hour |
+|-------------|-----|------|----------|
+| Medium (default) | 6 GB | Up to 2 | 0.5 |
+| Large | 12 GB | Up to 4 | 1.0 |

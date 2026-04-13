@@ -35,6 +35,7 @@ Add to `.env` for local development:
 ```env
 LAKEBASE_ENDPOINT=projects/<project>/branches/<branch>/endpoints/<endpoint>
 PGHOST=<your-lakebase-host>
+PGPORT=5432
 PGDATABASE=<database-name>
 PGSSLMODE=require
 ```
@@ -47,10 +48,14 @@ env:
     value: 'projects/<project-id>/branches/production/endpoints/primary'
   - name: PGHOST
     value: '<endpoint-hostname>'
+  - name: PGPORT
+    value: '5432'
   - name: PGDATABASE
     value: 'databricks_postgres'
   - name: PGSSLMODE
     value: 'require'
+  - name: NODE_ENV
+    value: 'production'
 ```
 
 **Two valid deployment patterns exist:**
@@ -197,7 +202,19 @@ await createApp({
 
 **With resource binding (scaffolded via `databricks apps init`):** The Service Principal is automatically granted `CONNECT_AND_CREATE` permission on the `postgres` resource. This lets the SP connect and create new objects, but not access existing schemas or tables. No manual SQL grants are needed for initial setup.
 
-**Without resource binding (manual CLI setup):** The SP does not automatically receive permissions. It gets ownership of any objects it creates (schemas, tables, sequences) through DDL in `server.ts`. If the SP encounters permission errors on first deploy, grant via the Lakebase SQL Editor:
+**Without resource binding (manual CLI setup):** The SP does not automatically receive permissions. It gets ownership of any objects it creates (schemas, tables, sequences) through DDL in `server.ts`. Grant the SP a Lakebase role before first deploy:
+
+**Option A — CLI (recommended, no existing DB connection required):**
+
+```bash
+SP_ID=$(databricks apps get $APP_NAME --output json --profile $PROFILE | jq -r '.service_principal_id')
+databricks postgres create-role \
+  projects/<project>/branches/production/endpoints/primary \
+  --json "{\"role_name\": \"$SP_ID\", \"role_type\": \"SERVICE_PRINCIPAL\"}" \
+  --profile $PROFILE
+```
+
+**Option B — SQL grants (alternative, requires existing DB connection via Lakebase SQL Editor):**
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS databricks_auth;

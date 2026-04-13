@@ -286,7 +286,7 @@ The scaffold generates react-router v7 with `createBrowserRouter`. For multi-pag
 - **`useNavigate()`** — programmatic navigation
 
 ```tsx
-import { createBrowserRouter, RouterProvider, NavLink, Outlet } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, NavLink, Outlet } from "react-router";
 
 const router = createBrowserRouter([
   {

@@ -19,6 +19,7 @@ Arguments:
 
 Options:
   --max-retries N   Maximum status check retries (default: 10)
+  --health-path P   Health check endpoint path (default: /api/health)
   --help, -h        Show this help message
 
 Steps:
@@ -44,11 +45,13 @@ EOF
 APP_NAME=""
 PROFILE=""
 MAX_RETRIES=10
+HEALTH_PATH="/api/health"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help|-h) show_help ;;
     --max-retries) MAX_RETRIES="${2:-10}"; shift 2 ;;
+    --health-path) HEALTH_PATH="${2:-/api/health}"; shift 2 ;;
     *)
       if [ -z "$APP_NAME" ]; then APP_NAME="$1"; shift
       elif [ -z "$PROFILE" ]; then PROFILE="$1"; shift
@@ -110,7 +113,7 @@ fi
 HEALTH_STATUS="fail"
 TOKEN=$(databricks auth token --profile "$PROFILE" 2>/dev/null | jq -r '.access_token // empty')
 if [ -n "$TOKEN" ]; then
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "$APP_URL/health" 2>/dev/null || echo "000")
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "${APP_URL}${HEALTH_PATH}" 2>/dev/null || echo "000")
   if [ "$HTTP_CODE" = "200" ]; then
     HEALTH_STATUS="ok"
     echo "Health check: 200 OK" >&2

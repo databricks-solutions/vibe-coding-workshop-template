@@ -380,10 +380,9 @@ $ curl -s http://localhost:8000 | head -1
 > - [ ] The UI loads at `http://localhost:8000` with no console errors
 > - [ ] All pages render with mock data (live data swap happens in the **Wire Lakebase Backend** step)
 > - [ ] `docs/ui_design.md` exists and describes the application
+> - [ ] `.vibecoding-state.md` updated with resolved issues, variable values, and workarounds
 >
 > **Do NOT proceed to Deploy until local testing passes.**
->
-> **Before moving on**, write (or append to) `apps_lakebase/$APP_NAME/.vibecoding-state.md` with resolved issues, variable values, and workarounds from this phase.
 
 #### Context for Deploy to Databricks Apps
 
@@ -551,7 +550,6 @@ The skill covers: config validation, build, deploy, UI verification, error diagn
 
 ```
 $ cd apps_lakebase/$APP_NAME
-$ databricks bundle deploy --profile $PROFILE
 $ databricks apps deploy --profile $PROFILE
 
 Deploying app 'prashanth-s-bookings'...
@@ -611,10 +609,9 @@ The same mock-data UI from the **Scaffold, Build & Test** step, now accessible a
 > - [ ] The web UI loads in browser at the app URL (React application, not an error page)
 > - [ ] No errors in the app logs (`databricks apps logs $APP_NAME`)
 > - [ ] Mock data renders correctly in all components
+> - [ ] `.vibecoding-state.md` updated with resolved issues, variable values, and workarounds
 >
 > **Continue to Setup Lakebase** to set up a Lakebase project for live data.
->
-> **Before moving on**, append to `apps_lakebase/$APP_NAME/.vibecoding-state.md` with resolved issues, variable values, and workarounds from this phase.
 
 #### Context for Setup Lakebase
 
@@ -890,10 +887,9 @@ $ databricks postgres get-endpoint projects/{user_app_name}/branches/production/
 > - [ ] Endpoint hostname (`LAKEBASE_HOST`) captured from Step 3.3
 > - [ ] Compute optimized: min 0.5 CU, max 2.0 CU, 300s suspend timeout
 > - [ ] Endpoint status is `ACTIVE`
+> - [ ] `.vibecoding-state.md` updated with resolved issues, variable values, and workarounds
 >
 > **Do NOT proceed to the Wire Lakebase Backend step until the Lakebase endpoint is active.**
->
-> **Before moving on**, append to `apps_lakebase/$APP_NAME/.vibecoding-state.md` with resolved issues, variable values, and workarounds from this phase.
 
 #### Context for Wire Lakebase Backend
 
@@ -1010,6 +1006,7 @@ await createApp({
 ```env
 LAKEBASE_ENDPOINT=projects/{user_app_name}/branches/production/endpoints/primary
 PGHOST={LAKEBASE_HOST}
+PGPORT=5432
 PGDATABASE=databricks_postgres
 PGSSLMODE=require
 DB_SCHEMA=<value of $DB_SCHEMA from Step A0>
@@ -1023,10 +1020,14 @@ env:
     value: 'projects/{user_app_name}/branches/production/endpoints/primary'
   - name: PGHOST
     value: '{LAKEBASE_HOST}'
+  - name: PGPORT
+    value: '5432'
   - name: PGDATABASE
     value: 'databricks_postgres'
   - name: PGSSLMODE
     value: 'require'
+  - name: NODE_ENV
+    value: 'production'
   - name: DB_SCHEMA
     value: '<value of $DB_SCHEMA from Step A0>'
 ```
@@ -1192,10 +1193,9 @@ Output format varies by AppKit version. Look for confirmation that the server is
 > - [ ] All static mock data replaced with API calls
 > - [ ] DECIMAL/DATE coercion and snake_case mapping handled
 > - [ ] `npm run build` passes; `npm run dev` runs with mock data
+> - [ ] `.vibecoding-state.md` updated with resolved issues, variable values, and workarounds
 >
 > **Do NOT proceed to Deploy and E2E Test until local testing passes with mock data.**
->
-> **Before moving on**, append to `apps_lakebase/$APP_NAME/.vibecoding-state.md` with resolved issues, variable values, and workarounds from this phase.
 
 #### Context for Deploy and E2E Test
 
@@ -1206,7 +1206,7 @@ Copy the following into your new Agent thread so it has the necessary context:
 > - **Workspace:** `{workspace_url}`
 > - **Lakebase project:** `{user_app_name}`
 > - All Lakebase API endpoints return `"source": "mock"` with fallback data locally (live data after deploy)
-> - `app.yaml` has static `value:` entries for Lakebase env vars (LAKEBASE_ENDPOINT, PGHOST, PGDATABASE, PGSSLMODE, DB_SCHEMA)
+> - `app.yaml` has static `value:` entries for Lakebase env vars (LAKEBASE_ENDPOINT, PGHOST, PGPORT, PGDATABASE, PGSSLMODE, NODE_ENV, DB_SCHEMA)
 
 ---
 
@@ -1215,6 +1215,17 @@ Copy the following into your new Agent thread so it has the necessary context:
 ## Step 5: Deploy and E2E Test with Lakebase
 
 In this step, you will deploy the Lakebase-wired application to Databricks Apps and run comprehensive end-to-end testing — verifying API correctness, Lakebase connectivity in production, log health, and connection resilience after idle periods.
+
+> **When in doubt, consult these authoritative sources before improvising:**
+> - AppKit deploy docs: https://databricks.github.io/appkit/docs/app-management
+> - Platform deploy behavior: https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy
+> - Lakebase plugin docs: https://databricks.github.io/appkit/docs/plugins/lakebase
+> - In-terminal: `npx @databricks/appkit docs "app-management"`
+> - Agent Skills: https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps/references/appkit
+>
+> Do NOT improvise npm lifecycle hooks, platform-detection conditionals, or workarounds
+> that skip the platform's build pipeline. If deployment fails, check logs and match
+> against the Common Errors table in the deploy skill (`03-appkit-deploy/SKILL.md`) first.
 
 Start a new Agent thread and use the following prompt:
 
@@ -1301,10 +1312,10 @@ echo "Using profile: $PROFILE"
 Verify `app.yaml` has the Lakebase-specific environment variables (in addition to the generic checks the deploy skill performs):
 
 ```bash
-grep -E "LAKEBASE_ENDPOINT|PGHOST|PGDATABASE|DB_SCHEMA" apps_lakebase/$APP_NAME/app.yaml
+grep -E "LAKEBASE_ENDPOINT|PGHOST|PGPORT|PGDATABASE|DB_SCHEMA|NODE_ENV" apps_lakebase/$APP_NAME/app.yaml
 ```
 
-You should see static `value:` entries for `LAKEBASE_ENDPOINT`, `PGHOST`, `PGDATABASE`, `PGSSLMODE`, and `DB_SCHEMA`. If missing, add them before deploying (see the **Wire Lakebase Backend** step, Part A). This workshop uses static values (see the **Wire Lakebase Backend** step, Part A). `valueFrom: postgres` is valid when using `databricks apps init` or bundle-managed resources, but is not used in this workshop path.
+You should see static `value:` entries for `LAKEBASE_ENDPOINT`, `PGHOST`, `PGPORT`, `PGDATABASE`, `PGSSLMODE`, `NODE_ENV`, and `DB_SCHEMA`. If missing, add them before deploying (see the **Wire Lakebase Backend** step, Part A). This workshop uses static values (see the **Wire Lakebase Backend** step, Part A). `valueFrom: postgres` is valid when using `databricks apps init` or bundle-managed resources, but is not used in this workshop path.
 
 ---
 
@@ -1320,7 +1331,21 @@ This is the first deploy with Lakebase code. The Service Principal runs the DDL 
 
 **Important:** Always use `databricks apps deploy` — never `databricks apps start` — to push code changes. `apps start` only resumes a stopped app without updating code, and may hang if compute is in STOPPED state.
 
-> **Service Principal permissions:** If the SP encounters permission errors on first deploy (e.g., `permission denied for schema`), grant via the Lakebase SQL Editor:
+> **Grant Service Principal Lakebase Access (Pre-Deploy):**
+>
+> The SP needs a Lakebase role before first deploy. Without a `postgres` resource in `databricks.yml`, the SP is NOT auto-granted access.
+>
+> **Option A — CLI (recommended, no existing DB connection required):**
+>
+> ```bash
+> SP_ID=$(databricks apps get $APP_NAME --output json --profile $PROFILE | jq -r '.service_principal_id')
+> databricks postgres create-role \
+>   projects/{user_app_name}/branches/production/endpoints/primary \
+>   --json "{\"role_name\": \"$SP_ID\", \"role_type\": \"SERVICE_PRINCIPAL\"}" \
+>   --profile $PROFILE
+> ```
+>
+> **Option B — SQL grants (alternative, requires existing DB connection via Lakebase SQL Editor):**
 >
 > ```sql
 > CREATE EXTENSION IF NOT EXISTS databricks_auth;
@@ -1422,7 +1447,8 @@ databricks apps logs $APP_NAME --tail-lines 100 --profile $PROFILE
 | Error | Cause | Fix |
 |-------|-------|-----|
 | `ERR_MODULE_NOT_FOUND` for `@databricks/lakebase` | Package not installed | Verify `@databricks/lakebase` is in `package.json` dependencies; redeploy |
-| `LAKEBASE_ENDPOINT is not set` or `PGHOST is not set` | Missing env vars in `app.yaml` | Add static `value:` entries for `LAKEBASE_ENDPOINT`, `PGHOST`, `PGDATABASE`, `PGSSLMODE` to `app.yaml` (see the **Wire Lakebase Backend** step, Part A); redeploy |
+| `LAKEBASE_ENDPOINT is not set` or `PGHOST is not set` | Missing env vars in `app.yaml` | Add static `value:` entries for `LAKEBASE_ENDPOINT`, `PGHOST`, `PGPORT`, `PGDATABASE`, `PGSSLMODE`, `NODE_ENV` to `app.yaml` (see the **Wire Lakebase Backend** step, Part A); redeploy |
+| `ConfigurationError: Missing required resources: postgres` | `PGPORT` missing from `app.yaml` | Add `- name: PGPORT` / `value: '5432'` to `app.yaml` env section; redeploy |
 | `role "xxxxxxxx-xxxx-..." does not exist` | Service Principal lacks Lakebase role | Re-deploy the app so the SP re-creates and owns objects. If the SP was just created, grant via SQL (see Step 5.2 callout) |
 | `permission denied for sequence` | SP lacks GRANT on sequences for SERIAL columns | Re-deploy the app so the SP re-creates objects, or grant manually: `GRANT ALL ON ALL SEQUENCES IN SCHEMA <DB_SCHEMA> TO "<sp-id>";` |
 | `Connection attempt 1/5 failed` | Normal on first request — Lakebase autoscaling cold start | Wait and retry. The connection pool handles retries automatically |
@@ -1435,7 +1461,7 @@ databricks apps logs $APP_NAME --tail-lines 100 --profile $PROFILE
 
 1. Identify the error from logs
 2. Apply the fix in `apps_lakebase/$APP_NAME/`
-3. Redeploy: `cd apps_lakebase/$APP_NAME && databricks bundle deploy --profile $PROFILE && databricks apps deploy $APP_NAME --profile $PROFILE`
+3. Redeploy: `cd apps_lakebase/$APP_NAME && databricks apps deploy --profile $PROFILE`
 4. Wait for the app to reach RUNNING state (stream logs with `databricks apps logs $APP_NAME --follow --profile $PROFILE`)
 5. Re-test endpoints
 
