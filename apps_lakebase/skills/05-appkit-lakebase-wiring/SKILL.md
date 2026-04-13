@@ -47,9 +47,10 @@ Design a database schema from a PRD, build Express API routes with mock fallback
 **Prerequisites — verify these before proceeding:**
 
 1. The Lakebase plugin is registered in `server/server.ts` (via `04-appkit-plugin-add`)
-2. Environment variables are configured in `.env` and `app.yaml` (`LAKEBASE_ENDPOINT`, `PGHOST`, `PGPORT`, `PGDATABASE`, `PGSSLMODE`, `DB_SCHEMA`)
-3. `DB_SCHEMA` is set to a user-scoped name derived from `$APP_NAME` (hyphens → underscores, e.g., `prashanth_s_booking_app`)
-4. `npm run build` passes with the Lakebase plugin imported
+2. Bundle resources (`postgres_project`/`postgres_branch`/`postgres_endpoint`) are declared in `databricks.yml`
+3. `app.yaml` has `LAKEBASE_ENDPOINT` with `valueFrom: postgres` and `DB_SCHEMA` as a static env var
+4. `DB_SCHEMA` is set to a user-scoped name derived from `$APP_NAME` (hyphens → underscores, e.g., `prashanth_s_booking_app`)
+5. `npm run build` passes with the Lakebase plugin imported
 
 **Read the database design reference first:** Before designing your schema, read [references/database-design-guide.md](references/database-design-guide.md) for normalization rules and PostgreSQL conventions.
 
@@ -383,12 +384,11 @@ These are validated by three independent agent runs ([retrospective](../../retro
 | `autoStart: false` missing when using `server.extend()` | Routes not registered; server starts before `extend()` runs | Always pass `server({ autoStart: false })` and call `AppKit.server.start()` after |
 | DECIMAL columns returned as strings | `"73" + "51" = "7351"` (concatenation, not addition) | Coerce with `Number()` in mapper functions |
 | DATE columns returned as JS Date objects | `String(date)` → `"Fri May 15 2026..."` | Use `.toISOString().slice(0, 10)` for `YYYY-MM-DD` |
-| `databricks.yml` postgres resource format | Old `postgres:` format rejected by bundle deployer | Do NOT add postgres resource for Autoscaling; use static env vars in `app.yaml` |
-| `valueFrom: postgres` in `app.yaml` | Doesn't resolve without bundle-managed resource | Use static `value:` for all PG env vars |
+| Old `postgres:` resource format in `databricks.yml` | Rejected by bundle deployer | Use `postgres_project`/`postgres_branch`/`postgres_endpoint` resources (not the old `postgres:` format with `branch:`/`database:`/`permission:` fields) |
 | `queryKey` on chart components | Requires analytics plugin (not installed) | Use `data` prop with fetched results |
 | Stale endpoint hostname in `.env` | Silent connection failures | Re-fetch host: `databricks postgres get-endpoint ... \| jq -r '.status.hosts.host'` |
 | Port 8000 already in use | `EADDRINUSE` on `npm run dev` | `lsof -ti:8000 \| xargs kill -9 2>/dev/null \|\| true` before starting |
-| SP lacks Lakebase role on first deploy | `permission denied for schema` / `role does not exist` | Without a `postgres` resource in `databricks.yml`, the SP is NOT auto-granted access. Use `databricks postgres create-role` CLI command to grant before deploying (see plugin-lakebase.md) |
+| SP permission errors on first deploy | `permission denied for schema` / `role does not exist` | SP permissions are auto-granted via bundle resource binding. Verify `postgres_project`/`postgres_branch`/`postgres_endpoint` are declared in `databricks.yml`. If using static env vars fallback, grant manually (see plugin-lakebase.md Troubleshooting) |
 
 ---
 

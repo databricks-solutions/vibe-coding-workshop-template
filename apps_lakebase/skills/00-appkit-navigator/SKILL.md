@@ -33,15 +33,15 @@ AppKit apps follow a linear development lifecycle. Each step maps to a skill or 
 ```
 Step 1          Step 2         Step 3            Step 4                           Step 5
 Scaffold ──► Build ──► Deploy mock ──► Setup Lakebase ──► Wire Lakebase      ──► Deploy+E2E
- (01)        (02)     (03-deploy)       (CLI)           (04-plugin-add +       (03-deploy)
-                                                         05-lakebase-wiring)
+ (01)        (02)     (03-deploy)    (04-plugin-add     (05-lakebase-wiring)   (03-deploy)
+                                      + bundle config)
 ```
 
 | Step | Skill / Prompt | What It Does |
 |------|---------------|-------------|
 | Scaffold, Build & Test | `01-appkit-scaffold` + `02-appkit-build` | Scaffold a blank AppKit project, build UI with mock data from PRD |
 | Deploy to Databricks Apps | `03-appkit-deploy` | Deploy mock-data app to Databricks Apps |
-| Setup Lakebase | `databricks-lakebase` agent skill + `apps_lakebase/prompts/03-setup-lakebase.md` | Create and configure a Lakebase project via CLI |
+| Setup Lakebase | `04-appkit-plugin-add` + `apps_lakebase/prompts/03-setup-lakebase.md` | Install Lakebase plugin and configure bundle resources in `databricks.yml` |
 | Wire Lakebase Backend | `04-appkit-plugin-add` + `05-appkit-lakebase-wiring` + `apps_lakebase/prompts/04-lakebase-wiring.md` | Add Lakebase plugin, design schema, build APIs, wire frontend — code changes only, does NOT deploy |
 | Deploy and E2E Test | `03-appkit-deploy` + `apps_lakebase/prompts/05-e2e-test.md` | Deploy with Lakebase (SP creates DB objects) + E2E test |
 
@@ -62,7 +62,7 @@ Match the user's request keywords to the correct skill. Read the skill's `SKILL.
 | "create app", "scaffold", "init", "new app", "bootstrap", "start new project" | `apps_lakebase/skills/01-appkit-scaffold/SKILL.md` | Create a new AppKit project |
 | "add plugin", "add lakebase", "add analytics", "add genie", "add files", "integrate postgres", "extend app" | `apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` | Add a plugin to an existing project |
 | "build UI", "implement PRD", "create dashboard", "add page", "build features", "develop frontend", "create components" | `apps_lakebase/skills/02-appkit-build/SKILL.md` | Build features from a PRD or spec |
-| "setup lakebase", "create lakebase project", "lakebase endpoint", "lakebase compute" | `apps_lakebase/Instructions.md` **Setup Lakebase** step or `apps_lakebase/prompts/03-setup-lakebase.md` | Create and configure a Lakebase project |
+| "setup lakebase", "add lakebase plugin", "lakebase bundle resources", "configure lakebase" | `apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` + `apps_lakebase/prompts/03-setup-lakebase.md` | Install Lakebase plugin, declare bundle resources |
 | "wire lakebase", "connect lakebase", "lakebase wiring", "lakebase backend", "CRUD API", "lakebase tables", "DDL" | `apps_lakebase/skills/05-appkit-lakebase-wiring/SKILL.md` (patterns) + `apps_lakebase/prompts/04-lakebase-wiring.md` (orchestration) | Wire Lakebase to UI — code changes only, does NOT deploy |
 | "database schema design", "useLakebaseData", "ConnectionStatus", "mock fallback", "database design" | `apps_lakebase/skills/05-appkit-lakebase-wiring/SKILL.md` | Lakebase wiring patterns (DDL, API routes, frontend hooks, testing) |
 | "e2e test", "test lakebase", "deploy lakebase", "verify live data" | `apps_lakebase/Instructions.md` **Deploy and E2E Test** step or `apps_lakebase/prompts/05-e2e-test.md` | Deploy with Lakebase (SP creates DB objects), test APIs, verify idle resilience |
@@ -79,8 +79,8 @@ Match the user's request keywords to the correct skill. Read the skill's `SKILL.
 3. IF "create" / "new" / "scaffold" / "init"         → Read apps_lakebase/skills/01-appkit-scaffold/SKILL.md
 4. IF "add plugin" / "integrate" / "add lakebase"     → Read apps_lakebase/skills/04-appkit-plugin-add/SKILL.md
 5. IF "build" / "implement" / "PRD" / "UI"            → Read apps_lakebase/skills/02-appkit-build/SKILL.md
-6. IF "setup lakebase" / "create lakebase project"    → Read apps_lakebase/prompts/03-setup-lakebase.md
-                                                        (also read databricks-lakebase skill for CLI reference)
+6. IF "setup lakebase" / "add lakebase plugin"         → Read apps_lakebase/skills/04-appkit-plugin-add/SKILL.md (plugin install)
+                                                        + apps_lakebase/prompts/03-setup-lakebase.md (bundle resources)
 7. IF "wire lakebase" / "connect lakebase" / "DDL"   → Read apps_lakebase/skills/05-appkit-lakebase-wiring/SKILL.md (patterns)
                                                         + apps_lakebase/prompts/04-lakebase-wiring.md (orchestration, no deploy)
 8. IF "e2e test" / "test lakebase" / "deploy lakebase" → Read apps_lakebase/prompts/05-e2e-test.md (deploy + E2E)

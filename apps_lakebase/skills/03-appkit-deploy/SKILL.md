@@ -114,15 +114,13 @@ When `databricks apps deploy` pushes code to the platform, the following sequenc
 
 **Hard timeout:** The entire sequence (steps 1-4) must complete within **10 minutes**. If npm install or build exceeds this, the deploy fails with `App process did not start within 10 minutes`.
 
-**Critical rules — do NOT violate:**
+**Critical rules:**
 
-- **NEVER** add `preinstall` or `postinstall` scripts that modify `node_modules` (e.g., `rm -rf node_modules`). These create infinite loops or corrupt the install.
-- **NEVER** add platform-detection conditionals (e.g., `[ "$HOME" = '/home/app' ]`) to skip build steps. The platform build pipeline is designed to work as-is.
-- **NEVER** ship pre-built `dist/` via `sync.include` and skip the build. The platform runs `npm install` in production mode and expects `build` to work with the installed dependencies.
-- **NEVER** add `rolldown-vite` or other packages with native bindings as the `vite` alias — native modules built on macOS won't load on the Linux platform container.
-- **DO** keep `devDependencies` lean. Remove test-only packages like `@playwright/test`, `sharp`, or other heavy native modules that are not needed for the build. The platform installs all `devDependencies` listed in `package.json` even in production mode if `npm run build` needs them — but heavy packages push install past the 10-minute timeout.
-- **DO** let scaffolded `prebuild` hooks run (`appkit sync`, `appkit generate-types`). These may emit warnings about `@ast-grep/napi` — the warnings are harmless and guarded by `2>/dev/null; true` in the scaffold output.
-- **DO** note that `databricks bundle deploy` (and `databricks apps deploy` which calls it internally) uses `.gitignore` patterns for file exclusion — NOT `.databricksignore`. If `.gitignore` excludes `dist/`, the build output won't be uploaded.
+- **NEVER** add `preinstall` or `postinstall` scripts that modify `node_modules`. These create infinite loops or corrupt the install.
+- **NEVER** add platform-detection conditionals (e.g., `[ "$HOME" = '/home/app' ]`) to skip build steps.
+- **NEVER** modify the scaffold's `package.json` dependency versions, aliases, or overrides. If `rolldown-vite`, `@playwright/test`, or other packages were included by `databricks apps init`, leave them as-is — the scaffold is tested to deploy on the platform.
+- **DO** let scaffolded `prebuild` hooks run (`appkit sync`, `appkit generate-types`). Warnings about `@ast-grep/napi` are harmless and guarded by `2>/dev/null; true`.
+- **DO** note that `databricks bundle deploy` (and `databricks apps deploy` which calls it internally) uses `.gitignore` patterns for file exclusion — NOT `.databricksignore`.
 
 **Authoritative source:** [Databricks Apps deploy — deployment logic](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy) and [post-deployment behavior](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/app-runtime).
 
@@ -309,27 +307,6 @@ Repeat up to 3 times. If errors persist after 3 attempts, report them for manual
 | `File is larger than 10485760 bytes` | Bundled file exceeds 10 MB limit | Use `requirements.txt`/`package.json` for deps; do not bundle large artifacts |
 | 504 Gateway Timeout | Request exceeded 120s proxy timeout | Use WebSockets for long operations; SSE may be buffered |
 | OBO scopes missing after deploy | `apps update` / `bundle run` does full replacement, can wipe scopes | Re-apply OBO scopes after each deploy that modifies resources |
-| `Cannot find native binding` or `@rolldown/binding-linux-x64-gnu` | `rolldown-vite` or other native-binding package in `devDependencies` | Replace `"vite": "npm:rolldown-vite@..."` with standard `vite` in `package.json`; remove the `overrides` entry; reinstall and redeploy |
-| `App process did not start within 10 minutes` | `npm install` timed out due to heavy devDependencies | Remove `@playwright/test`, `sharp`, and other test-only / native packages from `devDependencies`; regenerate lockfile; redeploy |
-| `ENOTEMPTY: directory not empty, rename` during npm install | Stale `node_modules` from a prior failed deploy | Redeploy — the platform typically self-heals on the next attempt. If persistent, stop the app, wait 30s, then redeploy |
-| `ConfigurationError: Missing required resources: postgres` | `PGPORT` missing from `app.yaml` env section | Add `- name: PGPORT` / `value: '5432'` to `app.yaml`; redeploy |
-
-### Platform Build Behavior
-
-When `package.json` exists, the platform runs these steps during deploy:
-
-1. `npm install` — installs all dependencies (the platform manages `node_modules`)
-2. `npm run build` — runs the build script if defined
-3. Starts the app via `app.yaml`'s `command` (or `npm run start` if no command is specified)
-
-Python deps are installed from `requirements.txt` or `uv.lock` if present.
-
-**Rules:**
-
-- **NEVER add `preinstall` or `postinstall` hooks that modify or delete `node_modules`.** The platform manages dependency installation. Custom hooks that delete `node_modules` (e.g., `rm -rf node_modules` in a `preinstall` script) cause runtime `ERR_MODULE_NOT_FOUND` errors.
-- **The scaffold's `prebuild` hooks may emit warnings** (`@ast-grep/napi` not found, `appkit plugin sync` failed). These are expected — the scaffold guards them with `2>/dev/null; true`. Do NOT add additional platform-detection or skip logic (e.g., `[ "$HOME" = '/home/app' ]`).
-- **The platform builds artifacts on deploy.** Do NOT ship pre-built `dist/` or `build/` directories and skip the build. The canonical flow is: platform runs `npm install` → `npm run build` → produces build output → `app.yaml` command starts the server from that output.
-- **If `rolldown-vite` causes native binding failures** (`Cannot find native binding` or `@rolldown/binding-linux-x64-gnu` missing), replace `"vite": "npm:rolldown-vite@..."` with standard `"vite": "^7.2.4"` in `package.json` and remove the `overrides` entry. See the Common Errors table above.
 
 The calling prompt may define additional plugin-specific errors (e.g., Lakebase connection or permission errors). Check those if the errors above don't match.
 

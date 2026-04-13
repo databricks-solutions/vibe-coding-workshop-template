@@ -28,55 +28,9 @@ await createApp({
 });
 ```
 
-### 3. Environment Variables
+### 3. Declare Bundle Resources in `databricks.yml`
 
-Add to `.env` for local development:
-
-```env
-LAKEBASE_ENDPOINT=projects/<project>/branches/<branch>/endpoints/<endpoint>
-PGHOST=<your-lakebase-host>
-PGPORT=5432
-PGDATABASE=<database-name>
-PGSSLMODE=require
-```
-
-Add to `app.yaml` for deployed apps (Lakebase Autoscaling):
-
-```yaml
-env:
-  - name: LAKEBASE_ENDPOINT
-    value: 'projects/<project-id>/branches/production/endpoints/primary'
-  - name: PGHOST
-    value: '<endpoint-hostname>'
-  - name: PGPORT
-    value: '5432'
-  - name: PGDATABASE
-    value: 'databricks_postgres'
-  - name: PGSSLMODE
-    value: 'require'
-  - name: NODE_ENV
-    value: 'production'
-```
-
-**Two valid deployment patterns exist:**
-
-1. **Resource binding (upstream default):** If the app was scaffolded with `databricks apps init --features lakebase` or has `postgres_project`/`postgres_branch`/`postgres_endpoint` resources in `databricks.yml`, the platform auto-injects `PGHOST`, `PGDATABASE`, `PGSSLMODE`, `PGUSER`, `PGPORT`, and `PGAPPNAME`. Only `LAKEBASE_ENDPOINT` needs to be set explicitly:
-   ```yaml
-   env:
-     - name: LAKEBASE_ENDPOINT
-       valueFrom: postgres
-   ```
-   Reference: [AppKit Lakebase docs - Environment variables](https://databricks.github.io/appkit/docs/plugins/lakebase#environment-variables)
-
-2. **Static env vars (manual setup):** If the Lakebase project was created via CLI without a bundle resource declaration, set all PG variables explicitly as static values in `app.yaml` (as shown above). Do NOT set `PGUSER` or `PGPASSWORD` — the plugin handles OAuth token rotation automatically.
-
-### 4. Lakebase Resources in databricks.yml (Optional)
-
-For Lakebase Autoscaling, `databricks.yml` does **not** require a postgres resource for the app to connect (if using static env vars in `app.yaml`). However, if you want `valueFrom: postgres` auto-injection or bundle-managed project lifecycle, declare `postgres_project`/`postgres_branch`/`postgres_endpoint` resources (CLI v0.287.0+).
-
-> **Do NOT use the old `postgres:` resource format** (with `branch:` / `database:` / `permission:` fields). That format is for Lakebase Provisioned only and will be rejected by the bundle deployer for Autoscaling projects.
-
-**Optional: Bundle-managed Lakebase project lifecycle.** If you want the bundle to create and manage the Lakebase Autoscaling project (instead of using CLI commands), use `postgres_project`, `postgres_branch`, and `postgres_endpoint` resources (Databricks CLI v0.287.0+):
+Declare `postgres_project`, `postgres_branch`, and `postgres_endpoint` resources. The bundle creates the Lakebase project on first deploy — no manual CLI project creation is needed. Autoscaling and scale-to-zero settings are declared directly in the resource YAML.
 
 ```yaml
 resources:
@@ -107,38 +61,75 @@ resources:
       suspend_timeout_duration: "300s"
 ```
 
-This manages the project lifecycle through the bundle but does **not** create an app resource binding. You still need static env vars in `app.yaml` and manual SP grants. Reference: [DABs postgres_project docs](https://docs.databricks.com/aws/en/dev-tools/bundles/resources#postgres_project)
+Requires Databricks CLI v0.287.0+. Reference: [DABs postgres_project docs](https://docs.databricks.com/aws/en/dev-tools/bundles/resources#postgres_project)
 
-### 5. Create a Lakebase Project First
+> **Do NOT use the old `postgres:` resource format** (with `branch:` / `database:` / `permission:` fields). That format is for Lakebase Provisioned only and will be rejected by the bundle deployer for Autoscaling projects.
 
-Before using the plugin, you need a Lakebase Postgres Autoscaling project. Create one via:
-- The Databricks UI (Compute > Lakebase Postgres)
-- Or: `databricks postgres create-project --name <project-name>`
+### 4. Configure Environment Variables
 
-Then retrieve the host from the endpoint listing:
-```bash
-databricks postgres list-endpoints projects/<project-name>/branches/production --output json
+**For deployment** — add to `app.yaml`:
+
+With bundle resources declared in `databricks.yml`, the platform auto-injects `PGHOST`, `PGDATABASE`, `PGSSLMODE`, `PGUSER`, `PGPORT`, and `PGAPPNAME`. Only `LAKEBASE_ENDPOINT` needs to be configured:
+
+```yaml
+env:
+  - name: LAKEBASE_ENDPOINT
+    valueFrom: postgres
+  - name: DB_SCHEMA
+    value: '<user-scoped schema name>'
 ```
 
-### Autoscaling and Scale-to-Zero
+`DB_SCHEMA` is an app-specific variable (not auto-injected) used to scope database objects. Derive it from the app name (hyphens to underscores).
 
-New Lakebase endpoints default to `suspend_timeout_duration: "0s"`, which means **always on** (no auto-suspend). To enable scale-to-zero and save cost during development, set a positive duration:
+Do NOT set `PGUSER` or `PGPASSWORD` — the plugin handles OAuth token rotation automatically.
 
-```bash
-# "spec" is the UPDATE_MASK positional arg — tells the API which top-level field to patch
-databricks postgres update-endpoint \
-  projects/<project>/branches/production/endpoints/primary spec \
-  --json '{"spec": {"autoscaling_limit_min_cu": 0.5, "autoscaling_limit_max_cu": 2.0, "suspend_timeout_duration": "300s"}}' \
-  --profile <PROFILE>
+Reference: [AppKit Lakebase docs - Environment variables](https://databricks.github.io/appkit/docs/plugins/lakebase#environment-variables)
+
+**For local development** — add to `.env`:
+
+```env
+LAKEBASE_ENDPOINT=projects/<project>/branches/production/endpoints/primary
+PGHOST=<your-lakebase-host>
+PGPORT=5432
+PGDATABASE=databricks_postgres
+PGSSLMODE=require
+DB_SCHEMA=<user-scoped schema name>
 ```
 
-- `suspend_timeout_duration: "300s"` -- scales to zero after 5 minutes idle
-- `autoscaling_limit_min_cu: 0.5` -- minimum compute when active
-- `autoscaling_limit_max_cu: 2.0` -- sufficient for development
+Local dev requires explicit PG variables because `valueFrom` only resolves on the platform. Before the first deploy, local dev uses mock fallback data. After the first deploy, retrieve the host from the endpoint:
 
-The endpoint wakes automatically on the next connection attempt (may take a few seconds on first request).
+```bash
+databricks postgres list-endpoints projects/<project-name>/branches/production --output json | jq -r '.[0].status.hosts.host'
+```
 
-### 6. Using the Pool
+<details>
+<summary>Fallback: Static env vars (when bundle resources are unavailable)</summary>
+
+If you cannot declare bundle resources in `databricks.yml`, set all PG variables explicitly in `app.yaml`:
+
+```yaml
+env:
+  - name: LAKEBASE_ENDPOINT
+    value: 'projects/<project-id>/branches/production/endpoints/primary'
+  - name: PGHOST
+    value: '<endpoint-hostname>'
+  - name: PGPORT
+    value: '5432'
+  - name: PGDATABASE
+    value: 'databricks_postgres'
+  - name: PGSSLMODE
+    value: 'require'
+  - name: NODE_ENV
+    value: 'production'
+  - name: DB_SCHEMA
+    value: '<user-scoped schema name>'
+```
+
+This requires a pre-existing Lakebase project (created via CLI or UI) and manual SP permission grants. See the Troubleshooting section under Database Permissions.
+
+</details>
+
+### 5. Using the Pool
 
 Use a schema name scoped to the user or app (e.g., `prashanth_s_booking_app`) to avoid collisions when multiple apps share a database. Avoid generic names like `app` or `public`. Pass the schema as a `DB_SCHEMA` environment variable.
 
@@ -200,11 +191,9 @@ await createApp({
 
 ## Database Permissions
 
-**With resource binding (scaffolded via `databricks apps init`):** The Service Principal is automatically granted `CONNECT_AND_CREATE` permission on the `postgres` resource. This lets the SP connect and create new objects, but not access existing schemas or tables. No manual SQL grants are needed for initial setup.
+**With bundle resources (recommended):** The Service Principal is automatically granted `CONNECT_AND_CREATE` permission via the resource binding. This lets the SP connect and create new objects. No manual SQL grants are needed.
 
-**Without resource binding (manual CLI setup):** The SP does not automatically receive permissions. It gets ownership of any objects it creates (schemas, tables, sequences) through DDL in `server.ts`. Grant the SP a Lakebase role before first deploy:
-
-**Option A — CLI (recommended, no existing DB connection required):**
+**Troubleshooting:** If the SP encounters permission errors despite bundle resources being declared, verify that `postgres_project`/`postgres_branch`/`postgres_endpoint` are present in `databricks.yml` and that `databricks apps deploy` (not `databricks bundle deploy` alone) was used. If using the static env vars fallback (no bundle resources), grant the SP a role manually:
 
 ```bash
 SP_ID=$(databricks apps get $APP_NAME --output json --profile $PROFILE | jq -r '.service_principal_id')
@@ -212,15 +201,6 @@ databricks postgres create-role \
   projects/<project>/branches/production/endpoints/primary \
   --json "{\"role_name\": \"$SP_ID\", \"role_type\": \"SERVICE_PRINCIPAL\"}" \
   --profile $PROFILE
-```
-
-**Option B — SQL grants (alternative, requires existing DB connection via Lakebase SQL Editor):**
-
-```sql
-CREATE EXTENSION IF NOT EXISTS databricks_auth;
-SELECT databricks_create_role('<SP_CLIENT_ID>', 'service_principal');
-GRANT CONNECT ON DATABASE databricks_postgres TO "<SP_CLIENT_ID>";
-GRANT CREATE, USAGE ON SCHEMA public TO "<SP_CLIENT_ID>";
 ```
 
 Reference: [AppKit Lakebase docs - Database Permissions](https://databricks.github.io/appkit/docs/plugins/lakebase#database-permissions)
@@ -245,9 +225,9 @@ table in `apps_lakebase/skills/05-appkit-lakebase-wiring/SKILL.md`** when buildi
 CRUD routes or wiring the frontend.
 
 The one gotcha specific to plugin setup (not wiring):
-- **Endpoint hostnames change when endpoints are recreated.** Always fetch the current
-  host dynamically via `databricks postgres get-endpoint ... | jq -r '.status.hosts.host'`
-  rather than relying on `.env` values from a previous session.
+- **Endpoint hostnames change when endpoints are recreated.** After deploy, fetch the current
+  host via `databricks postgres list-endpoints ... | jq -r '.[0].status.hosts.host'`
+  for your `.env` file.
 
 ## Generating Credentials for CLI/Script Access
 

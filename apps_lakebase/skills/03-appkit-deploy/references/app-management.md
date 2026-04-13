@@ -35,7 +35,7 @@ env:
 | `LAKEBASE_ENDPOINT` | `postgres` | Lakebase |
 | `DATABRICKS_VOLUME_*` | `volume` | Files |
 
-> **Workshop note:** This workshop uses static `value:` entries for Lakebase env vars for explicit visibility. Production apps should use `valueFrom: postgres` via `databricks apps init --features lakebase`.
+> **Lakebase env vars:** Use `valueFrom: postgres` in `app.yaml` with bundle-managed `postgres_project`/`postgres_branch`/`postgres_endpoint` resources in `databricks.yml`. The platform auto-injects `PGHOST`, `PGPORT`, `PGDATABASE`, `PGSSLMODE`.
 
 ## Deploy Command
 
