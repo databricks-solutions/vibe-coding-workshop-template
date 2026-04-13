@@ -629,7 +629,7 @@ Copy the following into your new Agent thread so it has the necessary context:
 
 ## Step 3: Setup Lakebase
 
-In this step, you will install the Lakebase (managed PostgreSQL) plugin and configure bundle resources in `databricks.yml`. The bundle creates the Lakebase project automatically on first deploy — no manual CLI project creation is needed. This step focuses on plugin installation and configuration only.
+In this step, you will install the `@databricks/lakebase` npm package and configure bundle resources in `databricks.yml` and `app.yaml`. This is a **config-only** step — `server.ts` is NOT modified. Plugin registration (`lakebase()` in the plugins array) happens in the **Wire Lakebase Backend** step alongside the database code. The bundle creates the Lakebase project automatically on first deploy — no manual CLI project creation is needed.
 
 Start a new Agent thread and use the following prompt:
 
@@ -639,17 +639,17 @@ Start a new Agent thread and use the following prompt:
 
 *Instructions for the AI model*
 
-You are a full-stack developer adding the Lakebase (PostgreSQL) plugin to an existing AppKit application and configuring bundle resources for deployment. Your goal is to install the plugin, declare Lakebase bundle resources in `databricks.yml`, and configure `app.yaml` so the platform auto-provisions and connects to Lakebase on deploy.
+You are a full-stack developer adding the Lakebase (PostgreSQL) package to an existing AppKit application and configuring bundle resources for deployment. This is a **config-only** step — install the npm package and configure YAML files, but do NOT modify `server.ts`.
 
 Key requirements:
 
-- Install `@databricks/lakebase` and register the plugin in `server/server.ts`
+- Install `@databricks/lakebase` npm package (do NOT register the plugin in `server.ts` yet — that happens in the **Wire Lakebase Backend** step)
 - Declare `postgres_projects` resource in `databricks.yml` (do NOT declare `postgres_branches` or `postgres_endpoints` — Lakebase auto-creates these)
 - Configure `app.yaml` with `valueFrom: postgres` for `LAKEBASE_ENDPOINT` and a static `DB_SCHEMA`
 - Derive `DB_SCHEMA` from `$APP_NAME` (hyphens to underscores) for user-scoped database isolation
-- Verify with `npm run build`
 - Do NOT deploy in this step — deployment happens in the **Deploy and E2E Test** step
 - Do NOT create a Lakebase project via CLI — the bundle creates it automatically on first deploy
+- Do NOT add `lakebase()` to `server.ts` — plugin registration happens in the **Wire Lakebase Backend** step
 
 CLI Best Practices:
 
@@ -666,7 +666,7 @@ CLI Best Practices:
 
 #### Your Task
 
-Add the Lakebase (PostgreSQL) plugin to the AppKit application and configure bundle resources so the platform auto-provisions Lakebase on deploy. This step focuses on plugin installation and configuration only — no database code or deployment.
+Install the `@databricks/lakebase` package and configure bundle resources so the platform auto-provisions Lakebase on deploy. This is a **config-only** step — install the npm package and configure YAML files. Do NOT modify `server.ts` — plugin registration and database code happen in the **Wire Lakebase Backend** step.
 
 **First:** Read `apps_lakebase/$APP_NAME/.vibecoding-state.md` if it exists — it contains resolved issues and variable values from prior phases.
 
@@ -700,21 +700,7 @@ npm install @databricks/lakebase
 
 ---
 
-#### Step 3.3: Register the Plugin
-
-In `server/server.ts`, add `lakebase` to the plugin list:
-
-```typescript
-import { createApp, server, lakebase } from "@databricks/appkit";
-
-await createApp({
-  plugins: [server(), lakebase()],
-});
-```
-
----
-
-#### Step 3.4: Add Bundle Resources to `databricks.yml`
+#### Step 3.3: Add Bundle Resources to `databricks.yml`
 
 Lakebase Autoscaling uses a **two-phase** deploy process because the database ID is auto-generated and cannot be known until the project exists:
 
@@ -746,7 +732,7 @@ Replace `<APP_NAME>` with the actual `$APP_NAME` value. If `databricks.yml` alre
 
 ---
 
-#### Step 3.5: Configure `app.yaml` Environment Variables
+#### Step 3.4: Configure `app.yaml` Environment Variables
 
 Add to the `env:` section of `app.yaml`:
 
@@ -761,14 +747,14 @@ The platform auto-injects `PGHOST`, `PGPORT`, `PGDATABASE`, `PGSSLMODE`, `PGUSER
 
 ---
 
-#### Step 3.6: Verify Build
+#### Step 3.5: Verify Package Installation
 
 ```bash
 cd apps_lakebase/$APP_NAME
-npm run build
+npm ls @databricks/lakebase
 ```
 
-Must complete without import or module errors for `@databricks/lakebase`.
+Must show `@databricks/lakebase` in the dependency tree.
 
 ---
 
@@ -781,11 +767,10 @@ Your Lakebase plugin is configured. The Lakebase project will be created automat
 #### Checklist
 
 - [ ] `@databricks/lakebase` installed in `package.json`
-- [ ] `lakebase()` registered in `server/server.ts` plugins
+- [ ] `server/server.ts` is **unchanged** (plugin registration happens in the Wire Lakebase Backend step)
 - [ ] `DB_SCHEMA` derived from `$APP_NAME`
 - [ ] `databricks.yml` has `postgres_projects` resource (no `postgres_branches` or `postgres_endpoints` — auto-created)
 - [ ] `app.yaml` has `LAKEBASE_ENDPOINT` with `valueFrom: postgres` and `DB_SCHEMA`
-- [ ] `npm run build` passes
 
 ---
 
@@ -873,10 +858,12 @@ You are a full-stack developer wiring a Lakebase PostgreSQL backend into an AppK
 
 Key requirements:
 
-- The Lakebase plugin is already installed and configured (from the **Setup Lakebase** step)
+- The `@databricks/lakebase` package is installed and YAML files are configured (from the **Setup Lakebase** step), but `server.ts` has NOT been modified yet
+- This step registers `lakebase()` in the plugins array AND writes all database code (DDL, routes, frontend hooks)
 - Follow the `05-appkit-lakebase-wiring` skill for DDL patterns, API route architecture, frontend hooks, and testing
 - Use `DB_SCHEMA` (from `.vibecoding-state.md` or `.env`) in all DDL, queries, and grants
 - Do NOT deploy in this step — deployment happens in the **Deploy and E2E Test** step
+- Local validation is `npm run build` only — `npm run dev` will crash because Lakebase env vars are not set until after the first deploy
 
 CLI Best Practices:
 
@@ -893,7 +880,7 @@ CLI Best Practices:
 
 #### Your Task
 
-Wire the AppKit web application to a Lakebase database so the UI fetches data from Lakebase PostgreSQL via Express API routes. This phase focuses on code changes and local testing with mock fallback data. Deployment and live data verification happen in the **Deploy and E2E Test** step.
+Wire the AppKit web application to a Lakebase database so the UI fetches data from Lakebase PostgreSQL via Express API routes. This step registers the `lakebase()` plugin in `server.ts` AND writes all database code. Local validation is **`npm run build` only** — `npm run dev` will crash because Lakebase env vars are not set until after the first deploy. Deployment and live data verification happen in the **Deploy and E2E Test** step.
 
 **First:** Read `apps_lakebase/$APP_NAME/.vibecoding-state.md` if it exists — it contains resolved issues and variable values from prior phases (including `DB_SCHEMA` from the **Setup Lakebase** step).
 
@@ -901,7 +888,7 @@ Wire the AppKit web application to a Lakebase database so the UI fetches data fr
 
 **Working directory:** All app code and commands use the `apps_lakebase/` folder. The scaffolded AppKit app lives at `apps_lakebase/$APP_NAME/`.
 
-**Prerequisite:** The **Setup Lakebase** step must be complete — the Lakebase plugin is installed, bundle resources are declared in `databricks.yml`, and `app.yaml` has `valueFrom: postgres`.
+**Prerequisite:** The **Setup Lakebase** step must be complete — the `@databricks/lakebase` package is installed, bundle resources are declared in `databricks.yml`, and `app.yaml` has `valueFrom: postgres`. Note: `server.ts` was NOT modified in that step — this step adds the `lakebase()` plugin registration along with all database code.
 
 ---
 
@@ -1534,19 +1521,20 @@ Combined verification across all steps:
 - [ ] Web UI loads at the app URL
 - [ ] Mock data renders correctly
 
-### Setup Lakebase
-- [ ] `@databricks/lakebase` installed and registered
+### Setup Lakebase (Config Only)
+- [ ] `@databricks/lakebase` installed in `package.json`
+- [ ] `server/server.ts` is **unchanged** (plugin registration happens in Wiring step)
 - [ ] `databricks.yml` has `postgres_projects` resource (no `postgres_branches` or `postgres_endpoints` — auto-created)
 - [ ] `app.yaml` has `LAKEBASE_ENDPOINT` with `valueFrom: postgres` and `DB_SCHEMA`
-- [ ] `npm run build` passes
 
-### Wire Lakebase Backend (Code Only)
+### Wire Lakebase Backend (Code + Plugin Registration)
+- [ ] `lakebase()` registered in `server/server.ts` plugins
 - [ ] `DB_SCHEMA` derived from `$APP_NAME` and used in all DDL/queries/grants
 - [ ] DDL and seed data run idempotently (count-check pattern)
 - [ ] All API routes return `{ data, source }` with mock fallback
 - [ ] ConnectionStatus component on all data pages
 - [ ] All static mock data replaced with API calls
-- [ ] `npm run dev` runs with mock fallback data
+- [ ] `npm run build` passes (do NOT run `npm run dev` — Lakebase env vars not set yet)
 
 ### Deploy + E2E Test
 - [ ] App deployed and Service Principal creates database objects

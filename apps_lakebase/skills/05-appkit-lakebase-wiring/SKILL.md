@@ -222,7 +222,7 @@ AppKit.server.extend((app) => {
 await AppKit.server.start();
 ```
 
-> **Local dev without `LAKEBASE_ENDPOINT`:** The `lakebase()` plugin may log connection warnings when `LAKEBASE_ENDPOINT` is not set (e.g., local dev before first deploy). This does not crash the server — the plugin initializes gracefully, and individual route handlers fall back to mock data via try/catch (see Step 2c). Use `npm run build` for local validation. `npm run dev` may show connection errors in the console, which is expected.
+> **`npm run dev` will NOT work until after the first deploy.** The `lakebase()` plugin throws `ConfigurationError` during `createApp()` when `LAKEBASE_ENDPOINT` and `PGHOST` are not set. These env vars are injected by the platform after the Lakebase project is provisioned (first deploy). Use **`npm run build` only** for local validation at this step — it type-checks and bundles without executing the code. Runtime testing with `npm run dev` is available after deployment creates the Lakebase project and you populate `.env` with connection details (see the **Deploy and E2E Test** step, Step 7).
 
 > **Gotcha — `autoStart: false` is required.** Without it, the server starts before `extend()` runs and routes are never registered. Always pass `server({ autoStart: false })` and call `AppKit.server.start()` after all routes are defined.
 
@@ -417,39 +417,25 @@ databricks apps validate --profile $PROFILE
 
 If the smoke test fails because of default selectors ("Minimal Databricks App", "hello world"), update `tests/smoke.spec.ts` heading and text assertions to match your app's actual content. See [testing.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/testing.md).
 
-### 4b. Run Locally
+### 4b. Local Validation (Build Only)
 
-> **Gotcha — Port 8000 already in use.** Kill stale processes first to avoid `EADDRINUSE`.
+> **Do NOT run `npm run dev` at this step.** The `lakebase()` plugin throws `ConfigurationError` when `LAKEBASE_ENDPOINT` and `PGHOST` are not set. These env vars are provisioned by the platform on first deploy. `npm run build` is sufficient — it validates all TypeScript, imports, and bundling without executing the code.
 
 ```bash
 cd apps_lakebase/$APP_NAME
-lsof -ti:8000 | xargs kill -9 2>/dev/null || true
-npm run dev
+npm run build   # Must pass with zero errors
 ```
 
-### 4c. Verify
+Runtime testing (`npm run dev`, `curl` endpoints, UI verification) happens **after deployment** in the **Deploy and E2E Test** step. After that deploy creates the Lakebase project and you configure `.env` with connection details, `npm run dev` works locally with live data.
 
-Open `http://localhost:8000` and check:
+### 4c. What to Verify at This Step
 
-- UI loads correctly
-- Navigation works between pages
-- ConnectionStatus shows "Mock Data" (expected — live data comes after deployment)
-- All pages render with mock fallback data
-- No console errors
+Since `npm run dev` is not available, verify these through `npm run build` output:
 
-### 4d. Test API Endpoints
-
-Run `bash scripts/test-endpoints.sh --endpoints /api/health/lakebase,/api/orders` to verify all API endpoints return valid responses. Or test manually:
-
-```bash
-curl -s "http://localhost:8000/api/health/lakebase" | jq .
-# Expected: { "status": "disconnected", "source": "mock" }
-
-curl -s "http://localhost:8000/api/orders" | jq .
-# Expected: { "data": [...], "source": "mock" }
-```
-
-Mock responses confirm the fallback pattern is working. Live data verification happens after deployment.
+- Zero TypeScript errors (catches incorrect types, missing imports)
+- All `@databricks/lakebase` and `@databricks/appkit` imports resolve
+- DDL strings, route handlers, and mapper functions compile
+- Mock fallback data arrays match the expected API response shape
 
 ---
 
@@ -462,11 +448,11 @@ Detailed callouts are embedded inline at the relevant step. This table is a comp
 | `ON CONFLICT DO NOTHING` with identity PKs | Count-check seed pattern | 1e |
 | `import express` / `require("express")` | Use `server.extend((app))` + inline parser | 2e |
 | Missing `autoStart: false` | Pass to `server()` plugin | 2a |
-| Lakebase connection warnings in local dev | Expected; plugin initializes but queries fail. Routes fall back to mock data via try/catch | 2a |
+| `lakebase()` crashes without env vars (`LAKEBASE_ENDPOINT`, `PGHOST`) | Expected before first deploy. Use `npm run build` only; `npm run dev` works after deploy + `.env` setup | 2a |
 | DECIMAL columns → strings | `Number()` in mappers | 3d |
 | DATE columns → Date objects | `.toISOString().slice(0,10)` | 3d |
 | `queryKey` on chart components | Use `data` prop instead | 3c |
-| Port 8000 in use | `lsof -ti:8000 \| xargs kill -9` | 4b |
+| `npm run dev` crashes without Lakebase env vars | Use `npm run build` only before first deploy | 4b |
 | Old `postgres:` resource format | Use `postgres_project`/`postgres_branch`/`postgres_endpoint` | Prerequisites |
 | Stale endpoint hostname in `.env` | Re-fetch: `databricks postgres get-endpoint ...` | Prerequisites |
 | AppKit AST-grep linter blocks `as any` and `as unknown as T` | Avoid type assertions; use proper type imports or leave parameters untyped for inference. `databricks apps validate` runs these rules but `npm run build` does not | 2a |
@@ -480,6 +466,5 @@ Detailed callouts are embedded inline at the relevant step. This table is a comp
 |------|------------------|
 | Check live Lakebase docs | `npx @databricks/appkit docs "lakebase"` |
 | Derive schema name | `DB_SCHEMA=$(echo "$APP_NAME" \| tr '-' '_')` |
-| Test health endpoint | `curl -s http://localhost:8000/api/health/lakebase \| jq .` |
 | Build gate | `npm run build` (must pass with zero errors) |
-| Kill stale dev server | `lsof -ti:8000 \| xargs kill -9 2>/dev/null \|\| true` |
+| Test health endpoint (after deploy) | `curl -s "$APP_URL/api/health/lakebase" -H "Authorization: Bearer $TOKEN" \| jq .` |
