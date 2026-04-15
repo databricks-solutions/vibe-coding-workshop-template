@@ -2,15 +2,17 @@
 name: 04-appkit-plugin-add
 description: >
   Add plugins to an existing Databricks AppKit project. Covers Lakebase (PostgreSQL),
-  Analytics (SQL queries + dashboards), Genie (natural language AI/BI), and Files
-  (UC Volumes). Guides through plugin registration, environment variables, app.yaml
-  configuration, and frontend integration. Use when asked to add a plugin to an
-  existing app, integrate Lakebase, add analytics, connect a Genie space, enable
-  file uploads, or extend an AppKit project with new capabilities. Triggers on
-  "add plugin", "add lakebase", "add analytics", "add genie", "add files plugin",
+  Analytics (SQL queries + dashboards), Genie (natural language AI/BI), Files
+  (UC Volumes), and Serving (Model Serving / Agent endpoints). Guides through plugin
+  registration, environment variables, app.yaml configuration, and frontend integration.
+  Use when asked to add a plugin to an existing app, integrate Lakebase, add analytics,
+  connect a Genie space, enable file uploads, add a serving endpoint, or extend an
+  AppKit project with new capabilities. Triggers on "add plugin", "add lakebase",
+  "add analytics", "add genie", "add files plugin", "add serving", "add agent endpoint",
   "integrate postgres", "add database", "add dashboards", "add file browser",
-  "extend app", "connect genie space". Not for creating a Lakebase project or
-  managing Lakebase via CLI -- use the databricks-lakebase agent skill for that.
+  "extend app", "connect genie space", "model serving plugin". Not for creating a
+  Lakebase project or managing Lakebase via CLI -- use the databricks-lakebase agent
+  skill for that.
 license: Apache-2.0
 compatibility: Requires an existing AppKit project with Node.js v22+ and Databricks CLI >= 0.295.0
 metadata:
@@ -28,12 +30,12 @@ metadata:
 
 # Add Plugins to an Existing AppKit Project
 
-Add Lakebase, Analytics, Genie, or Files plugins to a Databricks AppKit project that has already been scaffolded.
+Add Lakebase, Analytics, Genie, Files, or Serving plugins to a Databricks AppKit project that has already been scaffolded.
 
 ## When to Use
 
 - Adding a new plugin to an existing AppKit project
-- Integrating PostgreSQL (Lakebase), SQL dashboards (Analytics), natural language queries (Genie), or file management (Files)
+- Integrating PostgreSQL (Lakebase), SQL dashboards (Analytics), natural language queries (Genie), file management (Files), or model serving / agent endpoints (Serving)
 - Extending an app that was scaffolded blank or needs an additional plugin
 
 **Not for scaffolding a new app.** To create a new AppKit project (blank or with plugins), use the `01-appkit-scaffold` skill instead.
@@ -43,7 +45,7 @@ Add Lakebase, Analytics, Genie, or Files plugins to a Databricks AppKit project 
 ## Before You Begin
 
 **IMPORTANT — The upstream AppKit docs are the source of truth, not this skill.**
-AppKit may have plugins beyond the four listed here. Always check the upstream docs first to discover all available plugins and get the latest configuration details:
+AppKit may have plugins beyond those listed here. Always check the upstream docs first to discover all available plugins and get the latest configuration details:
 
 - **Plugin docs:** https://databricks.github.io/appkit/docs/plugins/
 - **CLI docs browser:** `npx @databricks/appkit docs "<plugin-name>"`
@@ -63,6 +65,7 @@ The table below covers plugins bundled with this skill. AppKit may offer additio
 | **Analytics** | SQL queries, dashboards, charts, warehouse, data viz | [references/plugin-analytics.md](references/plugin-analytics.md) |
 | **Genie** | Natural language, AI/BI, Genie spaces, conversational | [references/plugin-genie.md](references/plugin-genie.md) |
 | **Files** | File upload/download, UC Volumes, file browser | [references/plugin-files.md](references/plugin-files.md) |
+| **Serving** | Model serving, agent endpoint, inference, LLM, ML model | [references/plugin-serving.md](references/plugin-serving.md) |
 
 If the plugin you need is listed above, **READ its reference file before proceeding** — it contains the import, config, env vars, `app.yaml` changes, frontend hooks, and gotchas. For any other plugin, consult the upstream docs directly.
 
@@ -88,7 +91,7 @@ await createApp({
 Plugins compose freely — add as many as needed:
 
 ```typescript
-import { createApp, server, analytics, lakebase, genie, files } from "@databricks/appkit";
+import { createApp, server, analytics, lakebase, genie, files, serving } from "@databricks/appkit";
 
 await createApp({
   plugins: [
@@ -97,6 +100,7 @@ await createApp({
     lakebase(),
     genie(),
     files(),
+    serving(),
   ],
 });
 ```
@@ -124,6 +128,7 @@ Most plugins provide React hooks and/or components from `@databricks/appkit-ui/r
 | **Genie** | `GenieChat` component, `useGenieChat` hook |
 | **Files** | `DirectoryList`, `FileBreadcrumb`, `FilePreviewPanel` components |
 | **Lakebase** | Server-side only (no frontend components) |
+| **Serving** | `useServingStream` hook, `useServingInvoke` hook |
 
 See the plugin-specific reference for usage examples.
 

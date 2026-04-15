@@ -68,6 +68,8 @@ End-to-end guide for implementing production-grade Databricks GenAI agents using
 
 ## When to Use
 
+> **Want a quick start?** If you just need a working agent with Genie tool calling (no memory, evaluation, or monitoring), use [`09-simple-agent-scaffold`](../09-simple-agent-scaffold/SKILL.md) instead. It produces a deployed Model Serving endpoint in 5 steps. Come back here when you need production-grade capabilities.
+
 - Implementing a new AI agent on Databricks from scratch
 - Creating multi-agent systems with Genie Space data access
 - Setting up agent evaluation pipelines with LLM judges

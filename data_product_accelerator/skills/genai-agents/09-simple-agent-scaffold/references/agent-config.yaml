@@ -1,0 +1,18 @@
+# Agent configuration — ModelConfig reads this at import time.
+# Update the three sections below, then run agent.py.
+
+# TODO: Verify this endpoint exists in your workspace.
+# List available endpoints: databricks serving-endpoints list
+llm_endpoint: "databricks-claude-sonnet-4-6"
+
+# TODO: Customize for your domain.
+system_prompt: "You are a helpful data analyst. Use the available Genie tools to answer questions about the data."
+
+# TODO: Replace each space_id with a real Genie Space ID from your workspace.
+# Find IDs: Workspace → Genie → open a space → copy the ID from the URL.
+# Add or remove entries as needed — one per Genie Space.
+genie_spaces:
+  - name: "sales"
+    space_id: "TODO_REPLACE_WITH_SPACE_ID"
+  - name: "operations"
+    space_id: "TODO_REPLACE_WITH_SPACE_ID"
