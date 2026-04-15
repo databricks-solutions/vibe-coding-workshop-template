@@ -1,6 +1,6 @@
 # Workshop Presentation
 
-MARP-based slide deck for the Vibe Coding Workshop. Covers the Data Product Accelerator (59 agent skills, 9-stage pipeline), platform training modules (Databricks Apps, AppKit, Lakebase, SDP/DLT, Genie Spaces), and the AppKit + Lakebase hands-on workshop.
+MARP-based slide deck for the Vibe Coding Workshop. Covers the Data Product Accelerator (55 agent skills, 9-stage pipeline), platform training modules (Databricks Apps, AppKit, Lakebase, SDP/DLT, Genie Spaces), and the AppKit + Lakebase hands-on workshop.
 
 ## Prerequisites
 
@@ -50,7 +50,8 @@ Opens a local server with live reload on file changes. Great for iterating on co
 presentations/
 ├── README.md              # This file
 ├── workshop.marp.md       # Source slide deck (Markdown + MARP directives)
-├── workshop.html          # GENERATED: HTML output
+├── workshop.html          # GENERATED: HTML output (slide deck)
+├── workshop-explorer.html # Interactive workshop explorer (standalone)
 ├── workshop.pdf           # GENERATED: PDF output
 └── workshop.pptx          # GENERATED: PPTX output
 ```

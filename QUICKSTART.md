@@ -8,7 +8,7 @@ Get started building your data product on Databricks. Choose your starting point
 
 ## Path A: Build and Deploy a Databricks App
 
-Build a full-stack TypeScript app on Databricks AppKit, guided by 6 agent skills:
+Build a full-stack TypeScript app on Databricks AppKit, guided by 7 agent skills:
 
 ```bash
 # 1. Clone template
@@ -32,6 +32,7 @@ Follow the 5-phase workflow in [apps_lakebase/Instructions.md](apps_lakebase/Ins
 | 2 | Deploy to Databricks Apps (mock data) | `03-appkit-deploy` |
 | 3 | Setup Lakebase project | `00-appkit-navigator` |
 | 4 | Wire Lakebase backend (local) | `04-appkit-plugin-add`, `05-appkit-lakebase-wiring` |
+| 4b | Wire Serving / Agent endpoint (optional) | `04-appkit-plugin-add`, `06-appkit-serving-wiring` |
 | 5 | Deploy + E2E test with Lakebase | `03-appkit-deploy` |
 
 ---
@@ -57,8 +58,8 @@ Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold
 
 | Directory | What It Does |
 |-----------|-------------|
-| `apps_lakebase/` | AppKit workshop -- 6 agent skills for building full-stack Databricks Apps |
-| `data_product_accelerator/` | 59 agent skills for building end-to-end data products (9 stages) |
+| `apps_lakebase/` | AppKit workshop -- 7 agent skills for building full-stack Databricks Apps |
+| `data_product_accelerator/` | 55 agent skills for building end-to-end data products (9 stages) |
 | `agentic-framework/` | Multi-agent build framework for Databricks Foundation Models |
 
 ---

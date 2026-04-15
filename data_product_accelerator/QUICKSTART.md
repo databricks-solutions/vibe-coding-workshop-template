@@ -1,6 +1,6 @@
 # Quickstart: Data Product Accelerator
 
-This guide walks you through building a complete Databricks data platform — from a raw schema CSV to production GenAI agents — using one prompt per stage, plus an optional Stage 6b optimization loop.
+This guide walks you through building a complete Databricks data platform — from a raw schema CSV to production GenAI agents — using one prompt per stage.
 
 > **See also:** [AGENTS.md](AGENTS.md) (routing table for AI agents) | [README.md](README.md) (project overview) | [Skill Navigator](skills/skill-navigator/SKILL.md) (full routing system)
 >
@@ -316,36 +316,6 @@ This will involve the following steps:
 
 ---
 
-## Step 6b (Optional): Genie Space Optimization
-
-Optimize Genie Space accuracy and repeatability through MLflow-driven benchmark evaluation and iterative control lever adjustments. The optimization orchestrator routes to 4 worker skills on demand: benchmark generation, evaluation (8 judges + arbiter), metadata optimization (GEPA/introspection), and change application.
-
-**Prompt:**
-
-```
-Optimize the Genie Space using @data_product_accelerator/skills/semantic-layer/05-genie-optimization-orchestrator/SKILL.md
-
-This will involve the following optimization loop:
-
-- **Generate benchmarks** — create domain-relevant questions with expected SQL, validate ground truth via warehouse execution, sync to MLflow Evaluation Dataset
-- **Evaluate with 8 judges** — run each benchmark against the live Genie Space (12-second rate limit), score with 3-layer judge architecture: Layer 1 (syntax, schema, logic, semantics, completeness, routing), Layer 2 (result correctness via DataFrame comparison), Layer 3 (arbiter for disagreements with auto-correction)
-- **Introspect and optimize** — cluster failures by systemic root cause, generate metadata proposals mapped to 6 control levers with predicted impact, optionally use GEPA optimize_anything for metadata evolution
-- **Apply 6 control levers in priority order** — (1) UC table/column COMMENTs, (2) Metric View metadata, (3) TVF COMMENTs, (4) Monitoring tables, (5) ML tables, (6) Genie Instructions (~4000 char limit, last resort)
-- **Dual-persist every change** — apply fixes via BOTH API (immediate) AND repository files (persists across deployments)
-- **Re-evaluate and iterate** — run evaluation job again, compare iterations, loop until accuracy ≥95% or max 5 iterations with plateau detection
-- **Deploy and document** — bundle deploy optimized space, generate optimization report with before/after metrics logged to MLflow
-```
-
-**What it produces:**
-- Benchmark question suite with validated ground truth SQL (YAML + MLflow dataset)
-- Per-judge accuracy scores and MLflow experiment runs
-- Optimized UC metadata, Metric Views, TVFs, and/or Genie Instructions
-- Optimization report with before/after metrics and levers applied
-
-> **Deep dive:** See [Agent Walkthrough: Genie Optimization](docs/agent-walkthrough.md) for progressive disclosure patterns, long-running session management, and how the agent navigates the 9-step optimization loop.
-
----
-
 ## Step 7: Observability Setup
 
 Set up Lakehouse Monitors, AI/BI Dashboards, and SQL Alerts.
@@ -474,17 +444,16 @@ The orchestrator skill automatically loads worker skills for ResponsesAgent patt
 
 ```
 data_product_accelerator/context/*.csv
-  → Gold Design (1)      — dimensional model, ERDs, YAML schemas
-  → Bronze (2)           — source tables + test data
-  → Silver (3)           — DLT pipelines + data quality
-  → Gold Impl (4)        — tables, merges, constraints
+  → Gold Design (1)    — dimensional model, ERDs, YAML schemas
+  → Bronze (2)         — source tables + test data
+  → Silver (3)         — DLT pipelines + data quality
+  → Gold Impl (4)      — tables, merges, constraints
     ⚠️ Deployment Checkpoint — validate & deploy Bronze + Silver + Gold
-  → Planning (5)         — phase plans + manifest contracts
-  → Semantic (6)         — Metric Views, TVFs, Genie Spaces
+  → Planning (5)       — phase plans + manifest contracts
+  → Semantic (6)       — Metric Views, TVFs, Genie Spaces
     ⚠️ Deployment Checkpoint — validate & deploy Semantic Layer
-  → Genie Optimization (6b) — benchmark, evaluate, tune control levers
-  → Observability (7)    — monitors, dashboards, alerts
+  → Observability (7)  — monitors, dashboards, alerts
     ⚠️ Deployment Checkpoint — validate & deploy Observability
-  → ML (8)               — experiments, training, inference
-  → GenAI Agents (9)     — agents, evaluation, deployment
+  → ML (8)             — experiments, training, inference
+  → GenAI Agents (9)   — agents, evaluation, deployment
 ```

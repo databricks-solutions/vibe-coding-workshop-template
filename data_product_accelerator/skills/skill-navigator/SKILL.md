@@ -49,13 +49,12 @@ This framework uses a **Design-First** pipeline: design the target Gold model fr
 | 4 | Gold Implementation | `gold/01-gold-layer-setup` | Tables, merge scripts, FK constraints |
 | 5 | Planning | `planning/00-project-planning` | Plan semantic, observability, ML, GenAI phases |
 | 6 | Semantic Layer | `semantic-layer/00-semantic-layer-setup` | Metric Views, TVFs, Genie Spaces |
-| 6b | Genie Optimization | `semantic-layer/05-genie-optimization-orchestrator` (standalone) | Benchmark testing, accuracy/repeatability tuning |
 | 7 | Observability | `monitoring/00-observability-setup` | Monitors, dashboards, alerts |
 | 8 | ML | `ml/00-ml-pipeline-setup` | ML experiments, models, inference |
 | 9 | GenAI Agents | `genai-agents/00-genai-agents-setup` | Agents, evaluation, deployment |
 
 ```
-data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Genie Optimization (6b) → Observability (7) → ML (8) → GenAI (9)
+data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Observability (7) → ML (8) → GenAI (9)
 ```
 
 ---
@@ -199,7 +198,6 @@ domain-folder/
 | "implement Gold", "Gold tables", "Gold merge scripts" | Gold | `gold/01-gold-layer-setup` (stage 4) |
 | "project plan", "architecture planning", "planning_mode: workshop" | Planning | `planning/00-project-planning` (stage 5) |
 | "semantic layer", "build Genie", "Metric Views and TVFs" | Semantic | `semantic-layer/00-semantic-layer-setup` (stage 6) |
-| "optimize Genie", "Genie accuracy", "benchmark", "judge evaluation", "control lever" | Semantic | `semantic-layer/05-genie-optimization-orchestrator` (stage 6b, standalone orchestrator) |
 | "observability", "monitoring setup", "dashboards and alerts" | Monitoring | `monitoring/00-observability-setup` (stage 7) |
 | "MLflow", "ML pipeline", "model training" | ML | `ml/00-ml-pipeline-setup` (stage 8) |
 | "GenAI agent", "build agent", "ResponsesAgent" | GenAI | `genai-agents/00-genai-agents-setup` (stage 9) |
@@ -226,7 +224,6 @@ domain-folder/
 | "TVF", "function" | Semantic | `semantic-layer/02-databricks-table-valued-functions` |
 | "Genie Space", "Genie setup" | Semantic | `semantic-layer/03-genie-space-patterns` |
 | "Genie API", "export/import" | Semantic | `semantic-layer/04-genie-space-export-import-api` |
-| "optimize Genie", "Genie accuracy", "benchmark" | Semantic | `semantic-layer/05-genie-optimization-orchestrator` (standalone — stage 6b, not called by orchestrator) |
 | "monitoring", "Lakehouse" | Monitor | `monitoring/01-lakehouse-monitoring-comprehensive` |
 | "dashboard", "AI/BI" | Monitor | `monitoring/02-databricks-aibi-dashboards` |
 | "alert", "SQL alert" | Monitor | `monitoring/03-sql-alerting-patterns` |
@@ -246,6 +243,7 @@ domain-folder/
 | "deploy agent", "deployment job" | GenAI | `genai-agents/06-deployment-automation` |
 | "production monitoring", "registered scorers" | GenAI | `genai-agents/07-production-monitoring` |
 | "MLflow GenAI", "MLflow tracing", "GenAI foundation" | GenAI | `genai-agents/08-mlflow-genai-foundation` |
+| "simple agent", "scaffold agent", "MCP agent", "quick agent", "tool calling agent" | GenAI | `genai-agents/09-simple-agent-scaffold` |
 | "exploration notebook" | Explore | `exploration/00-adhoc-exploration-notebooks` |
 | "create skill", "new skill", "SKILL.md" | Admin | `admin/create-agent-skill` |
 | "improve skills" | Admin | `admin/self-improvement` |
@@ -371,9 +369,7 @@ skills/
 │   ├── 01-metric-views-patterns/SKILL.md                        # Worker: Metric views [stage 6]
 │   ├── 02-databricks-table-valued-functions/SKILL.md            # Worker: TVFs for Genie [stage 6]
 │   ├── 03-genie-space-patterns/SKILL.md                         # Worker: Genie Space setup [stage 6]
-│   ├── 04-genie-space-export-import-api/SKILL.md                # Worker: Genie API [stage 6]
-│   ├── 05-genie-optimization-orchestrator/SKILL.md              # Standalone: Genie optimization orchestrator [stage 6b]
-│   └── genie-optimization-workers/                              # 4 worker skills loaded on demand by orchestrator
+│   └── 04-genie-space-export-import-api/SKILL.md                # Worker: Genie API [stage 6]
 │
 ├── monitoring/
 │   ├── 00-observability-setup/SKILL.md                         # ORCHESTRATOR: Observability [stage 7]
@@ -394,7 +390,8 @@ skills/
 │   ├── 05-multi-agent-genie-orchestration/SKILL.md              # Worker: Multi-agent [stage 9]
 │   ├── 06-deployment-automation/SKILL.md                        # Worker: Agent CI/CD [stage 9]
 │   ├── 07-production-monitoring/SKILL.md                        # Worker: Prod monitoring [stage 9]
-│   └── 08-mlflow-genai-foundation/SKILL.md                      # Worker: MLflow GenAI basics [stage 9]
+│   ├── 08-mlflow-genai-foundation/SKILL.md                      # Worker: MLflow GenAI basics [stage 9]
+│   └── 09-simple-agent-scaffold/SKILL.md                        # Worker: Minimal MCP tool-calling agent [stage 9]
 │
 ├── exploration/
 │   └── 00-adhoc-exploration-notebooks/SKILL.md                  # Utility: Exploration [standalone]

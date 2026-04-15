@@ -13,9 +13,13 @@ This guide is structured as a series of **steps**, each designed to be given as 
 Step 1                Step 2             Step 3             Step 4               Step 5
 Scaffold, Build  -->  Deploy        -->  Setup Lakebase --> Wire Lakebase   -->  Deploy + E2E Test
 & Test Locally        (Mock Data)        Project            Backend (local)      with Lakebase
+
+                                                            Optional:
+                                                            Wire Serving --------^
+                                                            Endpoint (step 4b)
 ```
 
-Steps 1-2 build and deploy a functional UI with mock data (no database required). Steps 3-5 add a Lakebase PostgreSQL backend with live data.
+Steps 1-2 build and deploy a functional UI with mock data (no database required). Steps 3-5 add a Lakebase PostgreSQL backend with live data. Optionally, wire a Model Serving / Agent endpoint (step 4b) using the `06-appkit-serving-wiring` skill -- this is independent of Lakebase wiring and can be done before or after step 4.
 
 ---
 
@@ -1537,6 +1541,12 @@ Combined verification across all steps:
 - [ ] ConnectionStatus component on all data pages
 - [ ] All static mock data replaced with API calls
 - [ ] `npm run build` passes (do NOT run `npm run dev` — Lakebase env vars not set yet)
+
+### Wire Serving Endpoint (Optional)
+- [ ] `@databricks/serving` installed and `serving()` registered in `server/server.ts`
+- [ ] Agent endpoint configured in `app.yaml` as a serving resource
+- [ ] Chat UI component wired to streaming agent responses
+- [ ] See `apps_lakebase/skills/06-appkit-serving-wiring/SKILL.md` for patterns
 
 ### Deploy + E2E Test
 - [ ] App deployed and Service Principal creates database objects
