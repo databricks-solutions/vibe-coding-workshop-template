@@ -35,6 +35,31 @@ The serving endpoint must be added as a **resource** to your Databricks App befo
 
 The endpoint resource grants the app's service principal permission to query it. Without this resource binding, the plugin cannot reach the endpoint.
 
+#### `databricks.yml` resource snippet (DABs deploy)
+
+When provisioning the app via Databricks Asset Bundles, declare the serving endpoint resource in `databricks.yml`:
+
+```yaml
+resources:
+  apps:
+    ${var.app_name}:
+      resources:
+        - name: serving-endpoint
+          description: Agent serving endpoint the AppKit plugin binds to
+          serving_endpoint:
+            name: ${var.serving_endpoint_name}
+            permission: CAN_QUERY
+```
+
+> **Field name trap:** the bundle schema uses **`name`** (not `endpoint_name`). Using `endpoint_name` produces:
+>
+> ```
+> Error: unknown field: endpoint_name
+> Error: missing required field: name
+> ```
+>
+> ...at `databricks bundle validate` time. The schema changed from earlier docs. When in doubt, run `databricks bundle schema | jq '.definitions."AppResource_SERVING_ENDPOINT"'` to confirm the current field name against your CLI version. See [03-appkit-deploy/SKILL.md](../../03-appkit-deploy/SKILL.md) Common Errors for the recovery step.
+
 ### 3. Environment Variables
 
 **For deployment** — add to `app.yaml`:
@@ -160,6 +185,8 @@ Both hooks accept `autoStart: true` to invoke automatically on mount.
   ]
 }
 ```
+
+> **The plugin normalizes the request body for you.** Databricks Agent endpoints deployed via `databricks.agents.deploy()` expect `{"input": [...]}` at the top level — **not** `{"messages": [...]}`. The plugin transforms the incoming request before forwarding. When building a **custom proxy without the plugin**, you must do the `messages → input` transformation explicitly; see [06-appkit-serving-wiring/references/custom-proxy-fallback.md](../../06-appkit-serving-wiring/references/custom-proxy-fallback.md).
 
 ## Programmatic Access (Server-Side)
 

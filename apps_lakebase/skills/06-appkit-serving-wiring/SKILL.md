@@ -51,6 +51,7 @@ Connect a Databricks Model Serving or Agent endpoint to an AppKit app using the 
 3. Endpoint added as an **app resource** with `CAN_QUERY` permission (via Databricks Apps UI or `app.yaml` resources)
 4. `app.yaml` has `DATABRICKS_SERVING_ENDPOINT_NAME` with `valueFrom: serving-endpoint`
 5. `npm run build` passes with the Serving plugin imported
+6. `serving` export is available in your installed AppKit version (see [04-appkit-plugin-add/SKILL.md](../04-appkit-plugin-add/SKILL.md) Step 1b). If `typeof require('@databricks/appkit').serving === "undefined"`, stop here — read [references/custom-proxy-fallback.md](references/custom-proxy-fallback.md) and skip Step 3.
 
 **Upstream docs (always check for latest):**
 
@@ -150,6 +151,8 @@ Local dev also requires Databricks authentication (CLI profile or `DATABRICKS_HO
 ---
 
 ## Step 3: Register in server/server.ts
+
+> **If `serving` is undefined in your installed AppKit version**, stop here and read [references/custom-proxy-fallback.md](references/custom-proxy-fallback.md) instead of proceeding with Step 3. The bundler will silently accept a nonexistent `serving` import and fail at client build or runtime.
 
 ### 3a. Single Endpoint (Default)
 
@@ -278,12 +281,23 @@ Key rules:
 
 ### 4c. Streaming Chunk Format
 
-The structure of streaming chunks depends on the endpoint:
+Databricks emits streaming chunks in **two different shapes** depending on how the endpoint was deployed:
 
-- **OpenAI-compatible (standard for Databricks agents):** `chunk.choices[0].delta.content`
-- **Unknown schema:** chunks typed as `unknown` — log the first chunk during development to determine the shape
+- **Databricks Responses API** (agents deployed via `databricks.agents.deploy()` with `ResponsesAgent`): `{ type: "response.output_text.delta", delta: "..." }`
+- **OpenAI Chat Completion** (custom Model Serving, OpenAI-compatible pyfunc): `chunk.choices[0].delta.content`
 
-> **Gotcha:** Endpoints without an OpenAPI streaming schema produce `chunk: unknown`. Use `useServingInvoke` instead if you need typed responses, or cast the chunks.
+A parser that reads only `choices[0].delta.content` will silently produce empty output against a Responses-API endpoint. Before writing the parser, **read [references/sse-format-patterns.md](references/sse-format-patterns.md)** for the `curl` pre-deploy format test and a dual-format parser you can copy directly.
+
+Minimal dual-format extractor (use against both endpoint types):
+
+```typescript
+function extractDelta(chunk: any): string {
+  if (chunk.type === "response.output_text.delta") return chunk.delta ?? "";
+  return chunk.choices?.[0]?.delta?.content ?? "";
+}
+```
+
+For the full SSE reader (buffering, `[DONE]` handling, unknown-chunk warnings, and the `curl` pre-deploy format test), read [references/sse-format-patterns.md](references/sse-format-patterns.md).
 
 **Gate:** The streaming chat component renders in the browser with `npm run build` succeeding. Full runtime testing happens after deployment (Step 9).
 
@@ -376,6 +390,51 @@ app.post("/api/ask-agent/stream", async (req, res) => {
 
 **Gate:** `npm run build` passes with the extended server routes.
 
+### 6c. Custom Proxy Fallback (When `serving` Is Not Exported)
+
+If the Step 1b check in `04-appkit-plugin-add` returned `typeof serving === "undefined"`, replace Steps 3–5 with a custom proxy. The full pattern lives in [references/custom-proxy-fallback.md](references/custom-proxy-fallback.md); the three pieces agents most commonly get wrong are inlined here.
+
+**Auth — use `config.authenticate(headers)`, NOT `config.getToken()`:**
+
+```typescript
+import { getExecutionContext } from "@databricks/appkit";
+
+async function getServingHeaders() {
+  const ctx = getExecutionContext();
+  const config = ctx.client.config;
+  await config.ensureResolved();
+  const host = (config.host ?? "").replace(/\/$/, "");
+  const h = new Headers();
+  await config.authenticate(h);
+  h.set("Content-Type", "application/json");
+  const out: Record<string, string> = {};
+  h.forEach((v, k) => { out[k] = v; });
+  return { host, headers: out };
+}
+```
+
+> **Anti-patterns that will fail at deploy time:**
+> - `config.getToken()` — method does not exist on AppKit `Config`.
+> - `process.env.DATABRICKS_HOST` directly — may lack `https://`; use `config.host` instead.
+
+**Payload — transform `messages` → `input`:**
+
+```typescript
+function buildAgentPayload(body: any, stream = false) {
+  return {
+    input: body.messages ?? body.input ?? [],
+    ...(stream ? { stream: true } : {}),
+    ...(body.context ? { context: body.context } : {}),
+  };
+}
+```
+
+Sending `{messages: ...}` directly produces `400: Model is missing inputs ['input']`.
+
+**Routes:** mirror the plugin surface (`/api/serving/invoke`, `/api/serving/stream`) so the frontend hooks in Step 4 work unchanged. See [references/custom-proxy-fallback.md](references/custom-proxy-fallback.md) for the full Express handlers including SSE passthrough.
+
+**Gate:** `npm run build` passes with the custom proxy routes.
+
 ---
 
 ## Step 7: Map Agent Output to Structured UI (Optional)
@@ -463,6 +522,7 @@ Open the app URL in a browser and test:
 - Streaming responses appear progressively
 - Conversation history persists across turns
 - Error states display correctly when the agent fails
+- **A domain-specific data question returns data (not just a greeting).** If the agent greets but returns nothing for a question that should hit a tool / Genie / SQL (e.g., "how many bookings last month?"), the tool-calling path is broken. AI Playground may still work because it uses OBO; the app's SP does not. Check Genie Space / warehouse / UC grants via [09-simple-agent-scaffold/references/post-deploy-permissions.md](../../../data_product_accelerator/skills/genai-agents/09-simple-agent-scaffold/references/post-deploy-permissions.md).
 
 **Gate:** The agent responds to queries via the deployed app's UI and API endpoints.
 
@@ -485,6 +545,25 @@ Detailed callouts are embedded inline at the relevant step. This table is a comp
 | 403 on invoke/stream endpoints | User lacks `CAN_QUERY` on the serving endpoint; verify app resource binding | 2, 9 |
 | `npm run dev` crashes without env vars | Use `npm run build` only before first deploy; after deploy, configure `.env` | 8 |
 | Agent timeout (no response within 120s) | Increase `timeout` in `serving()` config or simplify the prompt | 3 |
+| `400: Model is missing inputs ['input']` when calling agent endpoint | Payload sent `{"messages":[...]}` but agent expects `{"input":[...]}`. The plugin normalizes this; a custom proxy must transform — see [references/custom-proxy-fallback.md](references/custom-proxy-fallback.md) | 3, 6c |
+| Stream returns 200, UI stays blank | Parser reads `choices[0].delta.content` but endpoint emits Databricks Responses API (`type: "response.output_text.delta"`). Use dual parser from [references/sse-format-patterns.md](references/sse-format-patterns.md) | 4 |
+| `TypeError: Failed to parse URL` when calling endpoint from a custom proxy | Using `process.env.DATABRICKS_HOST` which may lack `https://`. Use `config.host` from `getExecutionContext().client.config` — see [references/custom-proxy-fallback.md](references/custom-proxy-fallback.md) | 6c |
+| `TypeError: config.getToken is not a function` in custom proxy auth | AppKit `Config` does not expose `getToken()`. Use `await config.authenticate(headers)` — see [references/custom-proxy-fallback.md](references/custom-proxy-fallback.md) | 6c |
+| `serving` export missing in older AppKit versions | Run Step 1b check (`node -e ...`) BEFORE importing; fall back to Step 6c custom proxy if undefined | 3, 6c |
+
+---
+
+## Anti-Patterns (Things Agents Reach For That Fail)
+
+| Anti-Pattern | Why It Fails | Correct Approach |
+|--------------|--------------|------------------|
+| Import `serving` without verifying the export | tsdown bundles silently; fails only at tsc/runtime | Run Step 1b `node -e` check first |
+| Guess the SDK auth API (`getToken`, raw env vars) | AppKit `Config` exposes only `authenticate(headers)` | Step 6c `getServingHeaders` |
+| Forward `{messages:...}` straight to an Agent endpoint | Agent expects `{input:...}` at top level | Step 6c `buildAgentPayload` |
+| Parse only `choices[0].delta.content` | Databricks Responses API emits `response.output_text.delta` | Step 4c dual parser |
+| `rm -f package-lock.json && npm install` to "fix" deps | Picks up local proxy URLs, breaks platform install | `--package-lock-only`, or delete and let platform resolve |
+| Delete the app to "start fresh" | New SP loses ownership of Lakebase schemas | Fix the deploy; DROP+recreate schemas only as last resort |
+| Ship after one "Hello" response | Tool-calling path may still be broken | Test a real domain question before declaring done |
 
 ---
 

@@ -52,7 +52,7 @@ data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Si
 | "Silver", "DLT", "expectations", "data quality" | 3 | `data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md` |
 | "Gold tables", "merge scripts", "Gold setup" | 4 | `data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md` |
 | "project plan", "architecture plan", "planning", "planning_mode: workshop" | 5 | `data_product_accelerator/skills/planning/00-project-planning/SKILL.md` |
-| "metric view", "TVF", "Genie Space", "semantic layer" | 6 | `data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md` |
+| "metric view", "TVF", "Genie Space", "semantic layer", "semantic layer deployment", "deploy TVFs", "deploy metric views", "deploy genie", "deploy semantic", "data intelligence assets" | 6 | `data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md` |
 | "monitoring", "dashboard", "alert", "observability" | 7 | `data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md` |
 | "MLflow", "ML model", "training", "inference" | 8 | `data_product_accelerator/skills/ml/00-ml-pipeline-setup/SKILL.md` |
 | "GenAI agent", "ResponsesAgent", "AI agent" | 9 | `data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md` |

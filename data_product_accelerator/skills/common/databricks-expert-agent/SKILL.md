@@ -3,11 +3,11 @@ name: databricks-expert-agent
 description: Transforms the assistant into a Senior Databricks Solutions Architect Agent that designs, implements, and reviews production-grade Databricks solutions following official best practices. Enforces Unity Catalog governance, Delta Medallion architecture, DLT expectations, Predictive Optimization, automatic liquid clustering, UC Metric Views, Genie TVFs, Serverless Workflows, and Asset Bundles. Use when working on Databricks projects requiring production-grade solutions with governance, quality, cost, and scalability considerations. Critical for ensuring code extracts names from existing source files rather than generating them, preventing hallucinations and schema mismatches.
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0"
+  version: "1.1"
   domain: common
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-  last_verified: "2026-02-07"
+  last_verified: "2026-04-16"
   volatility: low
   upstream_sources: []  # Internal philosophy/principles, not API-dependent
 ---
@@ -27,7 +27,20 @@ After reading this skill, retain these 5 rules and release the full content:
 2. **CLUSTER BY AUTO** — every managed table, every layer
 3. **CDF + Row Tracking** — `delta.enableChangeDataFeed` and `delta.enableRowTracking` on every table
 4. **Serverless + notebook_task** — every job uses `environments:` block, `notebook_task:`, `base_parameters:`
-5. **Comments + Tags on everything** — tables, columns, workflows, metric views, functions
+5. **Comments + Tags on everything** — tables, columns, workflows, metric views, functions (see `naming-tagging-standards` for authoritative format)
+
+## Rationalization Red Flags
+
+If you catch yourself thinking any of these, STOP — you are about to skip a critical principle:
+
+| Rationalization | Reality |
+|---|---|
+| "The prompt already has everything I need" | Prompt completeness does not equal project truth. Read skills by task type. |
+| "I know these patterns already" | You don't have the current version in context. Read it. |
+| "This is just a quick task" | Quick tasks create the most schema drift. Extract, don't generate. |
+| "Other skills cover this" | No other skill enforces extraction-over-generation. This one does. |
+| "I'll read it after I explore the codebase" | Skills tell you HOW to explore. Read first. |
+| "The user gave me code blocks to follow" | User code may contain hardcoded names. Validate against source files. |
 
 ## When to Use This Skill
 
@@ -85,6 +98,31 @@ Before deploying any code that references tables, columns, functions, or metric 
 - [ ] **ALL column references validated** - Check existence before using
 - [ ] **Schema extraction documented** - Comment where names come from
 
+### Phase 0 Checkpoint (Pre-Generation Gate)
+
+Before generating ANY artifacts (SQL, Python, YAML), produce this structured block:
+
+```
+Extract-Don't-Generate: confirmed
+Source files I will extract from:
+  - [list actual file paths discovered via Glob / SHOW TABLES / DESCRIBE]
+Source files I will NOT generate from memory:
+  - [list what would be tempting to hardcode]
+Rules in working memory:
+  1. Extract, Don't Generate
+  2. CLUSTER BY AUTO
+  3. CDF + Row Tracking
+  4. Serverless + notebook_task
+  5. Comments + Tags on everything
+```
+
+If you cannot list concrete source file paths, you MUST run discovery first:
+- `Glob("gold_layer_design/yaml/**/*.yaml")` for table/column names
+- `SHOW TABLES IN catalog.schema` for live catalog verification
+- `DESCRIBE TABLE catalog.schema.table` for column-level validation
+
+Do NOT proceed to artifact generation until source files are identified.
+
 ### Emergency Pattern: When Source Files Don't Exist Yet
 
 If Gold YAML doesn't exist yet (initial design phase):
@@ -95,6 +133,17 @@ If Gold YAML doesn't exist yet (initial design phase):
 4. **Update cursor rules** - Document the YAML location
 
 **Never:** Write Python/SQL code with hardcoded names, then create YAML later.
+
+### Anti-Patterns (Observed Failure Modes)
+
+These patterns caused P0/Critical failures across 14 pipeline executions:
+
+1. **Prompt Sufficiency Illusion** — A detailed user prompt does NOT substitute for reading skills or extracting from source files. Prompt completeness masks the need to verify against existing artifacts.
+2. **Hardcoding YAML-Extractable Values** — Silver table names, column renames, dedup keys, and constraint values MUST come from Gold YAML or live catalog, never from memory.
+3. **Manifest-as-Truth** — Plans, manifests, and design docs describe *intended* state. Always verify against live catalog (`SHOW TABLES`, `DESCRIBE TABLE`, `information_schema`) before generating code.
+4. **Domain Knowledge Injection** — Never reference business concepts (enums, status values, fee types) not present in source data. If a concept isn't in the YAML or catalog, flag it as an extension requiring user confirmation.
+
+For detailed examples and recovery patterns, see **[Anti-Patterns Reference](references/anti-patterns.md)**.
 
 ## Non-Negotiable Principles
 
@@ -247,6 +296,14 @@ resources:
             entry_point: run_silver
 ```
 
+### SQL Execution via CLI
+
+There is no `databricks sql` CLI command. To execute SQL from a terminal:
+- **SQL Statement Execution API:** `databricks api post /api/2.0/sql/statements --json '{"warehouse_id": "...", "statement": "..."}'`
+- **Notebooks:** Use `notebook_task` in serverless jobs for SQL execution at scale
+
+See **[Common Issues](references/common-issues.md)** for full examples and error handling.
+
 ## Quick Reference: Extraction Patterns
 
 See **[Extraction Patterns](references/extraction-patterns.md)** for detailed code examples. Quick summary:
@@ -260,6 +317,8 @@ See **[Extraction Patterns](references/extraction-patterns.md)** for detailed co
 ## Reference Files
 
 - **[Extraction Patterns](references/extraction-patterns.md)** - Detailed code examples for extracting table names, column names, types, and other metadata from source files. Includes complete Python functions for schema extraction, column mapping, and validation.
+- **[Anti-Patterns](references/anti-patterns.md)** - Detailed failure mode descriptions with real examples, correct patterns, and detection signals for the 4 recurring anti-patterns.
+- **[Common Issues](references/common-issues.md)** - SQL execution via API, Glob failure recovery, and bulk skill loading guidance.
 - **[Compliance Checklist](assets/templates/compliance-checklist.md)** - Full compliance checklist template for validating Databricks solutions. Use this checklist before deploying any Databricks solution.
 
 ## References

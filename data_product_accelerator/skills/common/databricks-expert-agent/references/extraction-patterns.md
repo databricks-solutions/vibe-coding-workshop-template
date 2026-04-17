@@ -349,3 +349,49 @@ If Gold YAML doesn't exist yet (initial design phase):
 | **Get metric view name** | Filename | `Path(yaml_file).stem` |
 | **Get TVF name** | SQL file | `re.search(r'CREATE.*FUNCTION\s+(\w+)', sql).group(1)` |
 | **Validate column exists** | Silver metadata | `col_name in spark.table(table).columns` |
+
+## Runtime Environment Verification
+
+Before generating code that depends on workspace-specific capabilities, verify the runtime environment. Agents have assumed features (e.g., nested Metric View joins, advanced clustering modes) were available without checking, leading to deployment failures.
+
+### Check DBR / Runtime Version
+
+```sql
+SELECT current_version();
+-- Returns: {"number":"16.2","name":"..."}
+-- Use this to confirm feature availability before generating code that depends on it
+```
+
+### Check SQL Warehouse Type
+
+```python
+from databricks.sdk import WorkspaceClient
+
+w = WorkspaceClient()
+warehouse = w.warehouses.get(warehouse_id)
+warehouse_type = warehouse.warehouse_type  # PRO, CLASSIC, or TYPE_UNSPECIFIED
+is_serverless = warehouse.enable_serverless_compute
+```
+
+### Check Feature Availability
+
+```sql
+-- Verify Metric Views are supported
+SELECT * FROM information_schema.views
+WHERE table_schema = 'your_schema' LIMIT 1;
+
+-- Verify table exists before creating dependent objects
+SELECT table_name FROM information_schema.tables
+WHERE table_catalog = 'your_catalog'
+  AND table_schema = 'your_schema';
+```
+
+### Pre-Generation Verification Checklist
+
+Before generating artifacts that depend on runtime features:
+
+- [ ] DBR version checked via `current_version()` — feature requires DBR >= X
+- [ ] SQL warehouse type confirmed (serverless vs classic)
+- [ ] Target catalog/schema exists and is accessible
+- [ ] Referenced tables exist in live catalog (not just in design docs)
+- [ ] Column names validated via `DESCRIBE TABLE` (not assumed from memory)

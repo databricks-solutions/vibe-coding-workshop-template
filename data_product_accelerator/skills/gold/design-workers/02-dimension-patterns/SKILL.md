@@ -87,7 +87,7 @@ Dimension foreign keys should **never** be NULL. Instead, point to a dedicated "
 
 ### 3. Flags Must Be Textual Attributes
 
-Never store boolean flags as `true`/`false` or `0`/`1` in dimensions. Use full textual descriptions.
+Never store boolean flags as `true`/`false` or `0`/`1` in **business-sourced** dimensions. Use full textual descriptions instead.
 
 ```yaml
 # ❌ BAD: Boolean flags
@@ -101,6 +101,10 @@ Never store boolean flags as `true`/`false` or `0`/`1` in dimensions. Use full t
 ```
 
 **Why:** BI reports display raw values. "Active" reads better than "true" in dashboards and Genie responses.
+
+**Exception — generated date/time dimensions.** `dim_date` (and `dim_time` if present) are fully generated from a date range, not sourced from a business system. Their indicator columns (`is_weekend`, `is_holiday`, `is_business_day`, `is_month_end`, …) MAY be `BOOLEAN`. These columns are read almost exclusively by date-range filters and SQL predicates where `day_of_week IN (1,7)` or `is_weekend = TRUE` is idiomatic, and they are already well-described by their column names. The canonical template in `references/yaml-schema-patterns.md` uses BOOLEAN for these columns, and the Phase 8 semantic validator whitelists them.
+
+Every other dimension — including any derived business dimension that aggregates or classifies transactional data — MUST follow the textual-attribute rule above.
 
 ### 4. Avoid Abstract Generic Dimensions
 

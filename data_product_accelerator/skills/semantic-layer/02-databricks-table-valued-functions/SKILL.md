@@ -16,6 +16,8 @@ metadata:
   upstream_sources: []  # Internal TVF patterns
 ---
 
+> **End-to-end semantic layer?** If you are creating TVFs as part of a larger deployment that also includes Metric Views and Genie Spaces, read `semantic-layer/00-semantic-layer-setup/SKILL.md` first — it orchestrates this skill with the others and mandates Gold schema validation before artifact creation.
+
 # Databricks Table-Valued Functions (TVFs) for Genie
 
 ## Overview

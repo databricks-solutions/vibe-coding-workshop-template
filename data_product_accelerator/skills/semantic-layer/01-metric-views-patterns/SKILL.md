@@ -51,6 +51,8 @@ metadata:
       last_synced: "2026-02-20"
 ---
 
+> **End-to-end semantic layer?** If you are creating Metric Views as part of a larger deployment that also includes TVFs and Genie Spaces, read `semantic-layer/00-semantic-layer-setup/SKILL.md` first — it orchestrates this skill with the others and mandates Gold schema validation before artifact creation.
+
 # Metric Views Patterns for Genie & AI/BI
 
 ## Overview
@@ -194,6 +196,8 @@ joins:
     'on': dim_property.destination_id = dim_destination.destination_id  # ❌ References dim_property!
 ```
 
+This fails at plan-time with `UNRESOLVED_COLUMN` because `dim_property` is not visible in `dim_destination`'s `on` scope.
+
 **✅ FIX 1 (Preferred — simplest): Use denormalized columns from existing dimension**
 
 If `dim_property` already has `destination_name` and `destination_country`, reference them directly — no second join needed:
@@ -218,6 +222,19 @@ joins:
 ```
 
 **Validation gate:** Before generating YAML, inspect all join `on` clauses. If the left side of any `on` references a join name (not `source`), restructure as nested joins or use denormalized columns.
+
+**Pre-check for Fix 2 (nested joins):** Verify the workspace runtime supports nested joins:
+
+```python
+dbr = spark.sql("SELECT current_version()").first()[0]
+assert float('.'.join(dbr.split('.')[:2])) >= 17.1, \
+    f"Nested joins require DBR 17.1+, got {dbr}. Use Fix 1 or restructure."
+```
+
+**If Fix 1 is not feasible** (the intermediate dimension lacks the needed column, e.g., `dim_property` does not have `destination_name`), do NOT silently use Fix 2. Flag the constraint to the user and offer:
+- (a) Add the column to the intermediate dimension in the Gold layer design
+- (b) Confirm DBR 17.1+ and use nested joins
+- (c) Omit the dimension from the Metric View and handle it via TVFs instead
 
 See `references/advanced-patterns.md` for additional snowflake schema examples.
 

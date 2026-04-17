@@ -44,7 +44,7 @@ Implement full-stack UI and backend features on an already-scaffolded AppKit pro
 
 ## Before You Begin
 
-**This skill has two upstream masters. Check them when possible — recommended but not blocking.**
+**Optional upstream checks** (skip if latency-constrained or the `last_verified` date above is < 30 days old):
 
 1. **Databricks Apps skill (source of truth for AppKit workflow):**
    Fetch the latest from https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps
@@ -136,12 +136,13 @@ Key principles:
 - Choose a **bold aesthetic direction** — not generic AI aesthetics
 - Use AppKit UI primitives (`@databricks/appkit-ui`) as the foundation, then layer distinctive styling on top
 - Plan the page layout, component hierarchy, and navigation flow
+- Pay special attention to the "CSS Variables → Components" section — it prevents the most common styling anti-pattern
 
 ---
 
 ## Step 4: Build the Backend
 
-In `server/server.ts`, ensure plugins are registered:
+**First action:** Open `server/server.ts`. The scaffold may generate `createApp({...}).catch(console.error)` — this must be replaced. **Replace the file contents** with:
 
 ```typescript
 import { createApp, server, analytics } from "@databricks/appkit";
@@ -150,6 +151,8 @@ await createApp({
   plugins: [server(), analytics()],
 });
 ```
+
+Verify the file uses `await createApp()` before proceeding. Do not leave `.catch(console.error)`.
 
 For non-query APIs (writes, ML endpoints, custom logic), extend the server:
 
@@ -199,6 +202,18 @@ Use the `data` prop on AppKit data components (charts, tables) with representati
 />
 ```
 
+**Even with static data, add loading/error/empty branches** so components are ready for the query-driven swap:
+
+```tsx
+const properties = MOCK_PROPERTIES; // Will become API response
+const loading = false;              // Will become true during fetch
+const error: string | null = null;  // Will capture API errors
+
+if (loading) return <Skeleton className="h-64 w-full" />;
+if (error) return <div className="text-destructive">{error}</div>;
+if (!properties.length) return <EmptyState />;
+```
+
 **Later — Swap to query-driven data (final state):**
 
 Once SQL files exist in `config/queries/` and `npm run typegen` has generated types, replace static `data` with `queryKey` + `params`:
@@ -226,7 +241,7 @@ All static demo data must be replaced with query-driven data before declaring th
 
 ### Hard Rules
 
-READ [references/llm-guardrails.md](references/llm-guardrails.md) for the complete list. Key ones:
+**GATE:** Read [references/llm-guardrails.md](references/llm-guardrails.md) before writing any code in this step. Violations of these rules cause runtime bugs and deployment failures. Key rules (not a substitute for reading the file):
 
 - **SQL results return strings** — `useAnalyticsQuery` may return all values as strings at runtime, even for numeric columns. Always coerce with `Number()` before arithmetic to avoid string concatenation bugs
 - **Always `useMemo`** on query parameters — prevents infinite refetch loops. For parameterless queries (`Record<string, never>`), pass `useMemo(() => ({}), [])`
@@ -360,6 +375,8 @@ Common runtime surprises that cause bugs or confusion:
 | `getByText`/`getByRole` matches multiple elements (Playwright strict mode) | Use `data-testid` selectors; add `data-testid` attributes to key elements during page creation |
 | Escaped quotes in JSX attributes (`placeholder='I\'m...'`) crash Vite/rolldown parser | Use double-quoted attributes or JSX expressions: `placeholder={"I'm..."}` |
 | AppKit AST-grep linter blocks `as any` and `as unknown as T` | Avoid type assertions; use proper type imports or leave parameters untyped for inference. `databricks apps validate` runs these rules but `npm run build` does not |
+| Select "all/any" option sets a truthy string that passes boolean checks | Use `value=""` for "all/any" options. `if (filterValue)` correctly skips empty string but passes `"any"` as a literal match. |
+| `<Card onClick={...}>` without keyboard handlers | Wrap navigable cards in `<Link>` or add `role="link"`, `tabIndex={0}`, `onKeyDown`. Required for WCAG 2.1 AA. |
 
 ---
 

@@ -90,38 +90,74 @@ def process_json_values(obj, variables: dict):
     return obj
 
 
-def sort_all_arrays(space: dict) -> dict:
-    """Sort all arrays in Genie Space JSON by their API-required sort keys."""
-    if "tables" in space:
-        space["tables"] = sorted(
-            space["tables"], key=lambda x: x.get("table_name", "")
+def sort_all_arrays(config: dict) -> dict:
+    """Sort all arrays in the Genie Space JSON — API rejects unsorted data.
+
+    Canonical sort keys per 04-genie-space-export-import-api/SKILL.md §8:
+      - data_sources.tables             → identifier
+      - data_sources.metric_views       → identifier
+      - instructions.sql_functions      → (id, identifier)
+      - instructions.text_instructions  → id
+      - instructions.example_question_sqls → id
+      - instructions.sql_snippets.{measures,filters,expressions} → id
+      - config.sample_questions         → id
+      - benchmarks.questions            → id
+    """
+    if "data_sources" in config:
+        for key in ["tables", "metric_views"]:
+            if key in config["data_sources"]:
+                config["data_sources"][key] = sorted(
+                    config["data_sources"][key],
+                    key=lambda x: x.get("identifier", ""),
+                )
+    if "instructions" in config:
+        if "sql_functions" in config["instructions"]:
+            config["instructions"]["sql_functions"] = sorted(
+                config["instructions"]["sql_functions"],
+                key=lambda x: (x.get("id", ""), x.get("identifier", "")),
+            )
+        for key in ["text_instructions", "example_question_sqls"]:
+            if key in config["instructions"]:
+                config["instructions"][key] = sorted(
+                    config["instructions"][key],
+                    key=lambda x: x.get("id", ""),
+                )
+        if "sql_snippets" in config["instructions"]:
+            for key in ["measures", "filters", "expressions"]:
+                if key in config["instructions"]["sql_snippets"]:
+                    config["instructions"]["sql_snippets"][key] = sorted(
+                        config["instructions"]["sql_snippets"][key],
+                        key=lambda x: x.get("id", ""),
+                    )
+    if "config" in config and "sample_questions" in config["config"]:
+        config["config"]["sample_questions"] = sorted(
+            config["config"]["sample_questions"],
+            key=lambda x: x.get("id", ""),
         )
-    if "materialized_views" in space:
-        space["materialized_views"] = sorted(
-            space["materialized_views"],
-            key=lambda x: x.get("materialized_view_name", ""),
+    if "benchmarks" in config and "questions" in config["benchmarks"]:
+        config["benchmarks"]["questions"] = sorted(
+            config["benchmarks"]["questions"],
+            key=lambda x: x.get("id", ""),
         )
-    if "sql_functions" in space:
-        space["sql_functions"] = sorted(
-            space["sql_functions"], key=lambda x: x.get("function_name", "")
-        )
-    if "example_question_sqls" in space:
-        space["example_question_sqls"] = sorted(
-            space["example_question_sqls"],
-            key=lambda x: (
-                x.get("question", [""])[0]
-                if isinstance(x.get("question"), list)
-                else x.get("question", "")
-            ),
-        )
-    return space
+    return config
 
 
 _UUID4_HEX_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
 def validate_genie_json_structure(space: dict) -> list[str]:
-    """Pre-flight validation of Genie Space JSON structure. Returns list of errors."""
+    """Pre-flight validation of Genie Space JSON structure. Returns list of errors.
+
+    NOTE: This validator walks a flat-schema shape (top-level `tables`,
+    `materialized_views`, `sql_functions`, `example_question_sqls`). Real
+    exported configs use the nested schema documented in SKILL.md §4
+    (ID Generation) and §7 (Field Validation Rules) — see
+    `data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/SKILL.md`.
+    For nested-schema inputs, the loops below are effectively no-ops and
+    the authoritative rules in those SKILL.md sections supersede the
+    assertions here. A test-backed update to this validator is tracked
+    separately; do not treat a clean result here as full coverage.
+    """
     errors = []
 
     def _check_id(path: str, value):
@@ -208,6 +244,10 @@ def deploy_space(
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     }
+
+    # Required root field: the ExportConverter rejects version 0.
+    # See 04-genie-space-export-import-api/SKILL.md "Required Root Field".
+    space_config.setdefault("version", 2)
 
     serialized = json.dumps(space_config)
 

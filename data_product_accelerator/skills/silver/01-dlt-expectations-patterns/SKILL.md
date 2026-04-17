@@ -231,6 +231,16 @@ def get_rules(table_name: str, severity: str) -> dict:
 
 ## Core Patterns
 
+### Sourcing Enum Values from Data (Extract, Don't Generate)
+
+Before authoring `col IN (...)` rules, extract the actual values from Bronze rather than reading them from schema CSV comments:
+
+```sql
+SELECT DISTINCT col_name FROM {catalog}.{bronze_schema}.{bronze_table} WHERE col_name IS NOT NULL;
+```
+
+CSV column comments describe *intent*; production data may include extra values, typos, or legacy states. This follows the "Extract, Don't Generate" principle from `common/databricks-expert-agent` — applied to constraint value literals, not just names.
+
 ### Pattern 1: Create DQ Rules Delta Table
 
 ```sql
@@ -355,6 +365,28 @@ INSERT INTO {catalog}.{schema}.dq_rules VALUES (
 
 **See:** `references/expectation-patterns.md` for complete runtime management patterns
 
+### Pattern 5: Verifying Expectations Were Applied
+
+After a pipeline run completes, verify expectations are being checked using the DLT system `event_log()` table-valued function, scoped to a specific Silver table. **Do NOT use `databricks pipelines list-pipeline-events`** — it returns flow lifecycle events but NOT per-expectation pass/fail counts.
+
+```sql
+SELECT
+  event_type,
+  details:flow_progress.data_quality.dropped_records AS dropped,
+  details:flow_progress.data_quality.warned_records  AS warned,
+  details:flow_progress.data_quality.expectations    AS expectations
+FROM event_log(TABLE({catalog}.{silver_schema}.{silver_table_name}))
+WHERE details:flow_progress.data_quality IS NOT NULL
+ORDER BY timestamp DESC
+LIMIT 5;
+```
+
+The `expectations` array contains one entry per expectation with `name` (maps to `rule_name` in `dq_rules`), `dataset`, `passed_records`, and `failed_records`.
+
+**Common mistake:** Using `databricks pipelines list-pipeline-events` for DQ verification. That CLI command returns `flow_progress` events with row counts but NOT per-expectation detail. The `event_log()` TVF is the ONLY way to retrieve per-expectation pass/fail counts.
+
+**See:** `common/databricks-autonomous-operations/references/dlt-pipeline-troubleshooting.md` for the full DLT verification playbook (includes pipeline-id-scoped variant).
+
 ## Reference Files
 
 ### Expectation Patterns
@@ -399,6 +431,7 @@ INSERT INTO {catalog}.{schema}.dq_rules VALUES (
 - [ ] Then deploy DLT pipeline (loads rules from table)
 - [ ] Verify pipeline can read dq_rules table
 - [ ] Test rule updates take effect on next pipeline run
+- [ ] Verify expectations via `event_log()` TVF (Pattern 5) — NOT via `databricks pipelines list-pipeline-events`
 
 ## Common Mistakes to Avoid
 

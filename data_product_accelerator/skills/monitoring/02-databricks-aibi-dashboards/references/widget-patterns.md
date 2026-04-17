@@ -383,6 +383,80 @@ GROUP BY run_date
 ORDER BY run_date, status
 ```
 
+## Waterfall Chart (Version 3)
+
+Shows additive/subtractive contributions to a total. Useful for decomposing "who helped and who hurt?"
+
+```json
+{
+  "spec": {
+    "version": 3,
+    "widgetType": "waterfall",
+    "encodings": {
+      "x": {
+        "fieldName": "zone_combination",
+        "displayName": "Zone",
+        "scale": {"type": "categorical"}
+      },
+      "y": {
+        "fieldName": "apsd_change",
+        "displayName": "APSD $ Change",
+        "scale": {"type": "quantitative"}
+      }
+    }
+  }
+}
+```
+
+## Histogram (Version 3)
+
+Shows distribution of a continuous variable. Cross-filtering: click a bin to filter other charts to the rows in that bin.
+
+```json
+{
+  "spec": {
+    "version": 3,
+    "widgetType": "histogram",
+    "encodings": {
+      "x": {
+        "fieldName": "apsd_sales",
+        "displayName": "APSD Sales",
+        "scale": {"type": "quantitative"}
+      }
+    }
+  }
+}
+```
+
+## Filter Default Selection and `disallowAll`
+
+Single-select filters support a default value and the ability to remove the "All" option:
+
+```json
+{
+  "spec": {
+    "version": 2,
+    "widgetType": "filter-single-select",
+    "encodings": {
+      "fields": [{"displayName": "Period", "fieldName": "period", "queryName": "main_query"}]
+    },
+    "selection": {
+      "defaultSelection": {
+        "values": {
+          "dataType": "STRING",
+          "values": [{"value": "Day"}]
+        }
+      }
+    },
+    "disallowAll": true
+  }
+}
+```
+
+**`disallowAll: true`** — Removes the "All" option. Without this, period filters can show both Day and MTD rows simultaneously, causing double-counting in aggregated metrics like store counts.
+
+**`defaultSelection` format** — Values must be typed objects (`{"value": "Day"}`), not bare strings. An incorrect format is silently ignored and the filter falls back to "All".
+
 ## Common Error Messages and Fixes
 
 | Error Message | Cause | Fix |

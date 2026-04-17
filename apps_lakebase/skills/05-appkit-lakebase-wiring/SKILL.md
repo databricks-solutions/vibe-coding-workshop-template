@@ -69,13 +69,13 @@ When multiple approaches are valid, use these defaults. Override only if the PRD
 | Decision | Default | Rationale |
 |----------|---------|-----------|
 | Where does mock data live? | `server/mock-data.ts` — server owns all fallback data | Client and server are separate builds; cannot import across the boundary |
-| Single server file or split? | Split if `server.ts` would exceed ~300 lines | `tsdown unbundle: true` preserves relative imports between server files (see note above) |
+| Single server file or split? | **Split when `server.ts` exceeds 300 lines.** Extract mappers to `server/mappers.ts`. Count lines after writing: `wc -l server/server.ts`. | `tsdown unbundle: true` preserves relative imports between server files (see note above) |
 | Numeric PK or text PK? | Use `text` PK if the frontend already uses formatted IDs (e.g., `"lst-001"`) everywhere; otherwise `bigint identity` | Avoids a format-conversion layer that touches every route and mapper |
 | N+1 queries or JOINs? | Application-side joins for <50 rows; SQL JOINs for larger datasets | Simpler code; performance is irrelevant at seed-data scale |
 | Client-side or server-side validation? (promos, discounts) | Keep client-side for MVP; migrate to server in a follow-up | Reduces scope of this step |
 | Dynamically generated data (available dates, time slots)? | Generate in the mapper function, not a database table | Avoids seeding hundreds of ephemeral rows |
 | Mock fallback data format? | camelCase (matching API response after mappers) | Catch block returns data in the same shape as the live path |
-| Seed data: parameterized inserts or raw SQL? | Parameterized (`$1, $2`) for values with apostrophes/special chars; raw SQL for simple numeric data | Avoids SQL injection and escaping headaches |
+| Seed data: parameterized inserts or raw SQL? | **Parameterized (`$1, $2`) iterating over MOCK_* arrays** for all tables when mock-data.ts exists. Raw SQL only when no mock array exists and data is purely numeric. | Single source of truth; type-safe; avoids escaping bugs |
 
 ---
 
@@ -191,6 +191,8 @@ File ownership after wiring:
 | `server/mock-data.ts` | All data arrays (listings, bookings, etc.) in camelCase | Type definitions, UI constants |
 | `client/src/data/mockData.ts` | Type interfaces, filter-option constants, utility functions | Data arrays (deleted after migration) |
 | `server/server.ts` | DDL, seed logic, routes importing from `mock-data.ts` | Inline mock data objects |
+
+> **This table is prescriptive.** `server/mock-data.ts` must NOT define TypeScript interfaces — those belong exclusively in `client/src/data/mockData.ts`. The server file exports data arrays only and imports types from the client when feasible, or uses `Record<string, unknown>` parameter types with explicit return-type annotations. Duplicating interfaces causes type drift (e.g., server `status: string` vs. client `status: "confirmed" | "cancelled"`).
 
 ---
 
@@ -341,6 +343,8 @@ await createApp({
 
 **You MUST run `npm run build` and fix all errors before proceeding to Step 3.** Backend build errors found after frontend wiring are much harder to diagnose. This gate catches them early.
 
+**Line count check:** After build passes, run `wc -l server/server.ts`. If >300 lines, extract mapper functions to `server/mappers.ts` and re-run build before proceeding.
+
 ---
 
 ## Step 3: Wire Frontend
@@ -363,6 +367,14 @@ Usage: `const { data, source, error } = useLakebaseData<Order>("/api/orders");`
 - For AppKit chart components (`BarChart`, `AreaChart`, `DonutChart`, `DataTable`), use the `data` prop with fetched results
 
 > **Gotcha — `queryKey` requires the analytics plugin.** Do NOT use `queryKey` on chart components. Use the `data` prop with fetched results from `useLakebaseData` instead.
+
+### 3c2. Intermediate Build Gate
+
+**After rewiring every 2-3 page files, run `npm run build` (or `npx tsc --noEmit`).** Do not rewrite all pages in a single pass.
+
+When removing a static data import (e.g., `import { LISTINGS } from '../data/mockData'`), audit every other import in the same file. Symbols like `MapPin`, `User`, or helper functions may have only been used alongside the removed data source. If a page previously showed data from `PARENT_ARRAY.find()` (e.g., a property image on a booking page), the rewrite must either fetch that data via API or explicitly acknowledge the removal.
+
+> **Rule: removing a data import may orphan UI elements that depended on it.** Check imports and visual output after each batch. See [references/multi-table-example.md](references/multi-table-example.md) "Cross-Entity Enrichment" for the API pattern.
 
 ### 3d. Defensive Data Handling
 

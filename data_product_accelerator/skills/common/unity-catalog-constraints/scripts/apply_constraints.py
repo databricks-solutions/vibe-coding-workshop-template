@@ -11,7 +11,7 @@ Strategy:
 """
 
 from pyspark.sql import SparkSession
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 
 def add_primary_key(
@@ -45,6 +45,41 @@ def add_primary_key(
     print(f"  ✓ Added PK: {constraint_name} on {table_name}({pk_cols})")
 
 
+def verify_pk_exists(
+    spark: SparkSession,
+    catalog: str,
+    schema: str,
+    table_name: str,
+    pk_column: str
+) -> bool:
+    """Verify that a PRIMARY KEY constraint exists on the target column.
+
+    Run this before applying FK constraints to catch the most common failure:
+    FK references to business keys instead of surrogate PK columns.
+
+    Args:
+        spark: SparkSession instance
+        catalog: Unity Catalog catalog name
+        schema: Schema name
+        table_name: Referenced dimension table name
+        pk_column: Column name expected to be part of the PK
+
+    Returns:
+        True if PK constraint containing pk_column is found, False otherwise.
+    """
+    fqn = f"{catalog}.{schema}.{table_name}"
+    try:
+        rows = spark.sql(f"DESCRIBE EXTENDED {fqn}").collect()
+        for row in rows:
+            col_name = str(row[0] or "").strip()
+            data_type = str(row[1] or "").strip()
+            if col_name == "Constraints" and "PRIMARY KEY" in data_type and pk_column in data_type:
+                return True
+        return False
+    except Exception:
+        return False
+
+
 def add_foreign_key(
     spark: SparkSession,
     catalog: str,
@@ -53,7 +88,8 @@ def add_foreign_key(
     fk_columns: List[str],
     referenced_table: str,
     referenced_columns: List[str],
-    constraint_name: Optional[str] = None
+    constraint_name: Optional[str] = None,
+    verify: bool = True
 ):
     """Add FOREIGN KEY constraint to table.
     
@@ -66,12 +102,20 @@ def add_foreign_key(
         referenced_table: Referenced dimension table name
         referenced_columns: List of referenced PK column names
         constraint_name: Optional constraint name (defaults to fk_{table_name}_{referenced_table})
+        verify: If True, verify PK exists on referenced table before applying FK
     """
     fqn = f"{catalog}.{schema}.{table_name}"
     ref_fqn = f"{catalog}.{schema}.{referenced_table}"
     
     if constraint_name is None:
         constraint_name = f"fk_{table_name}_{referenced_table}"
+    
+    if verify:
+        for ref_col in referenced_columns:
+            if not verify_pk_exists(spark, catalog, schema, referenced_table, ref_col):
+                print(f"  ⚠ WARNING: No PK containing '{ref_col}' found on {referenced_table}. "
+                      f"FK will likely fail. Verify the referenced column is a PRIMARY KEY, "
+                      f"not a business key.")
     
     fk_cols = ", ".join(fk_columns)
     ref_cols = ", ".join(referenced_columns)
@@ -205,12 +249,11 @@ def apply_all_constraints(spark: SparkSession, catalog: str, schema: str):
     print("  • FKs reference surrogate PKs")
 
 
-# Example usage
+# Example usage (Databricks notebook only — dbutils is injected by the runtime)
 if __name__ == "__main__":
-    # Get parameters from widgets (Databricks notebook)
-    catalog = dbutils.widgets.get("catalog")
-    gold_schema = dbutils.widgets.get("gold_schema")
-    
+    catalog = dbutils.widgets.get("catalog")  # noqa: F821
+    gold_schema = dbutils.widgets.get("gold_schema")  # noqa: F821
+
     spark = SparkSession.builder.getOrCreate()
-    
+
     apply_all_constraints(spark, catalog, gold_schema)

@@ -91,6 +91,8 @@ ALTER TABLE fact_sales
 - [ ] Constraint script runs AFTER all table creation tasks
 - [ ] Primary keys applied to dimensions before foreign keys applied to facts
 - [ ] Each FK references an existing PK column
+- [ ] Verified target column has PRIMARY KEY constraint (run `DESCRIBE EXTENDED`)
+- [ ] Verified YAML `references:` fields point to surrogate PKs, not business keys
 - [ ] Constraint names follow naming conventions (e.g., `pk_dim_date`, `fk_sales_date`)
 - [ ] All constraints include `NOT ENFORCED`
 
@@ -215,6 +217,21 @@ KeyError: 'catalog' not found in widgets
 **Solution:**
 - Ensure YAML parameters match `dbutils.widgets.get()` names exactly
 - Use consistent naming: `catalog`, `schema`, `gold_schema`, etc.
+
+### Error 7: UNIQUE Constraint Fails on Serverless
+
+**Error:**
+```
+AnalysisException: Cannot modify the value of a Spark config: spark.databricks.sql.dsv2.unique.enabled
+```
+
+**Root Cause:** UNIQUE constraints require `spark.databricks.sql.dsv2.unique.enabled = true`,
+but serverless compute does not allow Spark config changes.
+
+**Solutions:**
+- Run constraint application job on classic compute
+- Skip UNIQUE constraints when deploying to serverless
+- Use a separate DAB job targeting a classic job cluster for constraint tasks
 
 ## Production Deployment Checklist
 

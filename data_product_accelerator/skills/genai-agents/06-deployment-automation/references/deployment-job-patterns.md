@@ -239,7 +239,9 @@ resources:
     deploy_agent_job:
       name: deploy-agent (serverless)
       environments:
-        - default
+        - environment_key: "default"
+          spec:
+            environment_version: "4"
       tasks:
         - task_key: evaluate_and_deploy
           environment_key: default

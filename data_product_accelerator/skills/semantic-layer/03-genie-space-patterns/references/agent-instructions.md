@@ -7,7 +7,7 @@ Comprehensive guide for writing effective Genie Space agent instructions.
 **The quality of Genie responses directly correlates with the depth of business context provided in agent instructions.**
 
 **Key Patterns:**
-1. **Seven-Section Structure**: A→B→C→D→E→F→G (all required)
+1. **Eight-Section Structure**: A→B→C→D→E→F→G→H (all required)
 2. **Concise Instructions**: 20 lines max for LLM behavior rules
 3. **Data Asset Hierarchy**: Metric Views (primary) → TVFs (specific) → Tables (reference)
 4. **SQL Validation**: Every benchmark question has working SQL
@@ -28,218 +28,332 @@ Comprehensive guide for writing effective Genie Space agent instructions.
 
 ---
 
-## Extended Instructions Template (Optional)
+## Extended Instructions: 13-Section Structure (Recommended)
+
+Production Genie Spaces benefit from structured, domain-rich instructions that go beyond the ≤20-line General Instructions summary. The **13-section structure** below is the recommended format for Extended Instructions — the comprehensive knowledge base that powers accurate query generation.
+
+### Relationship to General Instructions
+
+| Level | Where It Lives | Length | Purpose |
+|---|---|---|---|
+| **General Instructions** (Section E) | Genie Space UI "Instructions" field | ≤20 lines | Executive summary of behavior rules |
+| **Extended Instructions** (13 sections) | `text_instructions` in Genie JSON or appended to General Instructions | 50-200 lines | Full domain playbook for SQL generation |
+
+The General Instructions are a *concise subset* of the Extended Instructions. When the Extended Instructions are well-structured, the General Instructions become easier to write — they summarize the 13 sections into ≤20 essential rules.
+
+### The 13 Mandatory Sections
+
+Every Extended Instructions block MUST contain these 13 sections, in order:
+
+| # | Section | Purpose | Genie Impact |
+|---|---------|---------|-------------|
+| 1 | **PURPOSE** | Domain role, core KPI, default filters | ⭐⭐⭐⭐⭐ Critical |
+| 2 | **ASSET ROUTING** | Which asset for which question type | ⭐⭐⭐⭐⭐ Critical |
+| 3 | **BUSINESS DEFINITIONS** | KPI formulas, hierarchy, terminology | ⭐⭐⭐⭐⭐ Critical |
+| 4 | **DISAMBIGUATION** | Resolving ambiguous column/term choices | ⭐⭐⭐⭐⭐ Critical |
+| 5 | **AGGREGATION RULES** | Denominators, default filters, NULLIF | ⭐⭐⭐⭐ Very Important |
+| 6 | **FUNCTION ROUTING** | MEASURE() vs raw SUM/AVG, column naming | ⭐⭐⭐⭐ Very Important |
+| 7 | **JOIN GUIDANCE** | Keys, cardinality, mandatory join filters | ⭐⭐⭐⭐ Very Important |
+| 8 | **QUERY RULES** | Namespace, formatting, NULL handling | ⭐⭐⭐⭐ Very Important |
+| 9 | **QUERY PATTERNS** | Reusable SQL templates (UNION, drill-down) | ⭐⭐⭐ Important |
+| 10 | **TEMPORAL FILTERS** | Mapping user time terms to flag columns | ⭐⭐⭐ Important |
+| 11 | **DATA QUALITY NOTES** | Known caveats, filtered-out records | ⭐⭐⭐ Important |
+| 12 | **CONSTRAINTS** | Hard limits (namespace, exclusions, layer) | ⭐⭐⭐ Important |
+| 13 | **SQL EXPRESSIONS** | Structured measures, filters, dimensions for `sql_snippets` | ⭐⭐⭐⭐ Very Important |
+
+---
+
+### 13-Section Template
 
 ```markdown
-=================================================================================
-[PROJECT NAME] - GENIE AGENT INSTRUCTIONS
-=================================================================================
+=================================================================
+[PROJECT NAME] — GENIE AGENT INSTRUCTIONS
+=================================================================
 
-BUSINESS DOMAIN KNOWLEDGE:
+== 1. PURPOSE ==
+You are an expert {domain} analyst for the {report/system name}.
+Core KPI: {name} = {formula with clear variable definitions}.
+Default filter: {filter_column} = '{value}' for all {kpi} queries.
+Users: {target audience, e.g., field operations leaders, executives}.
 
-1. [DOMAIN ENTITY 1]
-   • [Key classification or concept]
-   • [Identifiers used]
-   • [Hierarchies or groupings]
+== 2. ASSET ROUTING ==
+| User Intent | Asset | Notes |
+|---|---|---|
+| Dimension-only lookups (list names, attributes, org hierarchy) | {dim_table} | No metrics — no MEASURE() |
+| Pre-aggregated KPIs, period comparisons, APSD-style metrics | {metric_view} with MEASURE() | Primary asset for all KPI questions |
+| Ad-hoc drill-downs, date-specific raw data, custom joins | {fact_table} + {dim_date} + {dim_location} | Use JOINs per Section 7 |
 
-2. [DOMAIN ENTITY 2]
-   • [Types or categories]
-   • [Business rules]
+⚠️ Route to dimension table when user asks ONLY for attributes
+(e.g., "list market leaders", "show stores in Virginia").
 
-3. [TRANSACTION TYPES]
-   • [Type 1]: [Description and business logic]
-   • [Type 2]: [Description and business logic]
+== 3. BUSINESS DEFINITIONS ==
+- {KPI_1}: {formula} — {one-line explanation}
+- {KPI_2}: {formula} — {one-line explanation}
+- "{synonym_term}" and "{column_term}" are synonyms ({column_name} field)
+- Hierarchy: {Level1} > {Level2} > ... > {LevelN} (e.g., Country > Zone > Region > Market > Area Leader > Store)
+- Currency: {primary currency} is consolidated; {secondary} stores also have local amounts
+- Time periods: "Day" = latest reporting day, "MTD" = month-to-date, "PY" = prior year same period
+⚠️ Promote top KPIs to sql_snippets.measures for structured Genie matching — see Section 13.
 
-4. [PROGRAM/FEATURE 1]
-   • [Component 1]: [Business definition]
-   • [Component 2]: [Business definition]
-   • [Metric]: [How calculated]
+== 4. DISAMBIGUATION ==
+When multiple columns could match the user's intent, apply these defaults:
 
-5. [DOMAIN CONCEPT]
-   • [Classification 1]: [Definition and criteria]
-   • [Classification 2]: [Definition and criteria]
+| User says | Default column | Reason | Alternative (only if explicitly requested) |
+|---|---|---|---|
+| "by {grouping}" | {grouping}_combination | Richer context (code + name) | {grouping}_name (name only) |
+| "by {grouping} name only" | {grouping}_name | User explicitly requested name-only | — |
+| "{term_with_two_meanings}" | {preferred_interpretation} | {reason} | {alternative} |
 
-6. [ANOTHER PROGRAM/FEATURE]
-   • [Field 1]: [Description]
-   • [Field 2]: [Description]
-   • [Calculation]: [Formula]
+**Key principle:** When a `_combination` column (code + name) exists alongside a
+`_name` column, default to the richer `_combination` column for "by X" queries.
+Users see more context; they can always ask for name-only explicitly.
 
-7. KEY PERFORMANCE INDICATORS (KPIs)
+== 5. AGGREGATION RULES ==
+- Default denominator for per-unit KPIs: COUNT(DISTINCT {store-day key})
+- Default filter: WHERE {same_store_flag} = 'Y' for all {kpi} queries
+- Use NULLIF({denominator}, 0) on all division operations
+- Default sort: DESC by primary metric unless user specifies otherwise
+- Limit ranking queries to top 10-20 rows unless user specifies otherwise
 
-   [Category 1] Metrics:
-   • [Metric 1] = [Formula with clear variable definitions]
-   • [Metric 2] = [Formula]
-   
-   [Category 2] Metrics:
-   • [Metric 1] = [Formula]
-   • [Metric 2] = [Formula]
+== 6. FUNCTION ROUTING ==
+- Use MEASURE({column_name}) for metric view pre-aggregated columns
+  ✅ MEASURE(total_sales_usd_day)   — actual column name
+  ❌ MEASURE(`Total Sales USD Day`)  — display name FAILS
+- Use raw SUM()/AVG()/COUNT() when querying fact tables with JOINs
+- Column names in MEASURE() must match the metric view YAML `name` field,
+  NOT the `display_name`
+⚠️ Measures registered as SQL Expressions (sql_snippets) get priority matching.
+  Register the top 10-20 KPIs as sql_snippets.measures — see Section 13.
 
-8. TIME DIMENSIONS
-   • [Hierarchy]: Year > Quarter > Month > Week > Day
-   • [Fiscal periods description]
-   • [Special time classifications]
-   • Time Comparisons:
-     - Week-over-Week (WoW)
-     - Month-over-Month (MoM)
-     - Quarter-over-Quarter (QoQ)
-     - Year-over-Year (YoY)
+== 7. JOIN GUIDANCE ==
+| Left Table | Right Table | Join Key | Cardinality |
+|---|---|---|---|
+| {fact_table} | {dim_date} | {fact}.{date_fk} = {dim}.{date_pk} | Many-to-One |
+| {fact_table} | {dim_location} | {fact}.{loc_fk} = {dim}.{loc_pk} | Many-to-One |
 
-9. GEOGRAPHIC ANALYSIS LEVELS
-   • [Level 1]: [Description]
-   • [Level 2]: [Description]
-   • [Level 3]: [Description]
+Always include active-record filters in JOIN conditions where applicable
+(e.g., is_record_active = 'Y', open_status_code = 'O').
 
-=================================================================================
-DATA ASSETS AVAILABLE
-=================================================================================
+== 8. QUERY RULES ==
+- All tables in {catalog}.{schema} — always use full 3-part names
+- For YoY comparisons, show both CY and PY values plus the % change
+- Do NOT add WHERE column IS NOT NULL on dimension-only lookups
+  unless the user explicitly requests excluding nulls
+- Continue using NULLIF for measure denominators per Aggregation Rules
 
-PRIMARY METRIC VIEWS (Use These First):
+== 9. QUERY PATTERNS ==
+Pattern A — Day + MTD side-by-side:
+  SELECT 'Day' AS period, MEASURE(...) ...
+  UNION ALL
+  SELECT 'MTD' AS period, MEASURE(...) ...
 
-1. [metric_view_name]
-   Purpose: [One-sentence description]
-   Source: [Underlying fact table]
-   Grain: [Aggregation level]
-   Dimensions: [List key dimensions]
-   Measures: [Count]+ measures including [examples]
-   Window Measures: [List rolling windows, YoY]
-   Best For: "[Example query pattern 1]", "[Example query pattern 2]"
+Pattern B — CY vs PY comparison:
+  SELECT {dim}, 'CY' AS year_label, MEASURE({cy_metric}) ...
+  UNION ALL
+  SELECT {dim}, 'PY' AS year_label, MEASURE({py_metric}) ...
+  ORDER BY {dim}, year_label
 
-TABLE-VALUED FUNCTIONS (Use for Specific Queries):
+Pattern C — Hierarchy drill-down:
+  SELECT {level1}, {level2}, {level3}, MEASURE({metric}) ...
+  GROUP BY {level1}, {level2}, {level3}
+  ORDER BY MEASURE({metric}) DESC
 
-1. [function_name]([parameters])
-   Returns: [Result description]
-   Use When: [Specific scenario]
-   Example: "[Natural language query example]"
+Pattern D — Dual currency (when applicable):
+  SELECT {dim}, 'USD' AS currency, MEASURE({usd_metric}) ...
+  UNION ALL
+  SELECT {dim}, '{local}' AS currency, MEASURE({local_metric}) ...
 
-=================================================================================
-QUERY INTERPRETATION GUIDELINES
-=================================================================================
+== 10. TEMPORAL FILTERS ==
+Map user time terms to the correct flag columns:
 
-1. TIME PERIOD HANDLING
-   When user says:          Interpret as:
-   • "this month"         → [SQL/filter logic]
-   • "last month"         → [SQL/filter logic]
-   • "this quarter"       → [SQL/filter logic]
-   • "last 7 days"        → [SQL/filter logic or window measure]
-   • "YTD"                → [SQL/filter logic]
+| User says | Filter column | Value |
+|---|---|---|
+| "today", "current day", "latest day" | {is_current_day_flag} | 'Y' |
+| "MTD", "month to date" | {is_mtd_flag} | 'Y' |
+| "prior year same day", "PY day" | {is_py_same_day_flag} | 'Y' |
+| "prior year MTD" | {is_py_mtd_flag} | 'Y' |
+| "last 7 days", "trailing week" | {is_7day_flag} | 'Y' |
 
-2. AGGREGATION LEVEL DETECTION
-   When user says:          Group by:
-   • "by [dimension1]"   → [table.column]
-   • "by [dimension2]"   → [table.column]
-   • "by [dimension3]"   → [table.column]
+{Include MTDay-vs-MTDate switching logic if applicable:}
+use_mtdate_flag = 1 on the 1st of month → use date-aligned PY comparison
+use_mtdate_flag = 0 otherwise → use weekday-aligned PY comparison
 
-3. RANKING AND LIMITS
-   When user says:          Use:
-   • "top 10"            → ORDER BY metric DESC LIMIT 10
-   • "bottom 5"          → ORDER BY metric ASC LIMIT 5
-   • "best performing"   → ORDER BY [primary_metric] DESC
+== 11. DATA QUALITY NOTES ==
+- Only {qualifying subset} records are included in {dim_table}
+  (e.g., only active, open, non-temporarily-closed stores)
+- {Column} is NULL for {condition} records
+  (e.g., exchange_rate is NULL for USD-denominated records)
+- {Special flag}: {definition and qualification criteria}
+  (e.g., is_finance_monthly_same_store = 'Y' means store open 28+ days)
 
-4. COMPARISON KEYWORDS
-   When user says:          Strategy:
-   • "compare X vs Y"    → Use CASE WHEN or PIVOT
-   • "growth"            → Calculate (current - prior) / prior * 100
-   • "trend"             → ORDER BY date ASC
-   • "vs last year"      → Join to prior year data
+== 12. CONSTRAINTS ==
+- Always use full 3-part UC namespace: {catalog}.{schema}.{object}
+- {Subset exclusion rule} (e.g., PDI and SAP stores excluded from US-only views)
+- Only Gold layer tables/views used as trusted assets
+- {Any domain-specific hard rules}
 
-5. FILTER KEYWORDS
-   When user says:          Filter:
-   • "[brand/category1]" → [table.column] = '[value]'
-   • "[classification1]" → [table.column] = [boolean/value]
-   • "[status1]"         → [table.column] = '[value]'
+== 13. SQL EXPRESSIONS ==
+Register key business concepts as structured sql_snippets for direct Genie matching.
+These are promoted from Sections 3, 4, and 5 — the text definitions remain as behavioral
+context; sql_snippets give Genie parseable, matchable definitions.
 
-6. METRIC SELECTION
-   When user asks about:    Use measure:
-   • "[term1]" / "[term2]" → [measure_name]
-   • "[term3]" / "[term4]" → [measure_name]
+MEASURES (promote top KPIs from Section 3):
+| display_name | sql | synonyms |
+|---|---|---|
+| {KPI_1 Name} | SUM({table}.{column}) | {synonym1}, {synonym2} |
+| {KPI_2 Name} | AVG({table}.{column}) / NULLIF(COUNT(...), 0) | {synonym1}, {synonym2} |
 
-7. AMBIGUITY RESOLUTION
-   If user query is unclear:
-   • Default to [most common metric] (not [alternative])
-   • Default to [time period] if no time specified
-   • Default to [scope] if no filter specified
-   • Include [key identifiers] for clarity
+FILTERS (promote common WHERE clauses from Section 5):
+| display_name | sql | synonyms |
+|---|---|---|
+| {Filter Name} | {table}.{column} = '{value}' | {synonym1}, {synonym2} |
+| {Filter Name} | {table}.{flag_column} = 'Y' | {synonym1}, {synonym2} |
 
-8. HANDLING MISSING DATA
-   • If metric view doesn't have requested data, check if TVF provides it
-   • If neither works, query underlying gold tables
-   • Always validate time period filters
-   • If no data matches filters, return empty result with explanation
+DIMENSIONS (promote grouping attributes from Section 4):
+| display_name | sql | synonyms |
+|---|---|---|
+| {Dimension Name} | {table}.{column} | {synonym1}, {synonym2} |
+| {Derived Dim Name} | CASE WHEN {table}.{col} ... END | {synonym1}, {synonym2} |
 
-9. COMPLEX QUERIES
-   For multi-part questions:
-   • Break into subqueries
-   • Use CTEs for readability
-   • Combine metric views when crossing domains
-   • Use window functions for ranking within groups
-
-10. RESPONSE FORMAT
-    Always include:
-    • Clear column headers with business-friendly names
-    • Proper formatting (currency, percentages, integers)
-    • Sorted results (DESC for "top", ASC for "bottom")
-    • Limited results (TOP N) for large datasets
-
-=================================================================================
-IMPORTANT CONSTRAINTS
-=================================================================================
-
-DATA QUALITY NOTES:
-• [Layer] data has passed [validation process]
-• [Special handling for edge cases]
-• [Identification of special record types]
-
-PERFORMANCE BEST PRACTICES:
-• Use metric views instead of fact tables (pre-aggregated)
-• Specify time period filters
-• Use TOP N to limit result sets
-• Leverage window_measures for rolling windows
-
-BUSINESS RULES:
-• [Rule 1 with formula]
-• [Rule 2 with data type notes]
-• [Rule 3 with SCD handling]
-
-=================================================================================
-EXAMPLE QUERY PATTERNS
-=================================================================================
-
-PATTERN 1: Top N with Time Filter
-Question: "[Example natural language question]"
-Strategy:
-  FROM [metric_view]
-  WHERE [time_filter]
-  GROUP BY [dimension]
-  ORDER BY MEASURE([metric]) DESC
-  LIMIT N
-
-[Include 4-5 more patterns covering different query types]
-
-=================================================================================
-TROUBLESHOOTING TIPS
-=================================================================================
-
-If query fails:
-1. [Common issue 1 and fix]
-2. [Common issue 2 and fix]
-3. [Common issue 3 and fix]
-
-If results seem wrong:
-1. [Validation check 1]
-2. [Validation check 2]
-3. [Validation check 3]
-
-=================================================================================
-SYNONYMS AND ALIASES
-=================================================================================
-
-[Business Term 1]: [synonym1], [synonym2], [synonym3]
-[Business Term 2]: [synonym1], [synonym2], [synonym3]
-
-=================================================================================
+=================================================================
 END OF INSTRUCTIONS
-=================================================================================
+=================================================================
 ```
+
+---
+
+### Instruction Evolution: Append-Only Updates
+
+**🔴 CRITICAL: When optimizing an existing Genie Space, APPEND new rules — never replace the entire instruction block.**
+
+Existing rules were validated by users and benchmarks. Replacing them risks regression
+on questions that currently work correctly.
+
+**✅ DO:** Append new sections or rules at the end
+```
+[existing rules 1-14 unchanged]
+
+15. ASSET ROUTING:
+- New routing guidance here...
+
+16. NULL FILTER GUIDANCE:
+- New constraint here...
+```
+
+**❌ DON'T:** Replace the entire instruction block with a new version
+```
+[all 14 existing rules deleted and rewritten]
+```
+
+**When is replacement acceptable?**
+- Only during a planned full migration with benchmark regression testing
+- Only when the user explicitly requests a rewrite
+- Always run all existing benchmarks after replacement to verify no regression
+
+---
+
+## Column Config Flags for Genie
+
+Beyond instructions, Genie uses `column_configs` in the space JSON to enhance entity matching
+and formatting. These flags significantly improve query accuracy.
+
+### enable_format_assistance
+
+Tells Genie to assist with value formatting for the column. Apply to **all dimension columns**
+(dates, text, categorical, numeric identifiers).
+
+```json
+{"column_name": "date_key_2", "enable_format_assistance": true}
+{"column_name": "location_number", "enable_format_assistance": true}
+{"column_name": "state_name", "enable_format_assistance": true}
+```
+
+### enable_entity_matching
+
+Tells Genie to perform fuzzy entity name matching for the column. Apply to **text/categorical
+columns that users filter by** — names, codes, flags, statuses.
+
+```json
+{"column_name": "zone_combination", "enable_entity_matching": true}
+{"column_name": "market_leader_name", "enable_entity_matching": true}
+{"column_name": "is_finance_monthly_same_store", "enable_entity_matching": true}
+```
+
+**Do NOT apply** to numeric measure columns (sales, counts, percentages).
+
+### Pattern by Column Type
+
+| Column Type | enable_format_assistance | enable_entity_matching | get_example_values | build_value_dictionary |
+|---|---|---|---|---|
+| Date/timestamp | ✅ | ❌ | ✅ | ❌ |
+| Numeric ID (store#) | ✅ | ❌ | ✅ | ❌ |
+| Text name (person, place) | ✅ | ✅ | ✅ | ✅ |
+| Categorical flag (Y/N) | ✅ | ✅ | ✅ | ✅ |
+| Code (zone_code) | ✅ | ❌ | ✅ | ❌ |
+| Numeric measure (sales) | ❌ | ❌ | ❌ | ❌ |
+| Percentage measure | ❌ | ❌ | ❌ | ❌ |
+
+### Synonym Placement
+
+**Synonyms go in `column_configs[].synonyms` in the Genie Space JSON (or in metric view
+YAML `synonyms` fields), NEVER in materialized view COMMENT strings.**
+
+| Where | What Goes There | Example |
+|---|---|---|
+| UC Table COMMENT | Purpose + grain | `'Location dimension: store attributes. Grain: one row per store.'` |
+| UC Column COMMENT | Business definition, valid values | `'Y/N flag for same-store qualification'` |
+| Genie column_configs synonyms | User-friendly alternative names | `["same store", "comp store", "SSS"]` |
+| Metric View YAML synonyms | Same as Genie synonyms | `synonyms: ["same store", "comp store"]` |
+
+**❌ DON'T** put synonyms in MV table/column COMMENTs:
+```sql
+-- BAD: synonyms pollute the UC metadata
+COMMENT ON COLUMN dim_location.zone_combination IS
+  'Zone code and name. Synonyms: zone, franchise zone, zone combo';
+```
+
+**✅ DO** put synonyms in column_configs:
+```json
+{"column_name": "zone_combination", "synonyms": ["zone", "franchise zone", "zone combo"]}
+```
+
+---
+
+## Enrichment Script Pattern
+
+For Genie Spaces with many columns, use a **Python enrichment script** as the canonical
+source of truth for `column_configs`. This prevents drift between manual JSON edits and
+ensures reproducible regeneration.
+
+### Pattern
+
+```python
+# enrich_column_configs.py — Source of truth for column_configs
+
+TABLE_COLUMNS = {
+    "dim_location": [
+        {"column_name": "zone_combination",
+         "get_example_values": True, "build_value_dictionary": True,
+         "enable_format_assistance": True, "enable_entity_matching": True,
+         "synonyms": ["zone", "franchise zone"],
+         "description": ["Combined zone code and name for reporting"]},
+        # ... more columns
+    ],
+}
+
+def enrich(genie_json):
+    for table in genie_json["data_sources"]["tables"]:
+        table_name = table["identifier"].split(".")[-1]
+        if table_name in TABLE_COLUMNS:
+            table["column_configs"] = TABLE_COLUMNS[table_name]
+    return genie_json
+```
+
+**Benefits:**
+- Single source of truth — no manual JSON drift
+- Reviewable in code review — changes are visible in diffs
+- Reproducible — re-run script after any upstream metadata change
+- Testable — validate column names against actual schema
 
 ---
 
@@ -247,13 +361,18 @@ END OF INSTRUCTIONS
 
 | Section | Purpose | Impact on Genie Quality |
 |---------|---------|------------------------|
-| **Business Domain Knowledge** | Teaches Genie your business concepts | ⭐⭐⭐⭐⭐ Critical |
-| **Data Assets Available** | Shows what data sources to use | ⭐⭐⭐⭐⭐ Critical |
-| **Query Interpretation** | Maps natural language to SQL patterns | ⭐⭐⭐⭐⭐ Critical |
-| **Constraints** | Prevents common errors | ⭐⭐⭐⭐ Very Important |
-| **Example Patterns** | Provides concrete query templates | ⭐⭐⭐⭐ Very Important |
-| **Troubleshooting** | Helps Genie recover from failures | ⭐⭐⭐ Important |
-| **Synonyms** | Improves query understanding | ⭐⭐⭐ Important |
+| **PURPOSE** | Sets the domain context and core KPI | ⭐⭐⭐⭐⭐ Critical |
+| **ASSET ROUTING** | Prevents wrong-asset selection (40% of misrouting) | ⭐⭐⭐⭐⭐ Critical |
+| **BUSINESS DEFINITIONS** | Teaches Genie your business concepts | ⭐⭐⭐⭐⭐ Critical |
+| **DISAMBIGUATION** | Resolves "by zone" → zone_combination vs zone_name | ⭐⭐⭐⭐⭐ Critical |
+| **AGGREGATION RULES** | Correct denominators and default filters | ⭐⭐⭐⭐ Very Important |
+| **FUNCTION ROUTING** | MEASURE() vs raw SQL, column naming | ⭐⭐⭐⭐ Very Important |
+| **JOIN GUIDANCE** | Correct join keys and cardinality | ⭐⭐⭐⭐ Very Important |
+| **QUERY RULES** | Namespace, formatting, NULL handling | ⭐⭐⭐⭐ Very Important |
+| **QUERY PATTERNS** | Provides concrete reusable SQL templates | ⭐⭐⭐ Important |
+| **TEMPORAL FILTERS** | Maps user time terms to flag columns | ⭐⭐⭐ Important |
+| **DATA QUALITY NOTES** | Prevents surprise NULLs and filtered-out records | ⭐⭐⭐ Important |
+| **CONSTRAINTS** | Hard limits that prevent broken queries | ⭐⭐⭐ Important |
 
 ---
 

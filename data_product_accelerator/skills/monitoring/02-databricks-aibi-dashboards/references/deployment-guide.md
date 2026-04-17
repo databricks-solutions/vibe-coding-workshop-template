@@ -339,7 +339,21 @@ WHERE usage_date >= '2025-01-01' AND usage_date <= '2025-01-31'
    )
    ```
 
-4. **Verify Deployment**
+4. **Publish Dashboard (Make Live)**
+
+   Bundle deploy and workspace import create a **draft**. To make the dashboard live for end users, publish it:
+
+   ```bash
+   # Get dashboard ID from bundle summary or workspace URL
+   databricks lakeview publish <dashboard-id>
+
+   # With explicit profile for multi-workspace setups
+   DATABRICKS_CONFIG_PROFILE=my-profile databricks lakeview publish <dashboard-id>
+   ```
+
+   Get the dashboard ID from `databricks bundle summary --output json` (look under `resources.dashboards`) or from the workspace dashboard URL (the hex string after `/sql/dashboards/`).
+
+5. **Verify Deployment**
    - Check dashboard URLs are accessible
    - Verify widgets render correctly
    - Test parameter filters

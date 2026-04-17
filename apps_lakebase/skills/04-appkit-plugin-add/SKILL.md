@@ -69,6 +69,32 @@ The table below covers plugins bundled with this skill. AppKit may offer additio
 
 If the plugin you need is listed above, **READ its reference file before proceeding** — it contains the import, config, env vars, `app.yaml` changes, frontend hooks, and gotchas. For any other plugin, consult the upstream docs directly.
 
+> **MANDATORY:** You MUST read the plugin's reference file before making any changes. Do not treat the reference as optional supplementary material. For Lakebase specifically, the reference contains critical Terraform state management warnings that prevent destructive deploy failures. After reading, note any "Critical" or "Keep" warnings in `.vibecoding-state.md` under a "Critical Notes for Next Phase" section so downstream agents inherit the context.
+
+---
+
+## Step 1b: Verify the Plugin Export Exists (before importing)
+
+Before adding the plugin to `server/server.ts`, confirm it is exported by your installed AppKit version. The server bundler (`tsdown`) does not type-check — a nonexistent import bundles silently and only fails at client build or runtime, usually after a long deploy round-trip.
+
+```bash
+cd apps_lakebase/$APP_NAME
+node -e "const m = require('@databricks/appkit'); console.log(typeof m.<pluginName>);"
+```
+
+- **`function`** → plugin is available, proceed to Step 2.
+- **`undefined`** → plugin is **not** in your installed AppKit version. Do NOT write `import { <pluginName> } from "@databricks/appkit"` — the bundler will accept it and your deploy will fail silently.
+  - If the plugin was recently published to npm: `npm install @databricks/appkit@latest @databricks/appkit-ui@latest` and rerun the check. If this triggers a `package-lock.json` regeneration, read [03-appkit-deploy/references/lockfile-and-recreation.md](../03-appkit-deploy/references/lockfile-and-recreation.md) before deploying.
+  - If the plugin is not yet published: use a custom proxy fallback. For the Serving plugin specifically, read [06-appkit-serving-wiring/references/custom-proxy-fallback.md](../06-appkit-serving-wiring/references/custom-proxy-fallback.md). For other plugins, consult the upstream docs for a supported fallback before hand-rolling one.
+
+Confirm the method / hook names you plan to call the same way — inspect the installed `.d.ts`:
+
+```bash
+find node_modules/@databricks/appkit -name "*.d.ts" | xargs grep -l "<ExportName>" | head -5
+```
+
+> **Anti-pattern — "Import it and see if it compiles."** The server bundler (tsdown) skips type checking and will silently bundle a broken import. The error surfaces only when the client build runs tsc or the server crashes at runtime — usually after a 2-3 minute deploy round-trip. Always run the `node -e` check above before writing the import.
+
 ---
 
 ## Step 2: Register the Plugin
@@ -115,6 +141,8 @@ Each plugin requires specific environment variables. After reading the plugin re
 2. **`app.yaml`** — for deployed apps
 
 See the plugin-specific reference for exact variable names and values.
+
+> **After editing `databricks.yml` and `app.yaml`, run `databricks apps validate --profile $PROFILE` to catch YAML syntax or resource binding errors before deploy.**
 
 ---
 

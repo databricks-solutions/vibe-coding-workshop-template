@@ -150,6 +150,17 @@ This orchestrator spans 3 phases. To maintain coherence without context pollutio
 
 Derive domains from your business questions and Gold table groupings (see Artifact Rationalization Framework). Do not force a fixed number — let the data model and use cases determine natural boundaries.
 
+##### Required Reads (Before Proceeding)
+
+Before defining domains and use cases, you MUST have read these references. Check each off in your Skill Usage Summary:
+
+- [ ] `references/rationalization-framework.md` — domain sizing rules, TVF creation gate, Genie Space capacity planning, naming conventions
+- [ ] `references/worked-example-wanderbricks.md` (if the project is WanderBricks or a hospitality/vacation-rental domain) OR `references/industry-domain-patterns.md` (otherwise) — domain naming, use case card depth, reference SQL patterns
+
+If a worked example matches your project, treat it as the **primary format reference** for use case cards and artifact designs — adapt, don't reinvent. "MANDATORY" means read it; note in the Skill Usage Summary if the reference did not change your decisions, but still read it.
+
+**Workshop mode:** `references/workshop-mode-profile.md` should already be loaded when `planning_mode: workshop` was detected — see its **Document Scope** section, since workshop mode changes artifact counts but NOT which documents to produce.
+
 | Domain | Icon | Focus Area | Key Gold Tables | Est. Business Questions |
 |--------|------|------------|-----------------|------------------------|
 | {Domain 1} | {emoji} | {focus} | {tables} | {count} |
@@ -201,7 +212,12 @@ After defining business questions and selecting addendums, consolidate into a **
 
 See [Worked Example: Wanderbricks](references/worked-example-wanderbricks.md) for 3 fully worked-out use case cards.
 
-**Stakeholder Checkpoint:** After generating the use case catalog, pause and present the Use Case Summary table to the user for confirmation before proceeding to addendum generation. If the user requests changes, update the catalog and domain questions before continuing.
+**Stakeholder Checkpoint:** After generating the use case catalog, present the Use Case Summary table to the user for review. Whether to block depends on prompt specificity:
+
+- **If the user's prompt listed explicit output steps** (e.g., "analyze Gold layer, generate use-case plans, produce manifests"): treat as pre-approval. Include the summary table at the top of your response and proceed without blocking. Note: *"Use cases derived from Gold layer analysis — let me know if adjustments are needed before the next pipeline stage."*
+- **If the user's prompt was open-ended** (e.g., "create a plan"): pause and ask for confirmation before proceeding to addendum generation.
+
+If the user requests changes after seeing the summary, update the catalog and domain questions before continuing.
 
 ### Phase 2: Plan Document Generation
 
@@ -217,6 +233,26 @@ Create plan documents using templates in the following order:
    - Genie Spaces — `assets/templates/phase1-genie-spaces-template.md`
 6. **Phase 2** — `assets/templates/phase2-agent-framework-template.md` (AI agents)
 7. **Phase 3** — `assets/templates/phase3-frontend-template.md` (user interface)
+
+#### Phase 2 Completion Gate
+
+Before proceeding to Phase 3 (Manifests), verify that ALL selected plan documents exist on disk:
+
+| Document | Template | Required? |
+|----------|----------|-----------|
+| `plans/README.md` | `plans-readme-template.md` | ALWAYS |
+| `plans/prerequisites.md` | `prerequisites-template.md` | ALWAYS |
+| `plans/use-case-catalog.md` | `use-case-catalog-template.md` | ALWAYS |
+| `plans/phase1-use-cases.md` | `phase1-use-cases-template.md` | ALWAYS |
+| `plans/phase1-addendum-1.2-tvfs.md` | `phase1-tvfs-template.md` | If TVFs selected |
+| `plans/phase1-addendum-1.3-metric-views.md` | (inline) | If Metric Views selected |
+| `plans/phase1-addendum-1.6-genie-spaces.md` | `phase1-genie-spaces-template.md` | If Genie Spaces selected |
+| `plans/phase1-addendum-1.4-lakehouse-monitoring.md` | (inline) | If Monitoring selected |
+| `plans/phase1-addendum-1.5-aibi-dashboards.md` | (inline) | If Dashboards selected |
+| `plans/phase1-addendum-1.7-alerting.md` | `phase1-alerting-template.md` | If Alerting selected |
+| `plans/phase1-addendum-1.1-ml-models.md` | (inline) | If ML selected |
+
+**If any required document is missing, create it from its template before generating manifests.** Manifests reference these files in `generated_from.plan_addendums` — they must exist on disk. **Workshop mode does not waive this gate**: artifact counts inside each document are capped, but the document set is unchanged.
 
 ### Phase 3: Manifest Generation (Plan-as-Contract)
 
@@ -402,6 +438,8 @@ For detailed architecture, design patterns, "Why Genie Spaces" comparison, and t
 | One Genie Space per domain when assets are thin | Consolidate thin domains (<10 assets) into fewer spaces |
 | TVF that duplicates a Metric View | TVFs only when multi-period/multi-table parameterized logic is needed |
 | Forcing a fixed domain count | Let business questions determine domains — 2-3 focused > 5-6 thin |
+| Counting a Genie Space as artifact coverage for a use-case question | Genie Space is an interface layer, not an implementing artifact. Every question must be answerable by at least one TVF, Metric View, or listed Gold table in the Genie Space's asset list. |
+| Inventing new YAML keys when the manifest template doesn't fit | Adapt within the template schema first. If the template is truly insufficient (e.g., unified cross-domain Genie Space), extend the template with a documented key (e.g., `unified_genie_space`) — never ship ad-hoc schema a downstream consumer doesn't know to look for. |
 
 ## Reference Files
 

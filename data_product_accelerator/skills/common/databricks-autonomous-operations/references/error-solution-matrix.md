@@ -23,6 +23,8 @@ Complete error tables for all Databricks resource categories. Load this referenc
 | `PARSE_SYNTAX_ERROR` with `%` in LIKE pattern | SQL escaping strips quotes from LIKE patterns | Use DataFrame insertion (`df.write.mode("append").saveAsTable(...)`) instead of SQL INSERT with string values. |
 | `AnalysisException: Column 'col' already exists` | Duplicate column in SELECT | Check for duplicate aliases. When joining tables, explicitly select columns instead of `SELECT *`. |
 | `StreamingQueryException` | Streaming checkpoint issue | Clear checkpoint directory and restart with `full_refresh: true`. |
+| `spark.conf.set()` crashes serverless job | `spark.conf.set()` is not supported on serverless compute | Remove `spark.conf.set()` calls. Use `spark_conf` in DAB cluster spec or table properties instead. |
+| Job fails after `DROP CASCADE` leaves schema empty | `DROP CASCADE` ran before error-prone code; error leaves schema with no tables | Place DROP late in the notebook (after validation) or use an idempotent `CREATE OR REPLACE` pattern. Never DROP CASCADE at the top of a notebook that might fail partway. |
 
 ---
 
@@ -41,6 +43,7 @@ Complete error tables for all Databricks resource categories. Load this referenc
 | `CONSTRAINT_VIOLATION` | NOT NULL or CHECK constraint violated | Fix source data or adjust constraints. |
 | `OutOfMemoryError` during DLT | Large table + small cluster | Enable Photon, increase cluster size in pipeline config, or add partitioning. |
 | Expectations table not populated | DLT expectations not stored | Ensure expectations are defined using `@dlt.expect_all()` or similar decorators. Check expectations are stored in Unity Catalog Delta table. |
+| DLT expectations not verifiable post-run | No documented way to verify expectation results | Use `event_log()` TVF in a SQL query against the pipeline's event log table (preferred), or use CLI: `databricks pipelines list-pipeline-events <PID>` with `jq` filter on `flow_progress` events containing `data_quality` field. See `references/dlt-pipeline-troubleshooting.md` for full examples. |
 
 ### DLT Pipeline Event Analysis Pattern
 
@@ -150,6 +153,8 @@ WHERE drift_type = 'CONSECUTIVE'   -- REQUIRED for period-over-period
 | Volume permissions error | Using `permissions` instead of `grants` | Volumes use `grants` with `privileges: [READ_VOLUME]`, NOT `permissions`. |
 | App env vars not set | Env vars in databricks.yml | Define env vars in `app.yaml` (source directory), NOT in the DAB resource file. |
 | Dashboard hardcoded catalog | Missing dataset_catalog/dataset_schema | Add `dataset_catalog: ${var.catalog}` and `dataset_schema: ${var.schema}` (CLI v0.281.0+). |
+| `--force` used for "pipeline name already used" | `--force` handles Terraform state drift, NOT API name uniqueness | List pipelines: `databricks pipelines list-pipelines`. Delete the conflicting one, then redeploy without `--force`. |
+| Lakebase `database already exists` after deletion | Lakebase soft-delete has 5-10 min retention window | Wait 5-10 minutes (not 60 seconds). Use `databricks lakebase databases list` to check availability. Cap retries at 3 with 3-min intervals. |
 
 ---
 

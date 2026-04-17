@@ -9,7 +9,7 @@ description: >
   "run job", "run pipeline", "make it work", "job failed", "troubleshoot", "fix and redeploy".
 metadata:
   author: prashanth subrahmanyam
-  version: "3.0"
+  version: "3.1"
   domain: operations
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -73,6 +73,11 @@ metadata:
 # Databricks Autonomous Operations
 
 ## 1. Overview
+
+> **Context Loading Rule:** Load this skill at **deployment time**, not during planning.
+> During earlier phases, retain only this 3-step summary in working memory:
+> `Deploy (bundle deploy) → Poll (get-run / pipelines get) → Verify (get-run-output)`.
+> Full skill activation should happen when the first `bundle deploy` or `bundle run` is invoked.
 
 This skill is both an **SDK/CLI/Connect reference** and an **autonomous operations playbook**. It teaches the AI agent to operate as an SRE — independently deploying, monitoring, diagnosing failures, applying fixes, redeploying, and verifying results across all Databricks resource types.
 
@@ -213,6 +218,21 @@ Before deploying, understand what's in the bundle:
 
 Determine the **target** (`dev`, `staging`, `prod`) from the user or default to `dev`.
 
+### Step 0.5: Resolve Workspace Identity
+
+Before ANY deployment, confirm you are targeting the correct workspace:
+
+1. **Check `databricks.yml`** for `workspace.host` and `profile` under the target
+2. **Check active profile:** `databricks auth env --profile <name>` — verify host matches intent
+3. **If multiple profiles exist** in `~/.databrickscfg`, do NOT auto-select — present options to user
+4. **If `databricks.yml` has no profile set**, ask the user which workspace to target
+5. **Scan repo context before creating a new `databricks.yml`:** `Glob` for `**/databricks.yml` across the repository. If an existing bundle config specifies `host` or `profile`, surface those as the **suggested default** in your question to the user. Example: "Your existing app config at `apps_lakebase/databricks.yml` uses profile `azure-demo` → host `https://adb-xxx.azuredatabricks.net/`. Should I use that same workspace for this bundle?"
+6. **When `bundle validate` reports "multiple profiles matched"** the host, include the repo-context hint in your question rather than listing all candidates blindly. Example: "Multiple profiles match this host. Your `apps_lakebase/databricks.yml` uses profile `azure-demo` — should I use that, or a different one?"
+
+**CLI profile inheritance warning:** Raw `databricks api` calls do NOT inherit the profile from `databricks.yml`. Always pass `-p <profile>` explicitly when using `databricks api`.
+
+**If deployed to wrong workspace** → see Step 7.5 for cleanup.
+
 ### Step 1: Validate & Deploy
 
 ```bash
@@ -222,6 +242,7 @@ databricks bundle deploy -t <target>     # Deploy all resources
 
 **If validate fails:** Read the error, fix the YAML (see Section 6 + `common/databricks-asset-bundles` skill), re-validate.
 **If deploy fails:** Common causes: auth expired (403), path resolution errors, invalid task types. See Section 6.
+**`--force` clarification:** `--force` handles **Terraform state drift** only (e.g., resource deleted outside bundle). It does NOT fix API name-uniqueness conflicts. For "pipeline name already used" or "resource already exists": list and delete the conflicting resource, then redeploy without `--force`.
 
 ### Step 2: Run
 
@@ -304,6 +325,7 @@ Match the error against **Section 6** (decision tree) and `references/error-solu
 2. **Apply fix** using editor tools (StrReplace, Write)
 3. If YAML/config issue → fix the DAB YAML (consult `common/databricks-asset-bundles` skill)
 4. If dependency issue → deploy upstream assets first (see Section 6 ordering)
+5. **Same-class fix rule:** Before redeploying, grep ALL files from the same generation batch for the same error pattern. If the bug was in one notebook, check sibling notebooks for identical issues. Fix all instances in one pass.
 
 ### Step 6: Redeploy & Re-run (Loop)
 
@@ -322,6 +344,18 @@ Present to the user:
 2. **All fixes attempted** — what was changed and why
 3. **Root cause hypothesis** — best guess based on evidence
 4. **Run page URLs** — direct links to the Databricks UI
+
+### Step 7.5: Cleanup After Wrong-Workspace Deploy
+
+If resources were deployed to the wrong workspace:
+
+1. **Inventory what was deployed:** Run `databricks bundle summary -t <target>` in the wrong workspace
+2. **Destroy cleanly:** `databricks bundle destroy -t <target>` (requires user confirmation)
+3. **Warn about persistent artifacts:** Tables, schemas, and data created by jobs are NOT removed by `bundle destroy` — these must be dropped manually
+4. **Reconcile state:** Delete `.databricks/` state directory if switching workspaces in the same repo
+5. **Redeploy to correct workspace:** Update profile/target, then restart from Step 0.5
+
+**Trigger this step proactively** whenever the user says "use profile X" / "switch to workspace Y" / "actually deploy to Z" AND you have already deployed in the current session. Before re-deploying to the new workspace, inventory what is running in the old workspace and offer `bundle destroy` on it. **Do not silently re-deploy** — orphaned jobs in the previous workspace are exactly the failure mode this step exists to prevent.
 
 ### Step 8: Capture Learnings
 

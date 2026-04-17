@@ -258,3 +258,47 @@ Pipeline Failed?
     ├── Review expectation definitions
     └── Consider expect (warn) vs expect_or_drop (enforce)
 ```
+
+---
+
+## Post-Run Expectation Verification
+
+After a DLT pipeline completes, verify expectation results using one of two methods:
+
+### Method 1: event_log() TVF (Preferred — SQL-based)
+
+```sql
+-- Query the pipeline's event log for expectation results
+SELECT
+  details:flow_progress.data_quality.expectations AS expectations,
+  details:flow_progress.metrics.num_output_rows AS rows_written,
+  origin.flow_name AS flow_name,
+  timestamp
+FROM event_log("<PIPELINE_ID>")
+WHERE details:flow_progress.data_quality IS NOT NULL
+ORDER BY timestamp DESC
+LIMIT 20;
+```
+
+This returns structured expectation results including `passed_records`, `failed_records`, and the expectation `name` and `dataset`.
+
+### Method 2: CLI Events (When SQL access is unavailable)
+
+```bash
+databricks pipelines list-pipeline-events <PIPELINE_ID> --output json \
+  | jq '[.events[] | select(.event_type == "flow_progress")
+    | select(.details.flow_progress.data_quality != null)
+    | {
+        flow: .origin.flow_name,
+        expectations: .details.flow_progress.data_quality,
+        rows_written: .details.flow_progress.metrics.num_output_rows
+      }] | .[0:10]'
+```
+
+### Interpreting Results
+
+- **`passed_records` + `failed_records`** = total records evaluated
+- **`expect`** (warn): rows pass through but violations are logged
+- **`expect_or_drop`** (enforce): failing rows are dropped from output
+- **`expect_or_fail`** (strict): pipeline fails on any violation
+- If `failed_records > 0` with `expect_or_drop`, investigate source data quality upstream

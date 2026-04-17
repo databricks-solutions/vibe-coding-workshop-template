@@ -17,8 +17,14 @@ resources:
       name: "[${bundle.target}] {Project} Bronze Layer - Setup"
       description: "Creates Bronze layer tables for testing/demo"
 
+      environments:
+        - environment_key: "default"
+          spec:
+            environment_version: "4"
+
       tasks:
         - task_key: setup_bronze_tables
+          environment_key: default
           notebook_task:
             notebook_path: ../src/{project}_bronze/setup_tables.py
             base_parameters:

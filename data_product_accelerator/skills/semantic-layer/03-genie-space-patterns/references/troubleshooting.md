@@ -376,7 +376,7 @@ Before debugging Genie behavior, check foundational requirements:
 - [ ] ONLY Gold layer assets used as trusted assets (no Silver/Bronze)
 - [ ] Table schemas were inspected before space creation
 
-### Step 1: Verify 7-Section Structure
+### Step 1: Verify 8-Section Structure
 
 Check that all sections are complete:
 - [ ] Section A: Space Name (exact format)
@@ -429,7 +429,7 @@ Test ambiguous questions:
 ### Pre-Deployment Verification
 
 1. **Structure Check**
-   - All 7 sections present
+   - All 8 sections present
    - Each section meets requirements
    - No missing content
 
@@ -498,6 +498,85 @@ Don't wrap TVFs in TABLE(), include all required parameters, avoid unnecessary G
 
 ---
 
+### Issue 11: Benchmark SQL Non-Determinism
+
+**Symptoms:**
+- Benchmark regression tests pass on some days but fail on others
+- Pass rate fluctuates without configuration changes
+- Row counts differ between test runs
+
+**Root Cause:**
+Benchmark SQL uses non-deterministic date functions (`CURRENT_DATE()`, `DATE_TRUNC('month', CURRENT_DATE)`, `CURRENT_TIMESTAMP()`). These produce different results each day, making automated validation unreliable.
+
+**Solution:**
+
+```sql
+-- ❌ FRAGILE: Different results every day
+WHERE transaction_date >= DATE_TRUNC('month', CURRENT_DATE)
+
+-- ✅ STABLE: Pinned date range for regression testing
+WHERE transaction_date BETWEEN DATE '2026-01-01' AND DATE '2026-03-31'
+```
+
+**Prevention:**
+- Use `CURRENT_DATE - 30` for initial interactive testing only
+- Pin to fixed date ranges (`DATE '...'`) for CI/CD regression suites
+- If benchmarks must reference "recent" data, use a configurable date parameter:
+  ```python
+  benchmark_date = os.getenv("BENCHMARK_ANCHOR_DATE", "2026-03-31")
+  ```
+
+**Verification:**
+- [ ] Run the same benchmark suite twice on different days — same results expected
+- [ ] No `CURRENT_DATE` or `CURRENT_TIMESTAMP` in benchmark SQL
+- [ ] Regression suite uses pinned date ranges or configurable anchor dates
+
+---
+
+### Issue 12: Metric View Dimension Loss After Edits
+
+**Symptoms:**
+- Genie returns `UNRESOLVED_COLUMN` for dimensions that previously worked
+- Metric View deployment succeeds but some dimensions are silently missing
+- Benchmark questions that reference specific dimensions start failing
+
+**Root Cause:**
+Dimensions can be silently dropped during metric view YAML edits — the deployment succeeds without error, but the metric view no longer exposes all expected dimensions. This affects Genie routing when the metric view is a trusted asset.
+
+**Solution:**
+
+1. **Diff YAML before deploying:**
+   ```bash
+   git diff src/semantic/metric_views/{view_name}.yaml
+   ```
+
+2. **Verify dimensions after deployment:**
+   ```sql
+   -- Confirm all expected dimensions are queryable
+   SELECT state_name, city_name, MEASURE(total_revenue)
+   FROM ${catalog}.${gold_schema}.${view_name}
+   LIMIT 5;
+   ```
+
+3. **Compare against expected dimensions list:**
+   ```sql
+   DESCRIBE EXTENDED ${catalog}.${gold_schema}.${view_name};
+   -- Verify Type = METRIC_VIEW and all dimensions appear
+   ```
+
+**Prevention:**
+- Maintain a dimension manifest per metric view (list of expected dimension names)
+- Add a post-deployment dimension count check to CI/CD
+- Always diff YAML files before `databricks bundle deploy`
+
+**Verification:**
+- [ ] YAML diff reviewed before deployment (no inadvertent dimension removals)
+- [ ] `DESCRIBE EXTENDED` confirms type = METRIC_VIEW
+- [ ] All expected dimensions queryable via `SELECT ... MEASURE(...) LIMIT 5`
+- [ ] Genie benchmark questions that reference these dimensions still pass
+
+---
+
 ## Getting Help
 
 ### Check Documentation
@@ -512,7 +591,7 @@ Don't wrap TVFs in TABLE(), include all required parameters, avoid unnecessary G
 
 ### Escalation
 If issues persist:
-1. Verify all 7 sections complete
+1. Verify all 8 sections complete
 2. Check General Instructions ≤20 lines
 3. Test all benchmark SQL
 4. Review routing rules for conflicts
@@ -520,7 +599,43 @@ If issues persist:
 
 ---
 
+## SQL Dialect Errors
+
+LLMs trained on multi-dialect SQL corpora frequently generate non-Databricks syntax in benchmark SQL, SQL expressions, and TVF bodies. These errors cause silent Genie failures (wrong results rather than parse errors).
+
+### Common Dialect Traps
+
+| Category | Wrong (Oracle/Postgres/T-SQL) | Correct (Databricks SQL) | Notes |
+|----------|-------------------------------|--------------------------|-------|
+| Date truncation | `TRUNC(date, 'quarter')` | `DATE_TRUNC('quarter', date)` | Argument order reversed vs Oracle |
+| Current date | `SYSDATE`, `GETDATE()`, `NOW()` | `CURRENT_DATE()` | Parentheses required |
+| Null coalescing | `NVL(x, y)`, `ISNULL(x, y)` | `COALESCE(x, y)` | COALESCE is ANSI-standard |
+| Date arithmetic | `DATEADD(day, -30, date)` | `DATE_ADD(date, -30)` | No interval unit in DATE_ADD |
+| Date difference | `DATEDIFF(day, d1, d2)` | `DATEDIFF(d2, d1)` | Two args only, no unit |
+| Date casting | `TO_DATE('2024-01-01')` | `CAST('2024-01-01' AS DATE)` | Oracle syntax |
+| String concat | `x \|\| y` (some contexts) | `CONCAT(x, y)` | Both work, CONCAT preferred for Genie |
+| Top N rows | `SELECT TOP 10 ...` | `SELECT ... LIMIT 10` | T-SQL syntax |
+| Outer apply | `OUTER APPLY` | `LATERAL JOIN` | T-SQL syntax |
+| Boolean | `WHERE x = 1` (for bool) | `WHERE x = TRUE` | Explicit boolean preferred |
+
+### Validation Approach
+
+After generating benchmark SQL or SQL expressions, scan for these patterns before writing to disk:
+
+1. Search for `TRUNC(` — should be `DATE_TRUNC(`
+2. Search for `NVL(` — should be `COALESCE(`
+3. Search for `SYSDATE` or `GETDATE` — should be `CURRENT_DATE()`
+4. Search for `DATEADD(` — should be `DATE_ADD(`
+5. Search for `DATEDIFF(` with 3 args — reduce to 2 args
+6. Search for `TO_DATE(` — should be `CAST(... AS DATE)`
+
+---
+
 ## Version History
+
+- **v1.2** (Apr 2026) - Production-hardened issues from cross-skill comparison
+  - Added Issue 11: Benchmark SQL Non-Determinism (temporal expression warnings)
+  - Added Issue 12: Metric View Dimension Loss After Edits (silent dimension drops)
 
 - **v1.1** (Feb 2026) - New issues from reference material integration
   - Added Issue 8: Poor SQL due to missing comments

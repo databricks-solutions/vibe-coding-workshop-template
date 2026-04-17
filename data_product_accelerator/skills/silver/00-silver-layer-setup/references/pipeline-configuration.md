@@ -147,9 +147,15 @@ resources:
     silver_dq_setup_job:
       name: "[${bundle.target}] {Project} Silver Layer - DQ Rules Setup"
       description: "One-time: Create and populate data quality rules Delta table"
-      
+
+      environments:
+        - environment_key: "default"
+          spec:
+            environment_version: "4"
+
       tasks:
         - task_key: setup_dq_rules_table
+          environment_key: default
           notebook_task:
             notebook_path: ../src/{project}_silver/setup_dq_rules_table.py
             base_parameters:

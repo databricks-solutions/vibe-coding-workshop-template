@@ -1,7 +1,7 @@
 {
   "description": "Natural language analytics for retail product sales and inventory. Ask questions in plain English to analyze sales, inventory, promotions, and customer loyalty across 100+ locations.\n\nDATA COVERAGE:\n\u2022 100+ stores (franchise & corporate) across multiple states\n\u2022 50+ product SKUs across multiple categories\n\u2022 Daily sales: revenue, units, transactions, discounts, returns\n\u2022 Real-time inventory: on-hand, forecasts, stockouts, replenishment needs\n\u2022 Customer loyalty program data and penetration metrics\n\u2022 Store, product, and date dimensions for multi-dimensional analysis\n\nAVAILABLE ANALYTICS:\n1. Sales Performance - Revenue trends, transaction volumes, promotional ROI, brand performance, store rankings\n2. Inventory Health - Stock levels, days of supply, stockout alerts, replenishment priorities, overstock\n3. Store Operations - Franchise vs corporate analysis, geographic performance, store type comparisons\n4. Product Analytics - Brand comparisons, premium vs standard, SKU performance, seasonal trends\n5. Customer Loyalty - Program penetration, member behavior, transaction value analysis\n6. Time Analysis - Daily/monthly/quarterly trends, year-over-year comparisons, rolling windows (7/30/90 days)\n\nUSE CASES:\nSales managers (regional tracking) \u2022 Category managers (product mix) \u2022 Supply chain (inventory optimization) \u2022 \nStore operators (replenishment) \u2022 Marketing (promotional ROI) \u2022 Regional directors (store comparisons) \u2022 \nFinance (revenue analysis)\n\nTIME PERIODS:\nHistorical data with daily granularity. Supports current month, last 7/30/90 days, quarterly, yearly, \nand year-over-year comparisons.",
   "serialized_space": {
-    "version": 1,
+    "version": 2,
     "config": {
       "sample_questions": [
         {
@@ -938,7 +938,126 @@
             "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
           ]
         }
-      ]
+      ],
+      "sql_snippets": {
+        "filters": [
+          {
+            "id": "01f0ad10a1cd17470000000000000001",
+            "sql": [
+              "${catalog}.${gold_schema}.dim_store.state_name = 'CA'"
+            ],
+            "display_name": "California Stores",
+            "instruction": [
+              "Use this filter when the user asks about California, CA, or the state of California."
+            ],
+            "synonyms": [
+              "california",
+              "CA",
+              "state of california"
+            ]
+          },
+          {
+            "id": "01f0ad10a1cd17470000000000000002",
+            "sql": [
+              "${catalog}.${gold_schema}.dim_product.product_tier = 'Premium'"
+            ],
+            "display_name": "Premium Products",
+            "instruction": [
+              "Use this filter when the user asks about premium, high-end, or top-tier products."
+            ],
+            "synonyms": [
+              "premium",
+              "high-end",
+              "top tier",
+              "premium products"
+            ]
+          }
+        ],
+        "expressions": [
+          {
+            "id": "01f0ad10ec6214390000000000000001",
+            "sql": [
+              "${catalog}.${gold_schema}.dim_date.month_name"
+            ],
+            "display_name": "Month Name",
+            "instruction": [
+              "Use as a grouping dimension when the user asks for data by month or monthly breakdown."
+            ],
+            "synonyms": [
+              "month",
+              "monthly",
+              "by month"
+            ]
+          },
+          {
+            "id": "01f0ad10ec6214390000000000000002",
+            "sql": [
+              "${catalog}.${gold_schema}.dim_store.region_name"
+            ],
+            "display_name": "Region",
+            "instruction": [
+              "Use as a grouping dimension when the user asks for data by region or regional performance."
+            ],
+            "synonyms": [
+              "region",
+              "regional",
+              "by region",
+              "area"
+            ]
+          }
+        ],
+        "measures": [
+          {
+            "id": "01f0ad10c9a616dc0000000000000001",
+            "sql": [
+              "SUM(${catalog}.${gold_schema}.fact_sales_daily.net_revenue)"
+            ],
+            "display_name": "Total Revenue",
+            "instruction": [
+              "Use for revenue, sales, total sales, or dollar amount questions."
+            ],
+            "synonyms": [
+              "revenue",
+              "sales",
+              "total sales",
+              "total revenue",
+              "dollars"
+            ]
+          },
+          {
+            "id": "01f0ad10c9a616dc0000000000000002",
+            "sql": [
+              "COUNT(DISTINCT ${catalog}.${gold_schema}.fact_sales_daily.transaction_id)"
+            ],
+            "display_name": "Transaction Count",
+            "instruction": [
+              "Use for transaction volume, number of transactions, or transaction count questions."
+            ],
+            "synonyms": [
+              "transactions",
+              "transaction count",
+              "number of transactions",
+              "volume"
+            ]
+          },
+          {
+            "id": "01f0ad10c9a616dc0000000000000003",
+            "sql": [
+              "SUM(${catalog}.${gold_schema}.fact_sales_daily.net_revenue) / NULLIF(COUNT(DISTINCT ${catalog}.${gold_schema}.fact_sales_daily.transaction_id), 0)"
+            ],
+            "display_name": "Average Transaction Value",
+            "instruction": [
+              "Use for average ticket, average transaction, or per-transaction revenue questions."
+            ],
+            "synonyms": [
+              "average ticket",
+              "avg transaction",
+              "per transaction",
+              "ATV"
+            ]
+          }
+        ]
+      }
     },
     "benchmarks": {
       "questions": [

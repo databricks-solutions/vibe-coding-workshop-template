@@ -89,7 +89,11 @@ Verify every question has at least one implementing artifact, and every artifact
 | UC-002 Q1: {Short form} | x | | x | | | | x |
 | ... | ... | ... | ... | ... | ... | ... | ... |
 
-**Validation:** No row should be empty (every question needs an artifact). No artifact column should be all-empty (every artifact type serves at least one question).
+**Validation rules:**
+
+1. No row should be empty — every question needs at least one implementing artifact.
+2. No artifact column should be all-empty — every artifact type listed serves at least one question (otherwise remove the column or the unused artifact).
+3. **No row should have Genie Space as its ONLY coverage.** The Genie Space is an interface layer, not an implementing artifact. Every question must be answerable by at least one TVF, Metric View, or raw Gold table that is included in the Genie Space's asset list. If a question can only be answered by ad-hoc SQL against a raw table, that raw table MUST be listed as a Genie Space asset — and mark the row with `x` in the matching artifact column, not just in the Genie Space column.
 
 ---
 

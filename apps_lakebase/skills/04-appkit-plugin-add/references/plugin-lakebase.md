@@ -32,6 +32,15 @@ await createApp({
 
 This is a **two-phase process** because the default database ID is auto-generated and must be retrieved after the project is created.
 
+#### Pre-Check: Does the Lakebase project already exist?
+
+```bash
+databricks postgres get-project projects/$APP_NAME --profile $PROFILE --output json 2>&1
+```
+
+- **If the command succeeds** (project exists): Skip the `postgres_projects` declaration below. The project was created by a prior deploy or manual creation. Proceed directly to Phase 2 (discover database ID, add `app.resources.postgres`). Note "Project already exists — skipping postgres_projects" in `.vibecoding-state.md`.
+- **If the command fails** with "not found": Proceed normally with Phase 1 below.
+
 #### Phase 1: Declare the project (first deploy creates it)
 
 Declare the `postgres_projects` resource only. The platform **automatically creates** a default `production` branch with a `primary` endpoint when the project is provisioned — do NOT declare `postgres_branches` or `postgres_endpoints` for these defaults, or Terraform will fail with `branch already exists`.

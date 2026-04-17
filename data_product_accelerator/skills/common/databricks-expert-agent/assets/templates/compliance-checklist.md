@@ -74,6 +74,22 @@ Use this checklist to validate that your Databricks solution follows production-
 - [ ] Code comments explain schema extraction sources
 - [ ] All artifacts are parameterized and documented
 
+## Phase 0 Checkpoint
+
+- [ ] Pre-generation gate produced before any artifact generation
+- [ ] All 5 Essential Rules quoted in the checkpoint block
+- [ ] Concrete source file paths listed (not "will find later")
+- [ ] Discovery commands run if source files were not immediately found (Glob, SHOW TABLES, DESCRIBE)
+- [ ] No artifact generation began before source files were identified
+
+## Anti-Pattern Verification
+
+- [ ] No Prompt Sufficiency Illusion — source files read even when prompt was detailed
+- [ ] No Hardcoded YAML-Extractable Values — all table/column names parsed from YAML or catalog
+- [ ] No Manifest-as-Truth — live catalog queried to verify objects exist before generating dependent artifacts
+- [ ] No Domain Knowledge Injection — all enum values, status codes, and business rules extracted via `SELECT DISTINCT` or source files (not from domain knowledge)
+- [ ] Runtime environment verified — DBR version, warehouse type, and feature availability checked before using advanced features
+
 ## Pre-Deployment Validation
 
 - [ ] Schema extraction scripts tested
@@ -94,5 +110,5 @@ Use this checklist to validate that your Databricks solution follows production-
 
 ---
 
-**Last Updated:** 2025-02-06  
-**Version:** 1.0
+**Last Updated:** 2026-04-16  
+**Version:** 1.1

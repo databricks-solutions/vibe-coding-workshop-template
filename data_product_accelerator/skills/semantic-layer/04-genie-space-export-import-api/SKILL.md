@@ -41,6 +41,24 @@ Use this skill when you need to:
 - **Validate Genie Space JSON structure** before deployment
 - **Understand the complete GenieSpaceExport schema** (config, data_sources, instructions, benchmarks)
 
+## Start From Templates (Mandatory)
+
+**NEVER write the deployment notebook or job YAML from scratch.** Writing these from scratch is the #1 source of deployment failures — copy the template, then customize:
+
+- `assets/templates/deploy_genie_spaces.py` → copy to `src/{project}_semantic/deploy_genie_spaces.py`
+- `assets/templates/genie-deployment-job-template.yml` → copy to `resources/semantic/genie_deploy_job.yml`
+
+The templates encode the correct notebook cell separators, `extract_space_config()` (wrapped vs raw format handling), `validate_genie_json_structure()`, array sorting, and `base_parameters` wiring. Hand-written versions routinely miss one of these and fail in deploy cycles 2–9 (see the retrospective in `references/` or the project's retrospectives directory).
+
+## End-to-End Deployment? Use the Orchestrator
+
+If you are deploying **TVFs + Metric Views + Genie Spaces together** (not just a standalone Genie Space), **STOP and read `semantic-layer/00-semantic-layer-setup/SKILL.md` first.** That orchestrator:
+- Mandates a Gold schema inventory query before artifact creation (prevents phantom table errors)
+- Coordinates skill loading across 6 phases with validation gates
+- Provides combined job templates with `depends_on` chains
+
+This skill handles **individual Genie Space API operations.** The orchestrator handles the **end-to-end semantic layer lifecycle.**
+
 ## Quick Reference
 
 ### API Operations
@@ -61,6 +79,16 @@ Use this skill when you need to:
 | `benchmarks.questions` | **Max 50** | Truncate in generation script |
 | `data_sources.tables` | No hard limit | Keep ~25-30 for performance |
 | `data_sources.metric_views` | No hard limit | Keep ~5-10 per space |
+
+### Required Root Field
+
+Every Genie Space JSON MUST include `"version": 2` at the root of `serialized_space`:
+
+```json
+{"version": 2, "config": {...}, "data_sources": {...}, "instructions": {...}, "benchmarks": {...}}
+```
+
+Omitting `"version": 2` causes silent failures or API rejection. The API does NOT default to version 2.
 
 ### Core Workflow
 
@@ -107,12 +135,26 @@ def generate_id() -> str:
     return uuid.uuid4().hex  # e.g., "a1b2c3d4e5f6789012345678abcdef01"
 ```
 
-**Required ID fields** (every one must be a fresh `uuid.uuid4().hex`):
-- `space.id`
-- `space.tables[].id`
-- `space.sql_functions[].id`
-- `space.example_question_sqls[].id`
-- `space.materialized_views[].id`
+**Required ID fields** (every one must be a fresh `uuid.uuid4().hex`).
+
+Use the canonical nested-schema field paths below. Any older guidance that listed flat `space.tables[].id` / `space.materialized_views[].id` / `space.sql_functions[].id` / `space.example_question_sqls[].id` as required was for a deprecated flat schema and is superseded by this list:
+
+- `config.sample_questions[].id`
+- `instructions.sql_functions[].id`
+- `instructions.text_instructions[].id`
+- `instructions.example_question_sqls[].id`
+- `instructions.sql_snippets.measures[].id`
+- `instructions.sql_snippets.filters[].id`
+- `instructions.sql_snippets.expressions[].id`
+- `benchmarks.questions[].id`
+
+**❌ Arrays that MUST NOT have an `id`** (adding one causes `Cannot find field: id in message ...` errors — see Common Errors):
+
+- `data_sources.tables[]` — use only `identifier` and optional `description`
+- `data_sources.metric_views[]` — use only `identifier` and optional `description`
+- `benchmarks.questions[].answer[]` — use only `format` and `content`
+
+This is the single source of truth for ID placement. The no-id list later in this section and in Section 7 intentionally restates it for retrieval during debugging — keep both lists consistent if editing.
 
 **❌ WRONG IDs (will cause import failures):**
 ```python
@@ -123,6 +165,13 @@ hashlib.md5(name.encode()).hexdigest()  # ❌ Deterministic, not UUID4
 ```
 
 **✅ CORRECT: Always use `uuid.uuid4().hex`** — nothing else.
+
+**Arrays that do NOT have `id` fields — NEVER add one:**
+- `data_sources.tables[]` — uses `identifier` only
+- `data_sources.metric_views[]` — uses `identifier` only
+- `benchmarks.questions[].answer[]` — uses `format` + `content` only
+
+A common agent error is applying `regenerate_ids()` universally across all arrays. The function must SKIP `data_sources.tables` and `data_sources.metric_views`.
 
 ### Section 5: Array Format Requirements
 
@@ -165,6 +214,22 @@ def substitute_variables(data: dict, variables: dict) -> dict:
 ```
 
 ### 5. Asset Inventory-Driven Generation
+
+**Step 0 — Verify assets exist before referencing them:**
+
+```sql
+-- Run this BEFORE creating or editing any Genie Space JSON
+SELECT table_name, table_type
+FROM {catalog}.information_schema.tables
+WHERE table_schema = '{gold_schema}'
+ORDER BY table_type, table_name;
+
+SELECT routine_name
+FROM {catalog}.information_schema.routines
+WHERE routine_schema = '{gold_schema}';
+```
+
+**Only include assets that appear in these results.** A Genie Space that references a non-existent table fails with `Table '...' does not exist` during space creation. This is the #1 cause of deployment failures. Do NOT trust a pre-generated manifest as ground truth — query the live catalog.
 
 **NEVER manually edit `data_sources`.** Generate from verified inventory:
 
@@ -236,6 +301,9 @@ genie_config['data_sources']['tables'] = [
 | `instructions.sql_functions` | `(id, identifier)` | Ascending |
 | `instructions.text_instructions` | `id` | Ascending |
 | `instructions.example_question_sqls` | `id` | Ascending |
+| `instructions.sql_snippets.measures` | `id` | Ascending |
+| `instructions.sql_snippets.filters` | `id` | Ascending |
+| `instructions.sql_snippets.expressions` | `id` | Ascending |
 | `config.sample_questions` | `id` | Ascending |
 | `benchmarks.questions` | `id` | Ascending |
 
@@ -262,6 +330,13 @@ def sort_genie_config(config: dict) -> dict:
                     config["instructions"][key],
                     key=lambda x: x.get("id", ""),
                 )
+        if "sql_snippets" in config["instructions"]:
+            for key in ["measures", "filters", "expressions"]:
+                if key in config["instructions"]["sql_snippets"]:
+                    config["instructions"]["sql_snippets"][key] = sorted(
+                        config["instructions"]["sql_snippets"][key],
+                        key=lambda x: x.get("id", ""),
+                    )
     if "config" in config and "sample_questions" in config["config"]:
         config["config"]["sample_questions"] = sorted(
             config["config"]["sample_questions"],
@@ -322,6 +397,9 @@ else:
 | `expected_sql` field not recognized | Used `expected_sql` instead of `answer` | Use `answer: [{format: "SQL", content: ["SELECT ..."]}]` |
 | `Invalid export proto: data_sources.tables must be sorted by identifier` | Arrays not sorted — sort key is `identifier` (not `table_name`) for tables/metric_views, `id` for all others | Call `sort_genie_config()` before every PATCH (see Section 8) |
 | Invalid ID format | ID is not 32-char hex, contains dashes, or is prefixed | Use `uuid.uuid4().hex` exclusively |
+| `Cannot find field: id in message ...MetricView` | Added `id` to `data_sources.metric_views[]` | Remove `id` — use only `identifier` and `description` (see Section 4) |
+| `Cannot find field: id in message ...BenchmarkAnswer` | Added `id` to `benchmarks.questions[].answer[]` | Remove `id` — use only `format` and `content` |
+| `Invalid export proto: ExportConverter supports versions 1 and 2, but got 0` | Missing top-level `version` field in `serialized_space` | Add `"version": 2` at the root before `json.dumps()` (see "Required Root Field" above) |
 
 See [Troubleshooting Guide](references/troubleshooting.md) for detailed fix scripts.
 
@@ -331,12 +409,33 @@ See [Troubleshooting Guide](references/troubleshooting.md) for detailed fix scri
 - **[Workflow Patterns](references/workflow-patterns.md)**: Detailed GenieSpaceExport schema (config, data_sources, instructions, benchmarks), ID generation, serialization patterns, variable substitution, asset inventory-driven generation, complete examples
 - **[Troubleshooting](references/troubleshooting.md)**: Common production errors with Python fix scripts, validation checklists, deployment checklist, error recovery patterns, field-level format requirements
 
-## Assets
+## Implementation: Start from Templates (MANDATORY)
 
-- **`assets/templates/genie-deployment-job-template.yml`** — Standalone Asset Bundle job using `notebook_task` for Genie Space deployment (for combined deployment, use the orchestrator's `semantic-layer-job-template.yml`)
-- **`assets/templates/deploy_genie_spaces.py`** — Databricks notebook template for Asset Bundle `notebook_task` deployment. Uses `dbutils.widgets.get()` for parameters. Copy to `src/{project}_semantic/deploy_genie_spaces.py` and customize.
+**NEVER write deployment notebooks or job YAMLs from scratch.** The templates below handle pre-flight JSON validation, correct ID field scoping, `extract_space_config()` for wrapped/raw formats, array sorting (via the canonical `sort_genie_config()`), and `version: 2` injection. Writing from scratch bypasses these safeguards.
 
-> **CLI vs Notebook:** `scripts/import_genie_space.py` is the CLI tool (uses `argparse`) for local/CI use. `assets/templates/deploy_genie_spaces.py` is the notebook template (uses `dbutils.widgets.get()`) for Asset Bundle `notebook_task` deployment.
+**Step 1 — Copy the notebook template into your project:**
+
+```bash
+cp data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/assets/templates/deploy_genie_spaces.py \
+   src/{project}_semantic/deploy_genie_spaces.py
+```
+
+**Step 2 — Copy the job YAML template:**
+
+```bash
+cp data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/assets/templates/genie-deployment-job-template.yml \
+   resources/semantic/genie_deploy_job.yml
+```
+
+**Step 3 — Customize:**
+- In the notebook: populate `GENIE_SPACE_METADATA` with your `{space_name: genie_space_id_<name>}` mapping
+- In the job YAML: update `notebook_path` and `base_parameters` to match your bundle layout
+
+**Available templates:**
+- **`assets/templates/deploy_genie_spaces.py`** — Databricks notebook for Asset Bundle `notebook_task` deployment (parameters via `dbutils.widgets.get()`)
+- **`assets/templates/genie-deployment-job-template.yml`** — Standalone Asset Bundle job YAML (for combined deployment, the orchestrator provides `semantic-layer-job-template.yml`)
+
+> **CLI vs Notebook:** `scripts/import_genie_space.py` is the CLI tool (`argparse`) for local/CI use. The notebook template (`dbutils.widgets.get()`) is for Asset Bundle `notebook_task` deployment.
 
 ## Scripts
 

@@ -355,8 +355,15 @@ resources:
   jobs:
     exploration_job:
       name: adhoc-exploration
+
+      environments:
+        - environment_key: "default"
+          spec:
+            environment_version: "4"
+
       tasks:
         - task_key: explore_tables
+          environment_key: default
           notebook_task:
             notebook_path: ../src/exploration/adhoc_exploration.py  # ✅ Include .py extension
             base_parameters:

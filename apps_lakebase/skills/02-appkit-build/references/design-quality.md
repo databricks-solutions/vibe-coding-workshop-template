@@ -35,6 +35,28 @@ Choose a clear conceptual direction and execute with precision. Bold maximalism 
 - Design for both light and dark themes; vary across projects
 - **AppKit theming:** The scaffold generates `client/src/index.css` with commented-out oklch CSS custom properties (e.g. `--primary`, `--background`, `--accent`). Uncomment and customize these variables — this is the primary theming mechanism for creating a distinctive palette
 
+### CSS Variables → Components (Enforcement)
+
+**Every brand color must flow through CSS custom properties.** Define colors in `client/src/index.css` as oklch variables, then reference them in components via Tailwind classes only.
+
+Anti-pattern (inline hex — bypasses dark mode, unmaintainable):
+```tsx
+<header style={{ backgroundColor: "#00467F" }}>
+```
+
+Correct (CSS variable via Tailwind):
+```tsx
+<header className="bg-primary text-primary-foreground">
+```
+
+If a color doesn't map to an existing semantic token (`primary`, `accent`, `muted`, etc.), define a new CSS variable:
+```css
+:root { --brand-cta: oklch(0.65 0.16 145); }
+```
+```tsx
+<button className="bg-[var(--brand-cta)]">
+```
+
 ### Motion & Interaction
 - Use animations for delight and micro-interactions
 - Focus on high-impact moments: a well-orchestrated page load with staggered reveals creates more delight than scattered micro-interactions
@@ -88,3 +110,14 @@ Match code complexity to the design vision:
 - **Maximalist designs** need elaborate code — extensive animations, layered effects, rich textures
 - **Minimalist designs** need restraint — precision in spacing, typography, and subtle details
 - **Elegance** comes from executing the vision well, not from complexity itself
+
+---
+
+## Accessibility Baseline
+
+Non-negotiable regardless of aesthetic direction:
+
+- **Interactive cards:** If a `<Card>` has `onClick`, wrap in `<Link>` (navigation) or add `role="link"`, `tabIndex={0}`, and `onKeyDown` (Enter/Space triggers click).
+- **Images:** All `<img>` tags have descriptive `alt` text. Decorative images use `alt=""`.
+- **Form fields:** Every `<Input>` has an associated `<label>` element or `aria-label`.
+- **Color contrast:** Text on brand-colored backgrounds must meet WCAG AA ratio (4.5:1 normal, 3:1 large text).

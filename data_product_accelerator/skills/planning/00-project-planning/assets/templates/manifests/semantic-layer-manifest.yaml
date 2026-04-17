@@ -146,6 +146,48 @@ domains:
             expected_asset: "get_{domain}_{metric}_summary"
 
 # -----------------------------------------------------------------------------
+# Unified Genie Space (cross-domain or workshop mode)
+# -----------------------------------------------------------------------------
+# Use this key when a single Genie Space spans multiple domains (common in
+# workshop mode or when total queryable assets ≤ 15). When present:
+#   - The downstream semantic-layer orchestrator checks for `unified_genie_space`
+#     FIRST, and if present, SKIPS per-domain `genie_spaces[]` entries.
+#   - Per-domain `genie_spaces:` should remain `[]` or be omitted to avoid
+#     ambiguous orchestration.
+#   - `domains_covered` lists which domains the unified space serves.
+#
+# Do NOT invent alternative keys (e.g., `unified_genie_spaces` plural,
+# `cross_domain_genie`, etc.) — downstream consumers only recognize
+# `unified_genie_space` (singular).
+# -----------------------------------------------------------------------------
+# unified_genie_space:           # Uncomment when using a single cross-domain space
+#   name: "{Project} Intelligence"
+#   description: "{Combined analytics across all domains}"
+#   warehouse: serverless
+#   domains_covered:
+#     - "{domain_1}"
+#     - "{domain_2}"
+#   assets:
+#     metric_views:
+#       - "{domain_1}_analytics_metrics"
+#       - "{domain_2}_analytics_metrics"
+#     tvfs:
+#       - "get_{domain_1}_{metric}_summary"
+#       - "get_top_{domain_2}_contributors"
+#     tables:
+#       - "fact_{entity_1}"
+#       - "dim_{entity_1}"
+#       - "fact_{entity_2}"
+#   total_asset_count: "{N}"            # Must be ≤ 25 (Genie Space hard limit)
+#   use_case_refs:
+#     - "UC-001"
+#     - "UC-002"
+#   benchmark_questions_count: "{N}"
+#   benchmark_questions:
+#     - question: "{Natural language question}"
+#       expected_asset: "{asset_name}"
+
+# -----------------------------------------------------------------------------
 # Summary counts (for validation)
 # Fill in after populating all domains
 # -----------------------------------------------------------------------------

@@ -53,6 +53,11 @@ def apply_fk_constraints(spark: SparkSession, catalog: str, schema: str, config:
         fk_name = f"fk_{table_name}_{idx+1}"
         fk_cols_str = ", ".join(fk_cols)
 
+        # IMPORTANT: In serverless, FK references MUST target PK columns.
+        # Consider querying information_schema.table_constraints to verify
+        # the referenced column has a PK before attempting the ALTER TABLE.
+        # See "Serverless FK Limitation" section below for details.
+
         try:
             spark.sql(f"""
                 ALTER TABLE {catalog}.{schema}.{table_name}
@@ -124,6 +129,24 @@ FK constraints may fail for several reasons:
 - Typo in YAML references field
 
 All failures are logged as warnings so the script continues processing other FKs.
+
+## Serverless FK Limitation: References Must Target PK Columns
+
+In serverless compute (`environment_version: "4"`), UNIQUE constraints cannot be created because `spark.databricks.sql.dsv2.unique.enabled` is not a settable configuration. This means:
+
+- FK constraints can **ONLY** reference columns that have a PRIMARY KEY constraint on the target table
+- If your YAML defines `references: dim_user(user_id)` but `user_id` is **NOT** the PK of `dim_user` (the PK is `user_key`), the FK will fail with: *"The foreign key parent columns do not match the referenced primary key child columns"*
+- **NEVER** attempt `spark.conf.set("spark.databricks.sql.dsv2.unique.enabled", "true")` in serverless — this will crash the job
+
+**Resolution options (pick one):**
+
+1. **Skip and document (recommended for workshops)** — Apply PKs only. FK relationships remain documented in YAML `foreign_keys` metadata for Genie Space and BI tool discovery. The `add_fk_constraints.py` script logs a warning and continues.
+2. **Change FK references to use surrogate PK columns** — e.g., change `references: dim_user(user_id)` to `references: dim_user(user_key)` and add `user_key` as an FK column on the fact table. Requires fact tables to carry surrogate keys.
+3. **Use classic compute with UNIQUE enabled** — Set `spark.databricks.sql.dsv2.unique.enabled = true` on a classic cluster. NOT compatible with the skill's serverless-first mandate.
+
+**Default behavior:** If FK application fails, log a warning and continue. **Never crash the setup job due to FK failures.**
+
+**Cross-reference:** See `unity-catalog-constraints/SKILL.md` section "Foreign Keys Must Reference Primary Keys" — this is the authoritative rule.
 
 ## Related Skills
 

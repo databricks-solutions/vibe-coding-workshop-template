@@ -218,6 +218,54 @@ SET TBLPROPERTIES (
 3. Write to Bronze tables
 4. Add governance metadata
 
+### Intra-Workspace Clone Pattern (RECOMMENDED for UC-to-UC)
+
+When the source is another Unity Catalog schema on the **same workspace** (and the source tables are Delta), prefer `DEEP CLONE` over read-write:
+
+```sql
+CREATE OR REPLACE TABLE {target_catalog}.{target_schema}.{table_name}
+DEEP CLONE {source_catalog}.{source_schema}.{table_name}
+```
+
+**Why DEEP CLONE over read-write (`spark.table().write.saveAsTable()`):**
+
+| Feature | `DEEP CLONE` | `spark.table().write.saveAsTable()` |
+|---------|--------------|--------------------------------------|
+| Column COMMENTs | Preserved | Lost |
+| PK / FK constraints | Preserved | Lost |
+| Row tracking metadata | Preserved | Lost |
+| Table properties | Copied (override with `ALTER TABLE`) | None |
+| Performance | Faster (file-level copy) | Slower (read + rewrite) |
+| Recommended use | UC-to-UC Delta cloning | Non-Delta sources or transform-on-copy |
+
+After `DEEP CLONE`, apply the enterprise TBLPROPERTIES and clustering:
+
+```sql
+ALTER TABLE {target_catalog}.{target_schema}.{table_name}
+SET TBLPROPERTIES (
+    'delta.enableChangeDataFeed' = 'true',
+    'delta.autoOptimize.optimizeWrite' = 'true',
+    'delta.autoOptimize.autoCompact' = 'true',
+    'layer' = 'bronze',
+    'source_system' = 'cloned_from_{source_catalog}.{source_schema}',
+    'domain' = '{domain}',
+    'entity_type' = '{dimension|fact}',
+    'contains_pii' = '{true|false}',
+    'data_classification' = '{confidential|internal|public}',
+    'business_owner' = '{team}',
+    'technical_owner' = 'Data Engineering',
+    'data_purpose' = 'testing_demo',
+    'is_production' = 'false'
+);
+
+ALTER TABLE {target_catalog}.{target_schema}.{table_name} CLUSTER BY AUTO;
+```
+
+**Use the read-write pattern (below) ONLY when:**
+- Source is NOT Delta (CSV, JDBC, Parquet)
+- You need to transform/filter/sanitize during copy
+- Source is on a **different** workspace or an external system
+
 ### CSV Pattern
 
 ```python
@@ -241,6 +289,10 @@ df.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.bronze_{entity}")
 ### Post-Copy: Always Add Metadata
 
 After any copy operation, apply the standard Bronze TBLPROPERTIES and enable Change Data Feed. Use the [`databricks-table-properties`](../../../common/databricks-table-properties/SKILL.md) skill for the full property template.
+
+> **Cross-reference:** The complete required TBLPROPERTIES list is in
+> `common/databricks-table-properties/SKILL.md`. Templates above are
+> abbreviated examples — always verify against the full property list.
 
 ---
 

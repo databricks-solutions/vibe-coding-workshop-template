@@ -255,6 +255,91 @@ WHERE property_type = 'Apartment';
 
 ---
 
+## 🔴 MANDATORY: Column Config Flags for Genie
+
+**Beyond UC metadata, Genie uses `column_configs` in the space JSON to enhance entity matching and formatting.** Every trusted asset should have column_configs with appropriate flags.
+
+### Flag Reference
+
+| Flag | Purpose | Apply To |
+|---|---|---|
+| `get_example_values` | Genie samples real values for LLM context | All filterable dimension columns |
+| `build_value_dictionary` | Low-cardinality lookup for exact matching | Text columns with < ~100 distinct values |
+| `enable_format_assistance` | Genie assists with value formatting | All dimensions (dates, text, IDs, flags) |
+| `enable_entity_matching` | Fuzzy entity name matching | Text/categorical columns users filter by |
+| `synonyms` | User-friendly alternative names | All columns users might reference by alternate names |
+| `description` | Column semantics for Genie | All columns (supplements UC COMMENT) |
+
+### Pattern by Column Type
+
+| Column Type | Example | format_assistance | entity_matching | example_values | value_dictionary |
+|---|---|---|---|---|---|
+| Date/timestamp | `full_date` | ✅ | ❌ | ✅ | ❌ |
+| Numeric ID | `location_number` | ✅ | ❌ | ✅ | ❌ |
+| Text name (person/place) | `zone_combination` | ✅ | ✅ | ✅ | ✅ |
+| Categorical flag | `is_same_store` | ✅ | ✅ | ✅ | ✅ |
+| Code (zone_code) | `zone_code` | ✅ | ❌ | ✅ | ❌ |
+| Numeric measure | `total_sales_usd` | ❌ | ❌ | ❌ | ❌ |
+| Percentage | `apsd_pct_chg` | ❌ | ❌ | ❌ | ❌ |
+
+### Example column_config Entry
+
+```json
+{
+  "column_name": "zone_combination",
+  "get_example_values": true,
+  "build_value_dictionary": true,
+  "enable_format_assistance": true,
+  "enable_entity_matching": true,
+  "synonyms": ["zone", "franchise zone", "zone combo"],
+  "description": ["Combined zone code and name for reporting"]
+}
+```
+
+### Enrichment Script Pattern
+
+For spaces with many columns (50+), maintain column_configs in a **Python enrichment script** rather than editing JSON manually. The script acts as the single source of truth and can regenerate the JSON reproducibly.
+
+```python
+# enrich_column_configs.py — canonical source of truth
+TABLE_COLUMNS = {
+    "dim_location": [
+        {"column_name": "zone_combination", "get_example_values": True,
+         "build_value_dictionary": True, "enable_format_assistance": True,
+         "enable_entity_matching": True,
+         "synonyms": ["zone", "franchise zone"],
+         "description": ["Combined zone code and name for reporting"]},
+    ],
+}
+```
+
+---
+
+## 🔴 MANDATORY: Synonym Placement
+
+**Synonyms belong in `column_configs[].synonyms` in the Genie Space JSON (or in metric view YAML `synonyms` fields). NEVER embed synonyms in UC TABLE or COLUMN COMMENT strings.**
+
+| Where | What Goes There | Example |
+|---|---|---|
+| **UC Table COMMENT** | Purpose + grain | `'Location dimension. Grain: one row per store.'` |
+| **UC Column COMMENT** | Business definition, valid values | `'Y/N flag for same-store qualification'` |
+| **Genie column_configs synonyms** | User-friendly alternative names | `["same store", "comp store", "SSS"]` |
+| **Metric View YAML synonyms** | Same as Genie synonyms | `synonyms: ["same store", "comp store"]` |
+
+**❌ DON'T** pollute UC metadata with synonyms:
+```sql
+-- BAD
+COMMENT ON COLUMN dim_location.zone_combination IS
+  'Zone code + name. Synonyms: zone, franchise zone, zone combo';
+```
+
+**✅ DO** put synonyms in column_configs:
+```json
+{"column_name": "zone_combination", "synonyms": ["zone", "franchise zone", "zone combo"]}
+```
+
+---
+
 ## 🔴 MANDATORY: Table/Column Comments for Genie
 
 **Genie reads Unity Catalog metadata to understand your data.** Every trusted asset MUST have:
@@ -336,6 +421,8 @@ For each Metric View:
 - [ ] 3-5 example use cases/questions
 - [ ] Source table has TABLE and COLUMN comments
 - [ ] All column names are descriptive (no abbreviations)
+- [ ] column_configs with `enable_format_assistance` / `enable_entity_matching` per column type
+- [ ] Synonyms in column_configs or metric view YAML — not in UC COMMENTs
 
 For each TVF:
 - [ ] Fully qualified name (catalog.schema.function_name)
@@ -355,6 +442,8 @@ For each Table:
 - [ ] TABLE COMMENT set with business-friendly description
 - [ ] ALL COLUMN COMMENTs set (zero NULL comments)
 - [ ] Column names are self-documenting (no abbreviations)
+- [ ] column_configs with `enable_format_assistance` / `enable_entity_matching` per column type
+- [ ] Synonyms in column_configs — not in UC COMMENTs
 
 ---
 
@@ -388,6 +477,44 @@ For each Table:
 
 ---
 
+## SQL Expressions for Assets
+
+SQL Expressions (`sql_snippets`) extend trusted assets by providing Genie with structured definitions of business concepts tied to specific table columns. They complement column-level metadata (comments, synonyms, format assistance) with reusable logic fragments.
+
+### Column References Must Match Trusted Assets
+
+Every `sql` field in a sql_snippet **must** reference a table that is already a trusted asset in the Genie Space. The table identifier in the SQL fragment should match the `data_sources.tables[].identifier` pattern.
+
+**✅ CORRECT:**
+```json
+{"sql": ["${catalog}.${gold_schema}.fact_sales.net_revenue"]}
+```
+Where `${catalog}.${gold_schema}.fact_sales` is a trusted asset in `data_sources.tables`.
+
+**❌ WRONG:**
+```json
+{"sql": ["staging.raw_sales.amount"]}
+```
+Referencing a table that isn't a trusted asset causes Genie to generate invalid SQL.
+
+### Which Assets Get SQL Expressions?
+
+| Asset Type | Measure Candidates | Filter Candidates | Dimension Candidates |
+|---|---|---|---|
+| **Metric Views** | Top KPIs (revenue, volume, avg ticket) | Same-store flags, country filters | Org hierarchy columns, time window |
+| **Fact Tables** | Aggregation columns (SUM, AVG, COUNT) | Status flags, date range conditions | Foreign key lookups, derived columns |
+| **Dimension Tables** | Rarely (count distinct only) | Attribute filters (state, type, category) | Grouping attributes (zone, region) |
+
+### Deriving SQL Expressions from Asset Metadata
+
+When documenting an asset's measures, filters, and dimensions in the text instructions, identify which ones should also be registered as structured `sql_snippets`:
+
+1. **From Metric View measures** → Register the top 10-20 as `sql_snippets.measures` with `SUM(table.column)` syntax
+2. **From column_configs with synonyms** → Register key categorical columns as `sql_snippets.expressions` (dimensions)
+3. **From General Instructions WHERE clauses** → Register recurring filter patterns as `sql_snippets.filters`
+
+---
+
 ## Validation Checklist
 
 Before adding assets to Genie Space:
@@ -404,3 +531,10 @@ Before adding assets to Genie Space:
 - [ ] Every table has TABLE COMMENT (verified via information_schema)
 - [ ] Every column has COLUMN COMMENT (zero NULLs)
 - [ ] All column names are descriptive (no abbreviations)
+- [ ] Column configs include `enable_format_assistance` / `enable_entity_matching` flags
+- [ ] Synonyms in column_configs or metric view YAML (not in UC COMMENTs)
+- [ ] SQL Expressions reference only trusted asset tables (matching `data_sources.tables[].identifier`)
+- [ ] Measures use aggregation functions (`SUM`, `AVG`, `COUNT`, etc.)
+- [ ] Filters evaluate to boolean conditions
+- [ ] Dimensions reference columns or derive per-row values (no aggregation)
+- [ ] Each SQL Expression has `display_name`, `instruction`, and 2-5 `synonyms`

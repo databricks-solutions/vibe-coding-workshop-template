@@ -145,11 +145,34 @@ This orchestrator spans 9 phases over 4-8 hours. To maintain coherence without c
 
 **What to offload:** Each design-worker skill has `Design Notes to Carry Forward` and `Next Step` sections. Read them to know what to pass to the next phase.
 
+**Skill reading strategy (just-in-time, per phase):** Read worker skills only when the phase that needs them is about to start. This keeps the salient rules at the top of the context window when they matter most.
+
+| Phase | Worker/reference skills to read at the start of this phase |
+|---|---|
+| 0 | `common/databricks-expert-agent`, `common/naming-tagging-standards`, `design-workers/00-schema-intake` |
+| 1 | `design-workers/01-business-onboarding` |
+| 2 | `design-workers/02-dimension-patterns`, `design-workers/03-fact-patterns`, `references/dimensional-modeling-guide.md` |
+| 3 | `design-workers/04-erd-patterns`, `references/erd-organization-strategy.md` |
+| 4 | `design-workers/05-yaml-schema-patterns`, `design-workers/06-table-documentation`, `references/yaml-schema-patterns.md`, `references/lineage-documentation-guide.md` |
+| 5-7 | `design-workers/06-table-documentation` (lineage CSV + business onboarding guide + source mapping) |
+| 8 | `design-workers/07-design-validation`, `references/validation-checklists.md` |
+
+**Anti-pattern — do NOT batch-read all design-worker skills upfront.** The retrospective found that pre-loading every worker at Phase 0 pushes the common-skill rules and the active phase's rules out of the attention window, producing format divergence across YAML files and non-standard transformation types. Read each skill the moment its phase begins.
+
 ---
 
 ## Step-by-Step Workflow
 
 ### Phase 0: Source Schema Intake (MANDATORY First Step)
+
+**PREREQUISITE — Read Common Skills Before Proceeding:**
+
+Before parsing the schema, read these two common skills. They set enterprise-wide constraints that every downstream phase depends on. Skipping them is the most common root cause of format divergence across YAML files.
+
+1. `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` — Retain: "Extract, Don't Generate" (all table/column names come from the YAML or source schema, never from memory), `CLUSTER BY AUTO`, CDF + Row Tracking, comments + tags on every object.
+2. `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` — Retain: snake_case everywhere, `dim_`/`fact_`/`bridge_` prefixes, dual-purpose description pattern `<Definition>. Business: <context>. Technical: <details>.` (the angle brackets are placeholders — do NOT write literal `<` or `[` characters into descriptions), mandatory tags (`layer`, `domain`, `PII`).
+
+These rules are the authoritative source whenever a domain-specific skill below paraphrases them.
 
 **This is the entry point for the entire data platform build.** The customer provides a source schema CSV (e.g., `context/Wanderbricks_Schema.csv`) containing table and column metadata. This phase parses it into a structured inventory that drives all subsequent design decisions.
 
@@ -249,6 +272,30 @@ The report summarizes: table inventory, entity classification, inferred relation
 - Enterprise bus matrix (fact tables × dimensions)
 - NULL handling strategy (Unknown member rows per dimension)
 
+### 🔴 MANDATORY: Write `gold_layer_design/DESIGN_DECISIONS.md` Before Phase 3
+
+At the end of Phase 2 — **before generating any ERD or YAML** — persist the design contract to disk using the template at `assets/templates/design-decisions-template.md`. This file is the shared contract that every Phase 3-7 step (and every parallel subagent) MUST reference verbatim. Without it, subagents paraphrase format rules differently and YAML files diverge.
+
+The file MUST contain these six sections:
+
+1. **Table inventory** — table name, entity type (dim/fact/bridge), domain, SCD type, grain, source Silver table(s).
+2. **FK format contract** — the exact YAML structure every `foreign_keys:` entry must use:
+   ```yaml
+   foreign_keys:
+     - columns: ["fk_column_name"]
+       references: target_table(target_column)
+       nullable: true   # or false
+   ```
+3. **Description format contract** — the exact string pattern (no literal brackets):
+   ```
+   One-sentence definition. Business: business context. Technical: implementation details.
+   ```
+4. **Transformation type enum** — the 15 allowed values (see Phase 4 Critical Rules); no other values permitted.
+5. **Top-level YAML key contract** — mandatory keys for every YAML file, plus dimension-only and fact-only keys. See the template for the authoritative list.
+6. **Boolean-to-text conversion list** — every source BOOLEAN column that will be rewritten as a STRING attribute in a business-sourced dimension (e.g., `is_verified` → `verification_status: "Verified"/"Unverified"`), plus the documented `dim_date` exception.
+
+**If using parallel subagents in Phase 4**, include the full text of `DESIGN_DECISIONS.md` in every subagent prompt (not by reference). This is the single most effective guard against format divergence across subagent boundaries.
+
 ---
 
 ### Phase 3: ERD Creation
@@ -293,7 +340,7 @@ The report summarizes: table inventory, entity classification, inferred relation
 6. Write dual-purpose descriptions following `06-table-documentation` patterns
 
 **Critical Rules (from design-workers/06-table-documentation + Non-Negotiable Defaults):**
-- Pattern: `[Definition]. Business: [context]. Technical: [details].`
+- Pattern: `<Definition>. Business: <context>. Technical: <details>.` — angle brackets are placeholders; do NOT write literal `[`, `]`, or `<`, `>` into descriptions.
 - Surrogate keys as PRIMARY KEYS (not business keys)
 - Include all TBLPROPERTIES (layer, domain, entity_type, grain, scd_type, etc.)
 - Every column MUST have a `lineage:` section
@@ -301,6 +348,25 @@ The report summarizes: table inventory, entity classification, inferred relation
 - 🔴 `delta.enableChangeDataFeed: "true"` in EVERY YAML `table_properties:`
 - 🔴 `delta.enableRowTracking: "true"` in EVERY YAML `table_properties:`
 - 🔴 All PRIMARY KEY columns MUST have `nullable: false`
+- 🔴 **Transformation type enum — every `lineage.transformation` value MUST be one of these 15 standard types** from `references/lineage-documentation-guide.md`:
+
+  ```
+  DIRECT_COPY | RENAME | CAST | AGGREGATE_SUM | AGGREGATE_SUM_CONDITIONAL
+  AGGREGATE_COUNT | AGGREGATE_AVG | DERIVED_CALCULATION | DERIVED_CONDITIONAL
+  HASH_MD5 | HASH_SHA256 | COALESCE | DATE_TRUNC | GENERATED | LOOKUP
+  ```
+
+  **Edge-case mapping (do NOT invent new types):**
+
+  | Source Pattern | Correct Type | NOT This |
+  |---|---|---|
+  | Boolean-to-text conversion | `DERIVED_CONDITIONAL` | ~~BOOLEAN_TO_LABEL~~ |
+  | SCD2 `effective_to` close | `GENERATED` | ~~SCD2_CLOSE~~ |
+  | SCD2 `is_current` flag | `GENERATED` | ~~SCD2_CURRENT_FLAG~~ |
+  | Join to another table | `LOOKUP` | ~~JOIN_LOOKUP~~ |
+  | Rename + type change | `RENAME` (document cast in `transformation_logic`) | ~~RENAME_CAST~~ |
+
+  When delegating to subagents, include this enum as a literal list in the prompt. Do not paraphrase.
 
 **YAML Template Reference:** See `references/yaml-schema-patterns.md`
 
@@ -373,8 +439,11 @@ The report summarizes: table inventory, entity classification, inferred relation
 **MANDATORY: Read this skill using the Read tool BEFORE running design validation:**
 
 1. `data_product_accelerator/skills/gold/design-workers/07-design-validation/SKILL.md` — YAML↔ERD↔Lineage cross-validation, PK/FK reference consistency, mandatory field validation
-
-**Also read:** `references/validation-checklists.md`
+2. **MANDATORY: Read** `references/validation-checklists.md` — semantic compliance checks that structural validation alone will NOT catch. The four highest-value checks the design validation subagent MUST run:
+   - **Transformation enum compliance** — every `lineage.transformation` value is one of the 15 standard types (no invented values like `BOOLEAN_TO_LABEL`, `SCD2_CLOSE`, `JOIN_LOOKUP`).
+   - **FK format consistency** — every `foreign_keys:` entry has `columns`, `references`, and `nullable` keys in that shape across every YAML file.
+   - **Description format compliance** — no literal `[`, `]`, `<`, or `>` characters appear inside `description:` strings (they are placeholder syntax only); descriptions match the `<Definition>. Business: … . Technical: … .` pattern.
+   - **Unknown-member presence** — every dimension that is referenced by a `nullable: true` FK in any fact table declares an `unknown_member:` block.
 
 **Validation Activities:**
 1. Consistency check: YAML ↔ ERD ↔ Lineage CSV (all columns match)

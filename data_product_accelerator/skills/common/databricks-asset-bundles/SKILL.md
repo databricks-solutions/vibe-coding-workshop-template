@@ -3,11 +3,11 @@ name: databricks-asset-bundles
 description: Standard patterns for Databricks Asset Bundles configuration files for serverless jobs, DLT pipelines, dashboards, alerts, apps, and workflows. Use when creating, configuring, or deploying DABs for infrastructure-as-code deployments. Covers mandatory serverless environment configuration, hierarchical job architecture (atomic/composite/orchestrator), DLT pipeline patterns, dashboard resources with dataset_catalog/dataset_schema, SQL Alerts v2 API schema, Apps lifecycle, Python notebook parameter passing (dbutils.widgets.get vs argparse), deployment error prevention, and pre-deployment validation.
 metadata:
   author: prashanth subrahmanyam
-  version: "2.0"
+  version: "3.0"
   domain: infrastructure
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-  last_verified: "2026-02-07"
+  last_verified: "2026-04-16"
   volatility: medium
   upstream_sources:
     - name: "ai-dev-kit"
@@ -122,6 +122,32 @@ tasks:
       parameters:  # ❌ CLI-style doesn't work!
         - "--catalog=value"
 ```
+
+### 🔴 MANDATORY: Notebook Source Format
+
+**Python files executed via `notebook_task` MUST use Databricks notebook source format:**
+
+```python
+# Databricks notebook source
+
+# COMMAND ----------
+
+catalog = dbutils.widgets.get("catalog")
+
+# COMMAND ----------
+
+spark.sql(f"USE CATALOG {catalog}")
+```
+
+**Rules:**
+- First line: `# Databricks notebook source`
+- Cell separator: `# COMMAND ----------` (exactly 10 dashes)
+- Markdown cells: prefix each line with `# MAGIC %md`
+- Missing separators → all code runs as a single cell (silent failure)
+- **NEVER mix Python code with `# MAGIC %md` in the same cell** — the entire cell renders as markdown and Python is silently ignored
+- Common failure: `NameError: name 'xxx' is not defined` — caused by placing `import` or assignments in a `# MAGIC %md` cell. Fix: insert `# COMMAND ----------` between the markdown cell and the code cell
+
+See [Notebook Source Format](references/notebook-source-format.md) for complete reference with examples.
 
 ## Core Patterns
 
@@ -306,11 +332,55 @@ Relative paths depend on YAML file location:
 
 **Rule:** Always verify path depth matches directory structure.
 
+## Shared Workspace Naming (Multi-User Environments)
+
+In shared workspaces (workshops, demos), pipeline and job names MUST include a user identifier to prevent name collisions:
+
+```yaml
+variables:
+  user_prefix:
+    description: "User identifier for shared workspaces"
+    default: ${workspace.current_user.short_name}
+
+resources:
+  pipelines:
+    silver_pipeline:
+      name: "[${bundle.target} ${var.user_prefix}] Silver Pipeline"
+  jobs:
+    gold_merge_job:
+      name: "[${bundle.target} ${var.user_prefix}] Gold Merge"
+```
+
+**Rule:** Always include `${var.user_prefix}` in resource names when deploying to shared workspaces. Without it, the second user to deploy will hit a name conflict that `--force` cannot resolve.
+
+## Profile & Workspace Resolution
+
+Before creating a new bundle or editing `databricks.yml`, check for existing configuration:
+
+1. **Check for existing `databricks.yml`:** If the repo already has one, inherit its `host`/`profile`/`workspace` settings
+2. **Check active profile:** Run `databricks auth profiles` — use the profile matching the target workspace
+3. **Never hardcode host URLs** — use named profiles or the `DATABRICKS_CONFIG_PROFILE` environment variable
+
+**Gotcha:** When a repo already has a `databricks.yml` pointing to workspace A, and you create a new bundle targeting workspace B, the deploy may silently go to workspace A if you don't override the profile.
+
+## ⚠️ Resource Lifecycle Warning
+
+**Removing a resource block from `databricks.yml` triggers Terraform DESTROY of the live resource.**
+
+This applies to ALL managed resources: jobs, pipelines, apps, `postgres_projects`, volumes.
+
+- **NEVER** remove `postgres_projects` or `apps` blocks between deployments
+- **NEVER** remove a resource block "because it already exists" — the bundle manages its lifecycle
+- If unsure, add resources incrementally; never subtract
+
+See [Error 15](references/common-errors.md) in Common Errors for recovery steps.
+
 ## Reference Files
 
 - **[Configuration Guide](references/configuration-guide.md)**: Complete YAML configuration patterns, environment setup, variables (with warehouse_id lookup), targets, DLT pipelines (with glob libraries), dashboards (dataset_catalog/dataset_schema), SQL Alerts v2, volumes (grants not permissions), Apps, schedules, notifications, permissions, library dependencies
 - **[Job Patterns](references/job-patterns.md)**: Hierarchical job architecture (atomic/composite/orchestrator), task types, parameter passing (dbutils.widgets.get vs argparse), orchestrator patterns, SQL tasks, multi-task dependencies
-- **[Common Errors](references/common-errors.md)**: Anti-patterns, deployment error prevention (14 common errors including dashboard hardcoded catalog, alert v2 schema mismatch, volume permissions, app env vars), troubleshooting guide, validation checklist, pre-deployment validation script
+- **[Common Errors](references/common-errors.md)**: Anti-patterns, deployment error prevention (17 common errors including Terraform destroy on resource removal, Lakebase soft-delete, --force limitations, dashboard hardcoded catalog, alert v2 schema mismatch, volume permissions, app env vars), troubleshooting guide, validation checklist, pre-deployment validation script
+- **[Notebook Source Format](references/notebook-source-format.md)**: Databricks notebook source format (`# Databricks notebook source`, `# COMMAND ----------` cell separators, `# MAGIC %md`). Read when creating or debugging notebooks executed via `notebook_task`
 
 ## Scripts
 
@@ -330,6 +400,8 @@ Before deploying any bundle:
 - [ ] Using `notebook_task` (NOT `python_task`)
 - [ ] Using `base_parameters` dictionary format (NOT CLI-style `parameters`)
 - [ ] Notebooks use `dbutils.widgets.get()` (NOT `argparse`)
+- [ ] Notebooks start with `# Databricks notebook source` and use `# COMMAND ----------` separators
+- [ ] `base_parameters` includes ALL `dbutils.widgets.get()` params used in the notebook
 - [ ] Variable references use `${var.<name>}` format
 - [ ] Hierarchical architecture: notebooks in atomic jobs only, composite/orchestrator use `run_job_task`
 - [ ] All jobs have `job_level` tag (atomic/composite/orchestrator)
@@ -348,6 +420,9 @@ Before deploying any bundle:
 - [ ] App env vars in `app.yaml` (not `databricks.yml`)
 
 ### Pre-Deploy
+- [ ] Check for existing pipeline/job names in workspace before first deploy
+- [ ] Re-read `databricks.yml` before editing (avoid stale reads in long sessions)
+- [ ] No resource blocks were removed (removal = Terraform destroy)
 - [ ] Run pre-deployment validation script
 - [ ] `databricks bundle validate` passes
 

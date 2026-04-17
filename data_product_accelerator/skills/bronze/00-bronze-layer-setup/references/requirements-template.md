@@ -84,6 +84,58 @@ Fill in this template before starting Bronze layer setup.
 
 ---
 
+## Approach C Inference Playbook
+
+When the user chose **Approach B (existing tables)** or **Approach C (external copy)**, they usually provide the source but NOT the per-table governance fields. Infer these from the source schema instead of asking; ask only for what cannot be inferred.
+
+### Inferring `contains_pii`
+
+Flag `contains_pii = true` if ANY column name matches these patterns (case-insensitive):
+
+| Pattern | Examples |
+|---------|----------|
+| Personal identifiers | `email`, `phone`, `mobile`, `ssn`, `national_id`, `passport`, `tax_id` |
+| Names | `first_name`, `last_name`, `full_name`, `middle_name` |
+| Address | `address`, `street`, `zip`, `postal_code`, `city` (when combined with name/email) |
+| Financial | `credit_card`, `card_number`, `account_number`, `iban`, `swift` |
+| Health | `medical_record`, `diagnosis`, `patient_id`, `dob`, `date_of_birth` |
+| Biometric | `fingerprint`, `face_id`, `biometric` |
+
+Otherwise, `contains_pii = false`.
+
+### Inferring `entity_type` (dimension vs fact)
+
+| Signal | Maps To |
+|--------|---------|
+| Table name ends in `_dim`, `_lookup`, `_ref`, or is a plural noun describing a master concept (`users`, `products`, `customers`, `hosts`, `amenities`, `countries`, `destinations`, `properties`, `employees`) | `dimension` |
+| Table name ends in `_fact`, contains `_events`, `_log`, `_history`, `_transactions`, or describes an action/event (`bookings`, `orders`, `payments`, `clickstream`, `page_views`, `reviews`, `customer_support_logs`, `booking_updates`) | `fact` |
+| Junction/mapping tables (two FKs, no business attributes) like `property_amenities` | `fact` (bridge) |
+
+When ambiguous, inspect the column list: presence of a monotonically-increasing PK + timestamps + FKs to multiple dimensions → `fact`. Presence of descriptive attributes + a single PK → `dimension`.
+
+### Inferring `data_classification`
+
+- `contains_pii = true` → `confidential`
+- Otherwise → `internal`
+- Only set `public` if the user explicitly says the data is safe for external sharing.
+
+### Inferring `domain`
+
+Infer from the source schema or catalog name. Common domains: `booking`, `customer`, `product`, `payment`, `support`, `marketing`, `operations`. If the source schema name itself encodes a domain (e.g., `wanderbricks` → `booking`, `retail_sales` → `retail`), use it.
+
+### What to Ask the User
+
+After inference, present a compact summary and ask only for:
+
+- **`business_owner`** — the team name. This cannot be inferred from schema.
+- Any field where inference confidence is low (rare; flag explicitly, e.g., "I couldn't determine whether `audit_logs` is a fact or dimension — please confirm").
+
+### Output
+
+Populate the Entity List table above using inferred values. The agent's final deliverable in Step 1 is a filled requirements template, NOT a prompt to the user for every field.
+
+---
+
 ## Input Summary
 
 - Entity list (5-10 tables with schema definitions)

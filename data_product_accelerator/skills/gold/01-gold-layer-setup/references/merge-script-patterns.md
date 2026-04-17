@@ -391,7 +391,7 @@ merge_fact_aggregated(
 )
 ```
 
-### Fact Table Checklist
+### Fact Table Checklist (Aggregated)
 
 - [ ] Grain inferred from PRIMARY KEY (composite = aggregated)
 - [ ] `.groupBy()` columns match composite PK columns
@@ -399,6 +399,121 @@ merge_fact_aggregated(
 - [ ] Grain validation: `distinct_count == total_count`
 - [ ] MERGE condition includes ALL grain columns
 - [ ] `whenMatchedUpdate` lists all measure columns explicitly
+
+## Transaction-Grain Fact Merge (No Aggregation)
+
+For facts where `grain_type: transaction` in YAML (or single-column PK that is a natural key), each source row maps to one Gold row. No `.groupBy().agg()` is needed — the pattern is dedup + map + MERGE.
+
+```python
+def merge_fact_transaction(
+    spark: SparkSession,
+    catalog: str,
+    silver_schema: str,
+    gold_schema: str,
+    meta: dict,           # ← FROM load_table_metadata(yaml_path)
+    column_mappings: dict = None,  # ← FROM load_column_mappings() or YAML lineage
+    derived_expressions: list = None,  # ← Hand-coded derived columns
+):
+    """
+    Merge a transaction-grain fact from Silver to Gold.
+    No aggregation — one source row becomes one Gold row.
+    Deduplication on the business key is still MANDATORY.
+
+    FROM YAML: table_name, pk_columns, business_key, columns, source_tables
+    HAND-CODED: derived_expressions (business logic), column_mappings overrides
+    """
+    table_name = meta["table_name"]              # ← FROM YAML
+    pk_columns = meta["pk_columns"]              # ← FROM YAML
+    business_key = meta["business_key"]           # ← FROM YAML
+    gold_columns = meta["columns"]                # ← FROM YAML
+    source_table = meta["source_tables"][0]       # ← FROM YAML lineage
+
+    print(f"\n--- Merging {table_name} (Transaction-Grain Fact) ---")
+
+    silver_table = f"{catalog}.{silver_schema}.{source_table}"  # ← FROM YAML
+    gold_table = f"{catalog}.{gold_schema}.{table_name}"        # ← FROM YAML
+
+    silver_raw = spark.table(silver_table)
+    original_count = silver_raw.count()
+
+    # Step 1: Deduplicate on business key (MANDATORY even for transaction facts)
+    silver_df = (
+        silver_raw
+        .orderBy(col("processed_timestamp").desc())
+        .dropDuplicates(business_key)  # ← FROM YAML
+    )
+    dedup_count = silver_df.count()
+    print(f"  Deduplicated: {original_count} → {dedup_count} records")
+
+    # Step 2: Map columns (Silver names → Gold names)
+    if column_mappings:
+        for gold_col, silver_col in column_mappings.items():
+            silver_df = silver_df.withColumn(gold_col, col(silver_col))
+
+    # Step 3: Add derived columns (business logic — hand-coded)
+    if derived_expressions:
+        for expr_fn in derived_expressions:
+            silver_df = expr_fn(silver_df)
+
+    # Step 4: Add audit timestamps
+    result_df = (
+        silver_df
+        .withColumn("record_created_timestamp", current_timestamp())
+        .withColumn("record_updated_timestamp", current_timestamp())
+    )
+
+    # Step 5: Select ONLY Gold columns — list FROM YAML
+    available_cols = set(result_df.columns)
+    select_cols = [c for c in gold_columns if c in available_cols]
+    result_df = result_df.select(select_cols)
+
+    # Step 6: Validate grain — one row per PK combination
+    distinct_grain = result_df.select(*pk_columns).distinct().count()
+    total_rows = result_df.count()
+    if distinct_grain != total_rows:
+        raise ValueError(
+            f"Grain validation failed for {table_name}!\n"
+            f"  PK columns (from YAML): {pk_columns}\n"
+            f"  Distinct combinations: {distinct_grain}\n"
+            f"  Total rows: {total_rows}"
+        )
+    print(f"  ✓ Grain validation passed: {total_rows} unique records")
+
+    # Step 7: Build MERGE condition FROM YAML pk_columns
+    merge_cond = build_merge_condition(pk_columns)
+
+    # Step 8: MERGE into Gold
+    delta_gold = DeltaTable.forName(spark, gold_table)
+    pk_set = set(pk_columns)
+    audit_cols = {"record_created_timestamp"}
+    update_cols = {
+        c: f"source.{c}" for c in select_cols
+        if c not in pk_set and c not in audit_cols
+    }
+
+    delta_gold.alias("target").merge(
+        result_df.alias("source"),
+        merge_cond
+    ).whenMatchedUpdate(
+        set=update_cols
+    ).whenNotMatchedInsertAll(
+    ).execute()
+
+    print(f"✓ Merged {total_rows} records into {table_name}")
+```
+
+**Key difference from aggregated facts:** No `.groupBy().agg()` step. The grain validation still applies — verify uniqueness on PK columns after dedup.
+
+**When to use:** YAML has `grain_type: transaction`, or the PK is a single natural key (e.g., `booking_id`) rather than a composite grain.
+
+### Transaction Fact Checklist
+
+- [ ] Business key extracted from YAML for deduplication
+- [ ] Deduplication applied BEFORE column mapping (mandatory)
+- [ ] No `.groupBy().agg()` — one source row = one Gold row
+- [ ] Column mappings from YAML lineage or `COLUMN_LINEAGE.csv`
+- [ ] Grain validation on PK columns after dedup
+- [ ] MERGE condition uses PK columns from YAML
 
 ## Main Entry Point
 

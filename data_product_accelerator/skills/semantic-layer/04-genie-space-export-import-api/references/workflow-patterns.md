@@ -523,7 +523,7 @@ Include questions that test:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "config": {
     "sample_questions": [
       {
@@ -640,7 +640,7 @@ def create_genie_space_payload(
 
 # Usage
 space_config = {
-    "version": 1,
+    "version": 2,
     "config": {...},
     "data_sources": {...},
     "instructions": {...},

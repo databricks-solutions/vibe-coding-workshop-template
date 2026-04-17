@@ -48,10 +48,12 @@ Deploy an AppKit project to Databricks Apps, verify it runs, and fix common erro
 Before deploying, ensure:
 
 - The app builds locally (`npm run build` succeeds)
-- `$APP_NAME` and `$PROFILE` are set by the calling prompt
+- `$APP_NAME` and `$PROFILE` are set by the calling prompt. **If a `.vibecoding-state.md` exists from a prior phase**, use the `APP_NAME`, `PROFILE`, and workspace URL values from it directly — do not re-derive them with `databricks current-user me` or `databricks auth profiles`.
 - The app directory contains `app.yaml` and `databricks.yml`
 - If deploying to a **different workspace** than where the app was scaffolded: update the `host` in `databricks.yml`, update `sql_warehouse_id` for the new workspace, and remove stale bundle state with `rm -rf $APP_NAME/.databricks`
 - If no CLI profile exists for the target workspace, create one with `databricks auth login --host <workspace-url>` (NOT `databricks configure`, which requires interactive token input and fails in automated/agent contexts)
+- All commands in this skill assume the working directory is `apps_lakebase/`. Paths like `$APP_NAME/app.yaml` are relative to `apps_lakebase/`, not the repo root.
+- **Do NOT run `rm -f package-lock.json && npm install` locally before deploying.** The platform's `npm install` depends on lockfile stability; regenerating the lockfile locally causes `ENOTEMPTY` / `Exit handler never called` failures during platform install. See [references/lockfile-and-recreation.md](references/lockfile-and-recreation.md) for the full rule, scenario table, and recovery ladder — plus the Lakebase ownership consequences of app recreation.
 
 ---
 
@@ -87,6 +89,7 @@ The [databricks-agent-skills](https://github.com/databricks/databricks-agent-ski
 | AppKit project structure and checklists | [appkit/overview.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/appkit/overview.md) |
 | Lakebase pool, CRUD, schema ownership | [appkit/lakebase.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/appkit/lakebase.md) |
 | Smoke tests and Playwright guidance | [testing.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/testing.md) |
+| Lakebase two-phase deploy (Phase 1/2 binding) | [plugin-lakebase.md](../04-appkit-plugin-add/references/plugin-lakebase.md) — **read before any Lakebase deploy** |
 | AppKit docs (in-terminal) | `npx @databricks/appkit docs "app-management"` |
 
 ### Platform Constraints (from platform-guide.md)
@@ -123,6 +126,34 @@ When `databricks apps deploy` pushes code to the platform, the following sequenc
 - **DO** note that `databricks bundle deploy` (and `databricks apps deploy` which calls it internally) uses `.gitignore` patterns for file exclusion — NOT `.databricksignore`.
 
 **Authoritative source:** [Databricks Apps deploy — deployment logic](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy) and [post-deployment behavior](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/app-runtime).
+
+### Package Lock Management
+
+The platform's `npm install` depends on `package-lock.json` stability. Scenario table:
+
+| Lockfile state | Platform behavior | Action |
+|----------------|-------------------|--------|
+| Present, matches platform cache | Fast install | Deploy |
+| Regenerated locally with foreign registry URLs | Mixed URLs → `ENOTEMPTY` / `Exit handler never called` after ~3 min | Revert or delete lockfile, redeploy |
+| Absent | Fresh resolve, slower but succeeds | Acceptable for first deploy |
+| Refreshed via `npm install --package-lock-only` | Keeps lockfile coherent, no tarball install | Preferred when bumping dep versions |
+
+> **NEVER run `rm -f package-lock.json && npm install` locally before deploying.** The regenerated lockfile picks up your local npm proxy URLs, breaking platform install. If you must refresh, use `--package-lock-only`, or delete the lockfile and let the platform resolve.
+
+Full recovery ladder + prevention rules: [references/lockfile-and-recreation.md](references/lockfile-and-recreation.md).
+
+### App Deletion Is Destructive (Lakebase Ownership)
+
+Deleting and recreating a Databricks App assigns a **new Service Principal UUID**. Lakebase schemas owned by the old SP become inaccessible (`permission denied for schema`, `must be owner of table`) even though `psql` as admin still sees them.
+
+Fix, as workspace admin via `databricks psql`:
+
+```sql
+DROP SCHEMA IF EXISTS <schema_name> CASCADE;
+-- Then redeploy — the new SP's DDL will recreate and own the schema.
+```
+
+Prevention: avoid app deletion. If deploys are broken, use the lockfile recovery ladder first. App deletion is a last resort.
 
 ---
 
@@ -166,12 +197,13 @@ env:
 
 The calling prompt may require additional plugin-specific env vars (e.g., `LAKEBASE_ENDPOINT` for Lakebase). Validate those before proceeding.
 
-Also verify `app.yaml` and `databricks.yml` both reference the correct `$APP_NAME`:
+Verify `databricks.yml` references the correct `$APP_NAME`:
 
 ```bash
-grep "name:" $APP_NAME/app.yaml
-grep "name:" $APP_NAME/databricks.yml | head -1
+grep "name:" $APP_NAME/databricks.yml | head -2
 ```
+
+Note: The AppKit scaffold does not include a `name:` field in `app.yaml` — the app name is defined only in `databricks.yml` under `bundle.name` and `resources.apps`.
 
 Run the AppKit validator to check `app.yaml` schema, resource bindings, and manifest validity:
 
@@ -194,17 +226,25 @@ done
 
 This catches the common failure where Lakebase `postgres` resources were attached via REST API or `databricks apps update` but not declared in `databricks.yml` — `bundle deploy` resets the resource list on every deploy, stripping anything not in the bundle config.
 
-**Check for pre-existing Lakebase projects that conflict with bundle declarations.** If `databricks.yml` declares `postgres_projects` but the project already exists on the platform, `bundle deploy` will fail with a Terraform "already exists" error.
+**Check for Lakebase project conflicts with bundle declarations.** If `databricks.yml` declares `postgres_projects` and the project already exists, the correct action depends on who created it:
+
+- **Bundle created it** (Phase 1 deploy already ran, `.databricks/` state exists): **Keep `postgres_projects`.** Terraform state tracks it. Phase 2 redeploy is idempotent. See `04-appkit-plugin-add/references/plugin-lakebase.md` for Phase 2 binding instructions.
+- **Created outside the bundle** (CLI, UI, or different bundle; no `.databricks/` state): **Remove `postgres_projects`** and skip to Phase 2 binding. Terraform has no state for it.
+
+> **CRITICAL: Never remove `postgres_projects` from `databricks.yml` after a bundle deploy has created the project.** Removing a Terraform-tracked resource declaration tells `bundle deploy` to destroy the resource. This causes a cascading failure: project destroyed → re-adding hits soft-delete retention ("already exists" for ~5-10 min) → manual recreation required outside the bundle.
 
 ```bash
 PROJECT_ID=$(grep -A2 'postgres_projects:' $APP_NAME/databricks.yml | grep 'project_id:' | awk '{print $2}' | tr -d "'" | tr -d '"')
 if [ -n "$PROJECT_ID" ]; then
   EXISTS=$(databricks postgres list-projects --profile $PROFILE --output json 2>/dev/null \
     | jq -e --arg pid "$PROJECT_ID" '[.[] | select(.name | contains($pid))] | length > 0' 2>/dev/null)
-  if [ "$EXISTS" = "true" ]; then
-    echo "WARNING: Lakebase project '$PROJECT_ID' already exists on the platform."
-    echo "  Remove postgres_projects (and postgres_branches/postgres_endpoints) from databricks.yml"
-    echo "  to avoid 'already exists' Terraform errors. Keep only app.resources.postgres binding."
+  BUNDLE_STATE=$(test -d "$APP_NAME/.databricks" && echo "true" || echo "false")
+  if [ "$EXISTS" = "true" ] && [ "$BUNDLE_STATE" = "true" ]; then
+    echo "OK: Lakebase project '$PROJECT_ID' exists and is tracked by this bundle. Keep postgres_projects."
+  elif [ "$EXISTS" = "true" ] && [ "$BUNDLE_STATE" = "false" ]; then
+    echo "WARNING: Lakebase project '$PROJECT_ID' exists but is NOT tracked by this bundle."
+    echo "  Remove postgres_projects from databricks.yml to avoid 'already exists' Terraform errors."
+    echo "  Keep only app.resources.postgres binding."
   fi
 fi
 ```
@@ -230,9 +270,30 @@ ls build/index.mjs 2>/dev/null || ls dist/server.js 2>/dev/null || echo "WARNING
 
 If there are TypeScript or build errors, fix them before proceeding.
 
+### Fixing TS6133 (Unused Import/Variable) Errors
+
+These are the most common build errors at deploy time. Before removing any symbol:
+
+1. **Grep the full file** for each symbol name — do not rely on reading only the import section.
+2. **If the import has other used names**, remove only the unused name from the import list.
+3. **If ALL names from a module are unused**, delete the entire import line. Never produce `import {} from "..."` — this is a side-effect import that loads the module for nothing.
+4. **If the error is on a variable declaration** (e.g., `const navigate = useNavigate()`), remove both the declaration and its import.
+
+After fixes, run the linter on edited files before rebuilding.
+
 ---
 
 ## Step 3: Deploy
+
+Before running the deploy, verify the lockfile has not been regenerated locally — a regenerated lockfile will often fail on the platform with `ENOTEMPTY` after ~3 minutes:
+
+```bash
+cd $APP_NAME
+test -f package-lock.json && git diff --quiet -- package-lock.json \
+  || echo "WARN: package-lock.json modified locally; review references/lockfile-and-recreation.md before deploy"
+```
+
+If the warning fires, read [references/lockfile-and-recreation.md](references/lockfile-and-recreation.md) and apply the recovery ladder (revert → delete → `--package-lock-only` refresh) before proceeding.
 
 Deploy using the AppKit CLI pipeline — a single command that builds the frontend, syncs code to the workspace via bundle deploy, and starts the app:
 
@@ -269,14 +330,22 @@ If `compute` is not `ACTIVE`, wait 30 seconds and re-check. Use `databricks apps
 
 ## Step 4: Verify UI Loads
 
-Run `bash scripts/verify-deploy.sh $APP_NAME $PROFILE` to automate status polling, URL retrieval, and health check. Or verify manually:
+Run the verification script — it handles polling, retries, and health checks in one call:
+
+```bash
+bash scripts/verify-deploy.sh $APP_NAME $PROFILE
+```
+
+Exit code 0 = healthy. Exit code 1 = still starting (wait 30s, re-run). Exit code 2 = error (proceed to Step 5).
+
+**Manual fallback** (only if `scripts/verify-deploy.sh` does not exist):
 
 ```bash
 APP_URL=$(databricks apps get $APP_NAME --output json --profile $PROFILE | jq -r '.url')
 echo "App URL: $APP_URL"
 ```
 
-Open `$APP_URL` in a browser. You should see the React application with your pages and components — not an error page or JSON.
+Open `$APP_URL` in a browser. You should see the React application — not an error page or JSON.
 
 If the page shows an error or doesn't load, proceed to Step 5.
 
@@ -336,6 +405,11 @@ Repeat up to 3 times. If errors persist after 3 attempts, report them for manual
 | `File is larger than 10485760 bytes` | Bundled file exceeds 10 MB limit | Use `requirements.txt`/`package.json` for deps; do not bundle large artifacts |
 | 504 Gateway Timeout | Request exceeded 120s proxy timeout | Use WebSockets for long operations; SSE may be buffered |
 | OBO scopes missing after deploy | `apps update` / `bundle run` does full replacement, can wipe scopes | Re-apply OBO scopes after each deploy that modifies resources |
+| `project with such id already exists in the workspace` | Lakebase project was recently deleted; platform has ~5-10 min soft-delete retention | Wait 5-10 min for retention to expire, then retry. Or create the project manually via `databricks postgres create-project` with a different project ID. If using bundle, clear `.databricks/` state before retry. |
+| `Failed to create role for SP... NOT_FOUND: project id not found` | `postgres_projects` was removed from `databricks.yml`, causing Terraform to destroy the project | Re-add `postgres_projects` to `databricks.yml`. If the project ID is stuck in soft-delete, wait 5-10 min or create manually via CLI. See the Lakebase project conflict check in Step 1. |
+| `ENOTEMPTY: directory not empty, rmdir '.../node_modules/<pkg>'` or `Exit handler never called` during platform `Installing packages...` | `package-lock.json` regenerated locally (e.g., after switching npm registries or running `rm -f package-lock.json && npm install`), producing mixed registry URLs the platform cache cannot satisfy | Revert the lockfile (`git checkout -- package-lock.json`); if that isn't possible, delete the lockfile and redeploy for a fresh platform resolve. Full recovery ladder + prevention rule in [references/lockfile-and-recreation.md](references/lockfile-and-recreation.md). |
+| `permission denied for schema <name>` (or `relation does not exist`) after deleting and recreating the app | Recreated app got a new SP UUID; Lakebase schemas are still owned by the old SP | DROP + recreate affected schemas as a workspace admin so the new SP owns them. Detailed steps in [references/lockfile-and-recreation.md](references/lockfile-and-recreation.md) (Rule 2). |
+| `unknown field: endpoint_name` / `missing required field: name` from `databricks bundle validate` | `serving_endpoint` app resource in `databricks.yml` uses `endpoint_name` — the schema field is `name` | Rename to `name:` in the `serving_endpoint` block. See [04-appkit-plugin-add/references/plugin-serving.md](../04-appkit-plugin-add/references/plugin-serving.md) ("Add Serving Endpoint as App Resource") for the correct snippet. |
 
 The calling prompt may define additional plugin-specific errors (e.g., Lakebase connection or permission errors). Check those if the errors above don't match.
 
