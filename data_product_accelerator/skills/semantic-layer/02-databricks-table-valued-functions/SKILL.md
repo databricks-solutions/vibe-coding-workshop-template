@@ -67,7 +67,7 @@ Use this skill when:
 
 **What You'll Create:**
 1. `table_valued_functions.sql` — SQL file with 10-15 TVF definitions using `${catalog}` and `${gold_schema}` template variables
-2. `create_tvfs.py` — Python notebook that reads the SQL file, substitutes `${catalog}` / `${gold_schema}` variables, splits into individual statements, and executes each via `spark.sql()`
+2. `create_tvfs.py` — Python notebook that reads the SQL file, substitutes `${catalog}` / `${gold_schema}` variables, splits into individual statements, and executes each via `spark.sql()`. **Use the canonical template at `assets/templates/create_tvfs.py`** — it imports the shared `src/common/_notebook_paths.py` helper (see `common/databricks-python-imports/SKILL.md`) and fails loud with `RuntimeError` on any DDL error. Never call `sys.exit(0)` to report failure (exit 0 = "success" to Databricks Jobs).
 3. `tvf_job.yml` — Asset Bundle job using `notebook_task` (NOT `sql_task` — see warning below)
 
 **⚠️ Why `notebook_task` instead of `sql_task`?** TVF DDL uses `${catalog}.${gold_schema}` in identifiers (schema-qualified function names). `sql_task.parameters` are SQL bind parameters (`:param`) that cannot substitute identifiers — only values in `WHERE` clauses. A Python notebook performs string substitution before executing the SQL.

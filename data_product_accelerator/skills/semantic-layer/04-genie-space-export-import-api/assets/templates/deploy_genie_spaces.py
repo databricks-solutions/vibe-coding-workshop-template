@@ -208,6 +208,98 @@ def validate_genie_json_structure(space: dict) -> list[str]:
     return errors
 
 
+def _assert_sql_arrays(space: dict) -> None:
+    """
+    Enforce serialized_space invariants BEFORE POST/PATCH.
+
+    This is the authoritative fail-loud validator — it checks the #1 silent
+    failure (sql field submitted as a bare string instead of List[str]) plus
+    deploy-time invariants (version=2, concrete warehouse id, sorted data
+    sources, uuid4.hex ids, 50-entry limits). See the invariants table in
+    `data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/SKILL.md`.
+
+    Raises RuntimeError on the first violation. Never logs-and-continues.
+    """
+    errors: list = []
+
+    if space.get("version") != 2:
+        errors.append(f"version must be exactly 2 (got {space.get('version')!r})")
+
+    cfg = space.get("config") or {}
+    if not isinstance(cfg.get("title"), str) or not cfg.get("title"):
+        errors.append("config.title must be a non-empty string")
+    if not isinstance(cfg.get("description"), str) or not cfg.get("description"):
+        errors.append("config.description must be a non-empty string")
+    wh = cfg.get("semantic_warehouse_id")
+    if not isinstance(wh, str) or not re.match(r"^[0-9a-f]{16,}$", wh or ""):
+        errors.append(
+            "config.semantic_warehouse_id must be a concrete deploy-time warehouse id; "
+            f"got {wh!r}. Template placeholders are never acceptable."
+        )
+
+    ds = space.get("data_sources") or {}
+    for key, name_field in [("tables", "table_full_name"), ("metric_views", "metric_view_full_name")]:
+        items = ds.get(key) or []
+        if not isinstance(items, list):
+            errors.append(f"data_sources.{key} must be a list")
+            continue
+        names = [it.get(name_field, "") for it in items]
+        if names != sorted(names):
+            errors.append(f"data_sources.{key} must be sorted by {name_field}")
+        for it in items:
+            _id = it.get("id", "")
+            if not (isinstance(_id, str) and _UUID4_HEX_PATTERN.match(_id)):
+                errors.append(f"data_sources.{key} entry id must be uuid4.hex: {it}")
+
+    def _check_sql_list(path: str, entries):
+        if entries is None:
+            return
+        if not isinstance(entries, list):
+            errors.append(f"{path} must be a list (got {type(entries).__name__})")
+            return
+        for idx, it in enumerate(entries):
+            if not isinstance(it, dict):
+                errors.append(f"{path}[{idx}] must be an object")
+                continue
+            _id = it.get("id", "")
+            if not (isinstance(_id, str) and _UUID4_HEX_PATTERN.match(_id)):
+                errors.append(f"{path}[{idx}].id must be uuid4.hex (32 hex chars)")
+            sql_field = it.get("sql")
+            if sql_field is None:
+                continue
+            if not isinstance(sql_field, list):
+                errors.append(
+                    f"{path}[{idx}].sql must be List[str] — got {type(sql_field).__name__}. "
+                    "This is the #1 silent-failure: the API accepts a bare string but the "
+                    'resulting space has broken example queries. Wrap SQL in ["..."].'
+                )
+                continue
+            for sidx, s in enumerate(sql_field):
+                if not isinstance(s, str) or not s.strip():
+                    errors.append(f"{path}[{idx}].sql[{sidx}] must be a non-empty string")
+
+    instr = space.get("instructions") or {}
+    _check_sql_list("instructions.sql_functions", instr.get("sql_functions"))
+    _check_sql_list("instructions.sample_queries", instr.get("sample_queries"))
+    _check_sql_list("benchmarks.questions", (space.get("benchmarks") or {}).get("questions"))
+
+    if len(instr.get("sql_functions") or []) > 50:
+        errors.append("instructions.sql_functions exceeds 50-entry limit")
+    if len((space.get("benchmarks") or {}).get("questions") or []) > 50:
+        errors.append("benchmarks.questions exceeds 50-entry limit")
+
+    gi = instr.get("general_instructions")
+    if gi is not None:
+        if not isinstance(gi, list) or not all(isinstance(x, str) for x in gi):
+            errors.append("instructions.general_instructions must be List[str]")
+
+    if errors:
+        joined = "\n  - ".join(errors)
+        raise RuntimeError(
+            f"serialized_space validation failed — refusing to POST/PATCH:\n  - {joined}"
+        )
+
+
 def extract_space_config(raw_config: dict) -> dict:
     """Extract space configuration, handling both wrapped and raw formats."""
     if "serialized_space" in raw_config:
@@ -248,6 +340,17 @@ def deploy_space(
     # Required root field: the ExportConverter rejects version 0.
     # See 04-genie-space-export-import-api/SKILL.md "Required Root Field".
     space_config.setdefault("version", 2)
+
+    # Stamp the concrete deploy-time warehouse id into serialized_space.config so
+    # the embedded invariant matches the POST envelope's warehouse_id.
+    # See SKILL.md "Required `serialized_space` Invariants" and Action S10.
+    cfg = space_config.setdefault("config", {})
+    cfg["semantic_warehouse_id"] = warehouse_id
+    cfg.setdefault("title", title)
+    cfg.setdefault("description", description)
+
+    # FAIL LOUD before POST/PATCH — never log-and-continue on structural defects.
+    _assert_sql_arrays(space_config)
 
     serialized = json.dumps(space_config)
 
@@ -365,6 +468,29 @@ print(f"DEPLOYMENT SUMMARY")
 print(f"{'='*60}")
 print(f"Total Genie Spaces processed: {len(results)}")
 print(f"Validation errors: {len(errors_all)}")
+
+print("\n" + "=" * 70)
+print("[ACTION REQUIRED] Copy the YAML below into databricks.yml under `variables:`")
+print("to persist the space_id across runs. This converts the next deploy from")
+print("POST (create) to PATCH (update) — the idempotent update-or-create path.")
+print("=" * 70)
+print("\nvariables:")
+for r in results:
+    result_data = r["result"]
+    sid = (
+        result_data.get("space", {}).get("id")
+        or result_data.get("space_id", "unknown")
+    )
+    stem = Path(r["config_file"]).stem
+    var_name = f"genie_space_id_{stem}"
+    print(f"  {var_name}:")
+    print(f"    description: 'Persisted Genie Space id for {r[\"title\"]!s} (do NOT edit)'")
+    print(f"    default: '{sid}'")
+print()
+print("After pasting, re-run `databricks bundle deploy -t <target>` so the workspace")
+print("copy of databricks.yml reflects the new ids. Subsequent runs of this notebook")
+print("will PATCH the existing space instead of creating a new one — avoiding")
+print("duplicate Genie Spaces in the workspace.\n")
 
 for r in results:
     result_data = r["result"]

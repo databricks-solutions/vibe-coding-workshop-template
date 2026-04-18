@@ -96,6 +96,8 @@ Use this skill when:
 - `common/databricks-expert-agent/SKILL.md` — "Extract Don't Generate" principle, core SA behavior
 - `common/naming-tagging-standards/SKILL.md` — naming conventions for dashboards and datasets
 
+> **Plan addendum filename:** Dashboards are always planned in `plans/phase1-addendum-1.5-aibi-dashboards.md`. See [`planning/00-project-planning/assets/addendum-numbering.md`](../../planning/00-project-planning/assets/addendum-numbering.md) for the canonical numbering table. The legacy name `phase1-addendum-1.1-dashboards.md` is forbidden — if you see it anywhere, replace it with `1.5-aibi-dashboards.md`.
+
 **Complementary installed skills** (check `available_skills` list):
 - `databricks-lakeview-dashboard` — comprehensive widget JSON patterns for 16+ chart types, **mandatory "TEST EVERY QUERY" validation workflow**
 - `databricks-lakeview-dashboard-analyzer` — analyzing existing dashboards for patterns
@@ -1719,6 +1721,56 @@ json_str = json_str.replace('${gold_schema}', gold_schema)
 - No manual dashboard creation required
 
 **Implementation:** See `scripts/deploy_dashboard.py`
+
+#### ⚠️ CRITICAL: Content MUST be base64-encoded (not raw UTF-8 bytes)
+
+The Workspace Import API (`ws.workspace.import_` / `POST /api/2.0/workspace/import`) expects the `content` field to be a **base64-encoded ASCII string**. Passing raw UTF-8 bytes silently produces a corrupt `.lvdash.json` that appears in the workspace tree but fails to open in the AI/BI editor with a generic parse error — the most frustrating failure mode because there is no import-time exception.
+
+```python
+import base64
+
+# ❌ WRONG — uploads the wrong bytes; the file is corrupt on arrival.
+ws.workspace.import_(
+    path=target_path,
+    content=rendered.encode("utf-8"),
+    format=ImportFormat.AUTO,
+    overwrite=True,
+)
+
+# ✅ CORRECT — base64-encode the UTF-8 bytes then decode to ASCII str.
+b64_content = base64.b64encode(rendered.encode("utf-8")).decode("ascii")
+ws.workspace.import_(
+    path=target_path,
+    content=b64_content,
+    format=ImportFormat.AUTO,
+    overwrite=True,
+)
+```
+
+Reference: https://docs.databricks.com/api/workspace/workspace/import
+
+#### ⚠️ CRITICAL: Pre-loop variable enumeration
+
+Before entering the per-dashboard deploy loop, scan **every** `.lvdash.json` file for `${...}` placeholders and fail loud if the caller's `variables` dict does not cover every placeholder. This prevents the partial-deploy failure mode where dashboards N+1…K never get deployed because dashboard N referenced an unsupplied variable mid-loop.
+
+```python
+import re
+_VAR_RE = re.compile(r"(?<!\$)\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+required = {}
+for df in dashboard_files:
+    for name in _VAR_RE.findall(df.read_text()):
+        required.setdefault(name, []).append(df)
+
+missing = {n: fs for n, fs in required.items() if variables.get(n) in (None, "")}
+if missing:
+    raise RuntimeError(
+        "Dashboard deploy pre-flight FAILED — missing variable values:\n"
+        + "\n".join(f"  - ${{{n}}} required by {fs}" for n, fs in sorted(missing.items()))
+    )
+```
+
+The canonical implementation of both guards lives in `scripts/deploy_dashboard.py` (`enumerate_required_variables`, `assert_all_variables_provided`, base64-encoded `deploy_dashboard`). The Phase 0.5 pre-flight in `semantic-layer/00-semantic-layer-setup/SKILL.md` calls `enumerate_required_variables` directly so the failure surfaces BEFORE `bundle validate`.
 
 ---
 

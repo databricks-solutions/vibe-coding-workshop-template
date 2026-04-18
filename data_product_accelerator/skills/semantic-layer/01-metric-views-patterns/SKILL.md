@@ -238,6 +238,130 @@ assert float('.'.join(dbr.split('.')[:2])) >= 17.1, \
 
 See `references/advanced-patterns.md` for additional snowflake schema examples.
 
+### ⚠️ CRITICAL: Multi-Hop / Snowflake Joins (subquery-source pattern)
+
+Transitive joins aren't the only multi-hop trap. Two other shapes silently produce **wrong numbers** instead of a clean planner error — and both are indistinguishable from valid Metric Views on casual inspection. Treat this section as the canonical reference for any join that must traverse more than one dimension hop.
+
+**Failure mode A (silent row-drop — DBR < 17.1):** Nested joins emitted under `joins:` are ignored by older runtimes. Aggregations run against the un-joined base, so dimensions from the nested table quietly disappear from the GROUP BY. No error surfaces — the Metric View just returns the wrong grain.
+
+**Failure mode B (fan-out cartesian):** Nested joins work on DBR 17.1+ but the join key on the intermediate table (`dim_property.destination_id`) is **not unique**. Every row from `source` fans out over every matching `dim_destination` row, inflating measures. Again: no error — just a wrong total.
+
+#### ❌ Anti-pattern 1 — flat "sibling" join relying on an earlier join's alias
+
+```yaml
+# Wrong: dim_destination is a sibling, not nested — and references dim_property.
+joins:
+  - name: dim_property
+    source: catalog.schema.dim_property
+    'on': source.property_id = dim_property.property_id
+  - name: dim_destination
+    source: catalog.schema.dim_destination
+    'on': dim_property.destination_id = dim_destination.destination_id  # ❌ transitive
+```
+
+Planner behaviour:
+- DBR ≥ 17.1: raises `UNRESOLVED_COLUMN` at creation time.
+- DBR < 17.1: may silently accept and produce wrong results. **Never rely on the error.**
+
+#### ❌ Anti-pattern 2 — nested join without verifying intermediate uniqueness
+
+```yaml
+joins:
+  - name: dim_property
+    source: catalog.schema.dim_property
+    'on': source.property_id = dim_property.property_id
+    joins:
+      - name: dim_destination
+        source: catalog.schema.dim_destination
+        'on': dim_property.destination_id = dim_destination.destination_id
+# ❌ Wrong if dim_property rows can share a destination_id with dim_destination M:1 ambiguity,
+#    OR if dim_destination has multiple rows per destination_id (e.g. SCD2 without is_current filter).
+```
+
+Always verify uniqueness before shipping a nested join:
+
+```sql
+-- Intermediate table must be 1:1 on the OUTER-facing key:
+SELECT property_id, COUNT(*) AS c
+FROM catalog.schema.dim_property
+GROUP BY property_id HAVING c > 1;  -- must return 0 rows
+
+-- Inner dimension must be 1:1 on the join key (or filtered to is_current):
+SELECT destination_id, COUNT(*) AS c
+FROM catalog.schema.dim_destination
+WHERE is_current = true              -- if SCD2
+GROUP BY destination_id HAVING c > 1;  -- must return 0 rows
+```
+
+#### ✅ Correct pattern — subquery `source` (pre-join, then treat as one dim)
+
+When nested joins are not available (DBR < 17.1) OR the intermediate table is not uniquely keyed, fold the multi-hop into a **subquery source** that pre-resolves the join off-Metric-View. The Metric View then joins `source` to a single, clean, uniquely-keyed dimension.
+
+```yaml
+source: catalog.schema.fact_booking_daily
+joins:
+  - name: dim_property_enriched
+    # Subquery as source — pre-joins dim_property → dim_destination and enforces uniqueness.
+    source: |
+      (
+        SELECT
+          p.property_key,
+          p.property_id,
+          p.property_name,
+          d.destination_id,
+          d.destination_name,
+          d.country
+        FROM catalog.schema.dim_property p
+        LEFT JOIN catalog.schema.dim_destination d
+          ON p.destination_id = d.destination_id
+         AND d.is_current = true        -- SCD2 guard
+        WHERE p.is_current = true
+      )
+    'on': source.property_key = dim_property_enriched.property_key
+dimensions:
+  - name: property_name
+    expr: dim_property_enriched.property_name
+  - name: destination_name
+    expr: dim_property_enriched.destination_name
+  - name: country
+    expr: dim_property_enriched.country
+```
+
+**Why this is the recommended default:**
+- Works on **every** DBR version (no 17.1 dependency).
+- The subquery makes uniqueness guarantees explicit — reviewers can see and test them.
+- Re-usable: wrap the subquery in a **Gold-layer VIEW** (`dim_property_enriched_v`) and reference it in every Metric View that needs the same enrichment — this also anchors the Gold dependency manifest (see `planning/00-project-planning/SKILL.md`).
+
+**Decision ladder for any multi-hop requirement:**
+1. Can the intermediate dimension carry the needed attribute directly (denormalize)? → Use Fix 1 (flat join, no second hop).
+2. Is every intermediate key uniquely 1:1 and is DBR ≥ 17.1? → Use nested joins (Fix 2) and document the uniqueness check in a comment.
+3. Otherwise → use the **subquery-source pattern above**. Do NOT ship a transitive join and hope for an error.
+
+**Anti-pattern detector — run before deploy:**
+
+```python
+import yaml, re
+bad = []
+for yf in Path("src/semantic/metric_views").rglob("*.yaml"):
+    mv = yaml.safe_load(yf.read_text())
+    joins = (mv.get("joins") or []) if isinstance(mv, dict) else []
+    alias_names = {j["name"] for j in joins}
+    for j in joins:
+        on_clause = j.get("on", "")
+        # Left side of `=` must start with `source.` or be a nested-join alias.
+        m = re.match(r"\s*([A-Za-z_][\w.]*)", on_clause)
+        left_head = (m.group(1).split(".", 1)[0] if m else "")
+        if left_head in alias_names:
+            bad.append((str(yf), j["name"], on_clause))
+if bad:
+    for f, n, o in bad:
+        print(f"TRANSITIVE JOIN in {f} :: join '{n}' -> {o}")
+    raise RuntimeError(
+        "Transitive/flat-sibling joins detected. Restructure as nested "
+        "joins (DBR 17.1+) or as subquery-source (preferred)."
+    )
+```
+
 ## Implementation Workflow
 
 ### Phase 1: Design (30 min)

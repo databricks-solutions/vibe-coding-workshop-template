@@ -1,0 +1,61 @@
+# Databricks Asset Bundle resource — agent deploy job (serverless).
+#
+# Loaded by SKILL.md Step 2 when no interactive cluster is available (workshop
+# or restricted workspaces). Pair with references/agent-deploy-notebook.py.
+#
+# Copy into your bundle as resources/agent_deploy_job.yml and wire the
+# following variables in databricks.yml:
+#
+#   variables:
+#     project_name:          { default: "booking_app" }
+#     catalog:               { default: "my_catalog" }
+#     agent_schema:          { default: "booking_app_agents" }
+#     agent_model_name:      { default: "booking-genie-agent" }
+#     gold_schema:           { default: "booking_app_gold" }
+#     semantic_warehouse_id: { default: "<warehouse-id>" }
+#     genie_space_id:        { default: "<space-id>" }
+#     agents_folder_ws_path: { default: "/Workspace/Users/${workspace.current_user.userName}/${var.project_name}/agents" }
+#
+# Deploy & run:
+#
+#   databricks sync . "/Workspace/Users/${USER}/${var.project_name}" --profile $PROFILE
+#   databricks bundle deploy -t dev --profile $PROFILE
+#   databricks bundle run -t dev agent_deploy_job --profile $PROFILE
+
+resources:
+  jobs:
+    agent_deploy_job:
+      name: "${var.project_name}-agent-deploy"
+      tags:
+        project: "${var.project_name}"
+        stage: "genai-agents"
+        skill: "simple-agent-scaffold"
+      tasks:
+        - task_key: deploy_agent
+          environment_key: default
+          notebook_task:
+            notebook_path: "${var.agents_folder_ws_path}/deploy_agent"
+            base_parameters:
+              # Consumed by agent-deploy-notebook.py via dbutils.widgets.get(...)
+              uc_catalog: "${var.catalog}"
+              uc_agent_schema: "${var.agent_schema}"
+              uc_model_name: "${var.agent_model_name}"
+              uc_gold_schema: "${var.gold_schema}"
+              warehouse_id: "${var.semantic_warehouse_id}"
+              genie_space_id: "${var.genie_space_id}"
+              agent_folder_ws_path: "${var.agents_folder_ws_path}"
+      environments:
+        - environment_key: default
+          spec:
+            # Serverless environment client. Bump when Databricks releases a new
+            # version. Do NOT switch to `new_cluster` or `existing_cluster_id`
+            # — classic clusters fail `NETWORK_CONFIGURATION_FAILURE` on
+            # restricted workspaces.
+            client: "1"
+            dependencies:
+              - databricks-agents
+              - databricks-openai
+              - "mlflow[databricks]"
+              - mcp
+              - nest_asyncio
+              - uv

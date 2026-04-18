@@ -573,12 +573,12 @@ Your job is complete when:
 $ cd apps_lakebase/$APP_NAME
 $ databricks apps deploy --profile $PROFILE
 
-Deploying app 'prashanth-s-bookings'...
+Deploying app '{user_app_name}'...
 Building application... done
 Starting application... done
 
 App deployed successfully!
-  URL:    https://prashanth-s-bookings.cloud.databricks.com
+  URL:    https://{user_app_name}.{workspace_url}
   Status: RUNNING
 ```
 
@@ -599,8 +599,8 @@ graph LR
 
 ```json
 {
-  "name": "prashanth-s-bookings",
-  "url": "https://prashanth-s-bookings.cloud.databricks.com",
+  "name": "{user_app_name}",
+  "url": "https://{user_app_name}.{workspace_url}",
   "status": {
     "state": "RUNNING",
     "message": "Application is running"
@@ -876,7 +876,7 @@ env:
   - name: LAKEBASE_ENDPOINT
     valueFrom: postgres
   - name: DB_SCHEMA
-    value: 'prashanth_s_booking_app'
+    value: '{user_schema_prefix}_booking_app'
 ```
 
 ---

@@ -36,6 +36,53 @@ NEVER use project-specific `.replace()` calls. This is the #1 failure mode obser
 | `.replace("/src/my_project", "")` | WRONG -- breaks when project name changes |
 | `.replace("/src/booking_app_semantic", "")` | WRONG -- hardcoded to one project |
 
+## Shared Helper: `_notebook_paths.py` (PREFERRED)
+
+**New scripts must use the shared helper — do not re-implement bundle-root resolution inline.**
+
+- **Source of truth:** [`assets/_notebook_paths.py`](assets/_notebook_paths.py)
+- **Exports:** `resolve_bundle_root`, `ensure_bundle_root_on_path`, `bundle_path`, `fail_loud`
+- **Scaffold placement:** copy to `src/common/_notebook_paths.py` in the generated project so every notebook can import it with `from src.common._notebook_paths import ...`.
+
+### Canonical notebook header (new scripts)
+
+```python
+# Databricks notebook source
+import sys, os
+from pathlib import Path
+
+# Minimal bootstrap: prepend bundle root to sys.path so we can import the helper.
+try:
+    _nb = (
+        dbutils.notebook.entry_point.getDbutils()
+        .notebook().getContext().notebookPath().get()
+    )
+    _root = "/Workspace" + str(_nb).rsplit("/src/", 1)[0]
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+except Exception:
+    pass  # Local execution
+
+from src.common._notebook_paths import ensure_bundle_root_on_path, bundle_path, fail_loud
+
+BUNDLE_ROOT = ensure_bundle_root_on_path(verbose=True)
+# ... the rest of your notebook follows ...
+```
+
+### Fail-loud rule (CRITICAL)
+
+**Never use `sys.exit(0)` to report a failure.** Exit code 0 is success — Databricks Jobs will mark the run as green and silently propagate broken deploys to downstream tasks.
+
+| Pattern | Verdict |
+|---------|---------|
+| `raise RuntimeError("…")` / `fail_loud("…")` | CORRECT — job marked FAILED, traceback visible |
+| `sys.exit(0)` after printing an error | WRONG — run shows green, failure hidden |
+| `sys.exit(1)` | Acceptable for top-level CLI; prefer `raise` in notebooks |
+
+### `__file__` is undefined in notebook cells
+
+Do not use `__file__` to locate asset files inside a Databricks notebook — it raises `NameError` once the code runs in the notebook context. Always use `bundle_path("src", "semantic", "metric_views", "revenue.yaml")` (or the raw `rsplit` pattern) instead.
+
 ## When NOT to Use This Skill
 
 Skip this skill entirely when:

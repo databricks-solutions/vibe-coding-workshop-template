@@ -13,7 +13,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: prashanth subrahmanyam
-  version: "1.2.0"
+  version: "1.3.0"
   domain: genai-agents
   role: worker
   pipeline_stage: 9
@@ -318,65 +318,169 @@ databricks serving-endpoints query <endpoint-name> \
 
 The endpoint name is derived from the UC model name (dots replaced with hyphens). Check the Serving UI if unsure.
 
-### Grant service principal permissions (required for Genie tools)
+### Step 5a — First data question hits `PERMISSION_DENIED`? Disambiguate first.
 
-`agents.deploy()` creates a system SP for the endpoint. Without `CAN_USE` on the SQL warehouse the agent can answer greetings but every Genie tool call fails with `PERMISSION_DENIED`.
+`PERMISSION_DENIED: No access to table X` has THREE orthogonal causes with the same error surface. Run this three-minute probe BEFORE granting anything — the cheapest fix differs per cause.
 
-Find the SP UUID from the endpoint's **Events** tab in the Serving UI, or from the first `PERMISSION_DENIED` error message.
+| Probe | Pass | Fail → cause |
+|---|---|---|
+| `databricks genie start-conversation $SPACE_ID --content "any data question" --profile $PROFILE` (as YOU, not the endpoint) | Returns real numbers | Space is healthy. Cause is an SP grant (→ Step 5b). |
+| Same probe | Returns "no tables or functions are available" | `serialized_space` was wiped. Recover via [references/restore-genie-space.py](references/restore-genie-space.py) BEFORE granting. |
+| `databricks api get /api/2.0/genie/spaces/$SPACE_ID --profile $PROFILE \| jq '.serialized_space \| length'` | `> 0` (non-empty JSON string) | Space has content. |
+| Same | `0` / empty string | Space is empty — run the restore helper first. |
 
-Grant the SP `CAN_USE` on the warehouse via the Permissions API:
+ONLY after both probes pass should you proceed to grant UC on the endpoint system SP (Step 5b).
+
+### Step 5b — Grant the endpoint system SP what it needs (auto-discover, idempotent)
+
+`agents.deploy()` creates a **system service principal** per endpoint. This SP:
+
+- is **NOT** in workspace SCIM, so `databricks service-principals list` will NOT find it. Do not grep for a UUID in the error message — the `No access to table X` variant doesn't include one.
+- **IS** enforced by Unity Catalog, so `GRANT … TO \`<uuid>\`` works by UUID.
+- is an **implicit member** of the `users` group, so workspace ACLs (warehouse `CAN_USE`, Genie Space `CAN_RUN`) are typically already inherited — no explicit per-SP PATCH is needed. Calls to `PATCH /api/2.0/permissions/...` with `service_principal_name = <uuid>` return `200` but **silently drop** the entry because system SPs are not in SCIM.
+
+Auto-discover the UUID from the endpoint's creation events:
 
 ```python
-import os, requests
+from databricks.sdk import WorkspaceClient
 
-WAREHOUSE_ID = "TODO_WAREHOUSE_ID"
-SP_UUID = "TODO_SP_UUID"
+def get_endpoint_sp(w: WorkspaceClient, endpoint_name: str) -> str:
+    """Return the system SP UUID created by agents.deploy() for this endpoint.
 
-response = requests.patch(
-    f"{os.environ['DATABRICKS_HOST']}/api/2.0/permissions/sql/warehouses/{WAREHOUSE_ID}",
-    headers={"Authorization": f"Bearer {os.environ['DATABRICKS_TOKEN']}"},
-    json={
-        "access_control_list": [
-            {"service_principal_name": SP_UUID, "permission_level": "CAN_USE"}
-        ]
-    },
-)
-assert response.status_code == 200, response.text
+    System SPs are not in SCIM — the reliable source is the endpoint's
+    event stream. Looks for: "System service principal creation with ID <uuid> succeeded".
+    """
+    resp = w.api_client.do(
+        "GET",
+        f"/api/2.0/serving-endpoints/{endpoint_name}/events",
+        query={"limit": 200},
+    )
+    marker = "System service principal creation with ID "
+    for e in resp.get("events", []):
+        msg = e.get("message", "")
+        if marker in msg:
+            return msg.split(marker, 1)[1].split(" ", 1)[0]
+    raise RuntimeError(
+        f"No system SP creation event on {endpoint_name}. "
+        f"Endpoint may still be provisioning — wait for READY and retry."
+    )
 ```
 
-Grant the SP `SELECT` on the UC tables the Genie Space reads (SQL, run as a workspace admin or owner):
+Apply UC grants idempotently by UUID. `EXECUTE` is required if your Genie Space exposes TVFs as certified answers — without it, TVF calls fail with the same `PERMISSION_DENIED` symptom as a missing `SELECT`:
 
-```sql
-GRANT USE CATALOG ON CATALOG <catalog> TO `<sp-uuid>`;
-GRANT USE SCHEMA ON SCHEMA <catalog>.<schema> TO `<sp-uuid>`;
-GRANT SELECT ON SCHEMA <catalog>.<schema> TO `<sp-uuid>`;
+```python
+w = WorkspaceClient()
+ENDPOINT_NAME = "<your agent endpoint>"     # dots in UC model name replaced with hyphens
+CATALOG       = "<your catalog>"
+GOLD_SCHEMA   = "<your gold schema>"
+WAREHOUSE_ID  = "<your warehouse id>"        # the semantic warehouse the Genie Space uses
+
+SP = get_endpoint_sp(w, ENDPOINT_NAME)
+print(f"Endpoint system SP: {SP}")
+
+for stmt in [
+    f"GRANT USE CATALOG ON CATALOG `{CATALOG}` TO `{SP}`",
+    f"GRANT USE SCHEMA, SELECT, EXECUTE ON SCHEMA `{CATALOG}`.`{GOLD_SCHEMA}` TO `{SP}`",
+]:
+    w.statement_execution.execute_statement(
+        warehouse_id=WAREHOUSE_ID,
+        statement=stmt,
+        wait_timeout="30s",
+    )
+    print(f"OK: {stmt}")
 ```
 
-In AI Playground, OBO uses the **caller's** identity — users with table access get data regardless of SP grants. SP grants matter for programmatic/API-token access (including end-user apps calling the endpoint with a service token).
+Duplicate `GRANT` statements are idempotent — re-running this block on a subsequent deploy is a no-op.
 
-### Verify with a data question
-
-After granting, smoke-test the endpoint with a real data query (not just a greeting):
+Verify warehouse inheritance via the `users` group (one-time, per workspace). Do NOT grant the SP directly:
 
 ```bash
-curl -s "$DATABRICKS_HOST/serving-endpoints/<endpoint-name>/invocations" \
-  -H "Authorization: Bearer $DATABRICKS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"input": [{"role": "user", "content": "How many bookings were made last month?"}]}'
+WH_ID="<your warehouse id>"
+databricks api get /api/2.0/permissions/warehouses/$WH_ID --profile $PROFILE \
+  | jq '.access_control_list[] | select(.group_name=="users") | .all_permissions[].permission_level'
+# Expect: "CAN_USE". If missing, grant the GROUP (users) — NOT the SP — once, workspace-wide.
 ```
 
-A successful response contains data or a meaningful Genie answer, not a `PERMISSION_DENIED`.
+Full OBO-vs-SP matrix, anti-patterns, and the silent-drop trap: see [references/post-deploy-permissions.md](references/post-deploy-permissions.md).
 
-Full CLI equivalents, OBO-vs-SP matrix, and multi-warehouse patterns: see [references/post-deploy-permissions.md](references/post-deploy-permissions.md).
+### Step 5 verification gate — `curl + PAT` with a domain-specific question
+
+A greeting in AI Playground does NOT verify the tool-calling path. For `EMBEDDED_CREDENTIALS` endpoints Playground routes MCP calls through the same system SP as every other caller — so a Playground greeting doesn't prove the SP can read Genie's tables. The required gate is a **domain-specific data question** hitting `/invocations` via `curl + PAT`:
+
+```bash
+ENDPOINT="<your endpoint>"
+HOST="$(databricks auth env --profile $PROFILE | jq -r .env.DATABRICKS_HOST)"
+TOKEN="$(databricks auth token --profile $PROFILE | jq -r .access_token)"
+
+curl -sS -X POST "$HOST/serving-endpoints/$ENDPOINT/invocations" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"input":[{"role":"user","content":"<domain-specific data question>"}]}' \
+  | jq '.output[] | select(.type=="function_call" or .type=="message")'
+```
+
+- **PASS** — at least one `function_call` to `<tool>__query_space_<space_id>` appears in `.output`, followed by a `message` with real numbers.
+- **FAIL (greeting only)** — no `function_call` means the tool wasn't exercised. Either the system prompt is too generic (add a domain nudge) or the Genie Space has no content (run Step 5a probes).
+- **FAIL (`PERMISSION_DENIED`)** — run Step 5a first; if the space is healthy, re-run Step 5b; if it still fails, the space's underlying tables need `SELECT` for the `users` group or for the SP UUID directly.
 
 **Gate:** ALL of the following:
 
 1. Endpoint reaches `READY` state.
-2. Test query with a **greeting** returns a valid response (confirms endpoint is live).
-3. Test query with a **domain-specific data question** returns data or a meaningful Genie response (confirms the tool-calling path works end-to-end).
-4. Agent is visible and testable in AI Playground.
+2. Step 5a probes pass (space is healthy, `serialized_space` is non-empty).
+3. Step 5b auto-grant completed without errors; the SP UUID is printed.
+4. `curl + PAT` with a **domain-specific data question** returns at least one `function_call` in `.output` followed by a `message` with real data.
+5. Agent is visible in AI Playground (a smoke test, NOT the gate).
 
-If step 3 fails with `PERMISSION_DENIED`, see "Grant service principal permissions" above. If step 3 returns a Genie error about table access, the Genie Space itself needs table permissions — revisit Prerequisites.
+### Step 5c — Emit `DEPLOY_CHECKPOINT.md` for Step 17 handoff
+
+After the verification gate passes, write a structured checkpoint file that Step 17 (`06-appkit-serving-wiring`) reads instead of rederiving values. Without this file, downstream AppKit wiring hand-recomputes the endpoint name, substitutes it in `app.yaml`, and often picks the wrong casing for `DATABRICKS_SERVING_ENDPOINT_NAME`'s `valueFrom` — a common, silent failure mode.
+
+Write to `apps_lakebase/$APP_NAME/agents/DEPLOY_CHECKPOINT.md`:
+
+```python
+import pathlib, textwrap
+
+APP_NAME = "<your app>"                         # same as Step 17's $APP_NAME
+checkpoint_dir = pathlib.Path(f"apps_lakebase/{APP_NAME}/agents")
+checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+checkpoint = textwrap.dedent(f"""
+    # Agent Deploy Checkpoint (Step 16)
+
+    Structured handoff to Step 17 (`apps_lakebase/skills/06-appkit-serving-wiring`).
+    Do NOT rederive these values by hand — read them from this file.
+
+    | Field                        | Value |
+    |---                           |---    |
+    | Endpoint name (full)         | `{ENDPOINT_NAME}` |
+    | Endpoint name (64-char)      | `{ENDPOINT_NAME[:64]}` |
+    | System SP UUID               | `{SP}` |
+    | UC model name                | `{UC_MODEL_NAME}` |
+    | UC model version             | `{registered.version}` |
+    | Genie Space ID               | `{GENIE_SPACE_ID}` |
+    | Warehouse ID                 | `{WAREHOUSE_ID}` |
+    | Gold schema granted          | `{CATALOG}.{GOLD_SCHEMA}` |
+
+    ## Verified `curl` block (paste-ready)
+
+    ```bash
+    ENDPOINT="{ENDPOINT_NAME}"
+    HOST="<your workspace host>"
+    TOKEN="<PAT>"
+    curl -sS -X POST "$HOST/serving-endpoints/$ENDPOINT/invocations" \\
+      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\
+      -d '{{"input":[{{"role":"user","content":"<domain-specific data question>"}}]}}' \\
+      | jq '.output[] | select(.type=="function_call" or .type=="message")'
+    ```
+
+    PASS = at least one `function_call` to `<tool>__query_space_{GENIE_SPACE_ID}` in `.output`.
+""").strip()
+
+(checkpoint_dir / "DEPLOY_CHECKPOINT.md").write_text(checkpoint + "\n")
+```
+
+The reference notebook [references/agent-deploy-notebook.py](references/agent-deploy-notebook.py) writes this file automatically at the end of Step 5b.
+
+**Checkpoint gate:** `DEPLOY_CHECKPOINT.md` exists at `apps_lakebase/$APP_NAME/agents/DEPLOY_CHECKPOINT.md` with endpoint name, SP UUID, UC model name/version, Genie Space ID, warehouse ID, and the verified `curl` block. Step 17 reads this file on entry.
 
 ---
 
@@ -386,8 +490,8 @@ If step 3 fails with `PERMISSION_DENIED`, see "Grant service principal permissio
 
 The deployed endpoint from Step 5 is ready to be consumed by an AppKit application.
 
-1. **Note your endpoint name** — this becomes the value for `DATABRICKS_SERVING_ENDPOINT_NAME` in the AppKit `app.yaml`.
-2. **Read [06-appkit-serving-wiring](../../../../apps_lakebase/skills/06-appkit-serving-wiring/SKILL.md)** — start at Step 2 (Configure `app.yaml`). The wiring skill covers Serving plugin registration, resource binding, streaming chat hooks, and server-side proxy patterns.
+1. **Read `apps_lakebase/$APP_NAME/agents/DEPLOY_CHECKPOINT.md`** — Step 5c emitted this file with the endpoint name, SP UUID, UC model version, and the verified `curl` block. Step 17 reads these values from disk rather than rederiving them.
+2. **Read [06-appkit-serving-wiring](../../../../apps_lakebase/skills/06-appkit-serving-wiring/SKILL.md)** — start at Step 2 (Configure `app.yaml`). The wiring skill covers Serving plugin registration, resource binding, streaming chat hooks, and server-side proxy patterns. Use the endpoint name from `DEPLOY_CHECKPOINT.md` verbatim — do NOT retype it.
 3. If you haven't registered the Serving plugin yet, first read [04-appkit-plugin-add](../../../../apps_lakebase/skills/04-appkit-plugin-add/SKILL.md) with [references/plugin-serving.md](../../../../apps_lakebase/skills/04-appkit-plugin-add/references/plugin-serving.md).
 
 > **Contract the UI layer must honor** (when wiring this endpoint into an AppKit app via `06-appkit-serving-wiring`):
@@ -433,9 +537,10 @@ For the complete 9-phase implementation (foundation through monitoring), use `00
 | Endpoint stuck in `PENDING` | Deploy appears to hang | Check endpoint events in Serving UI; common cause is dependency resolution. Ensure `uv` is in pip requirements. |
 | `FileNotFoundError: Config file is not provided` inside `log_model()` / `_load_model_code_path` | MLflow copies `agent.py` to a temp dir for validation; `agent-config.yaml` isn't there | Add `model_config="agent-config.yaml"` to `log_model()`. Do NOT try to fix `__file__` / relative paths — it's a framework lifecycle issue, not a path issue. |
 | `ModuleNotFoundError: azure.core` during `register_model()` | Bare `mlflow` lacks the Azure storage SDK | Install `"mlflow[databricks]"` (also covers AWS/GCP) |
-| `PERMISSION_DENIED: ... not authorized to use this SQL Endpoint` post-deploy | Endpoint SP lacks warehouse `CAN_USE` | Grant via Permissions API — SP UUID is in the error message. See [references/post-deploy-permissions.md](references/post-deploy-permissions.md). |
+| `PERMISSION_DENIED: ... not authorized to use this SQL Endpoint` post-deploy | Endpoint SP lacks `users`-group `CAN_USE` inheritance on warehouse | Verify with `jq '.access_control_list[] \| select(.group_name=="users")'` on `/permissions/warehouses/{id}`. If missing, grant the `users` group once. Do NOT PATCH `service_principal_name = <uuid>` — it returns `200` but silently drops. See Step 5b + [references/post-deploy-permissions.md](references/post-deploy-permissions.md). |
 | `NETWORK_CONFIGURATION_FAILURE` when submitting a job | Classic cluster can't reach control plane | Use serverless: `environment_key` + `environments` spec, not `new_cluster`. |
-| Agent answers greetings but fails on data questions | SP has endpoint access but not warehouse/table access | Grant `CAN_USE` on warehouse + `SELECT` on gold tables. Or test in AI Playground (OBO uses your credentials). |
+| Agent answers greetings but fails on data questions | SP has endpoint access but not UC grants on the gold schema | Run Step 5b auto-grant (`get_endpoint_sp()` + `GRANT USE CATALOG/SCHEMA, SELECT, EXECUTE`). Playground false-confidence: `EMBEDDED_CREDENTIALS` endpoints route MCP calls through the system SP too — Playground is not an OBO bypass. |
+| `PERMISSION_DENIED: No access to table X` on a domain question, no UUID in the error | Either `serialized_space` is wiped OR the SP lacks UC grants | Run Step 5a disambiguation probes FIRST. Don't grep the error for a UUID — it won't have one. Discover the SP via `/serving-endpoints/{name}/events` (Step 5b `get_endpoint_sp`). |
 
 ---
 
@@ -484,6 +589,27 @@ When a run fails, check whether you're falling into one of these reasoning traps
 - **Classic cluster is not the default.** In restricted/workshop workspaces, serverless is the safe default. Check prior compute patterns in `.vibecoding-state.md` before picking a cluster type.
 - **`READY` endpoint ≠ working agent.** An endpoint that only answers greetings has never exercised the tool-calling path. Verify with a domain-specific data question.
 - **Same error class after retry ≠ try another variant — change approach.** If two path-style fixes produce the same framework-loader error, the category of fix is wrong. Step back and understand the framework's lifecycle.
+- **Playground greeting ≠ Step 5 gate.** For `EMBEDDED_CREDENTIALS` endpoints, Playground routes MCP tool calls through the system SP exactly like `curl + PAT` — a Playground greeting proves the LLM is live but does not prove the SP can read Genie's tables. Use the Step 5 verification gate (`curl + PAT` with a domain question + `jq` on `function_call`).
+- **`databricks service-principals list` ≠ SP discovery for `agents.deploy()` endpoints.** The endpoint's system SP is NOT in SCIM. Use `GET /api/2.0/serving-endpoints/{name}/events` with the marker `"System service principal creation with ID"`. See Step 5b `get_endpoint_sp()`.
+- **`PATCH /permissions/warehouses/{id}` with `service_principal_name = <uuid>` ≠ granting a system SP.** Returns `200 OK` but silently drops the entry. Rely on `users`-group inheritance for workspace ACLs; grant UC privileges directly by UUID for the database layer.
+
+### Do NOT PATCH `/api/2.0/data-rooms/{id}` with partial payloads
+
+`/api/2.0/data-rooms/{id}` is an **internal** API surface. PATCHing it with anything other than a full `serialized_space` payload (e.g. to flip `run_as_type`, `display_name`, or `warehouse_id`) will **silently wipe the space's `serialized_space`**. Symptoms after the wipe:
+
+- `GET /api/2.0/genie/spaces/{id}` returns `serialized_space = {}` (empty).
+- `databricks genie start-conversation $SPACE_ID --content "..."` returns "no tables or functions are available in this Genie space schema".
+- Agent endpoint `/invocations` calls return `PERMISSION_DENIED: No access to table X` — misleading, because the real cause is an empty space, not a permission gap.
+
+The ONLY supported mutation endpoint for a Genie Space's content is:
+
+```
+PATCH /api/2.0/genie/spaces/{id}  with  {"serialized_space": "<full JSON string>"}
+```
+
+If you hit this wipe, recover with [references/restore-genie-space.py](references/restore-genie-space.py) — it reads the source-of-truth `genie_configs/*.json`, substitutes template vars, sorts the `tables`/`functions` arrays, and PATCHes the correct endpoint. Turns a 30-minute reconstruction into a 30-second command.
+
+To change `run_as_type` today: rebuild the space via the Genie UI or re-run `deploy_genie_spaces.py`. There is no supported API for flipping `run_as_type` on an existing space.
 
 ---
 
@@ -518,3 +644,4 @@ When a run fails, check whether you're falling into one of these reasoning traps
 | Apr 15, 2026 | 1.0.0 | Initial creation — canonical notebook pattern with ModelConfig parameterization |
 | Apr 17, 2026 | 1.1.0 | Apply retro v2 actions 1-6: Genie Space verification in prereqs, `mlflow[databricks]`, `model_config` in `log_model`, uncommented `DatabricksGenieSpace`, Step 2 job-submission callout, Step 5 SP permissions, 3 new gotchas, Anti-Patterns block, `references/post-deploy-permissions.md` + `references/job-submission.md` |
 | Apr 17, 2026 | 1.2.0 | Apply retro v3 actions 1-6: 3-option Genie Space remediation, inlined serverless default (full JSON in Step 2) + preventive SP grant code + `mlflow[databricks]` in Step 3 `pip_requirements` + structured debugging decision tree + tightened Step 5 gate (numbered list) + 2 new gotchas (`NETWORK_CONFIGURATION_FAILURE`, greetings-vs-data) |
+| Apr 18, 2026 | 1.3.0 | Apply retro v3 actions S1–S10: auto-discover endpoint system SP via `/serving-endpoints/{name}/events` + idempotent UC grants including `EXECUTE` (Step 5b), `PERMISSION_DENIED` disambiguation probe tree (Step 5a), `curl + PAT` domain-question verification gate (Step 5), `DEPLOY_CHECKPOINT.md` handoff for Step 17 (Step 5c), rewritten `references/post-deploy-permissions.md` (3 factually-wrong sections fixed), new `references/restore-genie-space.py` recovery helper, new `references/agent_deploy_job.yml` + `references/agent-deploy-notebook.py` serverless templates with Step 5b baked in, `/api/2.0/data-rooms/{id}` destructive-PATCH anti-pattern block (mirrored in `semantic-layer/04-genie-space-export-import-api`), updated Gotchas + Anti-Patterns for system-SP invisibility and Playground false-confidence |
