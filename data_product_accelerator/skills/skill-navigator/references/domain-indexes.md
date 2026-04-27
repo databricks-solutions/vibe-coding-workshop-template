@@ -169,7 +169,7 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 6. Optimization targets: accuracy ≥95%, repeatability ≥90%
 7. Optimization workers: Generator (benchmarks) → Evaluator (judges) → Optimizer (GEPA/introspection) → Applier (6 control levers + dual persistence)
 
-**Cross-domain usage:** `05-genie-optimization-orchestrator` is also used by `genai-agents/00-genai-agents-setup` (Phase 8: Genie Optimization). The orchestrator routes to 4 worker skills in `genie-optimization-workers/`.
+**Cross-domain usage:** Genie optimization patterns are surfaced through `genai-agents/00-course-orchestrator` when GenAI workflows need Genie assets. The orchestrator routes to the relevant worker skills instead of the deleted setup skill.
 
 **Plan-as-Contract:** The semantic-layer orchestrator `consumes` `plans/manifests/semantic-layer-manifest.yaml` (Phase 0). Falls back to Gold table self-discovery if no manifest exists.
 
@@ -288,7 +288,7 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 
 | Skill | Path | ~Tokens |
 |---|---|---|
-| `genai-agents-setup` | `genai-agents/00-genai-agents-setup/SKILL.md` | ~1.2K |
+| `course-orchestrator` | `genai-agents/00-course-orchestrator/SKILL.md` | ~1.2K |
 
 ### Workers
 
@@ -320,7 +320,7 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 **Plan-as-Contract:** The orchestrator `consumes` `plans/manifests/genai-agents-manifest.yaml` (Phase 0). Falls back to Genie Space self-discovery if no manifest exists.
 
 **When to load full skills:**
-- Building a new agent end-to-end → Load `genai-agents/00-genai-agents-setup`
+- Building a new agent end-to-end → Load `genai-agents/00-course-orchestrator`
 - Genie optimization (Phase 8 of agent implementation) → Load `semantic-layer/05-genie-optimization-orchestrator`
 - Specific task → Load the relevant worker skill directly
 

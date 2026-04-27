@@ -10,16 +10,23 @@ This document is a comprehensive guide to building, deploying, and testing web a
 This guide is structured as a series of **steps**, each designed to be given as a prompt to an AI coding assistant (Cursor, Claude Code, Windsurf, etc.). The assistant executes the instructions using the referenced Agent Skills, which contain the detailed implementation knowledge.
 
 ```
-Step 1                Step 2             Step 3             Step 4               Step 5
-Scaffold, Build  -->  Deploy        -->  Setup Lakebase --> Wire Lakebase   -->  Deploy + E2E Test
-& Test Locally        (Mock Data)        Project            Backend (local)      with Lakebase
-
-                                                            Optional:
-                                                            Wire Serving --------^
-                                                            Endpoint (step 4b)
+Step 1                Step 2             Step 3
+Scaffold, Build  -->  Deploy        -->  Setup Lakebase
+& Test Locally        (Mock Data)        Bundle Resources
+                                          │
+                                          ├─► Step 4: Wire Lakebase Backend
+                                          │
+                                          ├─► Optional Step 4b: Wire Model Serving / Agent endpoint
+                                          │
+                                          ├─► Optional Step 4c: Wire AppKit to a separate Agent App
+                                          │
+                                          └─► Optional Step 4d: Add chat history + feedback
+                                                                  │
+                                                                  ▼
+                                                          Step 5: Deploy + E2E Test
 ```
 
-Steps 1-2 build and deploy a functional UI with mock data (no database required). Steps 3-5 add a Lakebase PostgreSQL backend with live data. Optionally, wire a Model Serving / Agent endpoint (step 4b) using the `06-appkit-serving-wiring` skill -- this is independent of Lakebase wiring and can be done before or after step 4.
+Steps 1-2 build and deploy a functional UI with mock data (no database required). Steps 3-5 add a Lakebase PostgreSQL backend with live data. Agent chat is optional: use `06-appkit-serving-wiring` when the agent is exposed as a Model Serving / Agent Serving endpoint, or use `06d-appkit-agent-app-proxy` when the agent is deployed as a separate Databricks App. Agent-chat apps can then add persistent chat history (`07-appkit-chat-history`) and user feedback linked to MLflow assessments (`08-appkit-feedback`).
 
 ---
 
@@ -46,6 +53,8 @@ Fill in these values before starting. They are referenced throughout all steps.
 | `{use_case_slug}` | __________________ | Short app identifier (e.g. `bookings`, `inventory`, `analytics`) |
 | `{user_app_name}` | __________________ | Lakebase project name (set in the **Setup Lakebase** step) |
 | `{LAKEBASE_HOST}` | __________________ | Lakebase host address (output of the **Setup Lakebase** step) |
+| `{agent_app_name}` | __________________ | Optional: separate Agent App name for the 2-Apps proxy path |
+| `{agent_app_url}` | __________________ | Optional: separate Agent App URL for the 2-Apps proxy path |
 
 ---
 
@@ -886,7 +895,7 @@ env:
 > **Validate before proceeding.**
 >
 > - [ ] `@databricks/lakebase` installed in `package.json`
-> - [ ] `lakebase()` registered in `server/server.ts` plugins
+> - [ ] `server/server.ts` is unchanged (plugin registration happens in the **Wire Lakebase Backend** step)
 > - [ ] `databricks.yml` has `postgres_projects` resource (no `postgres_branches` or `postgres_endpoints` — auto-created)
 > - [ ] `app.yaml` has `LAKEBASE_ENDPOINT` with `valueFrom: postgres` and `DB_SCHEMA`
 > - [ ] `npm run build` passes
@@ -1095,6 +1104,43 @@ Copy the following into your new Agent thread so it has the necessary context:
 > - **Lakebase project:** `{user_app_name}`
 > - All Lakebase API endpoints return `"source": "mock"` with fallback data locally (live data after deploy)
 > - `app.yaml` uses `valueFrom: postgres` for Lakebase env vars; `databricks.yml` declares bundle resources
+
+---
+
+## Optional Step 4b/4c: Wire Agent Chat
+
+Choose the agent wiring path that matches where your agent runs:
+
+| Agent runtime | Use this skill | When to choose it |
+|---------------|----------------|-------------------|
+| Model Serving / Agent Serving endpoint | `apps_lakebase/skills/06-appkit-serving-wiring/SKILL.md` | The agent is exposed as a serving endpoint alias in AppKit |
+| Separate Databricks Agent App | `apps_lakebase/skills/06d-appkit-agent-app-proxy/SKILL.md` | The agent is deployed as its own Databricks App and the AppKit app proxies `/api/chat` with app-to-app auth plus end-user OBO forwarding |
+
+For the standalone GenAI course's canonical Track A + AppKit 2-Apps flow, use `06d-appkit-agent-app-proxy` after the Agent App is deployed and you have recorded `{agent_app_name}` and `{agent_app_url}` in `.vibecoding-state.md`.
+
+Before moving on, verify:
+
+- [ ] The selected agent wiring skill has been completed
+- [ ] `/api/chat` or the serving stream route works with the expected auth model
+- [ ] `.vibecoding-state.md` records the agent runtime, endpoint/app URL, and any stream-format notes
+
+---
+
+## Optional Step 4d: Add Chat History and Feedback
+
+Agent-chat apps can add two user-facing quality features after Lakebase and agent streaming are wired:
+
+1. Read `apps_lakebase/skills/07-appkit-chat-history/SKILL.md` to persist chat sessions, messages, and trace IDs in Lakebase.
+2. Read `apps_lakebase/skills/08-appkit-feedback/SKILL.md` to add thumbs up/down feedback and optionally log MLflow assessments against captured trace IDs.
+
+`07-appkit-chat-history` requires Lakebase wiring plus either the serving endpoint path (`06`) or the separate Agent App proxy path (`06d`). `08-appkit-feedback` requires the `Vote` table and `traceId` flow created by `07`.
+
+Before deploying, verify:
+
+- [ ] Chat sessions and messages persist in Lakebase or degrade to ephemeral mode when configured
+- [ ] Assistant messages include IDs and trace IDs for feedback lookup
+- [ ] Feedback buttons call the AppKit feedback route and persist votes
+- [ ] `.vibecoding-state.md` records whether MLflow assessment logging is enabled
 
 ---
 
@@ -1672,11 +1718,18 @@ Combined verification across all steps:
 - [ ] All static mock data replaced with API calls
 - [ ] `npm run build` passes (do NOT run `npm run dev` — Lakebase env vars not set yet)
 
-### Wire Serving Endpoint (Optional)
+### Wire Agent Chat (Optional)
 - [ ] `@databricks/serving` installed and `serving()` registered in `server/server.ts`
 - [ ] Agent endpoint configured in `app.yaml` as a serving resource
 - [ ] Chat UI component wired to streaming agent responses
 - [ ] See `apps_lakebase/skills/06-appkit-serving-wiring/SKILL.md` for patterns
+- [ ] If the agent is a separate Databricks App instead, `06d-appkit-agent-app-proxy` is complete and `/api/chat` forwards app-to-app auth plus end-user OBO headers
+
+### Chat History and Feedback (Optional)
+- [ ] `07-appkit-chat-history` complete when persistent conversations are required
+- [ ] Chat messages include assistant message IDs and captured trace IDs
+- [ ] `08-appkit-feedback` complete when thumbs feedback or MLflow assessments are required
+- [ ] Votes persist in Lakebase and MLflow assessment logging is verified when tracing is enabled
 
 ### Deploy + E2E Test
 - [ ] App deployed and Service Principal creates database objects

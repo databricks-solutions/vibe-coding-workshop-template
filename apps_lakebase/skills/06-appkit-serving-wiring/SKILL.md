@@ -18,11 +18,23 @@ metadata:
   domain: apps
   role: serving-wiring
   standalone: false
-  last_verified: "2026-04-15"
+  last_verified: "2026-04-27"
   volatility: medium
   upstream_sources:
-    - https://databricks.github.io/appkit/docs/plugins/serving
-    - https://github.com/databricks/databricks-agent-skills
+    - name: "databricks-agent-skills/databricks-model-serving"
+      repo: "databricks/databricks-agent-skills"
+      paths:
+        - "skills/databricks-model-serving/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-04-27"
+      sync_commit: "manifest-v2-2026-04-22"
+    - name: "databricks-agent-skills/databricks-apps"
+      repo: "databricks/databricks-agent-skills"
+      paths:
+        - "skills/databricks-apps/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-04-27"
+      sync_commit: "manifest-v2-2026-04-22"
 ---
 
 # Wire Serving Endpoint into AppKit
@@ -580,3 +592,11 @@ Detailed callouts are embedded inline at the relevant step. This table is a comp
 | Frontend invoke hook | `useServingInvoke({ messages }, { alias: "agent" })` |
 | Server-side invoke | `AppKit.serving("agent").asUser(req).invoke({ messages })` |
 | Server-side stream | `for await (const chunk of AppKit.serving("agent").stream({ messages }))` |
+
+---
+
+## See Also
+
+- Upstream platform skills: [`databricks-model-serving`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-model-serving) and [`databricks-apps`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps) (both tracked in `upstream_sources`).
+- AppKit Serving plugin docs: [databricks.github.io/appkit/docs/plugins/serving](https://databricks.github.io/appkit/docs/plugins/serving)
+

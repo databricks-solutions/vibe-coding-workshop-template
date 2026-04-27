@@ -8,7 +8,7 @@ Maps every skill to the official documentation URLs used to verify its patterns 
 
 ## GenAI Agents Domain (High Volatility)
 
-### `genai-agents/00-genai-agents-setup`
+### `genai-agents/00-course-orchestrator`
 | URL | Check For |
 |---|---|
 | https://docs.databricks.com/en/generative-ai/agent-framework/ | Agent Framework overview, supported agent types |

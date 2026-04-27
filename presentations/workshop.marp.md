@@ -148,7 +148,7 @@ mermaid.initialize({ startOnLoad: true, theme: 'dark', themeVariables: {
 
 ## Build Data Products with AI-Assisted Development
 
-**59 Agent Skills** &nbsp;|&nbsp; **9 Pipeline Stages** &nbsp;|&nbsp; **5 App Phases**
+**77 Accelerator Skills** &nbsp;|&nbsp; **10 AppKit Skills** &nbsp;|&nbsp; **9 Pipeline Stages**
 
 Powered by Databricks + AI Coding Assistants
 
@@ -173,7 +173,7 @@ Timing: ~2 min for introductions and orientation.
 Vibe coding, repo structure, skill anatomy
 
 ### Act II — Data Product Accelerator
-Animated journey through 9 stages, 59 skills
+Animated journey through 9 stages, 77 accelerator skills
 
 ### Act III — Platform Training
 Databricks Apps, AppKit, Lakebase, SDP, Genie
@@ -182,7 +182,7 @@ Databricks Apps, AppKit, Lakebase, SDP, Genie
 <div>
 
 ### Act IV — AppKit Workshop Journey
-5-phase hands-on lifecycle with skills
+Branch-aware AppKit lifecycle with skills
 
 ### Act V — Putting It All Together
 Live demo prompts, resources, Q&A
@@ -239,15 +239,17 @@ Timing: ~2 min
 
 # Repository Overview
 
-This is a **monorepo** with three components:
+This is a **monorepo** with four components:
 
 <div class="mermaid">
 graph LR
     Root["vibe-coding-workshop-template/"] --> A["apps_lakebase/"]
+    Root --> G["genai-agents/"]
     Root --> B["data_product_accelerator/"]
     Root --> C["agentic-framework/"]
-    A --> A1["6 Skills<br/>AppKit + Lakebase"]
-    B --> B1["59 Skills<br/>9-Stage Pipeline"]
+    A --> A1["10 Skills<br/>AppKit + Lakebase + Agent Chat"]
+    G --> G1["Course<br/>Track A + SDLC"]
+    B --> B1["77 Skills<br/>9-Stage Pipeline"]
     C --> C1["Agent Prompts<br/>Multi-Agent Framework"]
     Root --> D["Generated Artifacts"]
     D --> D1["gold_layer_design/"]
@@ -258,9 +260,10 @@ graph LR
 **Key rule:** Framework directories are **read-only inputs**. Generated code goes to **repo root**.
 
 <!--
-Speaker: Three components live here. The Data Product Accelerator has 59 skills for the full
-medallion architecture. AppKit has 6 skills for building Databricks Apps. The Agentic Framework
-is for multi-agent systems. All generated code goes to the repo root — never inside the framework dirs.
+Speaker: Four components live here. The Data Product Accelerator has 77 skills for the full
+medallion architecture, AppKit has 10 skills for apps and agent chat, and the standalone
+genai-agents course owns the Track A + SDLC agent path. The Agentic Framework is for
+multi-agent systems. All generated code goes to the repo root — never inside the framework dirs.
 Timing: ~2 min
 -->
 
@@ -286,7 +289,7 @@ Timing: ~2 min
 4. Wire Lakebase backend
 5. Deploy + E2E test
 
-**6 skills, 5 phases**
+**10 skills, branch-aware lifecycle**
 
 </div>
 <div>
@@ -298,7 +301,7 @@ Timing: ~2 min
 4. Gold implementation
 5. Semantic → Observability → ML → GenAI
 
-**59 skills, 9 stages**
+**77 skills, 9 stages**
 
 </div>
 </div>
@@ -307,7 +310,7 @@ Timing: ~2 min
 
 <!--
 Speaker: Two entry points, same destination. Path A is for the "I want an app" crowd — build
-a full-stack Databricks App in 5 phases. Path B is for the data engineers — design-first
+a full-stack Databricks App through a branch-aware lifecycle. Path B is for the data engineers — design-first
 pipeline through the full medallion architecture. They converge: your app can query your pipeline's Gold tables.
 Timing: ~2 min
 -->
@@ -391,7 +394,7 @@ The framework uses **4 tiers** to stay within the AI's context budget:
 <!--
 Speaker: Why tiers? Claude Opus has a 200K token window, but performance drops if you overload
 it. We keep the operating budget at 40-60K tokens. Tier 1 is always loaded. Each subsequent tier
-loads only what's needed for the current task. This is how 59 skills fit without blowing the context.
+loads only what's needed for the current task. This is how 77 skills fit without blowing the context.
 Timing: ~2 min
 -->
 
@@ -484,7 +487,7 @@ Timing: ~2 min
 
 The Data Product Accelerator
 
-9 stages — 59 skills — one animated journey
+9 stages — 77 skills — one animated journey
 
 <!--
 Speaker: Now let's walk through the entire Data Product Accelerator pipeline. I'll show you
@@ -960,30 +963,26 @@ Timing: ~1.5 min
 
 # Stage 9: GenAI Agents
 
-**Orchestrator:** `genai-agents/00-genai-agents-setup` &nbsp; <span class="tag o">ORCHESTRATOR</span>
+**Orchestrator:** `genai-agents/00-course-orchestrator` &nbsp; <span class="tag o">ORCHESTRATOR</span>
 
-The **largest domain** — 8 specialized workers:
+The current GenAI course is a routed progression: foundation, Track A custom Agent Apps, AppKit 2-Apps wiring, and the MLflow SDLC.
 
 <div class="tree">
-<span class="hl">genai-agents/00-genai-agents-setup</span>  ← ORCHESTRATOR
+<span class="hl">genai-agents/00-course-orchestrator</span>  ← ORCHESTRATOR
 │
-├── <span class="hl2">01-responses-agent-patterns</span>       ResponsesAgent, predict_stream
-├── <span class="hl2">02-mlflow-genai-evaluation</span>        LLM judge scorers, evaluation harness
-├── <span class="hl2">03-lakebase-memory-patterns</span>       CheckpointSaver, stateful conversations
-├── <span class="hl2">04-prompt-registry-patterns</span>       Versioned prompts in Unity Catalog
-├── <span class="hl2">05-multi-agent-genie-orchestration</span> Intent classification, Genie routing
-├── <span class="hl2">06-deployment-automation</span>           CI/CD for agent deployment
-├── <span class="hl2">07-production-monitoring</span>           Registered scorers, drift detection
-└── <span class="hl2">08-mlflow-genai-foundation</span>         MLflow tracing, GenAI basics
+├── <span class="hl2">foundation/</span>       UC resources, MLflow, tracing, tools, KA, AI Gateway
+├── <span class="hl2">tracks/A-custom-agent-apps/</span>  Python Agent App on Databricks Apps
+├── <span class="hl2">apps_lakebase/skills/06d</span>   AppKit ↔ Agent App OBO proxy
+├── <span class="hl2">apps_lakebase/skills/07-08</span> Chat history + feedback
+└── <span class="hl2">sdlc/</span>             Prompt registry, evals, registration, deploy, monitor
 </div>
 
-From ResponsesAgent to multi-agent orchestration with Genie, memory, prompt versioning, evaluation, and production monitoring.
+From a custom Agent App to a rich AppKit frontend, with evaluation, prompt versioning, feedback, deployment, and production monitoring.
 
 <!--
-Speaker: The GenAI domain is the most expansive — 8 workers covering the full agent lifecycle.
-You start with the ResponsesAgent pattern, add memory via Lakebase, version prompts through
-Unity Catalog, orchestrate multiple agents with Genie integration, evaluate with LLM judges,
-deploy with CI/CD, and monitor in production. This is the capstone of the pipeline.
+Speaker: Stage 9 now starts at the course orchestrator. It routes to foundation setup, Track A
+custom Agent Apps, the AppKit 2-Apps proxy, chat history and feedback, then the MLflow SDLC:
+prompt registry, evaluation, registration, deployment, monitoring, and iteration.
 Timing: ~2 min
 -->
 
@@ -1017,7 +1016,7 @@ Timing: ~2 min
 
 ---
 
-# The Complete Skill Tree — 59 Skills
+# The Complete Skill Tree — 77 Accelerator Skills
 
 <div class="cols">
 <div class="tree" style="font-size:0.48em; line-height:1.35;">
@@ -1059,8 +1058,11 @@ skills/
 │   └── 00-ml-pipeline-setup     <span class="tag o">S8</span>
 │
 ├── <span class="hl">genai-agents/</span>
-│   ├── 00-genai-agents-setup    <span class="tag o">S9</span>
-│   └── workers (8)              <span class="tag g">S9</span>
+│   ├── 00-course-orchestrator   <span class="tag o">S9</span>
+│   ├── foundation/              <span class="tag g">S9</span>
+│   ├── tracks/                  <span class="tag g">S9</span>
+│   ├── sdlc/                    <span class="tag g">S9</span>
+│   └── capstone/                <span class="tag g">S9</span>
 │
 ├── <span class="hl3">common/ (8 shared skills)</span>
 └── <span class="dim">exploration/ (1 utility)</span>
@@ -1070,7 +1072,7 @@ skills/
 <span class="tag o">Orchestrator</span> <span class="tag g">Worker</span> <span class="tag b">Meta/Common</span>
 
 <!--
-Speaker: Here's the entire tree — 59 skills organized by domain. Orange badges are orchestrators
+Speaker: Here's the accelerator tree — 77 skills organized by domain. Orange badges are orchestrators
 (entry points), green are workers (specific patterns). The skill-navigator routes to the right
 one based on keywords. Common skills (8) are shared dependencies. This tree IS the framework.
 Timing: ~2 min
@@ -1870,7 +1872,7 @@ Timing: ~2 min
 
 AppKit + Lakebase Workshop
 
-5 phases — from scaffold to production with live data
+Branch-aware lifecycle — from scaffold to production with live data and optional agent chat
 
 <!--
 Speaker: Now for the hands-on part. We'll walk through the complete AppKit + Lakebase workshop
@@ -1881,13 +1883,13 @@ Timing: ~30 sec transition
 
 ---
 
-# The 5-Phase Lifecycle
+# The AppKit Lifecycle
 
 <div class="phases">
 <div class="p now">1 Scaffold + Build</div>
 <div class="p">2 Deploy Mock</div>
 <div class="p">3 Setup Lakebase</div>
-<div class="p">4 Wire Backend</div>
+<div class="p">4 Wire Branches</div>
 <div class="p">5 Deploy + E2E</div>
 </div>
 
@@ -1896,8 +1898,13 @@ graph LR
     S["Scaffold<br/>(blank app)"] --> B["Build UI<br/>(mock data)"]
     B --> D1["Deploy<br/>(mock)"]
     D1 --> LB["Setup<br/>Lakebase"]
-    LB --> W["Wire<br/>Backend"]
+    LB --> W["Wire<br/>Lakebase"]
+    LB --> A["Wire<br/>Agent Chat"]
+    A --> P["06d<br/>Agent App Proxy"]
+    A --> C["07/08<br/>History + Feedback"]
     W --> D2["Deploy +<br/>E2E Test"]
+    P --> D2
+    C --> D2
     style S fill:#1B3A4B,stroke:#FF3621
     style B fill:#1B3A4B,stroke:#FF3621
     style D1 fill:#1B3A4B,stroke:#2D5A6C
@@ -1907,20 +1914,20 @@ graph LR
 </div>
 
 **Phases 1-2:** Functional UI with mock data (no database needed)
-**Phases 3-5:** Add Lakebase backend with live data
+**Phases 3-5:** Add Lakebase and optional agent-chat branches, then verify live
 
 | Phase | Skills Used |
 |-------|-----------|
 | 1 | `01-appkit-scaffold` + `02-appkit-build` |
 | 2 | `03-appkit-deploy` |
-| 3 | `databricks-lakebase` agent skill |
-| 4 | `04-appkit-plugin-add` + `05-appkit-lakebase-wiring` |
+| 3 | `04-appkit-plugin-add` + `prompts/03-setup-lakebase.md` |
+| 4 | `05-appkit-lakebase-wiring`, optional `06` or `06d`, optional `07` + `08` |
 | 5 | `03-appkit-deploy` (again) |
 
 <!--
-Speaker: Five phases, each building on the last. The first two give you a deployed app with mock
-data — no database needed. Phases 3-5 add the Lakebase backend. This split is intentional:
-you validate the UI first, then wire the data layer. Each phase maps to specific skills.
+Speaker: The AppKit lifecycle still starts simply: scaffold, build, deploy mock. After that, it
+branches. You can wire Lakebase, wire a Model Serving endpoint, wire a separate Agent App with
+06d, then optionally add chat history and feedback before the final E2E deploy.
 Timing: ~2 min
 -->
 
@@ -2143,46 +2150,42 @@ Timing: ~2 min
 
 # Phase 3: Setup Lakebase Project
 
-Uses the **`databricks-lakebase`** agent skill (not an AppKit skill — a Databricks platform skill).
+Uses **`04-appkit-plugin-add`** plus `apps_lakebase/prompts/03-setup-lakebase.md` to add the Lakebase package and bundle resources.
 
 <div class="cols">
 <div>
 
 ### Steps
-1. Create a Lakebase project via CLI
-2. Create a production branch
-3. Create a read-write endpoint
-4. Configure compute (min/max CUs)
-5. Note the endpoint hostname
+1. Install `@databricks/lakebase`
+2. Add `postgres_projects` to `databricks.yml`
+3. Add `valueFrom: postgres` and `DB_SCHEMA` to `app.yaml`
+4. Validate app config
+5. Leave `server.ts` unchanged until Phase 4
 
 ### Key Commands
 
 ```bash
-# Create project
-databricks lakebase projects create \
-  --project-id my-app-db \
-  --pg-version 17
-
-# Get endpoint details
-databricks lakebase endpoints list \
-  --project-id my-app-db \
-  --branch-id production
+cd apps_lakebase/$APP_NAME
+npm install @databricks/lakebase
+databricks apps validate --profile $PROFILE
 ```
 
 </div>
 <div>
 
-### Project / Branch / Endpoint Model
+### Bundle Resource Model
 
 ```
-Project (my-app-db)
-├── Branch: production
-│   └── Endpoint: primary (read-write)
-│       ├── Host: <hostname>
-│       ├── Port: 5432
-│       └── Database: databricks_postgres
-└── Branch: dev (optional)
-    └── Endpoint: dev-rw
+databricks.yml
+└── resources.postgres_projects.my_db
+    ├── project_id: $APP_NAME
+    ├── pg_version: 17
+    └── default_endpoint_settings
+
+app.yaml
+└── env:
+    ├── LAKEBASE_ENDPOINT: valueFrom postgres
+    └── DB_SCHEMA: $APP_NAME with hyphens replaced
 ```
 
 ### Compute Sizing
@@ -2197,9 +2200,9 @@ Project (my-app-db)
 </div>
 
 <!--
-Speaker: Phase 3 creates the Lakebase project. The CLI gives you a managed Postgres instance with
-a project/branch/endpoint hierarchy (similar to git). For the workshop, we use a single production
-branch with one read-write endpoint. Scale-to-zero keeps costs minimal when idle.
+Speaker: Phase 3 is config-only. The bundle declares the Lakebase project and app environment
+variables, but the actual `lakebase()` registration and database code wait until Phase 4. This
+prevents local runtime crashes before platform-injected Lakebase env vars exist.
 Timing: ~2 min
 -->
 
@@ -2548,7 +2551,7 @@ Timing: ~2 min
 
 # AppKit Plugin Architecture
 
-All 5 plugins composing in a single app:
+AppKit plugins compose with custom proxy layers for agent-chat apps:
 
 <div class="mermaid">
 graph TB
@@ -2556,26 +2559,33 @@ graph TB
         Server["server()"]
         Analytics["analytics()"]
         Lakebase["lakebase()"]
+        Serving["serving()"]
         Genie["genie()"]
         Files["files()"]
+        Proxy["06d Agent App Proxy"]
+        History["07/08 History + Feedback"]
     end
     Analytics -->|SQL queries| WH["SQL Warehouse"]
     Lakebase -->|CRUD + OAuth| PG["Lakebase PostgreSQL"]
     Genie -->|NL queries| GS["Genie Space"]
     Files -->|File ops| UC["UC Volumes"]
+    Serving -->|Agent endpoint| EP["Model Serving"]
+    Proxy -->|OBO + app-to-app auth| AA["Separate Agent App"]
+    History -->|Messages + votes| PG
     Client["React Frontend"] -->|"useAnalyticsQuery"| Analytics
     Client -->|"useLakebaseData (custom)"| Lakebase
+    Client -->|"Chat UI"| Serving
+    Client -->|"POST /api/chat"| Proxy
     Client -->|"GenieChat / useGenieChat"| Genie
     Client -->|"DirectoryList / FileBreadcrumb"| Files
 </div>
 
-Each plugin is **independent** — add only what you need. The `server()` plugin is always required.
+Each plugin or proxy layer is **independent** — add only what you need. The `server()` plugin is always required.
 
 <!--
-Speaker: Here's the full plugin architecture. Five plugins, each connecting to a different backend
-service. The frontend uses specialized hooks and components for each. Plugins compose freely —
-you can start with just server(), add analytics() for dashboards, lakebase() for CRUD, genie()
-for natural language, and files() for document management. Mix and match.
+Speaker: Here's the plugin and proxy architecture. The built-in plugins connect to Databricks
+services, and the newer agent-chat path can either use serving() or a separate Agent App proxy
+with OBO forwarding. Chat history and feedback then persist messages and votes in Lakebase.
 Timing: ~1.5 min
 -->
 
@@ -2583,7 +2593,7 @@ Timing: ~1.5 min
 
 # Skill Dependency Map
 
-How the 6 AppKit skills connect to the 5 workshop phases:
+How the 10 AppKit skills connect to the branch-aware workshop lifecycle:
 
 <div class="cols">
 <div>
@@ -2595,9 +2605,10 @@ How the 6 AppKit skills connect to the 5 workshop phases:
 | 1. Scaffold | `01-appkit-scaffold` | `00-navigator` |
 | 1. Build | `02-appkit-build` | — |
 | 2. Deploy | `03-appkit-deploy` | — |
-| 3. Lakebase | `databricks-lakebase` | — |
-| 4. Plugin | `04-appkit-plugin-add` | — |
-| 4. Wire | `05-appkit-lakebase-wiring` | — |
+| 3. Lakebase setup | `04-appkit-plugin-add` | `prompts/03-setup-lakebase.md` |
+| 4. Lakebase wiring | `05-appkit-lakebase-wiring` | — |
+| 4. Agent endpoint | `06-appkit-serving-wiring` | or `06d-appkit-agent-app-proxy` |
+| 4. Chat UX | `07-appkit-chat-history` | `08-appkit-feedback` |
 | 5. Deploy | `03-appkit-deploy` | — |
 
 </div>
@@ -2616,6 +2627,12 @@ How the 6 AppKit skills connect to the 5 workshop phases:
 │
 <span class="hl">04-appkit-plugin-add</span>   ← needs scaffold
 └── <span class="hl">05-appkit-lakebase-wiring</span> ← needs plugin
+│
+├── <span class="hl">06-appkit-serving-wiring</span> ← Model Serving / Agent endpoint
+├── <span class="hl">06d-appkit-agent-app-proxy</span> ← separate Agent App
+│
+<span class="hl">07-appkit-chat-history</span> ← needs Lakebase + agent stream
+└── <span class="hl">08-appkit-feedback</span> ← needs chat trace IDs
 </div>
 
 ### Cross-References to Training
@@ -2629,9 +2646,10 @@ How the 6 AppKit skills connect to the 5 workshop phases:
 </div>
 
 <!--
-Speaker: This map shows how skills connect to phases and how the training modules support each
-phase. Notice 03-appkit-deploy is used twice — Phase 2 (mock) and Phase 5 (live). The dependency
-chain is linear: scaffold → build → deploy, then plugin-add → lakebase-wiring → deploy again.
+Speaker: This map shows the updated AppKit skill graph. The base app path is still scaffold,
+build, deploy mock. After plugin setup, Lakebase, serving endpoint wiring, and the separate Agent
+App proxy are branches. Chat history depends on Lakebase plus an agent stream, and feedback depends
+on the trace IDs captured by chat history.
 Timing: ~1.5 min
 -->
 
@@ -2669,18 +2687,21 @@ graph TB
     Monitor --> Dash["AI/BI Dashboards"]
     Gold --> ML["ML Models"]
     ML --> Agents["GenAI Agents"]
-    Agents -->|"served via"| AppUI
+    Agents -->|"06 or 06d"| AppUI
+    AppUI -->|"07/08"| Feedback["Chat History + Feedback"]
 </div>
 
 **The complete picture:**
 - **Path B** builds the data foundation (Gold tables, semantic layer, ML models, agents)
 - **Path A** builds the user-facing app that queries that foundation
+- The standalone GenAI course supplies the canonical Track A Agent App and AppKit 2-Apps proxy
 - Together: a production data product with a beautiful frontend
 
 <!--
 Speaker: Here's the convergence. Your data pipeline produces Gold tables, a semantic layer, ML
 models, and GenAI agents. Your Databricks App queries those Gold tables via the analytics plugin,
-embeds Genie via the genie plugin, stores app state in Lakebase, and can serve agent responses.
+embeds Genie via the genie plugin, stores app state in Lakebase, and can proxy agent responses
+from Model Serving or a separate Agent App.
 The two paths aren't separate — they're two halves of the same product.
 Timing: ~2 min
 -->
@@ -2698,6 +2719,8 @@ Fill in before starting. Referenced throughout all steps.
 | `{PROFILE}` | Databricks CLI profile name | `________________` |
 | `{user_app_name}` | Lakebase project name (Phase 3 output) | `________________` |
 | `{LAKEBASE_HOST}` | Lakebase endpoint hostname (Phase 3 output) | `________________` |
+| `{agent_app_name}` | Optional separate Agent App name for 06d | `________________` |
+| `{agent_app_url}` | Optional separate Agent App URL for 06d | `________________` |
 
 ### Pre-flight Check
 
@@ -2741,12 +2764,30 @@ Deploy the app to Databricks Apps. Read @apps_lakebase/skills/03-appkit-deploy/S
 App name: $APP_NAME, Profile: $PROFILE
 ```
 
+### Phase 3: Setup Lakebase
+
+```
+Set up Lakebase bundle resources for my AppKit app.
+Read @apps_lakebase/skills/04-appkit-plugin-add/SKILL.md and follow
+@apps_lakebase/prompts/03-setup-lakebase.md.
+Do not modify server/server.ts in this step.
+```
+
 ### Phase 4: Wire Lakebase
 
 ```
 Add the Lakebase plugin and wire the backend. Read @apps_lakebase/skills/04-appkit-plugin-add/SKILL.md
 to register the plugin, then @apps_lakebase/skills/05-appkit-lakebase-wiring/SKILL.md
 to design the schema, build CRUD APIs, and wire the frontend.
+```
+
+### Optional Agent Chat
+
+```
+If my agent is a Model Serving endpoint, read @apps_lakebase/skills/06-appkit-serving-wiring/SKILL.md.
+If my agent is a separate Databricks App, read @apps_lakebase/skills/06d-appkit-agent-app-proxy/SKILL.md.
+Then add history and feedback with @apps_lakebase/skills/07-appkit-chat-history/SKILL.md
+and @apps_lakebase/skills/08-appkit-feedback/SKILL.md.
 ```
 
 <!--
@@ -2846,7 +2887,7 @@ Timing: ~1 min
 
 <br/>
 
-**59 Agent Skills** — ready to guide your AI assistant
+**77 Accelerator Skills + 10 AppKit Skills** — ready to guide your AI assistant
 
 **Start now:** Clone the repo, pick a path, paste a prompt
 

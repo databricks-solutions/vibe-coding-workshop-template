@@ -1,6 +1,6 @@
 # Workshop Presentation
 
-MARP-based slide deck for the Vibe Coding Workshop. Covers the Data Product Accelerator (55 agent skills, 9-stage pipeline), platform training modules (Databricks Apps, AppKit, Lakebase, SDP/DLT, Genie Spaces), and the AppKit + Lakebase hands-on workshop.
+MARP-based slide deck for the Vibe Coding Workshop. Covers the Data Product Accelerator (77 agent skills, 9-stage pipeline), the standalone GenAI agent course, platform training modules (Databricks Apps, AppKit, Lakebase, SDP/DLT, Genie Spaces), and the AppKit + Lakebase + agent-chat hands-on workshop.
 
 ## Prerequisites
 
@@ -63,7 +63,7 @@ presentations/
 | I   | 1-8    | Welcome, vibe coding intro, repo overview, skill anatomy |
 | II  | 9-30   | Data Product Accelerator 9-stage animated journey |
 | III | 31-46  | Platform training: Apps, AppKit, Lakebase, SDP, Genie, UC |
-| IV  | 47-62  | AppKit + Lakebase 5-phase workshop journey |
+| IV  | 47-62  | AppKit + Lakebase branch-aware workshop journey |
 | V   | 63-70  | Synthesis, hands-on prompts, resources, Q&A |
 
 ## Notes

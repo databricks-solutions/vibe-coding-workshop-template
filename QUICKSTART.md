@@ -8,7 +8,7 @@ Get started building your data product on Databricks. Choose your starting point
 
 ## Path A: Build and Deploy a Databricks App
 
-Build a full-stack TypeScript app on Databricks AppKit, guided by 7 agent skills:
+Build a full-stack TypeScript app on Databricks AppKit, guided by 10 agent skills:
 
 ```bash
 # 1. Clone template
@@ -24,15 +24,17 @@ databricks auth login --host https://your-workspace.cloud.databricks.com
 I want to build a Databricks App. Read @apps_lakebase/skills/01-appkit-scaffold/SKILL.md and scaffold a new AppKit project.
 ```
 
-Follow the 5-phase workflow in [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md):
+Follow the branch-aware workflow in [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md):
 
 | Phase | What Happens | Skill Used |
 |-------|-------------|------------|
 | 1 | Scaffold + build UI from a PRD, test locally | `01-appkit-scaffold`, `02-appkit-build` |
 | 2 | Deploy to Databricks Apps (mock data) | `03-appkit-deploy` |
-| 3 | Setup Lakebase project | `00-appkit-navigator` |
+| 3 | Setup Lakebase bundle resources | `04-appkit-plugin-add`, `apps_lakebase/prompts/03-setup-lakebase.md` |
 | 4 | Wire Lakebase backend (local) | `04-appkit-plugin-add`, `05-appkit-lakebase-wiring` |
 | 4b | Wire Serving / Agent endpoint (optional) | `04-appkit-plugin-add`, `06-appkit-serving-wiring` |
+| 4c | Wire AppKit to a separate Agent App (optional) | `06d-appkit-agent-app-proxy` |
+| 4d | Add chat history + feedback (optional) | `07-appkit-chat-history`, `08-appkit-feedback` |
 | 5 | Deploy + E2E test with Lakebase | `03-appkit-deploy` |
 
 ---
@@ -58,8 +60,9 @@ Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold
 
 | Directory | What It Does |
 |-----------|-------------|
-| `apps_lakebase/` | AppKit workshop -- 7 agent skills for building full-stack Databricks Apps |
-| `data_product_accelerator/` | 55 agent skills for building end-to-end data products (9 stages) |
+| `apps_lakebase/` | AppKit workshop -- 10 agent skills for building full-stack Databricks Apps |
+| `genai-agents/` | GenAI agent course -- current orchestrator, prompt guide, Track A custom Agent Apps, and SDLC |
+| `data_product_accelerator/` | 77 agent skills for building end-to-end data products (9 stages) |
 | `agentic-framework/` | Multi-agent build framework for Databricks Foundation Models |
 
 ---
@@ -97,6 +100,17 @@ Schema CSV → Gold Design → Bronze → Silver → Gold → Semantic Layer →
 
 - [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md) -- Step-by-step (9 stages)
 - [data_product_accelerator/AGENTS.md](data_product_accelerator/AGENTS.md) -- Skill routing table
+
+---
+
+## GenAI Agent Course
+
+Build production GenAI agents on Databricks using the current course navigator:
+
+```
+Start with @genai-agents/00-course-orchestrator/SKILL.md.
+Use @genai-agents/PROMPT-GUIDE.md for the canonical Track A + AppKit 2-Apps walkthrough.
+```
 
 ---
 

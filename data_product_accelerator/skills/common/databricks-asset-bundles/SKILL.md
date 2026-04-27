@@ -17,6 +17,13 @@ metadata:
       relationship: "extended"
       last_synced: "2026-02-19"
       sync_commit: "97a3637"
+    - name: "databricks-agent-skills/databricks-dabs"
+      repo: "databricks/databricks-agent-skills"
+      paths:
+        - "skills/databricks-dabs/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-04-27"
+      sync_commit: "manifest-v2-2026-04-22"
 ---
 
 # Databricks Asset Bundles (DABs)

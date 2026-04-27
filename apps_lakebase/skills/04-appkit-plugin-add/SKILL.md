@@ -21,11 +21,16 @@ metadata:
   domain: apps
   role: plugin-integration
   standalone: true
-  last_verified: "2026-04-10"
+  last_verified: "2026-04-27"
   volatility: medium
   upstream_sources:
-    - https://databricks.github.io/appkit/docs/plugins/
-    - https://github.com/databricks/databricks-agent-skills
+    - name: "databricks-agent-skills/databricks-apps"
+      repo: "databricks/databricks-agent-skills"
+      paths:
+        - "skills/databricks-apps/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-04-27"
+      sync_commit: "manifest-v2-2026-04-22"
 ---
 
 # Add Plugins to an Existing AppKit Project
@@ -183,3 +188,11 @@ npx @databricks/appkit docs --full       # full index with all API entries
 | Generate query types (Analytics) | `npm run typegen` |
 | Validate app | `databricks apps validate` |
 | Deploy | `databricks apps deploy --profile <P>` |
+
+---
+
+## See Also
+
+- Upstream platform skill: [databricks-agent-skills / `databricks-apps`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps) (tracked in `upstream_sources`).
+- AppKit plugin docs: [databricks.github.io/appkit/docs/plugins/](https://databricks.github.io/appkit/docs/plugins/)
+

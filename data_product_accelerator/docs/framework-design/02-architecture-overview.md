@@ -2,9 +2,9 @@
 
 ## System Architecture
 
-The Data Product Accelerator uses a **skills-first architecture** where domain expertise lives in Agent Skills using the open [SKILL.md format](https://agentskills.io). This is a deliberate evolution: the original framework embedded all patterns in 46+ IDE-specific rules, which created context-window pressure and IDE lock-in. The restructured framework uses a single `AGENTS.md` entry point that routes to 59 Agent Skills, each following a progressive disclosure pattern.
+The Data Product Accelerator uses a **skills-first architecture** where domain expertise lives in Agent Skills using the open [SKILL.md format](https://agentskills.io). This is a deliberate evolution: the original framework embedded all patterns in 46+ IDE-specific rules, which created context-window pressure and IDE lock-in. The restructured framework uses a single `AGENTS.md` entry point that routes to 77 Agent Skills, each following a progressive disclosure pattern.
 
-The architecture has three layers: a **routing layer** (`AGENTS.md` — universal entry point), a **knowledge layer** (59 Agent Skills), and a **generation layer** (the output code, configurations, and documentation that the AI assistant produces).
+The architecture has three layers: a **routing layer** (`AGENTS.md` — universal entry point), a **knowledge layer** (77 Agent Skills), and a **generation layer** (the output code, configurations, and documentation that the AI assistant produces).
 
 ### Architecture Diagram
 
@@ -61,7 +61,7 @@ graph TB
 └────────────────────────────────┬────────────────────────────────────┘
                                  │ routes to
 ┌────────────────────────────────▼────────────────────────────────────┐
-│                  KNOWLEDGE LAYER (59 Agent Skills)                  │
+│                  KNOWLEDGE LAYER (77 Agent Skills)                  │
 │                                                                     │
 │  ┌───────────────────────────────────────────────────────────────┐  │
 │  │  ORCHESTRATORS (00-*)        WORKERS (01-*, 02-*, ...)       │  │
@@ -151,7 +151,7 @@ project_root/
 ├── AGENTS.md                           # Universal entry point (routing + common skills index)
 ├── QUICKSTART.md                       # One-prompt-per-stage guide
 ├── README.md                           # Project overview
-├── skills/                             # 59 Agent Skills (open SKILL.md format)
+├── skills/                             # 77 Agent Skills (open SKILL.md format)
 │   ├── admin/                          # 4 utility skills
 │   ├── bronze/                         # 2 skills (00-orchestrator, 01-worker)
 │   ├── common/                         # 8 shared skills

@@ -20,7 +20,7 @@ metadata:
     - semantic-layer/00-semantic-layer-setup
     - monitoring/00-observability-setup
     - ml/00-ml-pipeline-setup
-    - genai-agents/00-genai-agents-setup
+    - genai-agents/00-course-orchestrator
   dependencies:
     - admin/self-improvement
   triggers:
@@ -531,3 +531,10 @@ Without explicit user confirmation, NEVER retry:
 ### External Docs
 - SDK: https://databricks-sdk-py.readthedocs.io/en/latest/
 - GitHub: https://github.com/databricks/databricks-sdk-py
+
+---
+
+## See Also
+
+- Authoritative upstream: [databricks-agent-skills / `databricks-core`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-core) — back-up reference for canonical Databricks CLI / auth / data exploration patterns.
+

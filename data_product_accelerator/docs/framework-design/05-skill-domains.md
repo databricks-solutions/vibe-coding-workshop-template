@@ -2,7 +2,7 @@
 
 ## Overview
 
-The framework's 59 Agent Skills are organized into 12 domain directories. Each domain corresponds to a layer of the Medallion Architecture, a platform capability, or an administrative function. This document provides the complete inventory of every skill in every domain.
+The framework's 77 Agent Skills are organized into 12 domain directories. Each domain corresponds to a layer of the Medallion Architecture, a platform capability, or an administrative function. This document provides the complete inventory of every skill in every domain.
 
 ## Domain Summary
 
@@ -16,7 +16,7 @@ The framework's 59 Agent Skills are organized into 12 domain directories. Each d
 | Semantic Layer | `semantic-layer/` | `00-semantic-layer-setup` | 4 workers + 1 optimization orchestrator + 4 optimization workers | 10 | Stage 6 (+ optional 6b) |
 | Monitoring | `monitoring/` | `00-observability-setup` | 4 workers | 5 | Stage 7 |
 | ML | `ml/` | `00-ml-pipeline-setup` | 0 | 1 | Stage 8 |
-| GenAI Agents | `genai-agents/` | `00-genai-agents-setup` | 8 workers | 9 | Stage 9 |
+| GenAI Agents | `genai-agents/` | `00-course-orchestrator` | foundation/tracks/SDLC/capstone | 9 | Stage 9 |
 | Exploration | `exploration/` | `00-adhoc-exploration-notebooks` | 0 | 1 | Standalone |
 | Common | `common/` | — | — | 8 | All stages |
 | Admin | `admin/` | — | — | 4 | Meta/utility |
@@ -120,7 +120,7 @@ The largest domain with the most workers.
 
 | Skill | Role | Description |
 |-------|------|-------------|
-| `00-genai-agents-setup` | Orchestrator | End-to-end agent implementation |
+| `00-course-orchestrator` | Orchestrator | End-to-end agent course routing |
 | `01-responses-agent-patterns` | Worker | MLflow ResponsesAgent with streaming |
 | `02-mlflow-genai-evaluation` | Worker | LLM judges, custom scorers, thresholds |
 | `03-lakebase-memory-patterns` | Worker | Short-term (CheckpointSaver) + long-term (DatabricksStore) |

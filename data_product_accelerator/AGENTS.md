@@ -15,7 +15,7 @@ This module (`data_product_accelerator/`) contains the framework — skills, doc
 repo-root/                           <-- workspace root / agent CWD
 ├── data_product_accelerator/        <-- framework (skills, docs, context)
 │   ├── AGENTS.md
-│   ├── skills/                      <-- 55 agent skills (read-only)
+│   ├── skills/                      <-- 77 agent skills (read-only)
 │   ├── context/                     <-- customer schema CSV (input)
 │   └── docs/                        <-- framework documentation
 │
@@ -55,7 +55,7 @@ data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Si
 | "metric view", "TVF", "Genie Space", "semantic layer", "semantic layer deployment", "deploy TVFs", "deploy metric views", "deploy genie", "deploy semantic", "data intelligence assets" | 6 | `data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md` |
 | "monitoring", "dashboard", "alert", "observability" | 7 | `data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md` |
 | "MLflow", "ML model", "training", "inference" | 8 | `data_product_accelerator/skills/ml/00-ml-pipeline-setup/SKILL.md` |
-| "GenAI agent", "ResponsesAgent", "AI agent" | 9 | `data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md` |
+| "GenAI agent", "ResponsesAgent", "AI agent" | 9 | `genai-agents/00-course-orchestrator/SKILL.md` |
 
 ## Worker Routing (specific tasks)
 
@@ -138,6 +138,10 @@ Skills follow an **orchestrator/worker** pattern:
 - `00-` prefix = **Orchestrator** (manages end-to-end workflows for a pipeline stage)
 - `01-` prefix or named directories = **Workers** (specific patterns, called by orchestrators or used standalone)
 - Gold workers are organized into `design-workers/` and `pipeline-workers/` subdirectories for clear separation
+
+### Authoritative upstream skill registries
+
+For canonical Databricks-platform skills (Apps, Lakebase, Model Serving, DABs, Pipelines, Core), see [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills). The accelerator skills here extend or specialize those for the design-first pipeline. Local skills that genuinely derive from an upstream skill record a structured `upstream_sources` entry; the freshness audit (`skills/admin/skill-freshness-audit/`) tracks drift against that registry alongside the existing `databricks-solutions/ai-dev-kit` mappings.
 
 ## IDE Compatibility
 

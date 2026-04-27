@@ -27,7 +27,7 @@ The "Extract, Don't Generate" principle applies to the planning-to-implementatio
 | `semantic-layer-manifest.yaml` | `semantic-layer/00-semantic-layer-setup` (stage 6) | Metric Views, TVFs, Genie Spaces |
 | `observability-manifest.yaml` | `monitoring/00-observability-setup` (stage 7) | Monitors, Dashboards, Alerts |
 | `ml-manifest.yaml` | `ml/00-ml-pipeline-setup` (stage 8) | Feature Tables, Models, Experiments |
-| `genai-agents-manifest.yaml` | `genai-agents/00-genai-agents-setup` (stage 9) | Agents, Tools, Eval Datasets |
+| `genai-agents-manifest.yaml` | `genai-agents/00-course-orchestrator` (stage 9) | Agents, Tools, Eval Datasets |
 
 ---
 

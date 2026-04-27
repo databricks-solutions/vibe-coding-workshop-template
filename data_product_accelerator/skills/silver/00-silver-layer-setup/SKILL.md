@@ -630,3 +630,10 @@ End with:
 - [Row Tracking](https://docs.databricks.com/aws/en/delta/row-tracking) - Required for incremental MV refresh
 - [Schema Evolution in Streaming Tables](https://docs.databricks.com/aws/en/ldp/develop#schema-evolution) - Full refresh requirements
 - [Pipeline Edition Comparison](https://docs.databricks.com/aws/en/ldp/configure-pipeline#editions) - ADVANCED required for expectations/CDC
+
+---
+
+## See Also
+
+- Authoritative upstream (alternate registry): [databricks-agent-skills / `databricks-pipelines`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-pipelines) — canonical DLT / Spark Declarative Pipelines guidance.
+

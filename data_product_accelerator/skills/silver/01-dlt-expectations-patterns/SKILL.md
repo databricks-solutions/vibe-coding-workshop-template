@@ -467,3 +467,10 @@ The `expectations` array contains one entry per expectation with `name` (maps to
 - `dqx-patterns` - DQX framework patterns (complementary advanced validation)
 - `databricks-python-imports` - Pure Python module patterns (critical for rules loader)
 - `databricks-table-properties` - Silver table properties patterns
+
+---
+
+## See Also
+
+- Authoritative upstream (alternate registry): [databricks-agent-skills / `databricks-pipelines`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-pipelines) — canonical expectations / DLT reference.
+

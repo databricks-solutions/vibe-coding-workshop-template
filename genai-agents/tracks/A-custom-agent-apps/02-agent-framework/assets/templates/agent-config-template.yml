@@ -1,0 +1,39 @@
+# Agent configuration template for ModelConfig
+#
+# Load in your agent:
+#   config = mlflow.models.ModelConfig(development_config="config.yml")
+#   endpoint = config.get("model_serving_endpoint")
+#
+# Override at log time:
+#   mlflow.pyfunc.log_model(
+#       python_model=agent,
+#       artifact_path="agent",
+#       model_config="prod-config.yml",   # <-- different config per env
+#   )
+#
+# Values here are development defaults. Production overrides should live
+# in a separate file (e.g. prod-config.yml) and be passed at log time.
+
+# --- LLM -------------------------------------------------------------------
+model_serving_endpoint: "databricks-claude-sonnet-4-6"
+max_tokens: 4096
+temperature: 0.1
+
+# --- Retrieval (optional) --------------------------------------------------
+warehouse_id: ""
+vector_search_index: ""
+chunk_size: 512
+top_k: 5
+
+# --- Prompt -----------------------------------------------------------------
+prompt_template: |
+  You are a helpful assistant.
+
+  Context: {context}
+
+  Question: {question}
+
+# --- Feature flags ----------------------------------------------------------
+enable_tracing: true
+enable_memory: false
+memory_table: ""

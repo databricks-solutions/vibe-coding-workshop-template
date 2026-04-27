@@ -6,17 +6,48 @@ Scans all SKILL.md files for last_verified dates and reports stale skills
 based on volatility classification thresholds. Also checks upstream_sources
 lineage metadata for sync staleness.
 
+Discovery is repo-wide by default: every SKILL.md under the supplied root
+(repo root by default) is included unless its path matches one of the
+excluded path segments (`.git`, `node_modules`, `dist`, `build`, `.venv`,
+`presentations`, `retrospectives`, `assets`, `references`).
+
 Usage:
     python data_product_accelerator/skills/admin/skill-freshness-audit/scripts/scan_skill_freshness.py
+    python ... --root /path/to/repo
+    python ... --exclude '*tests*' --exclude '*sandbox*'
 
 Output: Markdown-formatted report of stale skills grouped by volatility,
         plus upstream sync status.
 """
 
+import argparse
+import fnmatch
 import re
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+
+KNOWN_DOMAIN_ROOTS = {
+    "data_product_accelerator",
+    "genai-agents",
+    "apps_lakebase",
+}
+
+DEFAULT_EXCLUDED_PATH_PARTS = {
+    ".git",
+    "node_modules",
+    "dist",
+    "build",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "presentations",
+    "retrospectives",
+    "assets",
+    "references",
+    ".cursor",
+    ".pytest_cache",
+}
 
 # Staleness thresholds (days)
 THRESHOLDS = {
@@ -195,15 +226,86 @@ def calculate_staleness(last_verified: str, volatility: str, today: datetime) ->
     }
 
 
-def scan_skills(root: Path) -> list[dict]:
-    """Scan all SKILL.md files and return freshness data."""
-    skills_dir = root / "skills"
+def discover_skill_paths(repo_root: Path, extra_excludes: list[str] | None = None) -> list[Path]:
+    """Repo-wide discovery of SKILL.md files.
+
+    Excludes vendored / build directories and reference / asset subtrees that
+    are not themselves skills. Additional fnmatch-style globs can be supplied
+    via `extra_excludes` (matched against the relative path).
+    """
+    extra_excludes = extra_excludes or []
+    discovered: list[Path] = []
+    for skill_md in repo_root.rglob("SKILL.md"):
+        try:
+            rel = skill_md.relative_to(repo_root)
+        except ValueError:
+            continue
+
+        rel_str = str(rel)
+        parts = rel.parts
+
+        if any(part in DEFAULT_EXCLUDED_PATH_PARTS for part in parts):
+            continue
+        if any(fnmatch.fnmatch(rel_str, pat) for pat in extra_excludes):
+            continue
+
+        discovered.append(skill_md)
+    return sorted(discovered)
+
+
+def attribute_domain(skill_path: Path, repo_root: Path) -> str:
+    """Compute a human-friendly domain string for a skill.
+
+    Walks upward from the skill file until it hits a known top-level skill
+    root (data_product_accelerator, genai-agents, apps_lakebase). The domain
+    is the segment immediately under that root, joined with the top-level
+    root for genai-agents subfolders so the output disambiguates between
+    foundation / sdlc / tracks etc.
+
+    Examples:
+        apps_lakebase/skills/00-appkit-navigator/SKILL.md
+            -> "apps_lakebase"
+        genai-agents/foundation/01-mlflow-genai-foundation/SKILL.md
+            -> "genai-agents/foundation"
+        data_product_accelerator/skills/ml/00-ml-pipeline-setup/SKILL.md
+            -> "ml"
+        data_product_accelerator/skills/admin/self-improvement/SKILL.md
+            -> "admin"
+    """
+    rel = skill_path.relative_to(repo_root)
+    parts = rel.parts
+    if not parts:
+        return "root"
+
+    top = parts[0]
+
+    if top == "data_product_accelerator":
+        if len(parts) >= 4 and parts[1] == "skills":
+            return parts[2]
+        return "data_product_accelerator"
+
+    if top == "genai-agents":
+        if len(parts) >= 3:
+            return f"genai-agents/{parts[1]}"
+        return "genai-agents"
+
+    if top == "apps_lakebase":
+        return "apps_lakebase"
+
+    if top in KNOWN_DOMAIN_ROOTS:
+        return top
+
+    return parts[0] if len(parts) > 1 else "root"
+
+
+def scan_skills(skill_paths: list[Path], repo_root: Path) -> list[dict]:
+    """Scan supplied SKILL.md files and return freshness data."""
     results = []
 
-    for skill_path in sorted(skills_dir.rglob("SKILL.md")):
-        relative_path = skill_path.relative_to(root)
+    for skill_path in skill_paths:
+        relative_path = skill_path.relative_to(repo_root)
         skill_dir = skill_path.parent.name
-        domain = skill_path.parent.parent.name if skill_path.parent.parent != skills_dir else "root"
+        domain = attribute_domain(skill_path, repo_root)
 
         metadata = parse_frontmatter(skill_path)
 
@@ -420,28 +522,73 @@ def generate_report(results: list[dict], today: datetime) -> str:
     return "\n".join(lines)
 
 
-def main():
-    # Find project root (look for skills directory)
-    # Supports both workspace root (data_product_accelerator/skills/) and project root (skills/)
-    cwd = Path.cwd()
-    root = cwd
+def find_repo_root(start: Path) -> Path:
+    """Walk upward from `start` until we find a directory that looks like the
+    repo root (contains at least one of the known skill roots). Falls back to
+    `start` if nothing matches within 10 levels.
+    """
+    candidate = start.resolve()
+    for _ in range(10):
+        if any((candidate / d).exists() for d in KNOWN_DOMAIN_ROOTS):
+            return candidate
+        if candidate.parent == candidate:
+            break
+        candidate = candidate.parent
+    return start.resolve()
 
-    # First check if data_product_accelerator/skills exists (workspace root)
-    if (root / "data_product_accelerator" / "skills").exists():
-        root = root / "data_product_accelerator"
-    else:
-        # Walk up to find skills directory
-        for _ in range(10):
-            if (root / "skills").exists():
-                break
-            root = root.parent
-        else:
-            print("ERROR: Could not find skills directory.", file=sys.stderr)
-            print("Run this script from the workspace root or data_product_accelerator/ directory.", file=sys.stderr)
-            sys.exit(1)
 
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Repo-wide skill freshness scanner. Scans every SKILL.md under the "
+            "supplied root, classifies staleness by volatility, and reports "
+            "upstream-source sync status."
+        )
+    )
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=None,
+        help=(
+            "Repository root to scan. Defaults to auto-detection by walking up "
+            "from the current working directory until a directory containing "
+            "data_product_accelerator/, genai-agents/, or apps_lakebase/ is found."
+        ),
+    )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help=(
+            "Additional fnmatch-style glob patterns (matched against the "
+            "skill path relative to the root) to exclude from the scan. "
+            "Repeat the flag for multiple patterns."
+        ),
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None):
+    args = parse_args(argv)
+
+    repo_root = args.root.resolve() if args.root else find_repo_root(Path.cwd())
+
+    if not any((repo_root / d).exists() for d in KNOWN_DOMAIN_ROOTS):
+        print(
+            "ERROR: Could not locate a repository root containing one of "
+            f"{sorted(KNOWN_DOMAIN_ROOTS)} starting from {repo_root}.",
+            file=sys.stderr,
+        )
+        print(
+            "Pass --root /path/to/repo or run from inside the repository.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    skill_paths = discover_skill_paths(repo_root, extra_excludes=args.exclude)
     today = datetime.now()
-    results = scan_skills(root)
+    results = scan_skills(skill_paths, repo_root)
     report = generate_report(results, today)
 
     print(report)

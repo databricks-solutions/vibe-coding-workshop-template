@@ -18,12 +18,9 @@ metadata:
   domain: apps
   role: build
   standalone: false
-  last_verified: "2026-04-10"
+  last_verified: "2026-04-27"
   volatility: medium
-  upstream_sources:
-    - https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps
-    - https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md
-    - https://databricks.github.io/appkit/
+  upstream_sources: []  # Project-specific PRD-to-UI workflow; see See Also for canonical upstream.
 ---
 
 # Build Features on Databricks AppKit
@@ -401,3 +398,12 @@ Before declaring the build complete:
 Once local testing passes, deploy to Databricks Apps using the `03-appkit-deploy` skill at `@apps_lakebase/skills/03-appkit-deploy/SKILL.md`. The calling prompt (`02-deploy.md` or `05-e2e-test.md`) will set variables and invoke the skill.
 
 See the [AppKit App Management docs](https://databricks.github.io/appkit/docs/app-management) for advanced deploy options.
+
+---
+
+## See Also
+
+- Authoritative upstream: [databricks-agent-skills / `databricks-apps`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps) — canonical Apps platform patterns this skill builds on.
+- Frontend design reference: [Anthropic frontend-design skill](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md)
+- AppKit docs hub: [databricks.github.io/appkit](https://databricks.github.io/appkit/)
+

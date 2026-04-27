@@ -11,7 +11,7 @@ metadata:
   called_by:
     - semantic-layer-setup
   standalone: true
-  last_verified: "2026-02-07"
+  last_verified: "2026-04-27"
   volatility: high
   upstream_sources:
     - name: "ai-dev-kit"
@@ -19,8 +19,20 @@ metadata:
       paths:
         - "databricks-skills/databricks-genie/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
+      last_synced: "2026-04-27"
+      sync_commit: "latest"
+    - name: "databricks-docs-genie-getspace"
+      url: "https://docs.databricks.com/api/workspace/genie/getspace"
+      relationship: "upstream"
+      last_synced: "2026-04-27"
+    - name: "databricks-docs-genie-createspace"
+      url: "https://docs.databricks.com/api/workspace/genie/createspace"
+      relationship: "upstream"
+      last_synced: "2026-04-27"
+    - name: "databricks-docs-genie-updatespace"
+      url: "https://docs.databricks.com/api/workspace/genie/updatespace"
+      relationship: "upstream"
+      last_synced: "2026-04-27"
 ---
 
 # Genie Space Export/Import API
@@ -99,15 +111,16 @@ Genie Space creation silently succeeds but produces a broken room when these inv
 | `version` | `int` | Must equal `2`. |
 | `config.title` | `str` | Non-empty. Mirrors top-level `title` in the POST envelope. |
 | `config.description` | `str` | Non-empty. |
-| `config.semantic_warehouse_id` | `str` (24 hex chars) | Must be the **deploy-time** warehouse id (see Action S10). Never a template placeholder. |
-| `data_sources.tables` | `list[object]` | Each entry: `{id: uuid4.hex, table_full_name: "catalog.schema.table"}`. **Sorted by `table_full_name`** to keep diffs stable. |
-| `data_sources.metric_views` | `list[object]` | Each entry: `{id: uuid4.hex, metric_view_full_name: "catalog.schema.mv_name"}`. Sorted. |
+| `config.semantic_warehouse_id` | `str` (16+ hex chars) | Must be the **deploy-time** warehouse id (see Action S10). Never a template placeholder. |
+| `data_sources.tables` | `list[object]` | Each entry: `{identifier: "catalog.schema.table", description?: List[str]}`. **NO `id` field** (adding one fails with `Cannot find field: id`). **Sorted by `identifier`** to keep diffs stable. |
+| `data_sources.metric_views` | `list[object]` | Each entry: `{identifier: "catalog.schema.mv_name", description?: List[str]}`. **NO `id` field**. Sorted by `identifier`. |
 | `instructions.general_instructions` | `list[str]` | List of plain strings — no nested objects. |
-| `instructions.sql_functions` | `list[object]` | Each: `{id, function_full_name, sql: List[str]}`. **`sql` MUST be a `List[str]`**, never a single string. Max 50 entries. |
-| `instructions.sample_queries` / `benchmarks.questions` | `list[object]` | Each: `{id, question: str, sql: List[str]}`. **`sql` MUST be a `List[str]`**, never a string. Max 50 entries for `benchmarks.questions`. |
+| `instructions.sql_functions` | `list[object]` | Each: `{id: uuid4.hex, identifier: "catalog.schema.fn_name"}`. No other fields. Max 50 entries. |
+| `instructions.example_question_sqls` | `list[object]` | Each: `{id: uuid4.hex, question: List[str], sql: List[str]}`. **`question` and `sql` MUST be `List[str]`**, never single strings. |
+| `benchmarks.questions` | `list[object]` | Each: `{id: uuid4.hex, question: List[str], answer: [{format: "SQL"\|"INSTRUCTIONS", content: List[str]}]}`. SQL lives inside `answer[].content`, never as a top-level `sql` field. Max 50 entries. |
 | Every `id` field | `str` (32 hex chars) | `uuid.uuid4().hex` — lowercase, no dashes. Regenerate on every new deploy (never copy/paste IDs across environments). |
 
-**The #1 silent-failure mode observed in production:** `sql_functions[].sql` or `sample_queries[].sql` submitted as a single SQL string. The API accepts it, but the resulting space has empty/broken example queries because Genie serializes only the first character and then errors internally on render. There is no error surfaced on POST.
+**The #1 silent-failure mode observed in production:** `example_question_sqls[].sql`, `example_question_sqls[].question`, or `benchmarks.questions[].answer[].content` submitted as a single string instead of `List[str]`. The API accepts it, but the resulting space has empty/broken example queries because Genie serializes only the first character and then errors internally on render. There is no error surfaced on POST.
 
 #### Validator — `_assert_sql_arrays`
 
@@ -131,13 +144,16 @@ def _assert_sql_arrays(space: dict) -> None:
     Validate serialized_space invariants before POST / PATCH.
     Raises RuntimeError on the FIRST violation — never returns False / warns.
 
-    Specifically enforces the #1 silent-failure: every `sql` field inside
-    instructions.sql_functions / sample_queries / benchmarks.questions must
-    be a List[str], never a single string.
+    Schema reference: https://docs.databricks.com/api/workspace/genie/getspace
+    Enforces:
+      - data_sources.tables / metric_views entries use `identifier` only (NO `id`).
+      - instructions.sql_functions entries: {id, identifier} only.
+      - instructions.example_question_sqls entries: {id, question: List[str], sql: List[str]}.
+      - benchmarks.questions[].answer[].content must be List[str] (SQL lives there,
+        not as a top-level `sql` field).
     """
     errors: List[str] = []
 
-    # Root invariants
     if space.get("version") != 2:
         errors.append("serialized_space.version must be exactly 2 (got %r)" % space.get("version"))
 
@@ -154,59 +170,105 @@ def _assert_sql_arrays(space: dict) -> None:
             f"got {wh!r}. Template placeholders like '${{warehouse_id}}' are never acceptable."
         )
 
-    # Data sources — sorted + shape
+    # Data sources — sorted by `identifier`, NEVER include `id` on these entries.
     ds = space.get("data_sources") or {}
-    for key, name_field in [("tables", "table_full_name"), ("metric_views", "metric_view_full_name")]:
+    for key in ("tables", "metric_views"):
         items = ds.get(key) or []
         if not isinstance(items, list):
             errors.append(f"data_sources.{key} must be a list")
             continue
-        names = [it.get(name_field, "") for it in items]
-        if names != sorted(names):
-            errors.append(f"data_sources.{key} must be sorted by {name_field} (got {names})")
+        idents = [it.get("identifier", "") for it in items]
+        if idents != sorted(idents):
+            errors.append(f"data_sources.{key} must be sorted by identifier (got {idents})")
         for it in items:
-            if not _is_uuid_hex(it.get("id")):
-                errors.append(f"data_sources.{key} entry missing 32-hex uuid4 id: {it}")
-            if not isinstance(it.get(name_field), str) or "." not in (it.get(name_field) or ""):
-                errors.append(f"data_sources.{key} entry {name_field} must be 'catalog.schema.name': {it}")
-
-    # CRITICAL: sql[] invariants
-    def _check_sql_list(path: str, entries: Any) -> None:
-        if entries is None:
-            return
-        if not isinstance(entries, list):
-            errors.append(f"{path} must be a list (got {type(entries).__name__})")
-            return
-        for idx, it in enumerate(entries):
-            if not isinstance(it, dict):
-                errors.append(f"{path}[{idx}] must be an object")
-                continue
-            if not _is_uuid_hex(it.get("id")):
-                errors.append(f"{path}[{idx}].id must be uuid4.hex (32 hex chars)")
-            sql_field = it.get("sql")
-            if not isinstance(sql_field, list):
+            if "id" in it:
                 errors.append(
-                    f"{path}[{idx}].sql must be List[str] — got {type(sql_field).__name__}. "
-                    f"This is the #1 silent-failure mode: the API accepts a bare string but the "
-                    f"resulting space has broken example queries. Wrap your SQL in `[\"...\"]`."
+                    f"data_sources.{key} entry MUST NOT include `id` — the API rejects with "
+                    f"`Cannot find field: id`. Use only `identifier` and optional `description`. Got: {it}"
                 )
-                continue
-            for sidx, s in enumerate(sql_field):
-                if not isinstance(s, str) or not s.strip():
-                    errors.append(f"{path}[{idx}].sql[{sidx}] must be a non-empty string")
+            ident = it.get("identifier")
+            if not isinstance(ident, str) or ident.count(".") != 2:
+                errors.append(
+                    f"data_sources.{key} entry `identifier` must be 'catalog.schema.name': {it}"
+                )
 
     instr = space.get("instructions") or {}
-    _check_sql_list("instructions.sql_functions", instr.get("sql_functions"))
-    _check_sql_list("instructions.sample_queries", instr.get("sample_queries"))
-    _check_sql_list("benchmarks.questions", (space.get("benchmarks") or {}).get("questions"))
+
+    # instructions.sql_functions — {id, identifier} only.
+    sqlfns = instr.get("sql_functions") or []
+    if not isinstance(sqlfns, list):
+        errors.append("instructions.sql_functions must be a list")
+    else:
+        for idx, it in enumerate(sqlfns):
+            if not isinstance(it, dict):
+                errors.append(f"instructions.sql_functions[{idx}] must be an object")
+                continue
+            if not _is_uuid_hex(it.get("id")):
+                errors.append(f"instructions.sql_functions[{idx}].id must be uuid4.hex (32 hex chars)")
+            ident = it.get("identifier")
+            if not isinstance(ident, str) or ident.count(".") != 2:
+                errors.append(
+                    f"instructions.sql_functions[{idx}].identifier must be 'catalog.schema.fn_name'"
+                )
+
+    # instructions.example_question_sqls — {id, question: List[str], sql: List[str]}.
+    eqs = instr.get("example_question_sqls") or []
+    if not isinstance(eqs, list):
+        errors.append("instructions.example_question_sqls must be a list")
+    else:
+        for idx, it in enumerate(eqs):
+            if not isinstance(it, dict):
+                errors.append(f"instructions.example_question_sqls[{idx}] must be an object")
+                continue
+            if not _is_uuid_hex(it.get("id")):
+                errors.append(f"instructions.example_question_sqls[{idx}].id must be uuid4.hex")
+            for arr_field in ("question", "sql"):
+                arr = it.get(arr_field)
+                if not isinstance(arr, list) or not all(isinstance(s, str) and s.strip() for s in arr):
+                    errors.append(
+                        f"instructions.example_question_sqls[{idx}].{arr_field} must be a non-empty "
+                        f"List[str] — single strings cause silent breakage. Wrap as [\"...\"]."
+                    )
+
+    # benchmarks.questions — SQL lives inside answer[].content, NOT a top-level sql field.
+    bench = (space.get("benchmarks") or {}).get("questions") or []
+    if not isinstance(bench, list):
+        errors.append("benchmarks.questions must be a list")
+    else:
+        for idx, it in enumerate(bench):
+            if not isinstance(it, dict):
+                errors.append(f"benchmarks.questions[{idx}] must be an object")
+                continue
+            if not _is_uuid_hex(it.get("id")):
+                errors.append(f"benchmarks.questions[{idx}].id must be uuid4.hex")
+            q = it.get("question")
+            if not isinstance(q, list) or not all(isinstance(s, str) and s.strip() for s in q):
+                errors.append(f"benchmarks.questions[{idx}].question must be List[str]")
+            answers = it.get("answer") or []
+            if not isinstance(answers, list):
+                errors.append(f"benchmarks.questions[{idx}].answer must be a list")
+                continue
+            for aidx, ans in enumerate(answers):
+                if not isinstance(ans, dict):
+                    errors.append(f"benchmarks.questions[{idx}].answer[{aidx}] must be an object")
+                    continue
+                if ans.get("format") not in ("SQL", "INSTRUCTIONS"):
+                    errors.append(
+                        f"benchmarks.questions[{idx}].answer[{aidx}].format must be 'SQL' or 'INSTRUCTIONS'"
+                    )
+                content = ans.get("content")
+                if not isinstance(content, list) or not all(isinstance(s, str) and s.strip() for s in content):
+                    errors.append(
+                        f"benchmarks.questions[{idx}].answer[{aidx}].content must be List[str] — "
+                        f"this is the #1 silent-failure mode for benchmark answers."
+                    )
 
     # Limits
-    if len(instr.get("sql_functions") or []) > 50:
+    if len(sqlfns) > 50:
         errors.append("instructions.sql_functions exceeds 50-entry limit — truncate before POST")
-    if len((space.get("benchmarks") or {}).get("questions") or []) > 50:
+    if len(bench) > 50:
         errors.append("benchmarks.questions exceeds 50-entry limit — truncate before POST")
 
-    # general_instructions must be List[str]
     gi = instr.get("general_instructions")
     if gi is not None:
         if not isinstance(gi, list) or not all(isinstance(x, str) for x in gi):
@@ -695,6 +757,7 @@ After API deployment is complete:
 
 ## Version History
 
+- **v3.7.0** (Apr 27, 2026) — Reconciled `Required serialized_space Invariants` table and `_assert_sql_arrays` validator with the current `getspace`/`createspace`/`updatespace` API: `data_sources.tables`/`metric_views` use `identifier` only and MUST NOT include `id`; `instructions.sql_functions` is `{id, identifier}` (no `sql` array); SQL for benchmarks lives in `answer[].content: List[str]` (not a top-level `sql` field). Replaced legacy `table_full_name`/`metric_view_full_name`/`sample_queries` references with current schema names. Validator now enforces the post-rename surface.
 - **v3.6.0** (Feb 22, 2026) — Fixed Section 8 array sorting: corrected sort keys from `table_name`/`materialized_view_name`/`function_name` to `identifier`/`id` (matching actual API protobuf requirements). Replaced `sort_all_arrays()` with `sort_genie_config()` (canonical implementation in applier). Updated Common Errors with specific error message `Invalid export proto: data_sources.tables must be sorted by identifier`. Added missing arrays (`text_instructions`, `sample_questions`, `benchmarks.questions`) to sort table.
 - **v2.0** (Feb 2026) — Array sorting requirements (Section 8); idempotent deployment pattern (Section 9); expanded array format table; strengthened ID generation guidance; 3 new common errors; deploy template major rewrite; benchmark SQL validation templates added; Notes to Carry Forward and Next Step for progressive disclosure
 - **v3.0** (January 2026) - Inventory-driven programmatic generation, template variables, 100% deployment success

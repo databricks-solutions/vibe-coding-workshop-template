@@ -16,17 +16,9 @@ metadata:
   domain: apps
   role: deploy
   standalone: true
-  last_verified: "2026-04-12"
+  last_verified: "2026-04-27"
   volatility: medium
-  upstream_sources:
-    - https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/SKILL.md
-    - https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps/references/appkit
-    - https://databricks.github.io/appkit/docs/app-management
-    - https://databricks.github.io/appkit/docs/configuration
-    - https://databricks.github.io/appkit/docs/development/project-setup
-    - https://databricks.github.io/appkit/docs/development/llm-guide
-    - https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy
-    - https://docs.databricks.com/aws/en/dev-tools/databricks-apps/app-runtime
+  upstream_sources: []  # Deployment workflow / fix-loop is project-specific; canonical upstream in See Also.
 ---
 
 # Deploy Databricks AppKit Applications
@@ -457,3 +449,12 @@ If the limit error persists, repeat with the next oldest stopped app — but sto
 | List all apps | `databricks apps list --profile $PROFILE` |
 | AppKit deploy help | `databricks apps deploy --help` |
 | Live docs | `npx @databricks/appkit docs "app-management"` |
+
+---
+
+## See Also
+
+- Authoritative upstream: [databricks-agent-skills / `databricks-apps`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps) — canonical deploy guidance for Databricks Apps.
+- AppKit references: [`appkit`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps/references/appkit), [App management](https://databricks.github.io/appkit/docs/app-management), [Configuration](https://databricks.github.io/appkit/docs/configuration), [Project setup](https://databricks.github.io/appkit/docs/development/project-setup), [LLM guide](https://databricks.github.io/appkit/docs/development/llm-guide).
+- Databricks Apps docs: [Deploy](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy), [App runtime](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/app-runtime).
+

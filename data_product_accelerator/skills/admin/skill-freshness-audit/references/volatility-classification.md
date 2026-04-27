@@ -24,7 +24,7 @@ These skills reference APIs or features that change frequently. Prioritize these
 | `deployment-automation` | genai-agents | `genai-agents/06-deployment-automation` | MLflow deployment APIs changing |
 | `production-monitoring` | genai-agents | `genai-agents/07-production-monitoring` | Registered scorers API new |
 | `mlflow-genai-foundation` | genai-agents | `genai-agents/08-mlflow-genai-foundation` | MLflow 3.x foundation APIs |
-| `genai-agents-setup` | genai-agents | `genai-agents/00-genai-agents-setup` | Orchestrator for all GenAI — depends on volatile workers |
+| `course-orchestrator` | genai-agents | `genai-agents/00-course-orchestrator` | Orchestrator for all GenAI — depends on volatile workers |
 | `metric-views-patterns` | semantic-layer | `semantic-layer/01-metric-views-patterns` | Metric Views spec actively evolving |
 | `genie-space-export-import-api` | semantic-layer | `semantic-layer/04-genie-space-export-import-api` | Genie API schema changes |
 | `genie-optimization-orchestrator` | semantic-layer | `semantic-layer/05-genie-optimization-orchestrator` | Conversation API + control levers evolving |

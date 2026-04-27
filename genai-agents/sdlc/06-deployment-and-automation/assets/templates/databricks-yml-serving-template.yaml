@@ -1,0 +1,94 @@
+# =============================================================
+# databricks.yml — Bundle configuration template for
+# deploying an agent as a Model Serving endpoint (Track C)
+#
+# Usage:
+#   databricks bundle validate
+#   databricks bundle deploy --var warehouse_id=<id>
+# =============================================================
+
+bundle:
+  name: my_agent_serving
+
+variables:
+  app_name:
+    description: "Agent name (used for endpoint and model naming)"
+    default: "my-agent"
+  catalog:
+    description: "Unity Catalog name"
+    default: "main"
+  schema:
+    description: "Schema within the catalog"
+    default: "my_schema"
+  warehouse_id:
+    description: "SQL Warehouse ID for query execution"
+  model_version:
+    description: "UC model version to serve"
+    default: "1"
+
+resources:
+
+  # ── MLflow Experiment (bundle-managed) ──────────────────────
+  experiments:
+    agent_experiment:
+      name: /Users/${workspace.current_user.userName}/${var.app_name}
+      permissions:
+        - group_name: "users"
+          level: "CAN_READ"
+
+  # ── Model Serving Endpoint ─────────────────────────────────
+  model_serving_endpoints:
+    agent_endpoint:
+      name: ${var.app_name}-endpoint
+      config:
+        served_entities:
+          - entity_name: "${var.catalog}.${var.schema}.${var.app_name}"
+            entity_version: ${var.model_version}
+            workload_size: "Small"
+            scale_to_zero_enabled: true
+        auto_capture_config:
+          catalog_name: ${var.catalog}
+          schema_name: ${var.schema}
+          table_name_prefix: "${var.app_name}_inference"
+          enabled: true
+      permissions:
+        - group_name: "users"
+          level: "CAN_QUERY"
+
+  # ── Deployment Pipeline Job (evaluate → gate → deploy) ─────
+  # Uncomment and customize when ready for CI/CD:
+  #
+  # jobs:
+  #   deploy_pipeline:
+  #     name: "${var.app_name}-deploy-pipeline"
+  #     tasks:
+  #       - task_key: evaluate
+  #         notebook_task:
+  #           notebook_path: ./jobs/evaluate_model.py
+  #       - task_key: gate_check
+  #         depends_on: [{task_key: evaluate}]
+  #         notebook_task:
+  #           notebook_path: ./jobs/gate_check.py
+  #       - task_key: deploy
+  #         depends_on: [{task_key: gate_check}]
+  #         notebook_task:
+  #           notebook_path: ./jobs/deploy_to_serving.py
+
+targets:
+  dev:
+    mode: development
+    default: true
+
+  staging:
+    mode: production
+    resources:
+      model_serving_endpoints:
+        agent_endpoint:
+          name: "${var.app_name}-endpoint-staging"
+
+  prod:
+    mode: production
+    resources:
+      model_serving_endpoints:
+        agent_endpoint:
+          name: "${var.app_name}-endpoint"

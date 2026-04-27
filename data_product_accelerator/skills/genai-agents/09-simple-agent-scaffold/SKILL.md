@@ -53,7 +53,7 @@ agent.py                                                       │
 - Workshop quick-start: zero to deployed endpoint
 - Prototyping an agent before adding evaluation, memory, or monitoring
 
-**Not for production-grade multi-agent systems.** Use the full `00-genai-agents-setup` orchestrator for evaluation pipelines, Lakebase memory, prompt registries, and multi-domain orchestration.
+**Not for production-grade multi-agent systems.** Use the full `00-course-orchestrator` for evaluation pipelines, Lakebase memory, prompt registries, and multi-domain orchestration.
 
 ---
 
@@ -517,7 +517,7 @@ Each add-on is an independent worker skill. Pick only what you need:
 
 ### Full production agent
 
-For the complete 9-phase implementation (foundation through monitoring), use `00-genai-agents-setup`. It orchestrates all of the above worker skills in the recommended order.
+For the complete 9-phase implementation (foundation through monitoring), use `00-course-orchestrator`. It routes to the appropriate foundation, track, SDLC, and monitoring skills in the recommended order.
 
 ---
 
@@ -633,7 +633,7 @@ To change `run_as_type` today: rebuild the space via the Genie UI or re-run `dep
 |---|---|
 | `01-responses-agent-patterns` | Critical rules for ResponsesAgent (this skill follows them) |
 | `06-appkit-serving-wiring` | Wires the deployed endpoint into an AppKit UI |
-| `00-genai-agents-setup` | Full production orchestrator (uses this as a quick-start entry point) |
+| `00-course-orchestrator` | Full production orchestrator (uses this as a quick-start entry point) |
 
 ---
 

@@ -17,11 +17,9 @@ metadata:
   domain: apps
   role: scaffold
   standalone: true
-  last_verified: "2026-04-10"
+  last_verified: "2026-04-27"
   volatility: medium
-  upstream_sources:
-    - https://databricks.github.io/appkit/
-    - https://github.com/databricks/databricks-agent-skills
+  upstream_sources: []  # Project-specific scaffold workflow; see See Also for canonical upstream.
 ---
 
 # Scaffold Databricks AppKit Applications
@@ -294,3 +292,11 @@ npx @databricks/appkit docs --full       # full index with all API entries
 | Validate | `databricks apps validate` |
 | Deploy | `databricks apps deploy --profile <P>` |
 | Browse AppKit docs | `npx @databricks/appkit docs` |
+
+---
+
+## See Also
+
+- Authoritative upstream: [databricks-agent-skills / `databricks-apps`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps) — canonical CLI scaffold patterns and Apps platform reference.
+- AppKit docs hub: [databricks.github.io/appkit](https://databricks.github.io/appkit/)
+

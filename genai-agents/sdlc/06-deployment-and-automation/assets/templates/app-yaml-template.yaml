@@ -1,0 +1,68 @@
+# =============================================================
+# app.yaml — Databricks Apps runtime configuration template
+#
+# This file is read by the Apps platform when starting your
+# process. When deploying via bundles, the `config` block in
+# databricks.yml overrides these values — see the relationship
+# explainer in the parent SKILL.md.
+#
+# For local dev, this file provides sensible defaults.
+# For bundle deploys, databricks.yml is the source of truth.
+# =============================================================
+
+command:
+  - "uv"
+  - "run"
+  - "start-app"
+
+env:
+  # See genai-agents/foundation/02-experiment-tracing-and-uc-storage/references/prod-tracing-deployment.md
+  # for the full env-var matrix (ENABLE_MLFLOW_TRACING, SP CAN_EDIT, OAuth vs PAT) and the Git-folder caveat.
+  # APP_ENVIRONMENT: app code reads this and overrides mlflow.source.type via metadata.
+  # See genai-agents/foundation/02c-trace-context-and-environments/SKILL.md.
+  - name: MLFLOW_TRACKING_URI
+    value: "databricks"
+  - name: MLFLOW_REGISTRY_URI
+    value: "databricks-uc"
+  - name: MLFLOW_EXPERIMENT_ID
+    valueFrom: "experiment"
+  - name: ENABLE_MLFLOW_TRACING
+    value: "true"
+  - name: APP_ENVIRONMENT
+    value: "production"
+
+  - name: LLM_MODEL
+    value: "databricks-claude-sonnet-4-6"
+
+  - name: WAREHOUSE_ID
+    valueFrom: "sql-warehouse"
+
+  - name: API_PROXY
+    value: "http://localhost:8000/invocations"
+  - name: CHAT_APP_PORT
+    value: "3000"
+  - name: CHAT_PROXY_TIMEOUT_SECONDS
+    value: "300"
+
+# Workspace resources attached to the app.
+# The app's service principal receives the declared permission level.
+#
+# IMPORTANT: Do not leave experiment_id or sql_warehouse id blank.
+# When deploying via bundles, these are interpolated from
+# databricks.yml (e.g. ${resources.experiments.agent_experiment.id}).
+# For standalone use, set them to your actual resource IDs.
+resources:
+  - name: "experiment"
+    experiment:
+      experiment_id: "YOUR_EXPERIMENT_ID"
+      permission: "CAN_MANAGE"
+
+  - name: "sql-warehouse"
+    sql_warehouse:
+      id: "YOUR_WAREHOUSE_ID"
+      permission: "CAN_USE"
+
+  - name: "serving-endpoint"
+    serving_endpoint:
+      name: "databricks-claude-sonnet-4-6"
+      permission: "CAN_QUERY"

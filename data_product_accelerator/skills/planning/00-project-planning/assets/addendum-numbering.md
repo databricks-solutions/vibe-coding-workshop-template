@@ -19,7 +19,7 @@ This table is the canonical mapping. When you see a mismatch anywhere in the acc
 | **1.5** | `plans/phase1-addendum-1.5-aibi-dashboards.md` | `planning/00-project-planning/assets/templates/phase1-dashboards-template.md` | `observability-manifest.yaml` | `monitoring/02-databricks-aibi-dashboards`, prompt `sections/14-aibi_dashboard.md` |
 | **1.6** | `plans/phase1-addendum-1.6-genie-spaces.md` | `planning/00-project-planning/assets/templates/phase1-genie-spaces-template.md` | `semantic-layer-manifest.yaml` | `semantic-layer/03-genie-space-patterns`, `semantic-layer/04-genie-space-export-import-api`, prompt `sections/15-genie_space.md` |
 | **1.7** | `plans/phase1-addendum-1.7-alerting.md` | `planning/00-project-planning/assets/templates/phase1-alerting-template.md` | `observability-manifest.yaml` | `monitoring/03-sql-alerts-patterns` |
-| **1.8** | `plans/phase1-addendum-1.8-genai-agents.md` | `planning/00-project-planning/assets/templates/phase2-agent-framework-template.md` | `genai-agents-manifest.yaml` | `genai-agents/00-genai-agents-setup` |
+| **1.8** | `plans/phase1-addendum-1.8-genai-agents.md` | `planning/00-project-planning/assets/templates/phase2-agent-framework-template.md` | `genai-agents-manifest.yaml` | `genai-agents/00-course-orchestrator` |
 
 Plus the always-present top-level plan files:
 

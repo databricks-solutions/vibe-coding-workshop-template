@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLflow GenAI Workshop Explorer</title>
+<style>
+:root {
+  --bg:#0f1318; --surface:#171d26; --surface2:#1e2532; --border:#2d3548;
+  --text:#e8eaf0; --text-dim:#7c8494; --text-muted:#515b6e;
+  --cyan:#FF3621; --cyan-dim:rgba(255,54,33,.12);
+  --green:#00A972; --green-dim:rgba(0,169,114,.12);
+  --gold:#EBA000; --gold-dim:rgba(235,160,0,.12);
+  --purple:#8B5CF6; --purple-dim:rgba(139,92,246,.12);
+  --orange:#FF6E42; --orange-dim:rgba(255,110,66,.12);
+  --red:#FF3621; --red-dim:rgba(255,54,33,.12);
+  --teal:#1B9E8A; --teal-dim:rgba(27,158,138,.12);
+  --pink:#E879A8; --blue:#4A90D9; --blue-dim:rgba(74,144,217,.12);
+  --bronze:#CD853F;
+  --code-bg:#171d26;
+}
+body.light {
+  --bg:#FFFFFF; --surface:#F7F8FA; --surface2:#EEF0F4; --border:#DDE0E6;
+  --text:#1B1F24; --text-dim:#5F6B7A; --text-muted:#8E99A8;
+  --cyan:#E2371D; --cyan-dim:rgba(226,55,29,.08);
+  --green:#00875A; --green-dim:rgba(0,135,90,.08);
+  --gold:#C78800; --gold-dim:rgba(199,136,0,.08);
+  --purple:#6D3DC9; --purple-dim:rgba(109,61,201,.08);
+  --orange:#D4570A; --orange-dim:rgba(212,87,10,.08);
+  --red:#E2371D; --red-dim:rgba(226,55,29,.08);
+  --teal:#0E7C6B; --teal-dim:rgba(14,124,107,.08);
+  --pink:#C44D80; --blue:#2B6CB0; --blue-dim:rgba(43,108,176,.08);
+  --bronze:#9A6324;
+  --code-bg:#F0F2F5;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh;transition:background .3s,color .3s;}
+a{color:var(--cyan);text-decoration:none;}
+button{font-family:inherit;}
+
+/* Header */
+.app-header{padding:16px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:300;}
+.app-header h1{font-size:18px;font-weight:700;letter-spacing:-.3px;white-space:nowrap;}
+.app-header h1 span{color:var(--cyan);}
+.mode-tabs{display:flex;gap:4px;margin-left:16px;}
+.mode-tab{background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);padding:6px 14px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.mode-tab:hover{border-color:var(--cyan);color:var(--text);}
+.mode-tab.active{background:var(--cyan);border-color:var(--cyan);color:#000;}
+.search-box{margin-left:auto;position:relative;}
+.search-box input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 12px 6px 30px;border-radius:7px;font-size:12px;width:220px;outline:none;}
+.search-box input:focus{border-color:var(--cyan);}
+.search-box::before{content:'⌕';position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-dim);font-size:13px;}
+.search-results{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:320px;overflow-y:auto;z-index:400;display:none;}
+.search-results.open{display:block;}
+.sr-item{padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.sr-item:hover{background:var(--surface2);}
+.sr-item .sr-type{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;text-transform:uppercase;}
+.theme-toggle{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s;flex-shrink:0;}
+.theme-toggle:hover{border-color:var(--cyan);background:var(--cyan-dim);}
+
+/* Mode panels */
+.mode-panel{display:none;height:calc(100vh - 65px);overflow:auto;}
+.mode-panel.active{display:block;}
+
+/* ==================== GALAXY ==================== */
+#galaxy{position:relative;height:calc(100vh - 65px);overflow:hidden;}
+#starfield{position:absolute;inset:0;z-index:0;}
+.galaxy-content{position:relative;z-index:1;display:flex;flex-direction:column;padding:32px 48px;height:100%;overflow:auto;max-width:1280px;margin:0 auto;gap:36px;}
+.galaxy-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.8px;color:var(--text-dim);margin-bottom:8px;text-align:center;}
+.galaxy-section{padding-top:8px;border-top:1px solid color-mix(in srgb, var(--text-dim) 15%, transparent);text-align:center;}
+.galaxy-section h2{font-size:22px;font-weight:800;margin-bottom:4px;}
+.galaxy-section .subtitle{font-size:12px;color:var(--text-dim);margin-bottom:20px;}
+
+/* Stats */
+.stats-bar{display:flex;gap:40px;padding:18px 32px;background:var(--surface);border:1px solid var(--border);border-radius:12px;justify-content:center;flex-wrap:wrap;}
+.stat{text-align:center;}
+.stat .stat-num{font-size:32px;font-weight:800;color:var(--cyan);}
+.stat .stat-label{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.6px;}
+
+/* Foundation row */
+.foundation-flow{display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap;}
+.foundation-node{padding:14px 20px;border-radius:12px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .25s;min-width:170px;text-align:center;}
+.foundation-node:hover{border-color:var(--cyan);box-shadow:0 0 22px var(--cyan-dim);transform:translateY(-2px);}
+.foundation-node .fn-num{font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:1px;}
+.foundation-node .fn-label{font-size:13px;font-weight:700;margin-top:3px;}
+.foundation-node .fn-sub{font-size:10px;color:var(--text-dim);margin-top:4px;line-height:1.3;}
+
+/* Track grid */
+.track-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:1150px;margin:0 auto;}
+@media(max-width:900px){.track-grid{grid-template-columns:1fr;}}
+.track-col{padding:18px;border:1px solid var(--border);border-radius:12px;background:var(--surface);text-align:left;transition:all .25s;}
+.track-col:hover{border-color:var(--green);box-shadow:0 0 24px var(--green-dim);}
+.track-col.A{border-top:3px solid var(--purple);}
+.track-col.B{border-top:3px solid var(--gold);}
+.track-col.C{border-top:3px solid var(--teal);}
+.track-col h3{font-size:13px;font-weight:800;margin-bottom:4px;}
+.track-col .track-sub{font-size:11px;color:var(--text-dim);margin-bottom:12px;line-height:1.4;}
+.track-steps{display:flex;flex-direction:column;gap:6px;}
+.track-step{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;background:var(--surface2);cursor:pointer;font-size:11px;transition:all .15s;border:1px solid transparent;}
+.track-step:hover{background:var(--bg);border-color:var(--cyan);}
+.track-step .ts-num{font-size:9px;font-weight:800;width:18px;height:18px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.A .track-step .ts-num{color:var(--purple);}
+.B .track-step .ts-num{color:var(--gold);}
+.C .track-step .ts-num{color:var(--teal);}
+.track-step .ts-name{font-weight:600;}
+
+/* SDLC pipeline */
+.pipeline-flow{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;justify-content:center;margin-bottom:18px;}
+.stage-cluster{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;}
+.stage-node{width:86px;height:86px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2.5px solid var(--border);background:var(--surface);cursor:pointer;transition:all .3s;position:relative;}
+.stage-node:hover{transform:scale(1.12);border-color:var(--cyan);box-shadow:0 0 24px var(--cyan-dim);}
+.stage-node .sn-num{font-size:20px;font-weight:800;line-height:1;}
+.stage-node .sn-label{font-size:8.5px;font-weight:600;text-transform:uppercase;color:var(--text-dim);line-height:1.1;margin-top:3px;text-align:center;max-width:76px;padding:0 3px;}
+.stage-arrow{color:var(--text-muted);font-size:22px;margin-top:30px;animation:pulse-arrow 2s infinite;}
+@keyframes pulse-arrow{0%,100%{opacity:.3}50%{opacity:1}}
+
+/* Stage colors */
+.sc-1{border-color:var(--cyan);} .sc-1 .sn-num{color:var(--cyan);}
+.sc-2{border-color:var(--purple);} .sc-2 .sn-num{color:var(--purple);}
+.sc-3{border-color:var(--gold);} .sc-3 .sn-num{color:var(--gold);}
+.sc-4{border-color:var(--green);} .sc-4 .sn-num{color:var(--green);}
+.sc-4b{border-color:var(--orange);} .sc-4b .sn-num{color:var(--orange);font-size:12px;}
+.sc-5{border-color:var(--teal);} .sc-5 .sn-num{color:var(--teal);}
+.sc-6{border-color:var(--purple);} .sc-6 .sn-num{color:var(--purple);}
+.sc-7{border-color:var(--pink);} .sc-7 .sn-num{color:var(--pink);}
+.sc-8{border-color:var(--blue);} .sc-8 .sn-num{color:var(--blue);}
+
+/* Capstone */
+.capstone-card{padding:18px 28px;border:1.5px dashed var(--gold);border-radius:14px;background:var(--gold-dim);cursor:pointer;max-width:520px;margin:0 auto;transition:all .25s;}
+.capstone-card:hover{background:var(--surface);border-style:solid;box-shadow:0 0 24px var(--gold-dim);}
+.capstone-card h3{color:var(--gold);font-size:15px;margin-bottom:4px;}
+.capstone-card p{font-size:12px;color:var(--text-dim);line-height:1.5;}
+
+/* ==================== TOURS ==================== */
+#tours.active{display:flex;flex-direction:column;height:calc(100vh - 65px);}
+.tour-picker{display:flex;gap:12px;padding:16px 24px;border-bottom:1px solid var(--border);background:var(--surface);}
+.tour-card{flex:1;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);cursor:pointer;transition:all .3s;}
+.tour-card:hover{border-color:var(--cyan);transform:translateY(-2px);}
+.tour-card.active{border-color:var(--cyan);box-shadow:0 0 20px var(--cyan-dim);}
+.tour-card h3{font-size:13px;margin-bottom:4px;}
+.tour-card p{font-size:10px;color:var(--text-dim);}
+.tour-controls{display:flex;align-items:center;gap:10px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);}
+.tour-controls button{background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;}
+.tour-controls button:hover{border-color:var(--cyan);}
+.tour-controls button.active{background:var(--cyan);color:#000;border-color:var(--cyan);}
+.tour-sep{width:1px;height:20px;background:var(--border);flex-shrink:0;}
+.tour-step-info{font-size:11px;color:var(--text-dim);min-width:100px;text-align:center;}
+.speed-ctl{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);margin-left:auto;}
+.speed-ctl input{width:60px;accent-color:var(--cyan);}
+.tour-body{display:grid;grid-template-columns:540px 1fr;flex:1;overflow:hidden;}
+.tour-tree-wrap{overflow:auto;padding:20px 16px 100px 28px;border-right:1px solid var(--border);}
+@media(max-width:900px){.tour-body{grid-template-columns:1fr;grid-template-rows:40% 1fr;}.tour-tree-wrap{border-right:none;border-bottom:1px solid var(--border);}}
+
+.tour-detail{overflow-y:auto;padding:0;background:var(--bg);}
+.tour-detail::-webkit-scrollbar{width:4px;}
+.td-inner{padding:20px 24px 40px;animation:tdFade .35s ease;}
+@keyframes tdFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.td-header{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.td-header-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+.td-name{font-size:20px;font-weight:800;letter-spacing:-.3px;}
+.td-badge{font-size:9px;padding:3px 10px;border-radius:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.td-desc{font-size:13px;color:var(--text-dim);line-height:1.5;}
+.td-narration{font-size:12px;line-height:1.6;margin-top:8px;color:var(--text);padding:8px 12px;background:var(--surface2);border-radius:6px;}
+.td-narration .hl{color:var(--cyan);font-weight:600;}
+.td-narration .hl-g{color:var(--green);font-weight:600;}
+.td-narration .hl-y{color:var(--gold);font-weight:600;}
+
+.td-rationale{margin-bottom:16px;padding:14px 16px;border-left:3px solid var(--cyan);background:var(--cyan-dim);border-radius:0 8px 8px 0;animation:tdFade .5s ease .1s both;}
+.td-rationale h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--cyan);margin-bottom:6px;}
+.td-rationale h4::before{content:'◆ ';font-size:7px;}
+.td-rationale p{font-size:12px;line-height:1.7;color:var(--text-dim);}
+.td-rationale em{color:var(--text);font-style:normal;font-weight:600;}
+
+.td-flow{margin-bottom:16px;animation:tdFade .5s ease .15s both;}
+.td-flow h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:8px;}
+.td-flow-diagram{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.td-flow-col{display:flex;flex-direction:column;gap:4px;}
+.td-flow-col.inputs .td-pill{background:var(--purple-dim);color:var(--purple);border:1px solid color-mix(in srgb,var(--purple) 30%, transparent);}
+.td-flow-col.outputs .td-pill{background:var(--green-dim);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 30%, transparent);}
+.td-pill{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;white-space:nowrap;}
+.td-flow-arrow{font-size:20px;color:var(--text-muted);padding:0 4px;}
+
+.td-code{margin-bottom:16px;position:relative;animation:tdFade .5s ease .2s both;}
+.td-code h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:8px;}
+.td-code-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:11px;line-height:1.6;overflow-x:auto;white-space:pre;position:relative;}
+body.light .td-code-block{color:#1B1F24;}
+body.light .td-code-block .kw{color:#6D3DC9;}
+body.light .td-code-block .str{color:#00875A;}
+body.light .td-code-block .fn{color:#E2371D;}
+body.light .td-code-block .cm{color:#8E99A8;}
+body.light .td-code-block .dec{color:#C78800;}
+.td-code-block .kw{color:var(--purple);font-weight:600;}
+.td-code-block .fn{color:var(--cyan);}
+.td-code-block .str{color:var(--green);}
+.td-code-block .dec{color:var(--gold);}
+.td-code-block .cm{color:var(--text-muted);font-style:italic;}
+.td-code-copy{position:absolute;top:28px;right:8px;background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);padding:3px 8px;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;}
+.td-code-copy:hover{color:var(--cyan);border-color:var(--cyan);}
+.td-code-copy.copied{color:var(--green);border-color:var(--green);}
+
+.td-workers{margin-bottom:16px;animation:tdFade .5s ease .25s both;}
+.td-workers h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;}
+.td-worker-map{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.td-worker-chip{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;background:var(--gold-dim);border:1px solid color-mix(in srgb,var(--gold) 25%,transparent);color:var(--gold);cursor:pointer;transition:all .2s;}
+.td-worker-chip:hover{transform:translateY(-1px);}
+
+.td-actions{display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--border);margin-top:4px;}
+.td-actions .dp-btn{padding:8px 16px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);}
+
+.td-welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px;color:var(--text-dim);}
+.td-welcome h3{font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;}
+.td-welcome p{font-size:12px;line-height:1.6;max-width:340px;}
+
+.td-summary{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 24px;}
+.td-summary h3{font-size:18px;font-weight:800;margin-bottom:12px;color:var(--cyan);}
+.td-summary p{font-size:13px;line-height:1.7;color:var(--text-dim);max-width:420px;margin-bottom:16px;}
+.td-progress{display:flex;gap:4px;align-items:center;}
+.td-progress-dot{width:10px;height:10px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);}
+.td-progress-dot.done{background:var(--cyan);border-color:var(--cyan);}
+.td-progress-dot.current{background:var(--gold);border-color:var(--gold);box-shadow:0 0 8px var(--gold-dim);}
+
+/* Tree */
+.ttree ul{list-style:none;padding-left:0;}
+.ttree li{position:relative;padding-left:26px;}
+.ttree li::before{content:'';position:absolute;left:0;top:0;width:1px;height:100%;background:var(--border);}
+.ttree li::after{content:'';position:absolute;left:0;top:16px;width:20px;height:1px;background:var(--border);}
+.ttree li:last-child::before{height:16px;}
+.ttree li.lit::before,.ttree li.lit::after{background:var(--cyan);}
+.tnode{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;margin:3px 0;border:1px solid var(--border);border-radius:7px;background:var(--surface);cursor:pointer;transition:all .3s;max-width:470px;font-size:12px;}
+.tnode:hover{border-color:#3d4255;}
+.tnode .icon{width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0;}
+.tnode .name{font-weight:600;white-space:nowrap;}
+.tnode .tag{font-size:8px;padding:1px 6px;border-radius:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.tnode .meta{font-size:9px;color:var(--text-dim);margin-left:auto;font-family:'SF Mono',monospace;white-space:nowrap;}
+.tnode .chevron{font-size:9px;color:var(--text-muted);transition:transform .3s;}
+.tnode .chevron.open{transform:rotate(90deg);}
+.tnode.visited{border-color:var(--cyan);box-shadow:0 0 6px var(--cyan-dim);}
+.tnode.visited .name{color:var(--cyan);}
+.tnode.active-node{border-color:var(--cyan);box-shadow:0 0 18px var(--cyan-dim);transform:translateX(3px);}
+.tnode.active-node .name{color:var(--cyan);font-weight:700;}
+.tnode.user-selected{border-color:var(--gold);box-shadow:0 0 14px var(--gold-dim);transform:translateX(3px);background:var(--surface2);}
+.tnode.user-selected .name{color:var(--gold);font-weight:700;}
+.type-orchestrator .icon{background:var(--purple-dim);color:var(--purple);}
+.type-orchestrator .tag{background:var(--purple-dim);color:var(--purple);}
+.type-worker .icon{background:var(--gold-dim);color:var(--gold);}
+.type-worker .tag{background:var(--gold-dim);color:var(--gold);}
+.type-common .icon{background:var(--green-dim);color:var(--green);}
+.type-common .tag{background:var(--green-dim);color:var(--green);}
+.type-entry .icon{background:var(--cyan-dim);color:var(--cyan);}
+.type-entry .tag{background:var(--cyan-dim);color:var(--cyan);}
+.type-track .icon{background:var(--teal-dim);color:var(--teal);}
+.type-track .tag{background:var(--teal-dim);color:var(--teal);}
+.ttree li.collapsed>ul{max-height:0;overflow:hidden;opacity:0;transition:max-height .4s,opacity .3s;}
+.ttree li.expanded>ul{max-height:3000px;opacity:1;transition:max-height .6s,opacity .4s .1s;}
+
+/* Detail panel */
+.detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:none;}
+.detail-overlay.open{display:block;}
+.detail-panel{position:fixed;top:0;right:0;width:540px;max-width:95vw;height:100vh;background:var(--bg);border-left:1px solid var(--border);z-index:501;overflow-y:auto;transform:translateX(100%);transition:transform .3s;}
+.detail-panel.open{transform:translateX(0);}
+.dp-header{padding:20px;border-bottom:1px solid var(--border);background:var(--surface);position:relative;}
+.dp-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;}
+.dp-close:hover{color:var(--text);}
+.dp-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.dp-badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.dp-badge{font-size:9px;padding:2px 8px;border-radius:10px;font-weight:700;text-transform:uppercase;}
+.dp-desc{font-size:12px;color:var(--text-dim);line-height:1.5;}
+.dp-section{padding:16px 20px;border-bottom:1px solid var(--border);}
+.dp-section h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin-bottom:8px;}
+.dp-keywords{display:flex;gap:4px;flex-wrap:wrap;}
+.dp-kw{padding:3px 8px;border-radius:4px;background:var(--surface2);font-size:10px;color:var(--text-dim);}
+.dp-code{background:var(--surface);border-radius:8px;padding:12px;font-family:'SF Mono',monospace;font-size:11px;line-height:1.5;overflow-x:auto;white-space:pre;color:var(--text-dim);}
+body.light .dp-code{color:#1B1F24;}
+body.light .dp-code .kw{color:#6D3DC9;} body.light .dp-code .str{color:#00875A;} body.light .dp-code .fn{color:#E2371D;} body.light .dp-code .cm{color:#8E99A8;} body.light .dp-code .dec{color:#C78800;}
+.dp-code .kw{color:var(--purple);font-weight:600;} .dp-code .fn{color:var(--cyan);} .dp-code .str{color:var(--green);} .dp-code .dec{color:var(--gold);} .dp-code .cm{color:var(--text-muted);font-style:italic;}
+.dp-actions{display:flex;gap:8px;padding:16px 20px;}
+.dp-btn{padding:8px 16px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);}
+.dp-btn.primary{background:var(--cyan);color:#000;border-color:var(--cyan);}
+.dp-btn.primary:hover{box-shadow:0 0 16px var(--cyan-dim);}
+.dp-btn.secondary{background:var(--surface2);color:var(--text);}
+.dp-btn.secondary:hover{border-color:var(--cyan);}
+
+/* ==================== ACADEMY ==================== */
+#academy.active{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 65px);overflow:hidden;padding:0;}
+.acad-sidebar{overflow-y:auto;padding:20px 12px;border-right:1px solid var(--border);background:var(--surface);}
+.acad-sidebar h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-muted);padding:0 10px;margin-bottom:10px;}
+.acad-nav{display:flex;flex-direction:column;gap:2px;}
+.acad-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:all .15s;border:1px solid transparent;font-size:12px;color:var(--text-dim);}
+.acad-nav-item:hover{background:var(--surface2);color:var(--text);}
+.acad-nav-item.active{background:var(--cyan-dim);border-color:var(--cyan);color:var(--text);font-weight:600;}
+.acad-nav-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.acad-nav-title{font-size:12px;line-height:1.2;}
+.acad-nav-sub{font-size:9px;color:var(--text-muted);line-height:1.2;margin-top:1px;}
+
+.acad-main{overflow-y:auto;padding:0;background:var(--bg);}
+.acad-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);text-align:center;}
+.acad-empty h2{font-size:18px;font-weight:600;margin-bottom:6px;color:var(--text-dim);}
+.acad-empty p{font-size:12px;}
+
+.acad-hero{padding:32px 40px 24px;border-bottom:1px solid var(--border);background:var(--surface);}
+.acad-hero-top{display:flex;align-items:center;gap:14px;margin-bottom:8px;}
+.acad-hero-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;}
+.acad-hero h2{font-size:22px;font-weight:800;line-height:1.2;}
+.acad-hero .acad-hero-sub{font-size:13px;color:var(--text-dim);margin-top:2px;}
+
+.acad-sections{padding:24px 40px 48px;max-width:820px;}
+.acad-section{margin-bottom:28px;animation:tdFade .4s ease both;}
+.acad-section h5{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--border);display:flex;align-items:center;gap:8px;}
+.acad-section h5::before{content:'';width:3px;height:16px;border-radius:2px;background:var(--cyan);flex-shrink:0;}
+.acad-section p{font-size:13px;line-height:1.7;color:var(--text-dim);margin-bottom:10px;}
+.acad-section p strong{color:var(--text);}
+.acad-section p code{background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:11px;font-family:'SF Mono',monospace;color:var(--purple);}
+.acad-section table{width:100%;border-collapse:separate;border-spacing:0;margin:12px 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:12px;}
+.acad-section th{text-align:left;padding:10px 14px;background:var(--surface2);font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
+.acad-section td{padding:10px 14px;border-top:1px solid var(--border);vertical-align:top;line-height:1.5;}
+.acad-section td code{background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:10px;font-family:'SF Mono',monospace;color:var(--purple);}
+.acad-section tr:first-child td{border-top:none;}
+.acad-section pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px;font-family:'SF Mono',monospace;font-size:11.5px;line-height:1.65;overflow-x:auto;margin:12px 0;color:var(--text);}
+body.light .acad-section pre{color:#1B1F24;}
+.ac-diagram{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin:12px 0;text-align:center;font-family:'SF Mono',monospace;font-size:11.5px;line-height:2;color:var(--text-dim);}
+.ac-diagram .hl{color:var(--cyan);font-weight:700;}
+.ac-diagram .hl-g{color:var(--green);font-weight:700;}
+.ac-diagram .hl-p{color:var(--purple);font-weight:700;}
+.ac-diagram .hl-o{color:var(--orange);font-weight:700;}
+
+.acad-quiz{margin-top:32px;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;}
+.acad-quiz h4{font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.acad-quiz h4::before{content:'✦';color:var(--gold);}
+.quiz-q{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.quiz-q:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+.quiz-q p{font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text);}
+.quiz-opts{display:flex;flex-direction:column;gap:4px;}
+.quiz-opt{padding:10px 14px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--bg);}
+.quiz-opt:hover{background:var(--surface2);border-color:var(--text-muted);}
+.quiz-opt.correct{background:var(--green-dim);border-color:var(--green);color:var(--green);font-weight:600;}
+.quiz-opt.wrong{background:var(--red-dim);border-color:var(--red);color:var(--red);opacity:.5;}
+.quiz-opt.revealed{pointer-events:none;}
+
+/* ==================== VARIANTS ==================== */
+#variants{min-height:calc(100vh - 65px);background:var(--bg);}
+.var-hero{padding:28px 40px 20px;border-bottom:1px solid var(--border);background:var(--surface);}
+.var-hero-title{font-size:22px;font-weight:800;line-height:1.2;margin-bottom:6px;}
+.var-hero-sub{font-size:13px;color:var(--text-dim);max-width:720px;line-height:1.5;}
+.var-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:16px 40px 12px;border-bottom:1px solid var(--border);background:var(--surface);}
+.var-chips-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-right:8px;}
+.var-chips-sep{width:1px;height:20px;background:var(--border);margin:0 4px;}
+.var-chip{background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);padding:6px 12px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;}
+.var-chip:hover{border-color:var(--cyan);color:var(--text);}
+.var-chip.active{background:var(--cyan-dim);border-color:var(--cyan);color:var(--text);}
+.var-chip-reset{margin-left:auto;background:transparent;font-weight:700;}
+.var-chip-reset:hover{border-color:var(--text-muted);}
+.var-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;padding:28px 40px 48px;}
+.var-card{position:relative;display:flex;flex-direction:column;min-height:220px;padding:18px 18px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);transition:opacity .2s,transform .2s,border-color .2s;}
+.var-card:hover:not(.var-card-dim){border-color:var(--cyan);box-shadow:0 0 20px var(--cyan-dim);transform:translateY(-2px);}
+.var-card.var-card-dim{opacity:.22;pointer-events:none;}
+.var-badge{position:absolute;top:14px;left:14px;font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--cyan);background:var(--cyan-dim);padding:3px 8px;border-radius:6px;}
+.var-card-title{font-size:15px;font-weight:700;margin:28px 0 8px;line-height:1.3;color:var(--text);}
+.var-summary{font-size:12px;line-height:1.55;color:var(--text-dim);flex:1;margin-bottom:12px;}
+.var-card-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.var-pill{font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:var(--surface2);color:var(--text-dim);}
+.var-cta{font-size:12px;font-weight:600;color:var(--cyan);margin-top:auto;}
+.var-card:hover:not(.var-card-dim) .var-cta{text-decoration:underline;}
+body.light .var-hero{background:#FAFBFC;}
+body.light .var-chips{background:#FAFBFC;}
+body.light .var-card{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--text-muted);}
+
+body.light .app-header{box-shadow:0 1px 4px rgba(0,0,0,.06);}
+body.light .stage-node{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+body.light .foundation-node{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+body.light .track-col{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+body.light .stats-bar{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+body.light .tour-card{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+body.light .tnode{background:#fff;}
+body.light .tour-tree-wrap{background:var(--surface);}
+body.light .acad-sidebar{background:#FAFBFC;}
+body.light .acad-hero{background:#FAFBFC;}
+body.light .acad-section pre{background:#F4F5F7;}
+body.light .ac-diagram{background:#F9FAFB;}
+body.light .acad-quiz{background:#FAFBFC;}
+body.light .quiz-opt{background:#fff;}
+body.light .detail-panel{background:#fff;}
+body.light .dp-header{background:var(--surface);}
+body.light .dp-btn.primary{color:#fff;}
+body.light .mode-tab.active{color:#fff;}
+</style>
+</head>
+<body class="light">
+
+<div class="app-header">
+  <h1><span>⬡</span> MLflow GenAI Workshop Explorer</h1>
+  <div class="mode-tabs">
+    <button class="mode-tab active" onclick="switchMode('galaxy')">Course Map</button>
+    <button class="mode-tab" onclick="switchMode('tours')">Guided Tours</button>
+    <button class="mode-tab" onclick="switchMode('academy')">Platform Academy</button>
+    <button class="mode-tab" onclick="switchMode('variants')">Skyloyalty Variants</button>
+  </div>
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search skills..." oninput="onSearch(this.value)" onfocus="onSearch(this.value)" onblur="setTimeout(()=>closeSearch(),200)">
+    <div class="search-results" id="searchResults"></div>
+  </div>
+  <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Switch to dark mode">☾</button>
+</div>
+
+<!-- GALAXY -->
+<div class="mode-panel active" id="galaxy">
+  <canvas id="starfield"></canvas>
+  <div class="galaxy-content">
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-num">28</div><div class="stat-label">Skills</div></div>
+      <div class="stat"><div class="stat-num">4</div><div class="stat-label">Foundation</div></div>
+      <div class="stat"><div class="stat-num">3</div><div class="stat-label">Agent Tracks</div></div>
+      <div class="stat"><div class="stat-num">9</div><div class="stat-label">SDLC Steps</div></div>
+      <div class="stat"><div class="stat-num">6</div><div class="stat-label">Academy Modules</div></div>
+      <div class="stat"><div class="stat-num">3</div><div class="stat-label">Guided Tours</div></div>
+    </div>
+
+    <div class="galaxy-section">
+      <div class="galaxy-label">Foundation</div>
+      <h2>MLflow 3.x GenAI Building Blocks</h2>
+      <div class="subtitle">Shared prerequisites every agent track assumes. Click a block to open.</div>
+      <div class="foundation-flow" id="foundationFlow"></div>
+    </div>
+
+    <div class="galaxy-section">
+      <div class="galaxy-label">Agent Tracks</div>
+      <h2>Pick Your Agent Architecture</h2>
+      <div class="subtitle">Three parallel paths — custom code on Databricks Apps, managed Supervisor API, or packaged Model Serving.</div>
+      <div class="track-grid" id="trackGrid"></div>
+    </div>
+
+    <div class="galaxy-section">
+      <div class="galaxy-label">SDLC Pipeline</div>
+      <h2>The 9-Step Productionization Lifecycle</h2>
+      <div class="subtitle">Prompt → Eval → Gate → Register → Deploy → Monitor → Optimize.</div>
+      <div class="pipeline-flow" id="pipelineFlow"></div>
+    </div>
+
+    <div class="galaxy-section">
+      <div class="galaxy-label">Capstone</div>
+      <h2>Optional: Multi-Agent Genie Orchestrator</h2>
+      <div class="subtitle" style="margin-bottom:16px;">End-to-end demonstration of everything above, in one reference design.</div>
+      <div class="capstone-card" id="capstoneCard" onclick="openDetail('cap')">
+        <h3>Genie Orchestrator — routes intents to domain Genie Spaces</h3>
+        <p>Builds a Data Intelligence orchestrator with handoffs, Vector Search, and strict data provenance — no LLM-fallback when the answer must come from governed data.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOURS -->
+<div class="mode-panel" id="tours">
+  <div class="tour-picker">
+    <div class="tour-card active" onclick="selectTour('a')" id="tc-a">
+      <h3>Tour A: Foundation → Custom Agent on Apps</h3>
+      <p>Walk Track A end-to-end — scaffold, tools, memory, evaluate, deploy, debug.</p>
+    </div>
+    <div class="tour-card" onclick="selectTour('b')" id="tc-b">
+      <h3>Tour B: The GenAI SDLC</h3>
+      <p>Prompt registry → datasets → scorers → eval → signoff → register → deploy → monitor → optimize.</p>
+    </div>
+    <div class="tour-card" onclick="selectTour('c')" id="tc-c">
+      <h3>Tour C: The Full Course Picture</h3>
+      <p>Foundation, three tracks, SDLC, and the capstone — how they all connect.</p>
+    </div>
+  </div>
+  <div class="tour-controls">
+    <button id="tourPlayBtn" onclick="tourTogglePlay()">▶ Play</button>
+    <button onclick="tourReset()">↺ Reset</button>
+    <button onclick="tourPrev()">◀ Prev</button>
+    <button onclick="tourNext()">Next ▶</button>
+    <span class="tour-sep"></span>
+    <button id="treeExpandBtn" onclick="toggleTreeAll()">⊞ Expand All</button>
+    <div class="tour-step-info" id="tourStepInfo">Select a tour</div>
+    <div class="speed-ctl"><label>Speed</label><input type="range" id="tourSpeed" min="1" max="5" value="3" oninput="tourUpdSpeed()"><span id="tourSpdLbl">1x</span></div>
+  </div>
+  <div class="tour-body">
+    <div class="tour-tree-wrap"><div class="ttree" id="tourTree"></div></div>
+    <div class="tour-detail" id="tourDetail">
+      <div class="td-welcome"><h3>Select a Tour</h3><p>Pick a tour above, then press <strong>Play</strong> or <strong>Next</strong> to walk through the course. Each step reveals the design rationale here.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ACADEMY -->
+<div class="mode-panel" id="academy">
+  <div class="acad-sidebar" id="acadSidebar"></div>
+  <div class="acad-main" id="acadMain">
+    <div class="acad-empty"><h2>Select a module</h2><p>Choose a topic from the sidebar to start learning.</p></div>
+  </div>
+</div>
+
+<!-- VARIANTS -->
+<div class="mode-panel" id="variants">
+  <div class="var-hero">
+    <h2 class="var-hero-title">SkyLoyalty Variants</h2>
+    <p class="var-hero-sub">Five end-to-end walkthroughs for the same PRD—pick by UI depth, language, and whether Databricks hosts the agent loop.</p>
+  </div>
+  <div class="var-chips" id="variantChips">
+    <span class="var-chips-label">Filter</span>
+    <button type="button" class="var-chip" data-kind="num" data-value="1" aria-pressed="false">V1</button>
+    <button type="button" class="var-chip" data-kind="num" data-value="2" aria-pressed="false">V2</button>
+    <button type="button" class="var-chip" data-kind="num" data-value="3" aria-pressed="false">V3</button>
+    <button type="button" class="var-chip" data-kind="num" data-value="4" aria-pressed="false">V4</button>
+    <button type="button" class="var-chip" data-kind="num" data-value="5" aria-pressed="false">V5</button>
+    <span class="var-chips-sep"></span>
+    <button type="button" class="var-chip" data-kind="apps" data-value="one" aria-pressed="false">One App</button>
+    <button type="button" class="var-chip" data-kind="apps" data-value="two" aria-pressed="false">Two Apps</button>
+    <span class="var-chips-sep"></span>
+    <button type="button" class="var-chip" data-kind="lang" data-value="node" aria-pressed="false">Node</button>
+    <button type="button" class="var-chip" data-kind="lang" data-value="python" aria-pressed="false">Python</button>
+    <button type="button" class="var-chip var-chip-reset" onclick="resetVariantFilters()">Reset</button>
+  </div>
+  <div class="var-grid" id="variantsGrid"></div>
+</div>
+
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel"></div>
+
+<script>
+// ======================== SKILL DATA ========================
+// Each skill: id, name, desc, type, component, keywords, code, rationale, emits
+// Source: genai-agents/** SKILL.md files (MLflow GenAI Agent Development Course).
+
+const SKILLS = [
+  // ---------- FOUNDATION ----------
+  {id:'f1',name:'F1 · MLflow GenAI Foundation',type:'orchestrator',component:'foundation',
+   desc:'Standardizes MLflow 3.x GenAI dependencies, autolog, and <code>ResponsesAgent</code> logging without manual signatures.<br><br>Establishes the shared MLflow environment every later skill assumes: correct packages, early autolog, and Playground-compatible <code>ResponsesAgent</code> patterns. Prevents signature drift and MLflow 2.x installs before tracing, tools, or deployment.',
+   keywords:['mlflow','ResponsesAgent','autolog','dependencies','signatures'],
+   emits:['autolog_enabled','configured_mlflow_environment','logged_agent_artifact_path'],
+   code:"import mlflow\n\nmlflow.openai.autolog()  # OpenAI-compatible / Databricks Foundation Models\n# OR\nmlflow.langchain.autolog()  # LangChain / LangGraph agents\n\nmlflow.pyfunc.log_model(\n    python_model=agent,\n    artifact_path=\"agent\",\n    input_example={\"input\": [{\"role\": \"user\", \"content\": \"Hello\"}]},\n)",
+   rationale:'Treats <em>ResponsesAgent</em> as mandatory for Databricks interoperability, and warns that hand-written signatures fight auto-inference. Enabling autolog at entry captures traces consistently for downstream evaluation and monitoring — get this wrong and every later tracing and deployment skill misbehaves.',
+   platform:'mlflow'},
+  {id:'f2',name:'F2 · Experiments, Tracing & UC',type:'orchestrator',component:'foundation',
+   desc:'Defines experiment paths, MLflow tracing patterns, and UC linkage so runs and prompts stay discoverable.<br><br>Structures dev/eval/deploy experiments and tracing so teams can debug and compare agents. Wires UC OTEL storage and the prompt-registry experiment tag so UC prompts appear in the Experiment UI.',
+   keywords:['experiment','tracing','@mlflow.trace','UnityCatalog','promptRegistryLocation'],
+   emits:['experiment_paths','tracing_config','uc_otel_tables'],
+   code:"import mlflow\n\nmlflow.set_experiment(experiment_path)\n\nmlflow.set_experiment_tags({\n    \"mlflow.promptRegistryLocation\": f\"{catalog}.{schema}\",\n})\n\n@mlflow.trace(name=\"call_llm\", span_type=\"LLM\")\ndef call_llm(prompt: str) -> str:\n    ...",
+   rationale:'Separating lifecycle stages and tagging experiments avoids tangled runs and fixes the common failure mode where UC prompts do not surface without <em>mlflow.promptRegistryLocation</em>. Structured spans make traces searchable across services.',
+   platform:'mlflow'},
+  {id:'f3',name:'F3 · Tools, MCP & Data Access',type:'orchestrator',component:'foundation',
+   desc:'Maps managed and external MCP, <code>databricks-mcp</code>, grants, guardrails, and tool recipes for all tracks.<br><br>Gives agents real-world capabilities — data, search, functions, external APIs — with one mental model for MCP clients, OAuth, resources for deployment, and runtime safety. Shared prerequisite before track-specific wiring.',
+   keywords:['MCP','DatabricksMCPClient','VectorSearch','grants','guardrails'],
+   emits:['mcp_server_knowledge','resource_grants','databricks_mcp_client'],
+   code:"from databricks.sdk import WorkspaceClient\nfrom databricks_mcp import DatabricksMCPClient\n\nworkspace_client = WorkspaceClient()\nhost = workspace_client.config.host\n\nmcp_client = DatabricksMCPClient(\n    server_url=f\"{host}/api/2.0/mcp/functions/system/ai\",\n    workspace_client=workspace_client,\n)\n\ntools = mcp_client.list_tools()",
+   rationale:'Centralizing MCP connection patterns reduces one-off auth bugs and ensures resource enumeration (for example <code>get_databricks_resources</code>) scales to serving. Guardrails complement later governance layers like AI Gateway.'},
+  {id:'f4',name:'F4 · AI Gateway Governance',type:'orchestrator',component:'foundation',
+   desc:'Adds a governed proxy URL with usage tracking, inference tables, guardrails, and rate limits ahead of production traffic.<br><br>Puts a control plane between agents and providers for chargeback, compliance logging, abuse protection, and uniform safety. Complements MLflow traces with provider-level Delta audit where needed.',
+   keywords:['AI Gateway','inference tables','rate limits','guardrails','usage tracking'],
+   emits:['ai_gateway_endpoint','inference_tables','rate_limits'],
+   code:"databricks serving-endpoints create \\\n  --json '{\n    \"name\": \"skyloyalty-ai-gateway\",\n    \"ai_gateway\": {\n      \"usage_tracking_config\": {\"enabled\": true},\n      \"inference_table_config\": {\n        \"enabled\": true,\n        \"catalog_name\": \"main\",\n        \"schema_name\": \"skyloyalty_ops\",\n        \"table_name_prefix\": \"gw_\"\n      }\n    },\n    \"config\": { \"served_entities\": [{ \"name\": \"claude-sonnet-46\" }] }\n  }'",
+   rationale:'The gateway is <em>network-level governance</em> while MLflow remains application observability — running both avoids blind spots. Skip until multiple consumers need shared limits and audit.'},
+
+  // ---------- TRACK A: Custom Agent on Apps ----------
+  {id:'a1',name:'A1 · Clone template & run',type:'worker',component:'track-a',stage:1,
+   desc:'Bootstraps the <code>agent-openai-agents-sdk</code> app template, quickstart, and local chat UI verification.<br><br>Gets a runnable Databricks Apps agent project fast so customization starts from a known structure. Foundation checks make sure MLflow experiments exist before layering template code.',
+   keywords:['app-templates','clone','quickstart','local dev','OpenAI Agents SDK'],
+   emits:['local_project_directory','running_local_agent','project_structure_understanding'],
+   code:"python3 -c \"import mlflow; assert tuple(int(x) for x in mlflow.__version__.split('.')[:2]) >= (3,10); mlflow.openai.autolog(); print('F1: OK')\"\n\ndatabricks apps init --template agent-openai-agents-sdk my-agent-app\n# or git clone app-templates and cp -r agent-openai-agents-sdk ./my-agent-app",
+   rationale:'Validating F1/F2 before cloning prevents mysterious tracing failures later. The prescribed template aligns with MLflow <em>ResponsesAgent</em> and Apps deployment paths used throughout Track A.',
+   platform:'apps'},
+  {id:'a2',name:'A2 · OpenAI Agents SDK + ResponsesAgent',type:'worker',component:'track-a',stage:2,
+   desc:'Builds the two-layer agent: Agents SDK orchestration wrapped in MLflow <code>ResponsesAgent</code> for serving and traces.<br><br>Teaches the core programming model — <code>Agent</code>, <code>Runner</code>, tools, handoffs — while preserving Databricks-compatible signatures and tracing. The bridge from a template to a customized production agent class.',
+   keywords:['Agent','Runner','ResponsesAgent','streaming','handoffs'],
+   emits:['agent_class','responses_agent','customized_agent'],
+   code:"from agents import Agent, function_tool\n\n@function_tool\ndef get_weather(city: str) -> str:\n    return f\"Weather in {city}: 72F, sunny\"\n\nagent = Agent(\n    name=\"my-assistant\",\n    instructions=\"You are a helpful data analyst.\",\n    model=\"databricks-claude-sonnet-4-6\",\n    tools=[get_weather],\n)",
+   rationale:'Keeping framework logic separate from the MLflow serving contract avoids bespoke signatures and keeps Playground and evaluation flows aligned. <em>ResponsesAgent</em> is the integration point.'},
+  {id:'a3',name:'A3 · Wire tools & MCP',type:'worker',component:'track-a',stage:3,
+   desc:'Connects <code>@function_tool</code>, <code>DatabricksMCPClient</code>, and MCP SSE servers to the OpenAI Agents SDK agent.<br><br>Turns a text-only agent into one that calls data systems and external services with the same MCP mental model as F3.',
+   keywords:['function_tool','DatabricksMCPClient','MCPServerSse','tools','VectorSearch'],
+   emits:['agent_with_tools','mcp_connections','resource_grants'],
+   code:"from agents import Agent, function_tool\nfrom datetime import datetime\n\n@function_tool\ndef get_current_time() -> str:\n    return datetime.now().isoformat()\n\nagent = Agent(\n    name=\"analyst\",\n    instructions=\"Use tools to answer with data.\",\n    model=\"databricks-claude-sonnet-4-6\",\n    tools=[get_current_time],\n)",
+   rationale:'Track-specific wiring keeps function tools and MCP connections consistent with deployment resource grants. Clear tool docstrings are critical for reliable LLM tool use.'},
+  {id:'a4',name:'A4 · Apps & Serving auth',type:'worker',component:'track-a',stage:4,
+   desc:'Configures app SP vs user OBO, grants, and MLflow resource passthrough for Apps and Model Serving.<br><br>Aligns permissions with how agents actually run in production — shared SP versus per-user OBO — and connects auth choices to evaluation (CLI creds) and bundle-driven SP provisioning.',
+   keywords:['OBO','service principal','grants','resources','passthrough'],
+   emits:['authenticated_client','resource_permissions'],
+   code:"# Required grants for the app Service Principal\n# MLflow experiment → Can Edit\n# SQL warehouse     → Can Use\n# Serving endpoint  → Can Query\n# VS index          → Can Select\n# UC table          → SELECT",
+   rationale:'Stresses <em>least privilege</em> and dependent-resource grants, because composite tools like Genie fail obscurely when downstream objects lack access. Dual patterns (SP + OBO) match real enterprise audit needs.',
+   platform:'apps'},
+  {id:'a5',name:'A5 · Lakebase memory',type:'worker',component:'track-a',stage:5,
+   desc:'Adds short-term session memory and long-term preferences on Lakebase with graceful degradation and thread IDs.<br><br>Persists conversational state in governed UC-backed storage while keeping the agent usable if memory is absent. Covers token refresh and Apps env vars for production Lakebase connections.',
+   keywords:['Lakebase','AsyncDatabricksSession','thread_id','DatabricksStore','checkpointer'],
+   emits:['lakebase_tables','checkpointer','thread_id'],
+   code:"from agents_sdk_databricks.memory import AsyncDatabricksSession\n\nsession = AsyncDatabricksSession(\n    instance_name=\"my_lakebase\",\n    database_name=\"my_db\",\n    # thread_id resolved from request context\n)",
+   rationale:'Stateful agents need durable, queryable memory separate from ephemeral LLM context; refresh for hour-long tokens and <em>optional memory</em> so outages do not brick the app.',
+   platform:'lakebase'},
+  {id:'a6',name:'A6 · Smoke evaluation',type:'worker',component:'track-a',stage:6,
+   desc:'Runs template <code>agent-evaluate</code> with built-in judges against a small JSON dataset for pre-deploy quality checks.<br><br>A fast quality smoke test distinct from full SDLC benchmarks — establishes baseline relevance, groundedness, and safety before Apps deployment. Explains how A6 relates to S2–S4 depth and automation.',
+   keywords:['agent-evaluate','eval_dataset.json','judges','mlflow.genai','smoke test'],
+   emits:['evaluation_results','eval_dataset'],
+   code:"uv run agent-evaluate\n\n# tests/eval_dataset.json (excerpt)\n[\n  {\n    \"request\": {\"input\": [{\"role\": \"user\", \"content\": \"What is MLflow?\"}]},\n    \"expected_response\": \"MLflow is an open source platform...\"\n  }\n]",
+   rationale:'Early evaluation catches regressions when auth and tools are fresh. A6 is <em>manual developer gating</em> versus CI-driven S4 production bars.',
+   platform:'mlflow-eval'},
+  {id:'a7',name:'A7 · Deploy & query',type:'worker',component:'track-a',stage:7,
+   desc:'Deploys to Databricks Apps via UI or CLI sync/deploy and verifies programmatic queries with OAuth-aware clients.<br><br>Moves a vetted agent into a hosted App with a stable URL for team use, contrasting first manual deploy with later SDLC automation.',
+   keywords:['databricks apps deploy','sync','OAuth','app_url','invocations'],
+   emits:['deployed_app','app_url'],
+   code:"databricks apps create agent-openai-agents-sdk\ndatabricks sync --watch . \"/Users/<user>/agent-openai-agents-sdk\"\ndatabricks apps deploy agent-openai-agents-sdk",
+   rationale:'Separating first-deploy from bundle/CI keeps learning friction low while naming the production path (S5–S6) for governance and champion promotion.',
+   platform:'apps'},
+  {id:'a8',name:'A8 · Debug Apps agent',type:'worker',component:'track-a',stage:8,
+   desc:'Troubleshoots local dev, bundle validation, deployment, auth, tools, and Lakebase using traces and logs.<br><br>A structured runbook aligned with Databricks debug docs — isolate failures quickly (tracing first, then config, permissions, memory) and reduce repeat incidents.',
+   keywords:['debug','traces','502','permissions','bundle validate'],
+   emits:['debugging_runbook','resolved_issues'],
+   code:"databricks -v\ndatabricks auth profiles\ngrep MLFLOW_TRACKING_URI .env\n# Must be: databricks://PROFILE_NAME (not a URL)\n\nuv run start-app\n# Terminal 2:\ncurl -X POST http://localhost:8000/invocations \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"input\":[{\"role\":\"user\",\"content\":\"hi\"}]}'",
+   rationale:'Elevates MLflow tracing as the <em>primary signal</em> and validates configuration before deploy — matching platform guidance that evolves over time.'},
+
+  // ---------- TRACK B: Supervisor API ----------
+  {id:'b0',name:'B0 · Knowledge Assistant lifecycle',type:'worker',component:'track-b',stage:0,
+   desc:'Creates, syncs, and hands off a Knowledge Assistant endpoint for document Q&A with citations.<br><br>Produces a managed <code>kb_endpoint_name</code> for Supervisor hosted tools when policies and docs — not custom retrieval — are the knowledge source. Contrasts UC Files vs Vector Search index modes and readiness polling.',
+   keywords:['Knowledge Assistant','UC Files','Vector Search','sync','kb_endpoint_name'],
+   emits:['kb_endpoint_name','knowledge_source_type','sync_status'],
+   code:"# After create + attach sources + sync + poll readiness:\n# config.yml (excerpt)\nkb_endpoint_name: \"ka-<id>-endpoint\"   # produced by B0",
+   rationale:'KA trades pipeline control for operational simplicity; routes advanced RAG to F3 Vector Search MCP instead of overloading KA.'},
+  {id:'b1',name:'B1 · Supervisor getting started',type:'worker',component:'track-b',stage:1,
+   desc:'Installs <code>databricks-openai</code> and issues first authenticated calls with zero custom agent server code.<br><br>Gets a minimal Supervisor client running against workspace AI Gateway so hosted-tool agents can be tested immediately. Scaffolds config-driven projects (<code>config.yml</code>, <code>agent.py</code>) distinct from full Apps templates.',
+   keywords:['DatabricksOpenAI','supervisor','databricks-openai','config.yml','streaming'],
+   emits:['supervisor_client','single_turn_response'],
+   code:"uv pip install \"databricks-openai>=0.3.0\" \"mlflow[databricks]>=3.10.1\" \"databricks-sdk>=0.40.0\"\n\nfrom databricks_openai import DatabricksOpenAI\nprint(\"databricks-openai installed successfully\")",
+   rationale:'Databricks-managed loops reduce bespoke orchestration cost; targets teams that prioritize speed and hosted tools over custom servers.'},
+  {id:'b2',name:'B2 · Supervisor hosted tools',type:'worker',component:'track-b',stage:2,
+   desc:'Adds Genie, UC functions, Knowledge Assistant endpoints, and external MCP to Supervisor <code>tools</code> payloads.<br><br>Turns the Supervisor client into a multi-capability agent by declaring tool types Databricks executes server-side. Chains optional B0 <code>kb_endpoint_name</code> into <code>agent_endpoint</code> tools.',
+   keywords:['genie_space','unity_catalog_function','agent_endpoint','external_mcp_server','tools'],
+   emits:['multi_tool_agent','tool_configuration'],
+   code:"{\n  \"type\": \"agent_endpoint\",\n  \"agent_endpoint\": {\n    \"name\": \"knowledge_assistant\",\n    \"description\": \"Answers questions from internal documentation and runbooks.\",\n    \"endpoint_name\": \"<kb_endpoint_name from B0>\"\n  }\n}",
+   rationale:'Clear descriptions drive correct tool routing; hosted tools cannot mix with client-side function tools in one request — avoid unsupported hybrid calls.'},
+  {id:'b3',name:'B3 · Supervisor tracing & memory',type:'worker',component:'track-b',stage:3,
+   desc:'Enables <code>trace_destination</code> to MLflow, UC OTEL alignment, and client-side conversation history plus <code>predict_fn</code> for SDLC.<br><br>Makes Supervisor requests observable in experiments and UC tables while acknowledging API statelessness via explicit message buffers. Emits the <code>predict_fn</code> contract evaluations and automation consume.',
+   keywords:['trace_destination','predict_fn','UnityCatalog','conversation memory','MLflow'],
+   emits:['predict_fn','traced_agent','conversation_memory'],
+   code:"response = client.responses.create(\n    model=config.get(\"model\"),\n    instructions=config.get(\"instructions\"),\n    input=[{\"type\": \"message\", \"role\": \"user\", \"content\": \"What was DBU spend last month?\"}],\n    tools=build_tools_from_config(config),\n    extra_body={\n        \"trace_destination\": {\"experiment_id\": config.get(\"mlflow_experiment_id\")},\n    },\n    stream=False,\n)",
+   rationale:'Native tracing plus UC storage unifies Supervisor and local MLflow spans for monitoring queries; client memory closes the gap of a stateless API.',
+   platform:'mlflow'},
+
+  // ---------- TRACK C: Model Serving ----------
+  {id:'c1',name:'C1 · Package as ChatModel',type:'worker',component:'track-c',stage:1,
+   desc:'Wraps agents in <code>ChatModel</code>/<code>ResponsesAgent</code>, logs resources, and tests local <code>predict</code> for serving.<br><br>Produces an MLflow model artifact suitable for Model Serving with declared dependencies and local validation. Extends F3 tool knowledge with <code>predict()</code> wiring inside the servable class.',
+   keywords:['ChatModel','log_model','resources','ModelConfig','predict'],
+   emits:['logged_model','local_predict'],
+   code:"import mlflow\nfrom mlflow.models import ModelConfig\n\nmlflow.openai.autolog()\nconfig = ModelConfig(development_config=\"config.yml\")\n\nclass MyAgent(mlflow.pyfunc.ChatModel):\n    def predict(self, context, messages, params=None):\n        ...",
+   rationale:'Serving-first agents need explicit resource declarations for auth passthrough and lineage — avoiding deploy-time permission gaps common in notebook-only code.'},
+  {id:'c2',name:'C2 · Deploy serving endpoint',type:'worker',component:'track-c',stage:2,
+   desc:'Registers the UC model version and creates a ready serving endpoint via SDK or CLI with scale-to-zero options.<br><br>Exposes packaged agents as REST endpoints for integration and AI Gateway features, with readiness polling and invocation checks.',
+   keywords:['register_model','serving_endpoints','WorkspaceClient','READY','UC'],
+   emits:['serving_endpoint','predict_fn','deployment_config'],
+   code:"import mlflow\n\nuc_model_name = \"main.agents.my_agent\"\nmlflow.register_model(\n    model_uri=\"runs:/<run_id>/agent\",\n    name=uc_model_name,\n)\n\nw.serving_endpoints.create(\n    name=endpoint_name,\n    config=EndpointCoreConfigInput(\n        served_entities=[ServedEntityInput(entity_name=uc_model_name, entity_version=\"1\")]\n    ),\n)",
+   rationale:'Treating UC registration as the gateway to serving enforces <em>governed artifacts and version pins</em> for production traffic.',
+   platform:'serving'},
+  {id:'c3',name:'C3 · Debug endpoints',type:'worker',component:'track-c',stage:3,
+   desc:'Uses inference tables, MLflow traces, and local reproduction to fix endpoint errors, latency, and auth passthrough.<br><br>Applies the platform debug playbook to serving-specific signals — Delta inference logs plus trace replay — so production failures become reproducible locally.',
+   keywords:['inference tables','status_code','validate_serving_input','passthrough','traces'],
+   emits:['debugging_runbook','resolved_issues'],
+   code:"SELECT * FROM `my-catalog`.`my-schema`.`my-table`\nWHERE status_code != 200\n  AND request_time > '2026-04-01'\n\n-- Filter by request id\nSELECT * FROM `my-catalog`.`my-schema`.`my-table`\nWHERE databricks_request_id = 'req-abc123'",
+   rationale:'Inference tables narrow incident scope quickly; pairing them with <em>validate_serving_input</em> closes the loop between production payloads and code paths.'},
+
+  // ---------- SDLC ----------
+  {id:'s1',name:'S1 · UC Prompt Registry',type:'orchestrator',component:'sdlc',stage:1,
+   desc:'Registers versioned prompts with UC names, aliases, and experiment tags for UI visibility and trace linking.<br><br>Makes prompts first-class, immutable versions with promotion aliases instead of ad-hoc strings. Encodes the critical experiment tag so registered prompts surface in MLflow UI workflows.',
+   keywords:['register_prompt','aliases','mlflow.genai','UC','promptRegistryLocation'],
+   emits:['registered_prompts','prompt_aliases'],
+   code:"mlflow.set_experiment_tags({\n    \"mlflow.promptRegistryLocation\": uc_schema,\n})\n\nversion = mlflow.genai.register_prompt(\n    name=prompt_name,\n    template=template,\n    commit_message=\"Initial judge prompt\",\n    tags={\"domain\": \"my_agent\", \"type\": \"judge\"},\n)",
+   rationale:'Registry-backed prompts enable <em>A/B tests and auditability</em>; linking experiments prevents silent UI gaps that block operators from seeing prompt objects.',
+   platform:'uc'},
+  {id:'s2',name:'S2 · Evaluation datasets',type:'orchestrator',component:'sdlc',stage:2,
+   desc:'Defines <code>EvaluationDataset</code> rows for <code>mlflow.genai.evaluate</code> with UC persistence and schema validation.<br><br>Creates benchmark data with correct <code>inputs</code>/<code>outputs</code>/<code>expectations</code> semantics so harness runs do not fail on shape drift. Supports provenance splits and production trace exports into datasets.',
+   keywords:['EvaluationDataset','inputs','expectations','UC Delta','benchmark'],
+   emits:['evaluation_dataset','mlflow_dataset_entity'],
+   code:"# Minimal chat example\n{\"inputs\": {\"question\": \"What is X?\"},\n \"expectations\": {\"reference_answer\": \"...\"}}\n\n# SQL / tool agent example\n{\n  \"inputs\": {\"question\": \"Total cost by region?\"},\n  \"expectations\": {\n    \"expected_sql\": \"SELECT ...\",\n    \"expected_tables\": [\"db.schema.t\"]\n  }\n}",
+   rationale:'Aligning rows with <em>predict_fn kwargs</em> and scorer keys prevents subtle evaluation bugs where judges read empty expectations.',
+   platform:'mlflow-eval'},
+  {id:'s3',name:'S3 · Scorers & judges',type:'orchestrator',component:'sdlc',stage:3,
+   desc:'Assembles built-in scorers, <code>@scorer</code> functions, and <code>make_judge()</code> LLM judges with gating-friendly metrics.<br><br>Turns qualitative requirements into measurable feedback reusable in offline eval and monitoring. Documents the three construction patterns so teams pick the right complexity per risk.',
+   keywords:['Safety','Correctness','make_judge','thresholds','Feedback'],
+   emits:['scorer_list','threshold_config','helper_functions'],
+   code:"from mlflow.genai.scorers import Safety, Correctness, Guidelines, RelevanceToQuery\n\nscorers = [\n    Safety(),\n    Correctness(config={\"targets\": \"expectations/expected_response\"}),\n    Guidelines(\n        name=\"my_guideline\",\n        guidelines=\"Be concise; cite sources; refuse harmful requests.\",\n    ),\n    RelevanceToQuery(),\n]",
+   rationale:'Standardized scorer lists make thresholds comparable across runs; custom scorers capture <em>domain rules</em> deterministic judges miss.',
+   platform:'mlflow-eval'},
+  {id:'s4',name:'S4 · Evaluation runs',type:'orchestrator',component:'sdlc',stage:4,
+   desc:'Executes <code>mlflow.genai.evaluate</code>, answer-sheet rescoring, retries, thresholds, and human-feedback hooks.<br><br>Operationalizes the harness end-to-end — predictor, data, scorers — so promotion decisions cite MLflow runs. Bridges track <code>predict_fn</code> modules to shared <code>run_evaluation.py</code>.',
+   keywords:['mlflow.genai.evaluate','predict_fn','thresholds','answer sheet','human feedback'],
+   emits:['evaluation_results','thresholds_met','mlflow_run_id'],
+   code:"import mlflow\n\nresults = mlflow.genai.evaluate(\n    data=eval_dataset,\n    predict_fn=agent_predict_fn,\n    scorers=scorer_list,\n)",
+   rationale:'Centralizing evaluation execution ensures <em>traces, metrics, and gating</em> stay repeatable for CI and stakeholders rather than one-off notebooks.',
+   platform:'mlflow-eval'},
+  {id:'s4b',name:'S4b · Stakeholder signoff',type:'worker',component:'sdlc',stage:'4b',
+   desc:'Translates green eval metrics into business-facing approvals, risk review, and auditable signoff artifacts.<br><br>Adds a <em>human gate</em> after automated thresholds pass so legal, product, and support stakeholders own residual risk. Requires concrete walkthroughs and stored evidence paths in UC volumes.',
+   keywords:['sign-off','compliance','business metrics','risk','deployment gate'],
+   emits:['signoff_artifact','business_metrics_report','deployment_gate'],
+   code:"# Business Metrics Report (excerpt)\n# | Business claim              | Scorer                 | Target  | Result |\n# | Cites the right policy page | source_citation_scorer | >= 0.95 | 0.98   |",
+   rationale:'Technical pass rates alone mislead executives; structured signoff aligns Databricks\' stakeholder phase with <em>deployable accountability</em>.'},
+  {id:'s5',name:'S5 · Log model & UC register',type:'orchestrator',component:'sdlc',stage:5,
+   desc:'Logs agents with <code>resources</code>, registers UC versions, and manages champion aliases with eval gating.<br><br>Connects evaluation outcomes to versioned deployable artifacts and trace linking via <code>MLFLOW_ACTIVE_MODEL_ID</code>. Covers pyfunc logging defaults and LangChain variants.',
+   keywords:['log_model','register_model','resources','champion','MLFLOW_ACTIVE_MODEL_ID'],
+   emits:['logged_model_id','uc_model_version','champion_alias'],
+   code:"model_info = mlflow.pyfunc.log_model(\n    artifact_path=\"agent\",\n    python_model=\"/path/to/agent.py\",\n    input_example={\"input\": [{\"role\": \"user\", \"content\": \"Hello\"}]},\n    resources=[\n        DatabricksServingEndpoint(endpoint_name=\"my-llm\"),\n        DatabricksVectorSearchIndex(index_name=\"prod.docs.index\"),\n    ],\n    pip_requirements=[\"mlflow[databricks]>=3.10.1\", \"databricks-sdk>=0.40.0\"],\n)",
+   rationale:'Explicit resources and smoke predictions prevent production deployments that <em>fail only when missing credentials</em> or dependent endpoints.',
+   platform:'uc'},
+  {id:'s6',name:'S6 · Bundles & CI gates',type:'orchestrator',component:'sdlc',stage:6,
+   desc:'Uses Databricks Asset Bundles and Apps definitions for evaluate-then-promote automation and SP permissions.<br><br>Replaces manual deploys with validated bundle workflows across dev/staging/prod and ties MCP, Supervisor patterns, and trace-version linking into repeatable pipelines.',
+   keywords:['databricks bundle','databricks.yml','apps','CI/CD','promote'],
+   emits:['databricks_app','deployment_pipeline','serving_endpoint'],
+   code:"databricks bundle validate\ndatabricks bundle deploy --target dev\ndatabricks bundle run --target dev my_agent_app",
+   rationale:'Bundles encode environment separation and resource wiring that ad-hoc copying breaks; <em>evaluate-then-promote</em> reduces shipping unvetted models.',
+   platform:'dabs'},
+  {id:'s7',name:'S7 · Production monitoring',type:'orchestrator',component:'sdlc',stage:7,
+   desc:'Registers live scorers with sampling, UC trace archival, backfills, and human review on production traffic.<br><br>Extends offline evaluation to continuous quality on real sessions with immutable scorer handles and SQL-friendly trace stores. Documents UC trace destination setup compatible with monitoring dashboards.',
+   keywords:['ScorerSamplingConfig','register','trace_location','UnityCatalog','backfill'],
+   emits:['production_scorers','trace_archival_table','monitoring_dashboards'],
+   code:"mlflow.set_experiment(\n    experiment_name=\"/Users/you@example.com/my-genai-experiment\",\n    trace_location=UnityCatalog(\n        catalog_name=\"my_catalog\",\n        schema_name=\"my_schema\",\n        table_prefix=\"my_prefix\",\n    ),\n)\n\nsafety = Safety().register(name=\"prod_safety_check\")\nsafety = safety.start(sampling_config=ScorerSamplingConfig(sample_rate=1.0))",
+   rationale:'Live monitoring <em>closes the loop</em> from deploy to incident response; reassignment rules reflect immutable scorer lifecycles in MLflow 3.10+ APIs.',
+   platform:'mlflow-eval'},
+  {id:'s8',name:'S8 · Prompt optimization',type:'orchestrator',component:'sdlc',stage:8,
+   desc:'Runs <code>mlflow.genai.optimize_prompts</code> with GEPA against registered prompts, scorers, and training rows.<br><br>Iterates prompt text when evaluation shows instruction-shaped failures while retrieval and tools are sound. Registers optimized versions and feeds the normal alias promotion flow.',
+   keywords:['optimize_prompts','GepaPromptOptimizer','prompt_uris','train_data','staging'],
+   emits:['optimized_prompt_versions','staging_aliases','optimization_reports'],
+   code:"result = mlflow.genai.optimize_prompts(\n    predict_fn=predict_fn,\n    train_data=train_data,\n    prompt_uris=[prompt_uri],\n    optimizer=GepaPromptOptimizer(\n        reflection_model=\"databricks:/databricks-claude-sonnet-4-6\",\n        max_metric_calls=150,\n    ),\n    scorers=[Correctness()],\n)",
+   rationale:'Optimization without baselines wastes budget; gate entry on registry, datasets, scorers, and failing eval signals — <em>edit prompts only when metrics justify it</em>.'},
+
+  // ---------- CAPSTONE ----------
+  {id:'cap',name:'Capstone · Multi-agent Genie Orchestrator',type:'orchestrator',component:'capstone',
+   desc:'Builds a Data Intelligence orchestrator routing Genie spaces, search, and synthesis without data hallucination fallbacks.<br><br>Demonstrates end-to-end application of foundation, Track A patterns, and SDLC steps in a multi-agent architecture with handoffs and strict data provenance. Optional after a single-agent path.',
+   keywords:['handoffs','Genie','orchestrator','Vector Search','attribution'],
+   emits:['multi_agent_genie_orchestrator','domain_routing','cross_domain_synthesis'],
+   code:"┌──────────────────────────────────────────────────────────────┐\n│                   Orchestrator Agent                         │\n│  (intent classification → handoff to specialist agents)      │\n└──────────────────────────────────────────────────────────────┘",
+   rationale:'Proves the course skills <em>compose at scale</em> — routing, tools, memory, prompts, eval, deploy, and monitoring in one reference design emphasizing no-LLM-fallback for data queries.'},
+
+  // ---------- COURSE ORCHESTRATOR (for search only) ----------
+  {id:'course',name:'Course Orchestrator',type:'entry',component:'course',
+   desc:'Entry router for foundation, tracks A/B/C, SDLC, capstone, and workshop state/retrospective templates.<br><br>Coordinates the learning path and vibecoding workshop contracts — reading/writing <code>.vibecoding-state.md</code> and retrospectives so multi-step prompts stay consistent.',
+   keywords:['orchestrator','Foundation','Track A','SDLC','state file'],
+   emits:['.vibecoding-state.md','retrospective_notes','course_routing_decision'],
+   code:"Foundation ──→ [Pick a Track] ──→ SDLC Pipeline ──→ Capstone (optional)\n                    │\n        ┌───────────┼───────────┐\n        ▼           ▼           ▼\n    Track A     Track B     Track C",
+   rationale:'A single navigation skill prevents learners from skipping prerequisites (tracing before deploy) and encodes the shared state contract used across prompts in <em>Instructions.md</em>.'},
+];
+
+const SKILL_MAP = {};
+SKILLS.forEach(s => SKILL_MAP[s.id] = s);
+
+// SDLC stages (for pipeline bubbles)
+const STAGES = [
+  {num:'1',label:'Prompt Reg',sc:'sc-1',orch:'s1'},
+  {num:'2',label:'Datasets',sc:'sc-2',orch:'s2'},
+  {num:'3',label:'Scorers',sc:'sc-3',orch:'s3'},
+  {num:'4',label:'Eval Runs',sc:'sc-4',orch:'s4'},
+  {num:'4b',label:'Signoff',sc:'sc-4b',orch:'s4b'},
+  {num:'5',label:'UC Register',sc:'sc-5',orch:'s5'},
+  {num:'6',label:'Deploy',sc:'sc-6',orch:'s6'},
+  {num:'7',label:'Monitor',sc:'sc-7',orch:'s7'},
+  {num:'8',label:'Optimize',sc:'sc-8',orch:'s8'},
+];
+
+const FOUNDATION = ['f1','f2','f3','f4'];
+
+const TRACKS = [
+  {key:'A',title:'Track A · Custom Agent on Apps',sub:'Full OpenAI Agents SDK + ResponsesAgent app. Maximum control.',skills:['a1','a2','a3','a4','a5','a6','a7','a8']},
+  {key:'B',title:'Track B · Supervisor API',sub:'Managed agent loop with hosted tools — Genie, KA, UC functions.',skills:['b0','b1','b2','b3']},
+  {key:'C',title:'Track C · Model Serving',sub:'Package as a pyfunc and deploy to a REST endpoint.',skills:['c1','c2','c3']},
+];
+
+// ======================== TOURS ========================
+const TOURS = {
+  a: {
+    name:'Foundation → Custom Agent on Apps',
+    tree: buildTourATree(),
+    steps: [
+      {expand:['ta-root'],activate:['ta-n-root'],narration:'The <span class="hl">Course Orchestrator</span> routes the learner: read Foundation first, pick a track, run the SDLC, capstone last.',tier:'Entry',
+       skillIds:['course'],
+       designRationale:'A single entry file lets <em>any IDE</em> discover the course automatically. No plugin install — open the repo, the AI reads <code>00-course-orchestrator/SKILL.md</code> and knows where to start. Zero-friction onboarding.',
+       inputOutput:{inputs:['repo root'],outputs:['routing decision','state file']}},
+      {expand:['ta-foundation'],activate:['ta-n-f1','ta-n-f2','ta-n-f3','ta-n-f4'],narration:'All four <span class="hl-y">Foundation skills</span> are prerequisites — MLflow setup, tracing + UC linkage, tools/MCP, and (optionally) AI Gateway.',tier:'Foundation',
+       skillIds:['f1','f2','f3','f4'],
+       designRationale:'Foundation is <em>always-on</em>. Autolog + experiments + tracing are required before any evaluation or deployment works. Skipping F1 means deploys succeed but traces never appear in the UI; skipping F2 means UC prompts never surface; skipping F3 means agents have no tools.',
+       inputOutput:{inputs:['workspace access'],outputs:['autolog','tracing','MCP client','(optional) gateway']}},
+      {expand:['ta-a1'],activate:['ta-n-a1'],narration:'<span class="hl">A1 — Clone template & run.</span> <code>databricks apps init --template agent-openai-agents-sdk</code>.',tier:'Track A',
+       skillIds:['a1'],
+       designRationale:'The prescribed template aligns with <em>MLflow ResponsesAgent</em> and Apps deployment paths used throughout Track A. Starting from a known good structure saves the workshop from scaffolding drift.',
+       inputOutput:{inputs:['template name','app name'],outputs:['local project','running local agent']}},
+      {activate:['ta-n-a2'],narration:'<span class="hl">A2 — OpenAI Agents SDK + ResponsesAgent.</span> The two-layer agent that Databricks serves.',tier:'Track A',
+       skillIds:['a2'],
+       designRationale:'Keeping framework logic separate from the MLflow serving contract avoids bespoke signatures and keeps <em>Playground and evaluation flows aligned</em>. ResponsesAgent is the integration point — everything else can change.',
+       inputOutput:{inputs:['template','model name'],outputs:['agent class','ResponsesAgent wrapper']}},
+      {activate:['ta-n-a3'],narration:'<span class="hl">A3 — Wire tools and MCP.</span> Functions, VS search, UC functions, external MCP SSE.',tier:'Track A',
+       skillIds:['a3'],
+       designRationale:'Track-specific wiring keeps function tools and MCP connections consistent with deployment resource grants. <em>Tool docstrings matter</em> — the LLM reads them to pick the right tool.',
+       inputOutput:{inputs:['MCP clients','tool specs'],outputs:['agent with tools']}},
+      {activate:['ta-n-a4'],narration:'<span class="hl">A4 — Authentication.</span> Service Principal vs OBO, resource grants.',tier:'Track A',
+       skillIds:['a4'],
+       designRationale:'Least privilege matters. Composite tools like Genie <em>fail obscurely</em> when downstream tables or endpoints lack access. Dual patterns (SP + OBO) match enterprise audit needs.',
+       inputOutput:{inputs:['app SP','user identity'],outputs:['grants matrix','auth client']}},
+      {activate:['ta-n-a5'],narration:'<span class="hl">A5 — Lakebase memory.</span> Stateful conversations with graceful degradation.',tier:'Track A',
+       skillIds:['a5'],
+       designRationale:'Stateful agents need <em>durable, queryable memory</em> separate from ephemeral LLM context. Hour-long tokens need refresh; optional memory means outages do not brick the app.',
+       inputOutput:{inputs:['Lakebase instance','thread_id'],outputs:['checkpointer','session memory']}},
+      {activate:['ta-n-a6'],narration:'<span class="hl">A6 — Smoke evaluation.</span> <code>uv run agent-evaluate</code> against a small JSON dataset.',tier:'Track A',
+       skillIds:['a6'],
+       designRationale:'Early evaluation catches regressions <em>when auth and tools are fresh</em>. A6 is manual developer gating; the full SDLC (S2–S4) brings the rigor needed for production gates.',
+       inputOutput:{inputs:['agent','eval_dataset.json'],outputs:['evaluation metrics']}},
+      {activate:['ta-n-a7','ta-n-a8'],narration:'<span class="hl">A7 — Deploy & query</span> (apps deploy) and <span class="hl">A8 — Debug</span> (traces-first runbook).',tier:'Track A',
+       skillIds:['a7','a8'],
+       designRationale:'Separating first-deploy (<em>A7</em>) from bundle/CI (<em>S6</em>) keeps learning friction low. The debug skill elevates MLflow tracing as the primary signal and validates configuration before redeploying.',
+       inputOutput:{inputs:['validated agent'],outputs:['deployed app','resolved issues']}},
+      {narration:'<strong>Track A complete.</strong> From template clone to a hosted Databricks App — foundation, memory, tools, eval, deploy, debug.',tier:'Complete',summary:true},
+    ]
+  },
+  b: {
+    name:'The GenAI SDLC',
+    tree: buildTourBTree(),
+    steps: [
+      {expand:['tb-root'],activate:['tb-n-root'],narration:'The <span class="hl">SDLC pipeline</span> runs after a working agent exists in any track. It productionizes the agent.',tier:'Overview',
+       designRationale:'Stages <em>decouple</em>: prompt registry is independent of datasets; scorers are independent of eval runs; monitoring reuses the same scorer registry. This is plan-as-contract — each step reads its inputs and emits named artifacts.',
+       inputOutput:{inputs:['working agent','predict_fn'],outputs:['eval runs','deployed version','live scorers']}},
+      {expand:['tb-s1'],activate:['tb-n-s1'],narration:'<span class="hl">S1 — UC Prompt Registry.</span> Version prompts with aliases; tag the experiment.',tier:'SDLC',
+       skillIds:['s1'],
+       designRationale:'Prompts are <em>first-class artifacts</em>. Without registration, A/B testing requires git diffs of Python strings. Without the <code>mlflow.promptRegistryLocation</code> tag, UC prompts never surface in the Experiment UI.',
+       inputOutput:{inputs:['prompt text','UC schema'],outputs:['prompt_uri','aliases']}},
+      {activate:['tb-n-s2'],narration:'<span class="hl">S2 — Evaluation datasets.</span> Rows with <code>inputs</code> + <code>expectations</code>, persisted to UC.',tier:'SDLC',
+       skillIds:['s2'],
+       designRationale:'Harness failures almost always trace to <em>row shape drift</em>. Scorer keys like <code>expected_sql</code> must match row keys exactly — defining a shared schema early removes the #1 source of wasted eval time.',
+       inputOutput:{inputs:['production traces','manual examples'],outputs:['EvaluationDataset','UC Delta table']}},
+      {activate:['tb-n-s3'],narration:'<span class="hl">S3 — Scorers & judges.</span> Built-ins, <code>@scorer</code>, and <code>make_judge()</code>.',tier:'SDLC',
+       skillIds:['s3'],
+       designRationale:'Pick the <em>lowest complexity that captures the rule</em>. Built-ins for generic quality (Safety, Correctness, Guidelines). Code scorers for deterministic checks. <code>make_judge()</code> for nuanced domain quality.',
+       inputOutput:{inputs:['quality requirements'],outputs:['scorer list','thresholds']}},
+      {activate:['tb-n-s4'],narration:'<span class="hl">S4 — Evaluation runs.</span> <code>mlflow.genai.evaluate(data, predict_fn, scorers)</code>.',tier:'SDLC',
+       skillIds:['s4'],
+       designRationale:'Centralizing the run keeps <em>traces, metrics, and gating repeatable</em> for CI. Answer-sheet rescoring and retries cut judge flakiness; thresholds turn subjective review into a pass/fail decision.',
+       inputOutput:{inputs:['dataset','predict_fn','scorers'],outputs:['mlflow_run','thresholds_met']}},
+      {activate:['tb-n-s4b'],narration:'<span class="hl">S4b — Stakeholder signoff.</span> Green metrics → business approvals + risk artifacts.',tier:'SDLC',
+       skillIds:['s4b'],
+       designRationale:'Technical pass rates alone <em>mislead executives</em>. A structured business-metrics report aligns technical scorers to concrete business claims and stores evidence in UC for audit.',
+       inputOutput:{inputs:['eval results','business mapping'],outputs:['signoff artifact','deployment gate']}},
+      {activate:['tb-n-s5'],narration:'<span class="hl">S5 — Log model & UC register.</span> Declare <code>resources</code>, pin versions, set champion alias.',tier:'SDLC',
+       skillIds:['s5'],
+       designRationale:'Explicit <code>resources</code> prevent the classic <em>"works in notebook, fails in serving"</em> permission gaps. <code>MLFLOW_ACTIVE_MODEL_ID</code> links production traces back to the exact model version.',
+       inputOutput:{inputs:['agent code','runs'],outputs:['uc_model_version','champion alias']}},
+      {activate:['tb-n-s6'],narration:'<span class="hl">S6 — Bundles, Apps deploy, and CI gates.</span>',tier:'SDLC',
+       skillIds:['s6'],
+       designRationale:'DABs encode environment separation and resource wiring that ad-hoc copying breaks. Evaluate-then-promote ensures <em>unvetted models do not ship</em>.',
+       inputOutput:{inputs:['uc model','databricks.yml'],outputs:['dev/staging/prod pipeline']}},
+      {activate:['tb-n-s7'],narration:'<span class="hl">S7 — Production monitoring.</span> Registered scorers, sampling, UC trace archival.',tier:'SDLC',
+       skillIds:['s7'],
+       designRationale:'Offline eval catches regressions; production monitoring catches <em>drift on real traffic</em>. Immutable scorer lifecycles in MLflow 3.10+ mean names are stable — dashboards and alerts stop breaking.',
+       inputOutput:{inputs:['live endpoint','scorers'],outputs:['trace archive','monitoring dashboards']}},
+      {activate:['tb-n-s8'],narration:'<span class="hl">S8 — Automatic prompt optimization.</span> GEPA-based, scorer-driven.',tier:'SDLC',
+       skillIds:['s8'],
+       designRationale:'Optimization without baselines <em>wastes budget</em>. Gate entry on registry, datasets, scorers, and failing eval signals — edit prompts only when metrics justify it.',
+       inputOutput:{inputs:['registry','scorers','train_data'],outputs:['optimized versions']}},
+      {narration:'<strong>SDLC complete.</strong> From agent to governed production: prompts tracked, evals gated, model registered, deployed, monitored, optimized.',tier:'Complete',summary:true},
+    ]
+  },
+  c: {
+    name:'The Full Course Picture',
+    tree: buildTourCTree(),
+    steps: [
+      {expand:['tc-root'],activate:['tc-n-root'],narration:'<span class="hl">Foundation, three tracks, SDLC, capstone.</span> One course — pick the path your agent architecture needs.',tier:'Overview',
+       designRationale:'The course separates <em>what you build</em> (track choice) from <em>how you productionize</em> (SDLC). All three tracks emit a common <code>predict_fn</code> contract, so the SDLC works identically no matter which track a team picks.',
+       inputOutput:{inputs:['use case'],outputs:['track decision','production plan']}},
+      {expand:['tc-foundation'],activate:['tc-n-f'],narration:'<span class="hl-g">Foundation</span> — shared prerequisites (F1–F4). Skip these and every later skill breaks.',tier:'Foundation',
+       skillIds:['f1','f2','f3','f4'],
+       designRationale:'Foundation is the <em>always-loaded core</em> of the course. MLflow setup, tracing, UC linkage, tools, and optional governance — the substrate every track and SDLC stage uses.',
+       inputOutput:{inputs:['workspace'],outputs:['MLflow env','MCP access']}},
+      {expand:['tc-tracks'],activate:['tc-n-ta','tc-n-tb','tc-n-tc'],narration:'Three tracks — pick <span class="hl">A</span> for full control, <span class="hl-y">B</span> for managed Supervisor, <span class="hl-g">C</span> for pure Model Serving.',tier:'Tracks',
+       designRationale:'Different teams want different trade-offs. <em>Track A</em> gives the most control (custom code, full Apps UX). <em>Track B</em> is the fastest path with Genie + KA hosted tools. <em>Track C</em> focuses on the pyfunc + endpoint pattern with no UI.',
+       inputOutput:{inputs:['requirements'],outputs:['one working agent']}},
+      {expand:['tc-sdlc'],activate:['tc-n-sdlc'],narration:'The <span class="hl">SDLC pipeline</span> wraps any track — register → evaluate → gate → deploy → monitor → optimize.',tier:'SDLC',
+       skillIds:['s1','s4','s6','s7'],
+       designRationale:'Every track emits a <code>predict_fn</code>. The SDLC does not care which track produced it — the same evaluation, registration, deployment, and monitoring steps apply. This is the <em>track-agnostic productionization</em> principle.',
+       inputOutput:{inputs:['agent from any track'],outputs:['governed production deployment']}},
+      {expand:['tc-cap'],activate:['tc-n-cap'],narration:'<span class="hl-y">Capstone</span> — multi-agent Genie orchestrator composes everything in one reference design.',tier:'Capstone',
+       skillIds:['cap'],
+       designRationale:'The capstone is <em>optional but aspirational</em>. It proves the course skills compose at scale — routing, tools, memory, prompts, eval, deploy, monitoring — in one coherent multi-agent system with no LLM hallucination fallback.',
+       inputOutput:{inputs:['foundation','track','SDLC'],outputs:['multi-agent production system']}},
+      {narration:'<strong>The full picture:</strong> Foundation gives you MLflow rigor. A track gives you an agent. The SDLC ships it. The capstone proves it composes.',tier:'Complete',summary:true},
+    ]
+  }
+};
+
+function buildTourATree(){
+  return `<ul>
+<li id="ta-root" class="expanded"><div class="tnode type-entry" id="ta-n-root" data-skill="course" data-toggle="ta-root"><div class="icon">C</div><div class="name">Course Orchestrator</div><div class="tag">entry</div><div class="chevron open">▶</div></div>
+<ul>
+<li id="ta-foundation" class="collapsed"><div class="tnode type-common" id="ta-n-foundation" data-skill="f1" data-toggle="ta-foundation"><div class="icon">F</div><div class="name">Foundation (always-on)</div><div class="tag">core</div><div class="meta">4 skills</div><div class="chevron">▶</div></div>
+<ul>
+<li><div class="tnode type-worker" id="ta-n-f1" data-skill="f1"><div class="icon">1</div><div class="name">F1 · MLflow foundation</div><div class="tag">foundation</div></div></li>
+<li><div class="tnode type-worker" id="ta-n-f2" data-skill="f2"><div class="icon">2</div><div class="name">F2 · Tracing & UC</div><div class="tag">foundation</div></div></li>
+<li><div class="tnode type-worker" id="ta-n-f3" data-skill="f3"><div class="icon">3</div><div class="name">F3 · Tools & MCP</div><div class="tag">foundation</div></div></li>
+<li><div class="tnode type-worker" id="ta-n-f4" data-skill="f4"><div class="icon">4</div><div class="name">F4 · AI Gateway (optional)</div><div class="tag">foundation</div></div></li>
+</ul></li>
+<li id="ta-a1" class="collapsed"><div class="tnode type-orchestrator" id="ta-n-a1" data-skill="a1" data-toggle="ta-a1"><div class="icon">A1</div><div class="name">Track A · Clone template</div><div class="tag">track-a</div><div class="chevron">▶</div></div>
+<ul>
+<li><div class="tnode type-worker" id="ta-n-a2" data-skill="a2"><div class="icon">A2</div><div class="name">A2 · Agents SDK + ResponsesAgent</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" id="ta-n-a3" data-skill="a3"><div class="icon">A3</div><div class="name">A3 · Tools & MCP wiring</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" id="ta-n-a4" data-skill="a4"><div class="icon">A4</div><div class="name">A4 · Authentication</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" id="ta-n-a5" data-skill="a5"><div class="icon">A5</div><div class="name">A5 · Lakebase memory</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" id="ta-n-a6" data-skill="a6"><div class="icon">A6</div><div class="name">A6 · Smoke evaluation</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" id="ta-n-a7" data-skill="a7"><div class="icon">A7</div><div class="name">A7 · Deploy & query</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" id="ta-n-a8" data-skill="a8"><div class="icon">A8</div><div class="name">A8 · Debug Apps agent</div><div class="tag">skill</div></div></li>
+</ul></li>
+</ul></li></ul>`;
+}
+
+function buildTourBTree(){
+  const w = (id,label,cls='type-worker',tag='skill') => `<li><div class="tnode ${cls}" id="tb-n-${id}" data-skill="${id}"><div class="icon">${id.toUpperCase()}</div><div class="name">${label}</div><div class="tag">${tag}</div></div></li>`;
+  return `<ul>
+<li id="tb-root" class="expanded"><div class="tnode type-entry" id="tb-n-root" data-skill="" data-toggle="tb-root"><div class="icon">P</div><div class="name">SDLC Pipeline</div><div class="tag">9 steps</div><div class="chevron open">▶</div></div>
+<ul>
+<li id="tb-s1" class="expanded"><div class="tnode type-orchestrator" id="tb-n-s1" data-skill="s1" data-toggle="tb-s1"><div class="icon">S1</div><div class="name">S1 · UC Prompt Registry</div><div class="tag">sdlc</div><div class="chevron open">▶</div></div>
+<ul>
+${w('s2','S2 · Evaluation datasets')}
+${w('s3','S3 · Scorers & judges')}
+${w('s4','S4 · Evaluation runs','type-orchestrator','sdlc')}
+${w('s4b','S4b · Stakeholder signoff')}
+${w('s5','S5 · Log model & UC register','type-orchestrator','sdlc')}
+${w('s6','S6 · Bundles & CI gates','type-orchestrator','sdlc')}
+${w('s7','S7 · Production monitoring','type-orchestrator','sdlc')}
+${w('s8','S8 · Prompt optimization','type-orchestrator','sdlc')}
+</ul></li>
+</ul></li></ul>`;
+}
+
+function buildTourCTree(){
+  return `<ul>
+<li id="tc-root" class="expanded"><div class="tnode type-entry" id="tc-n-root" data-skill="course" data-toggle="tc-root"><div class="icon">★</div><div class="name">MLflow GenAI Course</div><div class="tag">complete</div><div class="chevron open">▶</div></div>
+<ul>
+<li id="tc-foundation" class="collapsed"><div class="tnode type-common" id="tc-n-f" data-skill="f1" data-toggle="tc-foundation"><div class="icon">F</div><div class="name">Foundation (F1–F4)</div><div class="tag">core</div><div class="chevron">▶</div></div>
+<ul>
+<li><div class="tnode type-worker" data-skill="f1"><div class="icon">1</div><div class="name">F1 · MLflow foundation</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" data-skill="f2"><div class="icon">2</div><div class="name">F2 · Tracing & UC</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" data-skill="f3"><div class="icon">3</div><div class="name">F3 · Tools & MCP</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" data-skill="f4"><div class="icon">4</div><div class="name">F4 · AI Gateway</div><div class="tag">skill</div></div></li>
+</ul></li>
+<li id="tc-tracks" class="collapsed"><div class="tnode type-track" id="tc-n-tracks" data-skill="" data-toggle="tc-tracks"><div class="icon">T</div><div class="name">Agent Tracks (pick one)</div><div class="tag">tracks</div><div class="chevron">▶</div></div>
+<ul>
+<li><div class="tnode type-orchestrator" id="tc-n-ta" data-skill="a1"><div class="icon">A</div><div class="name">Track A · Custom Agent on Apps</div><div class="tag">8 skills</div></div></li>
+<li><div class="tnode type-orchestrator" id="tc-n-tb" data-skill="b1"><div class="icon">B</div><div class="name">Track B · Supervisor API</div><div class="tag">4 skills</div></div></li>
+<li><div class="tnode type-orchestrator" id="tc-n-tc" data-skill="c1"><div class="icon">C</div><div class="name">Track C · Model Serving</div><div class="tag">3 skills</div></div></li>
+</ul></li>
+<li id="tc-sdlc" class="collapsed"><div class="tnode type-orchestrator" id="tc-n-sdlc" data-skill="s1" data-toggle="tc-sdlc"><div class="icon">P</div><div class="name">SDLC Pipeline</div><div class="tag">9 steps</div><div class="chevron">▶</div></div>
+<ul>
+<li><div class="tnode type-worker" data-skill="s1"><div class="icon">S1</div><div class="name">S1 · Prompt Registry</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" data-skill="s4"><div class="icon">S4</div><div class="name">S4 · Evaluation runs</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" data-skill="s6"><div class="icon">S6</div><div class="name">S6 · Bundles & CI</div><div class="tag">skill</div></div></li>
+<li><div class="tnode type-worker" data-skill="s7"><div class="icon">S7</div><div class="name">S7 · Monitoring</div><div class="tag">skill</div></div></li>
+</ul></li>
+<li id="tc-cap" class="collapsed"><div class="tnode type-orchestrator" id="tc-n-cap" data-skill="cap"><div class="icon">★</div><div class="name">Capstone · Multi-agent Genie</div><div class="tag">optional</div></div></li>
+</ul></li></ul>`;
+}
+
+// ======================== ACADEMY ========================
+const ACADEMY = [
+  {id:'mlflow',title:'MLflow 3.x GenAI',subtitle:'Tracing, autolog, ResponsesAgent — the substrate',icon:'◉',color:'var(--cyan)',
+   content:`<h5>What MLflow 3.x adds for GenAI</h5><p>MLflow 3.x treats LLM calls, agents, and prompts as first-class citizens. You get <code>@mlflow.trace</code> spans, <code>mlflow.openai.autolog()</code>, <code>ResponsesAgent</code> for serving, UC-native model registry, and a GenAI evaluation harness in one unified SDK.</p>
+<div class="ac-diagram"><span class="hl">User request</span> → <span class="hl-p">Agent (ResponsesAgent)</span> → <span class="hl-g">LLM + tools</span><br>↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-o">MLflow traces</span>&nbsp;&nbsp;<span class="hl-o">experiment</span>&nbsp;&nbsp;<span class="hl-o">UC OTEL</span></div>
+<h5>Autolog — one call, every LLM traced</h5><pre>import mlflow
+mlflow.openai.autolog()      # OpenAI / Foundation Models
+mlflow.langchain.autolog()   # LangChain / LangGraph</pre><p>Autolog is an <em>always-on capture layer</em>. Every completion, tool call, token count, and latency gets a span with no extra code. This is the foundation for every later evaluation and monitoring skill.</p>
+<h5>The ResponsesAgent contract</h5><table><tr><th>Method</th><th>Purpose</th></tr><tr><td><code>predict(messages, context)</code></td><td>Single-turn inference, used by Playground + serving</td></tr><tr><td><code>predict_stream(messages, context)</code></td><td>Token-by-token streaming for chat UIs</td></tr><tr><td><code>load_context(context)</code></td><td>One-time setup (load tools, prompts, credentials)</td></tr></table><p>Avoid hand-written signatures — they fight MLflow's auto-inference. Let the class + an <code>input_example</code> do the work.</p>
+<h5>The three experiments pattern</h5><div class="ac-diagram"><span class="hl">/.../dev</span> → iteration + interactive traces<br><span class="hl-p">/.../eval</span> → benchmark runs for gating<br><span class="hl-g">/.../prod</span> → deployed traffic + monitoring</div>
+<h5>Linking prompts to experiments</h5><pre>mlflow.set_experiment_tags({
+  "mlflow.promptRegistryLocation": f"{catalog}.{schema}",
+})</pre><p>Without this tag, UC-registered prompts <strong>do not appear</strong> in the Experiment UI — a common silent failure.</p>`,
+   quiz:[
+     {q:'Which call turns on automatic LLM tracing for OpenAI-compatible models?',opts:['mlflow.start_run()','mlflow.openai.autolog()','mlflow.set_experiment()'],answer:1},
+     {q:'Why do signatures cause problems with ResponsesAgent?',opts:['They are slow','They fight MLflow auto-inference','They are not supported'],answer:1},
+     {q:'What happens without the mlflow.promptRegistryLocation tag?',opts:['Tracing breaks','UC prompts are not visible in the UI','Experiments cannot be created'],answer:1},
+   ]},
+
+  {id:'apps',title:'Databricks Apps',subtitle:'Managed hosting for the Track A agent UI',icon:'⬡',color:'var(--purple)',
+   content:`<h5>What Databricks Apps is</h5><p>A managed container platform for full-stack web apps. Your code runs inside the workspace with a Service Principal identity, auto-injected env vars, and workspace SSO on the front door — no DevOps required.</p>
+<div class="ac-diagram"><span class="hl">User</span> → <span class="hl-p">Databricks Proxy (SSO + OBO)</span> → <span class="hl-g">App container</span><br>↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-o">MLflow Serving</span>&nbsp;&nbsp;<span class="hl-o">Lakebase</span>&nbsp;&nbsp;<span class="hl-o">Vector Search</span></div>
+<h5>Deployment flow</h5><div class="ac-diagram"><span class="hl">databricks apps init</span> → <span class="hl-p">databricks sync</span> → <span class="hl-g">databricks apps deploy</span><br>(scaffold)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(upload code)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(start container)</div>
+<h5>Auto-injected env vars</h5><table><tr><th>Variable</th><th>Description</th></tr><tr><td><code>DATABRICKS_HOST</code></td><td>Workspace URL for SDK clients</td></tr><tr><td><code>DATABRICKS_CLIENT_ID</code></td><td>Service Principal client ID</td></tr><tr><td><code>DATABRICKS_CLIENT_SECRET</code></td><td>SP secret (auto-rotated)</td></tr><tr><td><code>DATABRICKS_APP_PORT</code></td><td>Port the container must bind</td></tr></table>
+<h5>SP vs OBO — choose consciously</h5><table><tr><th>Pattern</th><th>Who calls downstream APIs?</th><th>When</th></tr><tr><td>Service Principal</td><td>The app SP (shared)</td><td>Shared dashboards, background jobs</td></tr><tr><td>OBO (on-behalf-of)</td><td>The signed-in user</td><td>Per-user audit, row-level security</td></tr></table>
+<h5>Platform constraints</h5><table><tr><th>Constraint</th><th>Value</th></tr><tr><td>Startup timeout</td><td>10 minutes — health checks must pass</td></tr><tr><td>HTTP proxy timeout</td><td>120 seconds — stream long requests</td></tr><tr><td>Persistent disk</td><td>None — use Lakebase or UC Volumes</td></tr></table>`,
+   quiz:[
+     {q:'What authenticates inbound users to a Databricks App?',opts:['API key','Workspace SSO (OBO)','Basic auth'],answer:1},
+     {q:'If the app does not respond to health checks in 10 minutes, what happens?',opts:['It retries forever','Deploy fails','It runs without health checks'],answer:1},
+     {q:'Which pattern do you use for per-user audit and row-level security?',opts:['Service Principal','OBO','API key'],answer:1},
+   ]},
+
+  {id:'lakebase',title:'Lakebase for Agent Memory',subtitle:'Managed PostgreSQL with OAuth — stateful agents',icon:'⛁',color:'var(--teal)',
+   content:`<h5>Why agents need memory</h5><p>Every HTTP request to an agent is stateless — the LLM has no idea what the user said a minute ago. Lakebase gives each session a durable place to store messages, tool results, and preferences, all keyed by a <code>thread_id</code>.</p>
+<div class="ac-diagram"><span class="hl">Request</span> → resolve <span class="hl-p">thread_id</span> → load <span class="hl-g">session from Lakebase</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>agent reasons with full history → <span class="hl-o">writes new turn back</span></div>
+<h5>Two memory tiers</h5><table><tr><th>Tier</th><th>Purpose</th><th>Example table</th></tr><tr><td>Short-term</td><td>Conversation turns for the active session</td><td><code>messages</code> keyed by <code>thread_id</code></td></tr><tr><td>Long-term</td><td>User preferences surviving sessions</td><td><code>user_prefs</code> keyed by <code>user_id</code></td></tr></table>
+<h5>OAuth — no passwords</h5><p>Lakebase issues <strong>1-hour OAuth tokens</strong> that auto-refresh with a 2-minute buffer. You never write password-rotation code. The <code>AsyncDatabricksSession</code> helper does refresh transparently.</p>
+<h5>Graceful degradation</h5><p>If Lakebase is unreachable, the agent must still answer — just without memory. The skill wraps loads/saves in try/except and proceeds with an empty history. A small warning toast in the UI is better than a blank screen.</p>
+<h5>When not to use Lakebase</h5><table><tr><th>Need</th><th>Better alternative</th></tr><tr><td>Wide-column analytics</td><td>Delta tables in UC</td></tr><tr><td>Vector similarity search</td><td>Vector Search index</td></tr><tr><td>Hot per-key cache</td><td>Redis / in-process</td></tr></table>`,
+   quiz:[
+     {q:'How does Lakebase authenticate?',opts:['Username/password','OAuth tokens that rotate','SSH keys'],answer:1},
+     {q:'What identifier ties messages in one conversation together?',opts:['user_id','thread_id','request_id'],answer:1},
+     {q:'What happens if Lakebase is unreachable during a request?',opts:['Agent returns 500','Agent degrades gracefully without memory','Agent blocks indefinitely'],answer:1},
+   ]},
+
+  {id:'mlflow-eval',title:'MLflow GenAI Evaluation',subtitle:'Scorers, judges, datasets, and gating',icon:'✓',color:'var(--green)',
+   content:`<h5>The harness in one call</h5><pre>import mlflow
+from mlflow.genai.scorers import Safety, Correctness, RelevanceToQuery
+
+results = mlflow.genai.evaluate(
+    data=eval_dataset,
+    predict_fn=agent_predict_fn,
+    scorers=[Safety(), Correctness(), RelevanceToQuery()],
+)</pre><p><code>evaluate()</code> runs every row through <code>predict_fn</code>, scores the output with every scorer, and logs a run with metrics + traces. This is the <em>single call</em> CI/CD gates depend on.</p>
+<h5>Dataset row schemas</h5><table><tr><th>Row key</th><th>Who reads it</th></tr><tr><td><code>inputs.*</code></td><td><code>predict_fn(**inputs)</code></td></tr><tr><td><code>outputs.*</code> (optional)</td><td>Static answer-sheet rescoring</td></tr><tr><td><code>expectations.*</code></td><td>Scorers via <code>config={"targets":"expectations/x"}</code></td></tr></table>
+<h5>Three ways to build a scorer</h5><table><tr><th>Pattern</th><th>Use when</th></tr><tr><td>Built-in (<code>Safety</code>, <code>Correctness</code>, <code>Guidelines</code>)</td><td>Generic quality signals that apply everywhere</td></tr><tr><td><code>@scorer</code> function</td><td>Deterministic domain checks (schema match, keyword presence)</td></tr><tr><td><code>make_judge(prompt, model)</code></td><td>Nuanced qualitative judgments an LLM evaluates</td></tr></table>
+<h5>Thresholds turn metrics into gates</h5><pre># Agent fails to promote if any scorer drops
+THRESHOLDS = {"Safety": 0.99, "Correctness": 0.80}
+for name, target in THRESHOLDS.items():
+    assert results.metrics[f"{name}/mean"] >= target</pre>
+<h5>Answer sheet rescoring</h5><p>After a run, you can score the <em>existing outputs</em> with a new scorer without re-calling the agent. This cuts iteration cost when the only thing that changed is the judge prompt.</p>
+<h5>Production monitoring uses the same scorers</h5><p>Register a scorer once, then <code>.start()</code> it against a live experiment with a sampling rate. Offline and online use <em>identical</em> quality logic — no drift between benchmark and prod metrics.</p>`,
+   quiz:[
+     {q:'What is the single call that runs an evaluation?',opts:['mlflow.evaluate()','mlflow.genai.evaluate()','mlflow.score()'],answer:1},
+     {q:'Which dataset key do scorers read via <code>targets</code>?',opts:['inputs.*','outputs.*','expectations.*'],answer:2},
+     {q:'When is an LLM-judge (<code>make_judge</code>) preferred over a <code>@scorer</code> function?',opts:['Always','For nuanced qualitative criteria','For schema checks'],answer:1},
+   ]},
+
+  {id:'uc',title:'Unity Catalog for Prompts & Models',subtitle:'Governed registry for every agent asset',icon:'⊞',color:'var(--gold)',
+   content:`<h5>Two registries, one namespace</h5><p>Unity Catalog is the single governance plane for both <strong>prompts</strong> and <strong>models</strong>. Both live under <code>catalog.schema.name</code>, both support version pinning and aliases, both show column-level lineage.</p>
+<div class="ac-diagram"><span class="hl">Prompt version</span> → <span class="hl-p">Alias: champion</span> → loaded by agent<br><span class="hl-g">Model version</span> → <span class="hl-p">Alias: production</span> → served by endpoint</div>
+<h5>Prompt registry essentials</h5><pre>version = mlflow.genai.register_prompt(
+    name="main.agents.my_prompt",
+    template="You are a {role}. Answer: {question}",
+    commit_message="Initial version",
+    tags={"domain": "support", "type": "system"},
+)
+# Later — promote to champion
+mlflow.genai.set_prompt_alias(
+    name="main.agents.my_prompt",
+    alias="champion",
+    version=version.version,
+)</pre>
+<h5>Model registry essentials</h5><pre>uc_model = "main.agents.my_agent"
+mv = mlflow.register_model(
+    model_uri="runs:/<run_id>/agent",
+    name=uc_model,
+)
+client = mlflow.tracking.MlflowClient()
+client.set_registered_model_alias(uc_model, "production", mv.version)</pre>
+<h5>Aliases &gt; version numbers</h5><table><tr><th>Approach</th><th>Problem</th></tr><tr><td>Hardcode <code>version=7</code></td><td>Every promotion requires a code change</td></tr><tr><td>Load <code>@production</code></td><td>Promotion is a single MLflow call; code never changes</td></tr></table>
+<h5>Resources — the deploy contract</h5><p>When you log a model, declare every downstream Databricks resource it will call: serving endpoints, VS indices, SQL warehouses. MLflow stores this on the artifact, and Serving applies OAuth passthrough automatically. <em>No resource = 401 in production.</em></p>`,
+   quiz:[
+     {q:'Why prefer aliases over version numbers in code?',opts:['Aliases are faster','Promotion stops requiring code changes','Versions cannot be read at runtime'],answer:1},
+     {q:'What does declaring <code>resources</code> on a logged model do?',opts:['Nothing, it is optional metadata','Enables OAuth passthrough in Model Serving','Registers the model in UC'],answer:1},
+     {q:'Which tag makes UC prompts appear in the Experiment UI?',opts:['mlflow.promptTag','mlflow.promptRegistryLocation','mlflow.ucPrompt'],answer:1},
+   ]},
+
+  {id:'serving',title:'Model Serving & AI Gateway',subtitle:'REST endpoints + governed proxy',icon:'⚡',color:'var(--blue)',
+   content:`<h5>From UC model to REST endpoint</h5><pre>from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.serving import (
+  EndpointCoreConfigInput, ServedEntityInput,
+)
+
+w = WorkspaceClient()
+w.serving_endpoints.create(
+    name="my-agent",
+    config=EndpointCoreConfigInput(
+        served_entities=[ServedEntityInput(
+            entity_name="main.agents.my_agent",
+            entity_version="1",
+            scale_to_zero_enabled=True,
+        )],
+    ),
+)</pre>
+<h5>Inference tables — every request, every response</h5><p>Enable inference tables on an endpoint and Databricks streams every request/response pair to a Delta table. This is <em>how Track C debugs production</em>:</p><pre>SELECT *
+FROM my_catalog.my_schema.my_endpoint_payloads
+WHERE status_code != 200
+  AND request_time > current_timestamp() - INTERVAL 1 HOUR</pre>
+<h5>AI Gateway adds governance</h5><table><tr><th>Feature</th><th>What it does</th></tr><tr><td>Usage tracking</td><td>Per-tenant and per-route token + cost metrics</td></tr><tr><td>Rate limits</td><td>Per-user and per-endpoint request caps</td></tr><tr><td>Guardrails</td><td>PII / toxicity filters in front of the model</td></tr><tr><td>Inference tables</td><td>Full request/response audit, Delta-backed</td></tr></table>
+<h5>MLflow vs Gateway — both, for different reasons</h5><div class="ac-diagram"><span class="hl">MLflow traces</span> = application-level spans (tool calls, reasoning)<br><span class="hl-p">Gateway logs</span> = network-level audit (who, when, cost)</div><p>Run both. MLflow answers "why did the agent do X?"; the Gateway answers "how much did team Y spend last month?"</p>
+<h5>Debugging: reproduce locally</h5><pre>from mlflow.models import validate_serving_input
+validate_serving_input(
+    model_uri="models:/main.agents.my_agent@production",
+    serving_input={"input": [{"role":"user","content":"hi"}]},
+)</pre><p><code>validate_serving_input</code> runs the exact serving code path on your laptop. Most "endpoint 500" incidents reproduce immediately.</p>`,
+   quiz:[
+     {q:'Which feature gives you full request/response audit in Delta?',opts:['MLflow traces','Inference tables','Rate limits'],answer:1},
+     {q:'When should you run MLflow traces AND AI Gateway together?',opts:['Never — pick one','Always — they answer different questions','Only in staging'],answer:1},
+     {q:'What does <code>validate_serving_input</code> do?',opts:['Validates YAML','Runs the serving code path locally','Starts the endpoint'],answer:1},
+   ]},
+
+  {id:'dabs',title:'Databricks Asset Bundles',subtitle:'Declarative deploy for agents, jobs, and apps',icon:'📦',color:'var(--orange)',
+   content:`<h5>One YAML, three environments</h5><p>A bundle is a YAML-defined unit of deployment — your agent code, serving endpoint, Databricks App, SQL warehouse, MLflow experiment, and any jobs — <em>all in one place</em>, promoted with <code>--target dev|staging|prod</code>.</p>
+<pre>databricks bundle validate
+databricks bundle deploy --target dev
+databricks bundle run   --target dev my_agent_app
+# promote
+databricks bundle deploy --target staging
+databricks bundle deploy --target prod</pre>
+<h5>Canonical layout</h5><pre>my-agent/
+├── databricks.yml           # root bundle
+├── resources/
+│   ├── agent_app.yml        # Databricks App
+│   ├── serving_endpoint.yml # Model Serving
+│   ├── eval_job.yml         # nightly evaluation run
+│   └── experiment.yml       # MLflow experiment
+├── src/
+│   └── agent.py
+└── tests/
+    └── eval_dataset.json</pre>
+<h5>Targets = environments</h5><pre>targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      catalog: "dev_main"
+  staging: { variables: { catalog: "staging_main" } }
+  prod:
+    mode: production
+    variables: { catalog: "prod_main" }</pre>
+<h5>Evaluate-then-promote</h5><div class="ac-diagram"><span class="hl">Deploy to dev</span> → <span class="hl-p">Run eval job</span> → <span class="hl-g">Check thresholds</span> → <span class="hl-o">Promote to staging</span> → repeat for prod</div><p>The eval job reads the same <code>mlflow.genai.evaluate</code> call you wrote in S4. If thresholds fail, the bundle promotion step fails — <em>unvetted models never reach prod</em>.</p>
+<h5>Permissions belong in the bundle</h5><p>Resources accept a <code>permissions:</code> block. Declaring "this SP Can Query this endpoint, this experiment is Can Edit for the team" in YAML beats UI clickops that drift between environments.</p>`,
+   quiz:[
+     {q:'How do you promote a bundle from dev to staging?',opts:['Rebuild the container','databricks bundle deploy --target staging','Copy YAML manually'],answer:1},
+     {q:'What prevents unvetted models from reaching prod?',opts:['UI approval','Evaluate-then-promote eval job','Nothing'],answer:1},
+     {q:'Where should resource permissions live?',opts:['In the UI','In the bundle YAML','In a separate script'],answer:1},
+   ]},
+];
+
+// SkyLoyalty walkthrough variants (Skyloyalty Variants mode only)
+const VARIANTS = [
+  { id:'v1', num:1, title:'Supervisor API + AppKit', apps:'two', lang:'node-python',
+    href:'../alternate_methods/walkthroughs/WALKTHROUGH-sup-appkit.md',
+    summary:'Databricks-managed agent loop (DatabricksOpenAI) with hosted tools only — Genie, UC Functions, Knowledge Assistant. Node AppKit edge proxies to a Python sidecar. Fastest ramp when custom loop logic is not needed.',
+    chips:['Hosted tools only','Two Apps','Node + Python sidecar','AI Gateway tracing'] },
+  { id:'v2', num:2, title:'Model Serving + AppKit', apps:'two', lang:'node-python',
+    href:'../alternate_methods/walkthroughs/WALKTHROUGH-serving-appkit.md',
+    summary:'Python agent packaged via mlflow.pyfunc.log_model, registered to UC, deployed to Model Serving. AppKit calls the endpoint via HTTP. Ideal wrapper for existing agents, multi-agent Genie notebooks, or Knowledge Assistant.',
+    chips:['Model Serving','Two Apps','Python agent','UC model registry'] },
+  { id:'v3', num:3, title:'Agent on Apps (template UI only)', apps:'one', lang:'python',
+    href:'../alternate_methods/walkthroughs/WALKTHROUGH-agentapp-only.md',
+    summary:'agent-openai-agents-sdk template with built-in chat UI. One Databricks App, zero AppKit, pure Python. Fastest deploy when all you need is conversational chat.',
+    chips:['One App','Python','Template chat UI','No dashboard'] },
+  { id:'v4', num:4, title:'Agent on Apps + AppKit', apps:'two', lang:'node-python',
+    href:'../example/skyloyalty/WALKTHROUGH.md',
+    summary:'Canonical reference. Full Python ResponsesAgent (with tools, memory, OBO) in one App, plus a rich AppKit dashboard (Lakebase, admin views) in a second App. Agent embedded via iframe or proxy.',
+    chips:['Canonical','Two Apps','Python agent','Full AppKit','MLflow SDLC'] },
+  { id:'v5', num:5, title:'Integrated AppKit (Node-native)', apps:'one', lang:'node',
+    href:'../alternate_methods/walkthroughs/WALKTHROUGH-integrated-appkit.md',
+    summary:'@openai/agents running in-process inside the AppKit Node server. Single App, TypeScript end-to-end. Gives up MLflow-native SDLC features in exchange for OTLP tracing + Playwright evaluation.',
+    chips:['One App','Node-native','@openai/agents','OTLP + Playwright'] },
+];
+
+function escapeVarHtml(s){
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let variantFilterState = { num:null, apps:null, lang:null };
+
+function syncVariantChipUI(){
+  document.querySelectorAll('#variantChips .var-chip[data-kind]').forEach(ch => {
+    const kind = ch.dataset.kind;
+    const value = ch.dataset.value;
+    let active = false;
+    if (kind === 'num') active = variantFilterState.num === parseInt(value, 10);
+    if (kind === 'apps') active = variantFilterState.apps === value;
+    if (kind === 'lang') active = variantFilterState.lang === value;
+    ch.classList.toggle('active', active);
+    ch.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function applyVariantFilters(){
+  document.querySelectorAll('.var-card').forEach(card => {
+    const n = parseInt(card.dataset.num, 10);
+    const apps = card.dataset.apps;
+    let ok = true;
+    if (variantFilterState.num != null && n !== variantFilterState.num) ok = false;
+    if (variantFilterState.apps != null && apps !== variantFilterState.apps) ok = false;
+    if (variantFilterState.lang != null) {
+      if (variantFilterState.lang === 'node' && n !== 1 && n !== 5) ok = false;
+      if (variantFilterState.lang === 'python' && n !== 2 && n !== 3 && n !== 4) ok = false;
+    }
+    card.classList.toggle('var-card-dim', !ok);
+  });
+}
+
+function onVariantChipClick(e){
+  const chip = e.currentTarget;
+  const kind = chip.dataset.kind;
+  const value = chip.dataset.value;
+  if (kind === 'num') {
+    const n = parseInt(value, 10);
+    variantFilterState.num = variantFilterState.num === n ? null : n;
+  } else if (kind === 'apps') {
+    variantFilterState.apps = variantFilterState.apps === value ? null : value;
+  } else if (kind === 'lang') {
+    variantFilterState.lang = variantFilterState.lang === value ? null : value;
+  }
+  syncVariantChipUI();
+  applyVariantFilters();
+}
+
+function resetVariantFilters(){
+  variantFilterState = { num:null, apps:null, lang:null };
+  syncVariantChipUI();
+  applyVariantFilters();
+}
+
+function initVariants(){
+  const grid = document.getElementById('variantsGrid');
+  if (!grid) return;
+  grid.innerHTML = VARIANTS.map(v =>
+    `<a class="var-card" href="${escapeVarHtml(v.href)}" data-num="${v.num}" data-apps="${v.apps}">` +
+      `<span class="var-badge">V${v.num}</span>` +
+      `<div class="var-card-title">${escapeVarHtml(v.title)}</div>` +
+      `<p class="var-summary">${escapeVarHtml(v.summary)}</p>` +
+      `<div class="var-card-chips">${v.chips.map(c => `<span class="var-pill">${escapeVarHtml(c)}</span>`).join('')}</div>` +
+      `<span class="var-cta">Open walkthrough →</span>` +
+    `</a>`
+  ).join('');
+  document.querySelectorAll('#variantChips .var-chip[data-kind]').forEach(ch => {
+    ch.addEventListener('click', onVariantChipClick);
+  });
+  syncVariantChipUI();
+  applyVariantFilters();
+}
+
+// ======================== THEME ========================
+function toggleTheme(){
+  const isLight = document.body.classList.toggle('light');
+  const btn = document.getElementById('themeToggle');
+  btn.textContent = isLight ? '☾' : '☀';
+  btn.title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+  try { localStorage.setItem('mlflow-ws-theme', isLight ? 'light' : 'dark'); } catch(e){}
+  if (document.getElementById('galaxy').classList.contains('active')) initStarfield();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const saved = localStorage.getItem('mlflow-ws-theme');
+    if (saved === 'dark') {
+      document.body.classList.remove('light');
+      document.getElementById('themeToggle').textContent = '☀';
+    }
+  } catch(e){}
+  try { initGalaxy(); } catch(e){ console.error('initGalaxy', e); }
+  try { initAcademy(); } catch(e){ console.error('initAcademy', e); }
+  try { initVariants(); } catch(e){ console.error('initVariants', e); }
+  try { initStarfield(); } catch(e){ console.error('initStarfield', e); }
+  selectTour('a');
+});
+
+// ======================== MODE SWITCHING ========================
+function switchMode(mode){
+  document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(mode).classList.add('active');
+  document.querySelector(`.mode-tab[onclick="switchMode('${mode}')"]`).classList.add('active');
+  if (mode === 'galaxy') initStarfield();
+}
+
+// ======================== SEARCH ========================
+function onSearch(q){
+  const box = document.getElementById('searchResults');
+  if (!q || q.length < 2) { box.classList.remove('open'); return; }
+  const lq = q.toLowerCase();
+  const matches = SKILLS.filter(s =>
+    s.name.toLowerCase().includes(lq) ||
+    (s.keywords && s.keywords.some(k => k.toLowerCase().includes(lq))) ||
+    (s.desc && s.desc.toLowerCase().includes(lq))
+  ).slice(0,10);
+  if (!matches.length) { box.classList.remove('open'); return; }
+  box.innerHTML = matches.map(s => {
+    const tc = typeColor(s.type);
+    return `<div class="sr-item" onmousedown="openDetail('${s.id}')"><span class="sr-type" style="background:${tc.bg};color:${tc.fg}">${s.type}</span><span>${s.name}</span></div>`;
+  }).join('');
+  box.classList.add('open');
+}
+function closeSearch(){ document.getElementById('searchResults').classList.remove('open'); }
+function typeColor(t){
+  const m = {
+    orchestrator:{bg:'var(--purple-dim)',fg:'var(--purple)'},
+    worker:{bg:'var(--gold-dim)',fg:'var(--gold)'},
+    common:{bg:'var(--green-dim)',fg:'var(--green)'},
+    entry:{bg:'var(--cyan-dim)',fg:'var(--cyan)'},
+    track:{bg:'var(--teal-dim)',fg:'var(--teal)'},
+  };
+  return m[t] || {bg:'var(--surface2)',fg:'var(--text-dim)'};
+}
+function stripHtml(h){ if(!h) return ''; return h.replace(/<[^>]*>/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim().slice(0,200); }
+
+// ======================== GALAXY ========================
+function initGalaxy(){
+  const ff = document.getElementById('foundationFlow');
+  ff.innerHTML = FOUNDATION.map((id,i) => {
+    const s = SKILL_MAP[id];
+    return `<div class="foundation-node" onclick="openDetail('${id}')" title="${stripHtml(s.desc)}">
+      <div class="fn-num">F${i+1}</div>
+      <div class="fn-label">${s.name.replace(/^F\d · /,'')}</div>
+      <div class="fn-sub">${s.keywords.slice(0,3).join(' · ')}</div>
+    </div>`;
+  }).join('');
+
+  const tg = document.getElementById('trackGrid');
+  tg.innerHTML = TRACKS.map(t => `
+    <div class="track-col ${t.key}">
+      <h3>${t.title}</h3>
+      <div class="track-sub">${t.sub}</div>
+      <div class="track-steps">
+        ${t.skills.map((id,i) => {
+          const s = SKILL_MAP[id];
+          const short = s.name.replace(/^[A-C][0-9b]* · /,'');
+          return `<div class="track-step" onclick="openDetail('${id}')" title="${stripHtml(s.desc)}"><div class="ts-num">${i+1}</div><div class="ts-name">${id.toUpperCase()} · ${short}</div></div>`;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  const pf = document.getElementById('pipelineFlow');
+  pf.innerHTML = STAGES.map((st,i) => {
+    const s = SKILL_MAP[st.orch];
+    return (i>0 ? '<div class="stage-arrow">›</div>' : '') +
+      `<div class="stage-cluster"><div class="stage-node ${st.sc}" onclick="openDetail('${st.orch}')" title="${stripHtml(s?.desc||'')}"><div class="sn-num">${st.num}</div><div class="sn-label">${st.label}</div></div></div>`;
+  }).join('');
+}
+
+// ======================== STARFIELD ========================
+let starfieldRaf = null;
+function initStarfield(){
+  const c = document.getElementById('starfield');
+  if (!c) return;
+  if (starfieldRaf) cancelAnimationFrame(starfieldRaf);
+  const ctx = c.getContext('2d');
+  c.width = c.parentElement.clientWidth;
+  c.height = c.parentElement.clientHeight;
+  const isLight = document.body.classList.contains('light');
+  const stars = Array.from({length:120}, () => ({
+    x: Math.random()*c.width, y: Math.random()*c.height,
+    r: Math.random()*1.2+0.3, a: Math.random(), s: Math.random()*0.005+0.002
+  }));
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    stars.forEach(st => {
+      st.a += st.s; if (st.a > 1) st.s = -Math.abs(st.s); if (st.a < 0.1) st.s = Math.abs(st.s);
+      ctx.beginPath(); ctx.arc(st.x, st.y, st.r, 0, Math.PI*2);
+      ctx.fillStyle = isLight ? `rgba(30,40,80,${st.a*0.12})` : `rgba(200,220,255,${st.a*0.5})`;
+      ctx.fill();
+    });
+    starfieldRaf = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ======================== TOURS ========================
+let curTour = 'a', curTourStep = -1, tourPlaying = false, tourTimer = null, tourSpeedMs = 2000;
+
+function selectTour(id){
+  curTour = id; curTourStep = -1; tourPlaying = false;
+  document.querySelectorAll('.tour-card').forEach(c => c.classList.remove('active'));
+  const tc = document.getElementById('tc-'+id); if (tc) tc.classList.add('active');
+  document.getElementById('tourTree').innerHTML = TOURS[id].tree;
+  document.getElementById('tourDetail').innerHTML = `<div class="td-welcome"><h3>${TOURS[id].name}</h3><p>Press <strong>Play</strong> or <strong>Next</strong> to walk through. Each step reveals design choices, code patterns, and rationale here. Click a tree node anytime to jump to a skill.</p></div>`;
+  document.getElementById('tourStepInfo').textContent = `0 / ${TOURS[id].steps.length}`;
+  const btn = document.getElementById('tourPlayBtn'); if (btn) btn.textContent = '▶ Play';
+}
+
+function ttoggle(liId){
+  const li = document.getElementById(liId); if (!li) return;
+  const ch = li.querySelector(':scope > .tnode .chevron');
+  if (li.classList.contains('collapsed')) { li.classList.remove('collapsed'); li.classList.add('expanded'); if (ch) ch.classList.add('open'); }
+  else { li.classList.remove('expanded'); li.classList.add('collapsed'); if (ch) ch.classList.remove('open'); }
+}
+function tForceExpand(id){
+  const li = document.getElementById(id); if (!li) return;
+  li.classList.remove('collapsed'); li.classList.add('expanded');
+  const ch = li.querySelector(':scope > .tnode .chevron'); if (ch) ch.classList.add('open');
+}
+let treeExpanded = false;
+function toggleTreeAll(){
+  const tree = document.getElementById('tourTree'); if (!tree) return;
+  const btn = document.getElementById('treeExpandBtn');
+  treeExpanded = !treeExpanded;
+  tree.querySelectorAll('li.collapsed, li.expanded').forEach(li => {
+    if (treeExpanded) { li.classList.remove('collapsed'); li.classList.add('expanded'); }
+    else { li.classList.remove('expanded'); li.classList.add('collapsed'); }
+    const ch = li.querySelector(':scope > .tnode .chevron');
+    if (ch) { if (treeExpanded) ch.classList.add('open'); else ch.classList.remove('open'); }
+  });
+  btn.textContent = treeExpanded ? '⊟ Collapse All' : '⊞ Expand All';
+}
+function tActivate(id){
+  const el = document.getElementById(id); if (!el) return;
+  el.classList.add('active-node'); el.classList.remove('visited');
+  el.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+// Tree click handler
+document.addEventListener('click', function(e){
+  const tnode = e.target.closest('.tnode'); if (!tnode) return;
+  const tree = tnode.closest('#tourTree'); if (!tree) return;
+  const toggleId = tnode.getAttribute('data-toggle');
+  if (toggleId) ttoggle(toggleId);
+  const skillId = tnode.getAttribute('data-skill');
+  if (skillId && SKILL_MAP[skillId]) {
+    document.querySelectorAll('#tourTree .tnode.user-selected').forEach(el => el.classList.remove('user-selected'));
+    tnode.classList.add('user-selected');
+    renderNodeDetail(skillId);
+  }
+  e.stopPropagation();
+});
+
+function renderNodeDetail(skillId){
+  const s = SKILL_MAP[skillId]; if (!s) return;
+  const detail = document.getElementById('tourDetail');
+  const tc = typeColor(s.type);
+  let html = '<div class="td-inner">';
+  html += '<div class="td-header"><div class="td-header-top">';
+  html += `<span class="td-name">${s.name}</span>`;
+  html += `<span class="td-badge" style="background:${tc.bg};color:${tc.fg}">${s.type}</span>`;
+  if (s.component) html += `<span class="td-badge" style="background:var(--surface2);color:var(--text-dim)">${s.component}</span>`;
+  if (s.stage !== undefined) html += `<span class="td-badge" style="background:var(--surface2);color:var(--text-dim)">step ${s.stage}</span>`;
+  html += '</div>';
+  html += `<div class="td-desc">${s.desc||''}</div></div>`;
+  if (s.rationale) html += `<div class="td-rationale"><h4>Design rationale</h4><p>${s.rationale}</p></div>`;
+  if (s.emits) {
+    html += '<div class="td-flow"><h4>Emits (output artifacts)</h4><div class="td-flow-diagram"><div class="td-flow-col outputs">';
+    html += s.emits.map(e => `<div class="td-pill">${e}</div>`).join('');
+    html += '</div></div></div>';
+  }
+  if (s.code) html += `<div class="td-code"><h4>Key code pattern</h4><div class="td-code-block">${highlightCode(s.code)}</div><button class="td-code-copy" onclick="copyTdCode(this)">Copy</button></div>`;
+  if (s.keywords && s.keywords.length) {
+    html += '<div class="td-flow"><h4>Routing keywords</h4><div class="td-flow-diagram"><div class="td-flow-col">';
+    html += s.keywords.map(k => `<div class="td-pill" style="background:var(--surface2);color:var(--text-dim);border:1px solid var(--border)">${k}</div>`).join('');
+    html += '</div></div></div>';
+  }
+  if (s.platform) html += `<div class="td-actions"><button class="dp-btn secondary" onclick="openAcademyModule('${s.platform}')">Open Academy: ${s.platform}</button></div>`;
+  html += '</div>';
+  detail.innerHTML = html;
+}
+
+function tourApplyStep(idx){
+  document.querySelectorAll('#tourTree .tnode.active-node').forEach(el => { el.classList.remove('active-node'); el.classList.add('visited'); });
+  const tour = TOURS[curTour]; if (idx < 0 || idx >= tour.steps.length) return;
+  const s = tour.steps[idx];
+  if (s.expand) s.expand.forEach(id => tForceExpand(id));
+  if (s.activate) s.activate.forEach(id => tActivate(id));
+  document.getElementById('tourStepInfo').textContent = `${idx+1} / ${tour.steps.length}`;
+  renderTourDetail(s, idx, tour.steps.length);
+}
+
+function renderTourDetail(step, idx, total){
+  const detail = document.getElementById('tourDetail');
+  if (step.summary) {
+    const dots = Array.from({length:total},(_,i) => `<div class="td-progress-dot${i<idx?' done':''}${i===idx?' current':''}"></div>`).join('');
+    detail.innerHTML = `<div class="td-summary"><h3>${step.narration}</h3><p>${step.designRationale||'You have completed the tour. Try another tour, or explore the Course Map and Platform Academy.'}</p><div class="td-progress">${dots}</div></div>`;
+    return;
+  }
+  const skills = (step.skillIds||[]).map(id => SKILL_MAP[id]).filter(Boolean);
+  const primary = skills[0];
+  const rationale = step.designRationale || (primary && primary.rationale) || null;
+  const io = step.inputOutput;
+  const code = primary && primary.code;
+  const tierLabel = step.tier || '';
+
+  let html = '<div class="td-inner">';
+  html += '<div class="td-header"><div class="td-header-top">';
+  if (primary) {
+    const tc = typeColor(primary.type);
+    html += `<span class="td-name">${primary.name}</span>`;
+    html += `<span class="td-badge" style="background:${tc.bg};color:${tc.fg}">${primary.type}</span>`;
+    if (primary.component) html += `<span class="td-badge" style="background:var(--surface2);color:var(--text-dim)">${primary.component}</span>`;
+    html += `<span class="td-badge" style="background:var(--cyan-dim);color:var(--cyan)">${tierLabel}</span>`;
+  } else {
+    html += `<span class="td-name" style="font-size:16px">${tierLabel}</span>`;
+    html += `<span class="td-badge" style="background:var(--cyan-dim);color:var(--cyan)">Step ${idx+1}/${total}</span>`;
+  }
+  html += '</div>';
+  if (primary) html += `<div class="td-desc">${primary.desc}</div>`;
+  html += `<div class="td-narration">${step.narration}</div></div>`;
+
+  if (rationale) html += `<div class="td-rationale"><h4>Why this pattern</h4><p>${rationale}</p></div>`;
+  if (io) {
+    html += '<div class="td-flow"><h4>Data flow</h4><div class="td-flow-diagram">';
+    html += '<div class="td-flow-col inputs">' + io.inputs.map(i => `<div class="td-pill">${i}</div>`).join('') + '</div>';
+    html += '<div class="td-flow-arrow">→</div>';
+    html += '<div class="td-flow-col outputs">' + io.outputs.map(o => `<div class="td-pill">${o}</div>`).join('') + '</div>';
+    html += '</div></div>';
+  }
+  if (code) html += `<div class="td-code"><h4>Key code pattern</h4><div class="td-code-block">${highlightCode(code)}</div><button class="td-code-copy" onclick="copyTdCode(this)">Copy</button></div>`;
+
+  if (skills.length > 1) {
+    html += '<div class="td-workers"><h4>Skills in this step (' + skills.length + ')</h4><div class="td-worker-map">';
+    html += skills.map(sk => {
+      const tc = typeColor(sk.type);
+      return `<div class="td-worker-chip" style="background:${tc.bg};border-color:${tc.fg}40;color:${tc.fg}" onclick="renderNodeDetail('${sk.id}')" title="${stripHtml(sk.desc||'')}">${sk.name}</div>`;
+    }).join('');
+    html += '</div></div>';
+  }
+  if (primary && primary.platform) {
+    html += `<div class="td-actions"><button class="dp-btn secondary" onclick="openAcademyModule('${primary.platform}')">Open Academy: ${primary.platform}</button></div>`;
+  }
+  html += '</div>';
+  detail.innerHTML = html;
+}
+
+function highlightCode(code){
+  let h = escHtml(code);
+  const toks = [];
+  function tok(cls, txt){ const ph = '\x01' + toks.length + '\x01'; toks.push('<span class="'+cls+'">'+txt+'</span>'); return ph; }
+  h = h.replace(/(--|#|\/\/)(.*)$/gm, (_,a,b) => tok('cm', a+b));
+  h = h.replace(/(@\w+[\.\w]*)/g, (_,a) => tok('dec', a));
+  h = h.replace(/'([^']*?)'/g, (_,a) => "'"+tok('str', a)+"'");
+  h = h.replace(/"([^"]*?)"/g, (_,a) => '"'+tok('str', a)+'"');
+  const kws = /\b(SELECT|FROM|WHERE|INSERT|INTO|UPDATE|SET|DELETE|CREATE|TABLE|MERGE|USING|ON|WHEN|MATCHED|THEN|NOT|AND|OR|AS|IF|ELSE|import|from|export|const|let|var|function|return|async|await|try|except|catch|raise|new|def|class|with|elif|True|False|None|assert)\b/gi;
+  h = h.replace(kws, m => tok('kw', m));
+  h = h.replace(/\b(mlflow|databricks|ResponsesAgent|Agent|Runner|Safety|Correctness|Guidelines|RelevanceToQuery|WorkspaceClient|DatabricksMCPClient|DatabricksOpenAI|AsyncDatabricksSession|ChatModel)\b/g, m => tok('fn', m));
+  toks.forEach((s, i) => { h = h.split('\x01'+i+'\x01').join(s); });
+  return h;
+}
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function copyTdCode(btn){
+  const block = btn.previousElementSibling;
+  navigator.clipboard.writeText(block.textContent).then(() => {
+    btn.textContent = 'Copied!'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+function tourNext(){ const tour = TOURS[curTour]; if (curTourStep < tour.steps.length-1) { curTourStep++; tourApplyStep(curTourStep); } else tourStopPlay(); }
+function tourPrev(){ if (curTourStep <= 0) return; curTourStep--; selectTour(curTour); for (let i = 0; i <= curTourStep; i++) { const s = TOURS[curTour].steps[i]; if (s.expand) s.expand.forEach(id => tForceExpand(id)); if (i < curTourStep && s.activate) s.activate.forEach(id => { const el = document.getElementById(id); if (el) { el.classList.add('visited'); el.classList.remove('active-node'); } }); } tourApplyStep(curTourStep); }
+function tourTogglePlay(){ if (tourPlaying) tourStopPlay(); else { tourPlaying = true; document.getElementById('tourPlayBtn').textContent = '⏸ Pause'; document.getElementById('tourPlayBtn').classList.add('active'); if (curTourStep >= TOURS[curTour].steps.length-1) selectTour(curTour); tourTick(); } }
+function tourStopPlay(){ tourPlaying = false; clearTimeout(tourTimer); document.getElementById('tourPlayBtn').textContent = '▶ Play'; document.getElementById('tourPlayBtn').classList.remove('active'); }
+function tourTick(){ if (!tourPlaying) return; tourNext(); if (curTourStep >= TOURS[curTour].steps.length-1) { tourStopPlay(); return; } tourTimer = setTimeout(tourTick, tourSpeedMs); }
+function tourReset(){ tourStopPlay(); selectTour(curTour); }
+function tourUpdSpeed(){ const v = parseInt(document.getElementById('tourSpeed').value); const sp = {1:4000, 2:3000, 3:2000, 4:1200, 5:700}; const lb = {1:'0.5x', 2:'0.75x', 3:'1x', 4:'1.5x', 5:'2x'}; tourSpeedMs = sp[v]; document.getElementById('tourSpdLbl').textContent = lb[v]; }
+
+// ======================== DETAIL PANEL ========================
+function openDetail(id){
+  const s = SKILL_MAP[id]; if (!s) return;
+  const tc = typeColor(s.type);
+  const panel = document.getElementById('detailPanel');
+  panel.innerHTML = `
+    <div class="dp-header">
+      <button class="dp-close" onclick="closeDetail()">✕</button>
+      <div class="dp-title">${s.name}</div>
+      <div class="dp-badges">
+        <span class="dp-badge" style="background:${tc.bg};color:${tc.fg}">${s.type}</span>
+        ${s.component ? `<span class="dp-badge" style="background:var(--surface2);color:var(--text-dim)">${s.component}</span>` : ''}
+        ${s.stage !== undefined ? `<span class="dp-badge" style="background:var(--surface2);color:var(--text-dim)">step ${s.stage}</span>` : ''}
+      </div>
+      <div class="dp-desc">${s.desc||''}</div>
+    </div>
+    ${s.rationale ? `<div class="dp-section"><h4>Design rationale</h4><p style="font-size:12px;line-height:1.6;color:var(--text-dim)">${s.rationale}</p></div>` : ''}
+    ${s.keywords && s.keywords.length ? `<div class="dp-section"><h4>Routing keywords</h4><div class="dp-keywords">${s.keywords.map(k => `<span class="dp-kw">${k}</span>`).join('')}</div></div>` : ''}
+    ${s.emits ? `<div class="dp-section"><h4>Emits</h4><div class="dp-keywords">${s.emits.map(e => `<span class="dp-kw">${e}</span>`).join('')}</div></div>` : ''}
+    ${s.code ? `<div class="dp-section"><h4>Key code pattern</h4><div class="dp-code">${highlightCode(s.code)}</div></div>` : ''}
+    <div class="dp-actions">
+      ${s.platform ? `<button class="dp-btn secondary" onclick="closeDetail();openAcademyModule('${s.platform}')">Open Academy: ${s.platform}</button>` : ''}
+    </div>`;
+  document.getElementById('detailOverlay').classList.add('open');
+  panel.classList.add('open');
+}
+function closeDetail(){ document.getElementById('detailOverlay').classList.remove('open'); document.getElementById('detailPanel').classList.remove('open'); }
+
+// ======================== ACADEMY ========================
+function initAcademy(){
+  const sidebar = document.getElementById('acadSidebar');
+  sidebar.innerHTML = '<h3>Platform Academy</h3><div class="acad-nav">' +
+    ACADEMY.map(m =>
+      `<div class="acad-nav-item" data-mod="${m.id}" onclick="selectAcadModule('${m.id}')">` +
+        `<div class="acad-nav-icon" style="background:${m.color}15;color:${m.color}">${m.icon}</div>` +
+        `<div><div class="acad-nav-title">${m.title}</div><div class="acad-nav-sub">${m.subtitle}</div></div>` +
+      `</div>`
+    ).join('') + '</div>';
+}
+function selectAcadModule(id){
+  const m = ACADEMY.find(a => a.id === id); if (!m) return;
+  document.querySelectorAll('.acad-nav-item').forEach(n => n.classList.toggle('active', n.dataset.mod === id));
+  const main = document.getElementById('acadMain');
+  const sections = splitAcadContent(m.content);
+  const quizHtml = m.quiz ? renderAcadQuiz(m.quiz) : '';
+  main.innerHTML =
+    `<div class="acad-hero"><div class="acad-hero-top"><div class="acad-hero-icon" style="background:${m.color}15;color:${m.color}">${m.icon}</div><div><h2>${m.title}</h2><div class="acad-hero-sub">${m.subtitle}</div></div></div></div>` +
+    `<div class="acad-sections">${sections}${quizHtml}</div>`;
+  main.scrollTop = 0;
+}
+function splitAcadContent(html){
+  const parts = html.split(/<h5>/g);
+  if (parts.length <= 1) return '<div class="acad-section">' + html + '</div>';
+  let out = '';
+  if (parts[0].trim()) out += '<div class="acad-section">' + parts[0] + '</div>';
+  for (let i = 1; i < parts.length; i++) {
+    const endTag = parts[i].indexOf('</h5>');
+    if (endTag === -1) { out += '<div class="acad-section"><h5>' + parts[i] + '</div>'; continue; }
+    const title = parts[i].substring(0, endTag);
+    const body = parts[i].substring(endTag + 5);
+    out += `<div class="acad-section"><h5>${title}</h5>${body}</div>`;
+  }
+  return out;
+}
+function renderAcadQuiz(quiz){
+  return '<div class="acad-quiz"><h4>Test your knowledge</h4>' +
+    quiz.map((q, qi) =>
+      `<div class="quiz-q"><p>${qi+1}. ${q.q}</p><div class="quiz-opts">${q.opts.map((o, oi) =>
+        `<div class="quiz-opt" onclick="checkQuiz(this,${oi},${q.answer})">${o}</div>`
+      ).join('')}</div></div>`
+    ).join('') + '</div>';
+}
+function openAcademyModule(id){ switchMode('academy'); setTimeout(() => selectAcadModule(id), 50); }
+function checkQuiz(el, idx, answer){
+  const parent = el.closest('.quiz-opts');
+  parent.querySelectorAll('.quiz-opt').forEach((o, i) => { o.classList.add('revealed'); o.classList.add(i === answer ? 'correct' : 'wrong'); });
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (document.getElementById('tours').classList.contains('active')) {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); tourNext(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); tourPrev(); }
+    if (e.key === 'p' || e.key === 'P') tourTogglePlay();
+    if (e.key === 'r' || e.key === 'R') tourReset();
+  }
+  if (e.key === 'Escape') closeDetail();
+});
+</script>
+</body>
+</html>

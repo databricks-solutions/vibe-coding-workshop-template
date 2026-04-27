@@ -1,0 +1,92 @@
+# Starter template: Deployment pipeline job
+#
+# A 3-task DAG that evaluates a model version, checks quality gates,
+# and deploys to a serving endpoint. Customize task notebooks and
+# thresholds for your project.
+#
+# Usage:
+#   1. Copy this file into your databricks.yml under `resources.jobs`
+#   2. Create the three notebook files referenced below
+#   3. Adjust parameters, thresholds, and endpoint names
+#   4. Run: databricks bundle deploy && databricks bundle run deploy-pipeline
+
+resources:
+  jobs:
+    deploy-pipeline:
+      name: "agent-deploy-pipeline"
+      description: >-
+        Evaluate → gate-check → deploy pipeline for agent model versions.
+        Triggered manually or via MODEL_VERSION_CREATED webhook.
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      tags:
+        pattern: "evaluate-promote-deploy"
+        managed-by: "databricks-bundle"
+
+      parameters:
+        - name: model_uri
+          default: ""
+          # Fully qualified UC model URI, e.g. models:/catalog.schema.model_name/1
+        - name: space_id
+          default: ""
+        - name: catalog
+          default: "main"
+        - name: schema
+          default: "genie_optimization"
+
+      tasks:
+        # Task 1: Run evaluation against benchmark dataset
+        - task_key: evaluate
+          notebook_task:
+            notebook_path: ./jobs/evaluate_model.py
+            base_parameters:
+              model_uri: "{{job.parameters.model_uri}}"
+              space_id: "{{job.parameters.space_id}}"
+              catalog: "{{job.parameters.catalog}}"
+              schema: "{{job.parameters.schema}}"
+          environment_key: default
+          timeout_seconds: 7200
+          max_retries: 1
+
+        # Task 2: Check evaluation scores against thresholds
+        - task_key: gate_check
+          depends_on:
+            - task_key: evaluate
+          notebook_task:
+            notebook_path: ./jobs/gate_check.py
+            # Reads scores from evaluate task via taskValues
+          environment_key: default
+          timeout_seconds: 600
+          max_retries: 0
+
+        # Task 3: Deploy to serving endpoint (only if gate passes)
+        - task_key: deploy
+          depends_on:
+            - task_key: gate_check
+          notebook_task:
+            notebook_path: ./jobs/deploy_to_serving.py
+            # Reads model_uri and gate result from upstream taskValues
+          environment_key: default
+          timeout_seconds: 1800
+          max_retries: 0
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "mlflow[databricks]>=3.10.1"
+              - "databricks-sdk>=0.40.0"
+              - "databricks-agents>=1.1.0"
+
+      permissions:
+        - group_name: "users"
+          level: "CAN_VIEW"
+
+# Optional: Add MODEL_VERSION_CREATED trigger for automated CI/CD
+#
+#     trigger:
+#       type: MODEL_VERSION_CREATED
+#       model_name: "catalog.schema.model_name"
+#       stages: ["None"]

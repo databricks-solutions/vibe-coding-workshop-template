@@ -11,7 +11,7 @@ metadata:
   called_by:
     - semantic-layer-setup
   standalone: true
-  last_verified: "2026-02-07"
+  last_verified: "2026-04-27"
   volatility: high
   upstream_sources:
     - name: "ai-dev-kit"
@@ -19,36 +19,36 @@ metadata:
       paths:
         - "databricks-skills/databricks-metric-views/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-19"
+      last_synced: "2026-04-27"
       sync_commit: "latest"
-    - name: "databricks-docs-composability"
-      url: "https://docs.databricks.com/aws/en/metric-views/data-modeling/composability"
+    - name: "databricks-docs-overview"
+      url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/"
       relationship: "upstream"
-      last_synced: "2026-02-20"
-    - name: "databricks-docs-semantic-metadata"
-      url: "https://docs.databricks.com/aws/en/metric-views/data-modeling/semantic-metadata"
+      last_synced: "2026-04-27"
+    - name: "databricks-docs-yaml-reference"
+      url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/yaml-reference"
       relationship: "upstream"
-      last_synced: "2026-02-20"
-    - name: "databricks-docs-joins"
-      url: "https://docs.databricks.com/aws/en/metric-views/data-modeling/joins"
+      last_synced: "2026-04-27"
+    - name: "databricks-docs-basic-modeling"
+      url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/basic-modeling"
       relationship: "upstream"
-      last_synced: "2026-02-20"
-    - name: "databricks-docs-window-measures"
-      url: "https://docs.databricks.com/aws/en/metric-views/data-modeling/window-measures"
+      last_synced: "2026-04-27"
+    - name: "databricks-docs-advanced-techniques"
+      url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/advanced-techniques"
       relationship: "upstream"
-      last_synced: "2026-02-20"
-    - name: "databricks-docs-syntax"
-      url: "https://docs.databricks.com/aws/en/metric-views/data-modeling/syntax"
-      relationship: "upstream"
-      last_synced: "2026-02-20"
-    - name: "databricks-docs-materialization"
-      url: "https://docs.databricks.com/aws/en/metric-views/materialization"
-      relationship: "upstream"
-      last_synced: "2026-02-20"
+      last_synced: "2026-04-27"
     - name: "databricks-docs-create-sql"
       url: "https://docs.databricks.com/aws/en/metric-views/create/sql"
       relationship: "upstream"
-      last_synced: "2026-02-20"
+      last_synced: "2026-04-27"
+    - name: "databricks-docs-manage"
+      url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/manage"
+      relationship: "upstream"
+      last_synced: "2026-04-27"
+    - name: "databricks-docs-agent-metadata"
+      url: "https://docs.databricks.com/aws/en/business-semantics/agent-metadata"
+      relationship: "upstream"
+      last_synced: "2026-04-27"
 ---
 
 > **End-to-end semantic layer?** If you are creating Metric Views as part of a larger deployment that also includes TVFs and Genie Spaces, read `semantic-layer/00-semantic-layer-setup/SKILL.md` first — it orchestrates this skill with the others and mandates Gold schema validation before artifact creation.
@@ -85,7 +85,7 @@ Use this skill when:
 - [ ] Gold layer tables exist in Unity Catalog (use `gold-layer-design` + `gold-layer-setup` skills)
 - [ ] Gold layer YAML schemas exist in `gold_layer_design/yaml/` (for validation script)
 - [ ] Serverless SQL warehouse available (for metric view creation and querying)
-- [ ] Databricks Runtime 17.2+ (required for YAML version 1.1)
+- [ ] SQL warehouse or compute resource on Databricks Runtime 17.3+ (current docs requirement for `CAN USE` permission to create or edit a metric view). YAML v1.1 features were introduced in DBR 17.2; some experimental features (snowflake schema joins, agent metadata, materialization) require DBR 17.3+.
 
 ## MCP Tools (from upstream databricks-metric-views)
 
@@ -605,19 +605,21 @@ Requires serverless compute enabled. Currently experimental — use for high-que
 | "Cannot resolve column" | Dimension/measure names with spaces need backtick quoting |
 | JOIN at query time fails | Joins must be in the YAML definition, not in the SELECT query |
 | `MEASURE()` required | All measure references must be wrapped: `MEASURE(\`name\`)` |
-| DBR version error | Requires Runtime 17.2+ for YAML v1.1, or 16.4+ for v0.1 |
+| DBR version error | Compute must be on DBR 17.3+ to create or edit metric views (current docs requirement); YAML v1.1 features need 17.2+; legacy v0.1 needs 16.4+ |
 | Materialization not working | Requires serverless compute enabled; currently experimental |
 
 ## External References
 
 ### Official Documentation
-- [Metric Views SQL Creation](https://docs.databricks.com/aws/en/metric-views/create/sql)
-- [Metric Views YAML Syntax Reference](https://docs.databricks.com/aws/en/metric-views/data-modeling/syntax)
-- [Metric Views Joins](https://docs.databricks.com/aws/en/metric-views/data-modeling/joins)
-- [Metric Views Semantic Metadata](https://docs.databricks.com/aws/en/metric-views/data-modeling/semantic-metadata)
-- [Composability in Metric Views](https://docs.databricks.com/aws/en/metric-views/data-modeling/composability)
-- [Window Measures (Experimental)](https://docs.databricks.com/aws/en/metric-views/data-modeling/window-measures)
-- [Materialization for Metric Views](https://docs.databricks.com/aws/en/metric-views/materialization)
+- [Metric Views Overview](https://docs.databricks.com/aws/en/business-semantics/metric-views/)
+- [Create and Edit Metric Views](https://docs.databricks.com/aws/en/metric-views/create/sql)
+- [Metric View YAML Syntax Reference](https://docs.databricks.com/aws/en/business-semantics/metric-views/yaml-reference)
+- [Basic Modeling (sources, dimensions, measures, joins)](https://docs.databricks.com/aws/en/business-semantics/metric-views/basic-modeling)
+- [Advanced Techniques (composability, window measures, materialization)](https://docs.databricks.com/aws/en/business-semantics/metric-views/advanced-techniques)
+- [Tutorial: Build a complete metric view with joins](https://docs.databricks.com/aws/en/business-semantics/metric-views/tpch-example)
+- [Manage Metric Views](https://docs.databricks.com/aws/en/business-semantics/metric-views/manage)
+- [Query Metric Views](https://docs.databricks.com/aws/en/business-semantics/metric-views/query)
+- [Agent Metadata in Metric Views](https://docs.databricks.com/aws/en/business-semantics/agent-metadata)
 
 ### Related Skills
 - `databricks-table-valued-functions` — TVF patterns for Genie
@@ -626,6 +628,7 @@ Requires serverless compute enabled. Currently experimental — use for high-que
 
 ## Version History
 
+- **v5.1** (Apr 27, 2026) — Refreshed prerequisites and Common Issues for the current docs requirement (DBR 17.3+ for `CAN USE` on metric view creation/edit). Migrated External Documentation links and `upstream_sources` URLs to the current `/business-semantics/metric-views/...` paths (overview, yaml-reference, basic-modeling, advanced-techniques, manage, agent-metadata).
 - **v5.0** (Feb 2026) — Expanded transitive joins with inline fixes; exhaustive format type table (6 types); composability (MEASURE function) patterns; FILTER clause; USING join clause; filter top-level field; window measures clarification (Experimental v0.1); materialization expansion; progressive disclosure restructure (Notes to Carry Forward + Next Step); 7 upstream_sources from official docs; new composability-patterns.md reference
 - **v4.0** (Feb 2026) — Merged prompt content: Quick Start, implementation workflow, requirements template, creation script, validation queries, worked examples, common mistakes with paired examples
 - **v3.0** (Dec 19, 2025) — Standardized structured comment format

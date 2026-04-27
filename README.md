@@ -2,7 +2,7 @@
 
 > **Build end-to-end data products on Databricks with AI-assisted development**
 
-This template is a complete **data product builder** powered by vibe coding. Start from a raw customer schema or existing data, and build your way through the full Databricks stack — Databricks Apps with Lakebase, medallion architecture (Bronze, Silver, Gold), semantic layer, Genie Spaces, ML pipelines, and GenAI agents — all guided by 55 agent skills and your AI coding assistant.
+This template is a complete **data product builder** powered by vibe coding. Start from a raw customer schema or existing data, and build your way through the full Databricks stack — Databricks Apps with Lakebase, medallion architecture (Bronze, Silver, Gold), semantic layer, Genie Spaces, ML pipelines, and GenAI agents — all guided by 77 accelerator skills, a standalone GenAI agent course, and your AI coding assistant.
 
 ---
 
@@ -38,7 +38,7 @@ cd my-project
 
 #### Path A: Build and Deploy a Databricks App
 
-Build a full-stack TypeScript app on Databricks AppKit, guided by 7 agent skills:
+Build a full-stack TypeScript app on Databricks AppKit, guided by 10 agent skills:
 
 1. Read the workshop guide: [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md)
 2. Open your AI coding assistant and prompt:
@@ -47,12 +47,14 @@ Build a full-stack TypeScript app on Databricks AppKit, guided by 7 agent skills
 I want to build a Databricks App. Read @apps_lakebase/skills/01-appkit-scaffold/SKILL.md and scaffold a new AppKit project.
 ```
 
-3. Follow the 5-phase workflow in Instructions.md:
+3. Follow the branch-aware workflow in Instructions.md:
    - **Phase 1:** Scaffold + build UI from a PRD, test locally (uses `01-appkit-scaffold` and `02-appkit-build` skills)
    - **Phase 2:** Deploy to Databricks Apps with mock data (uses `03-appkit-deploy` skill)
-   - **Phase 3:** Setup Lakebase project (uses `00-appkit-navigator` skill)
+   - **Phase 3:** Setup Lakebase bundle resources (uses `04-appkit-plugin-add` and `apps_lakebase/prompts/03-setup-lakebase.md`)
    - **Phase 4:** Wire Lakebase backend locally (uses `04-appkit-plugin-add` and `05-appkit-lakebase-wiring` skills)
    - **Phase 4b (optional):** Wire Model Serving / Agent endpoint (uses `04-appkit-plugin-add` and `06-appkit-serving-wiring` skills)
+   - **Phase 4c (optional):** Wire AppKit to a separate Agent App with OBO proxying (uses `06d-appkit-agent-app-proxy`)
+   - **Phase 4d (optional):** Add persistent chat history and feedback (uses `07-appkit-chat-history` and `08-appkit-feedback`)
    - **Phase 5:** Deploy + E2E test with Lakebase (uses `03-appkit-deploy` skill)
 
 #### Path B: Build an End-to-End Data Pipeline
@@ -87,7 +89,7 @@ vibe-coding-workshop-template/
 ├── SECURITY.md                     # Security policy
 ├── env.example                     # Environment variable template
 │
-├── apps_lakebase/                  # Databricks AppKit Workshop (7 agent skills)
+├── apps_lakebase/                  # Databricks AppKit Workshop (10 agent skills)
 │   ├── Instructions.md             #   Comprehensive workshop guide
 │   ├── prompts/                    #   Numbered prompt files for each workshop step
 │   └── skills/                     #   Agent skills for the full app lifecycle
@@ -97,21 +99,31 @@ vibe-coding-workshop-template/
 │       ├── 03-appkit-deploy/       #     Deploy to Databricks Apps
 │       ├── 04-appkit-plugin-add/   #     Add plugins (Lakebase, Analytics, Genie, Files, Serving)
 │       ├── 05-appkit-lakebase-wiring/ #  Wire Lakebase DDL, API routes, frontend hooks
-│       └── 06-appkit-serving-wiring/  #  Wire Model Serving / Agent endpoint to frontend
+│       ├── 06-appkit-serving-wiring/  #  Wire Model Serving / Agent endpoint to frontend
+│       ├── 06d-appkit-agent-app-proxy/ # Wire AppKit frontend to a separate Agent App
+│       ├── 07-appkit-chat-history/    #  Persist chat conversations in Lakebase
+│       └── 08-appkit-feedback/        #  Add thumbs feedback linked to MLflow assessments
 │
 ├── presentations/                  # Workshop slide deck (Marp, HTML, PDF, PPTX)
 │
-├── data_product_accelerator/       # 55 Agent Skills for End-to-End Data Products
+├── genai-agents/                   # GenAI Agent Development Course
+│   ├── 00-course-orchestrator/     #   Current GenAI course navigator
+│   ├── PROMPT-GUIDE.md             #   Canonical Track A + AppKit 2-Apps prompts
+│   ├── foundation/                 #   UC resources, MLflow, tracing, tools, AI Gateway
+│   ├── tracks/                     #   Track A custom Agent Apps
+│   └── sdlc/                       #   Prompt registry, evals, deployment, monitoring
+│
+├── data_product_accelerator/       # 77 Agent Skills for End-to-End Data Products
 │   ├── AGENTS.md                   #   Detailed skill routing table
 │   ├── QUICKSTART.md               #   One-prompt-per-stage guide (9 stages)
 │   ├── README.md                   #   Accelerator overview
 │   ├── context/                    #   Schema CSV inputs (starting point)
-│   ├── skills/                     #   55 skills across 12 domains
+│   ├── skills/                     #   77 skills across 12 domains
 │   │   ├── admin/                  #     Skill creation, auditing (4)
 │   │   ├── bronze/                 #     Bronze layer + Faker data (2)
 │   │   ├── common/                 #     Cross-cutting shared skills (8)
 │   │   ├── exploration/            #     Ad-hoc notebooks (1)
-│   │   ├── genai-agents/           #     GenAI agent patterns (9)
+│   │   ├── genai-agents/           #     GenAI course mirror, tracks, SDLC, capstone
 │   │   ├── gold/                   #     Gold design, implementation, workers (14)
 │   │   ├── ml/                     #     MLflow pipelines (1)
 │   │   ├── monitoring/             #     Monitors, dashboards, alerts (5)
@@ -157,19 +169,19 @@ Raw Schema CSV or Existing Data
   └─► Databricks App       — AppKit (full-stack TypeScript), deployed on Databricks Apps
 ```
 
-Each stage is driven by a single prompt to your AI coding assistant. The 55 agent skills in `data_product_accelerator/` encode production-tested patterns so you get governed, high-quality output at every step.
+Each stage is driven by a single prompt to your AI coding assistant. The 77 agent skills in `data_product_accelerator/` encode production-tested patterns so you get governed, high-quality output at every step.
 
 ---
 
-## Data Product Accelerator (55 Agent Skills)
+## Data Product Accelerator (77 Agent Skills)
 
-The `data_product_accelerator/` directory contains **55 agent skills** organized by domain that guide your AI assistant through the entire pipeline:
+The `data_product_accelerator/` directory contains **77 agent skills** organized by domain that guide your AI assistant through the entire pipeline:
 
 | Domain | Skills | Focus |
 |--------|--------|-------|
 | **Gold** | 14 | Dimensional modeling, design workers, pipeline workers, ERDs, MERGE scripts |
 | **Semantic Layer** | 5 | Metric Views, TVFs, Genie Spaces, export/import API |
-| **GenAI Agents** | 10 | ResponsesAgent, evaluation, deployment, simple agent scaffold |
+| **GenAI Agents** | 31 | Course orchestrator, foundation, Track A/B/C, SDLC, capstone, simple agent scaffold |
 | **Common** | 8 | Asset Bundles, naming, constraints, imports |
 | **Monitoring** | 5 | Lakehouse Monitors, dashboards, SQL alerts |
 | **Admin** | 4 | Skill creation, auditing, docs |
@@ -184,14 +196,16 @@ See [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART
 
 ---
 
-## Databricks AppKit Workshop (7 Agent Skills)
+## Databricks AppKit Workshop (10 Agent Skills)
 
-The `apps_lakebase/` directory contains **7 agent skills** and a comprehensive workshop guide for building full-stack TypeScript apps on [Databricks AppKit](https://databricks.github.io/appkit/). The app is **not pre-built** — it gets scaffolded at runtime via `databricks apps init` and built iteratively with your AI coding assistant.
+The `apps_lakebase/` directory contains **10 agent skills** and a comprehensive workshop guide for building full-stack TypeScript apps on [Databricks AppKit](https://databricks.github.io/appkit/). The app is **not pre-built** — it gets scaffolded at runtime via `databricks apps init` and built iteratively with your AI coding assistant.
 
 **What gets built:**
 - Full-stack TypeScript app (React + Tailwind CSS frontend, AppKit backend)
-- SQL Warehouse integration for analytics queries
-- Lakebase (managed PostgreSQL) persistence (wired in phases 3-5)
+- Optional SQL Warehouse integration for analytics queries
+- Lakebase (managed PostgreSQL) persistence (wired after the mock-data app is deployed)
+- Optional agent chat with either Model Serving or a separate Agent App proxy
+- Optional persistent chat history and MLflow-linked feedback
 - Deployed to Databricks Apps with hot reload for local dev
 
 ### Workshop Skills
@@ -205,6 +219,9 @@ The `apps_lakebase/` directory contains **7 agent skills** and a comprehensive w
 | `04-appkit-plugin-add` | Add plugins to an existing AppKit project |
 | `05-appkit-lakebase-wiring` | Wire Lakebase DDL, Express API routes, frontend hooks, mock fallback |
 | `06-appkit-serving-wiring` | Wire Model Serving / Agent endpoint to frontend (streaming, invoke) |
+| `06d-appkit-agent-app-proxy` | Wire an AppKit frontend to a separate Agent App with OBO forwarding |
+| `07-appkit-chat-history` | Persist agent chat conversations in Lakebase with session auth |
+| `08-appkit-feedback` | Add thumbs up/down feedback linked to MLflow assessments |
 
 ### Local Development (after scaffolding)
 
@@ -214,6 +231,24 @@ The `apps_lakebase/` directory contains **7 agent skills** and a comprehensive w
 | Health Check | http://localhost:8000/health |
 
 Start the dev server from your scaffolded app directory with `npm run dev`.
+
+---
+
+## GenAI Agent Development Course
+
+The root `genai-agents/` directory is the current course entry point for production GenAI agents on Databricks. Start with `genai-agents/00-course-orchestrator/SKILL.md`, then use `genai-agents/PROMPT-GUIDE.md` for the canonical Track A + AppKit 2-Apps walkthrough.
+
+**Canonical flow:**
+
+```
+Foundation (UC, MLflow, tracing, tools)
+  → Track A custom Agent App on Databricks Apps
+  → AppKit frontend proxy with OBO (`06d`)
+  → Chat history + feedback (`07`, `08`)
+  → SDLC pipeline (prompt registry, evals, deployment, monitoring)
+```
+
+The canonical GenAI agent skills live in the root `genai-agents/` tree; stage 9 of the data product pipeline routes into the same agent-building patterns via `genai-agents/00-course-orchestrator/SKILL.md`. For Databricks-platform reference patterns (Knowledge Assistants, Genie Spaces, Model Serving, etc.) see the upstream registry [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills); local skills here extend or specialize those for our workshop and accelerator use cases.
 
 ---
 
@@ -242,11 +277,11 @@ The `agentic-framework/` directory provides prompts and patterns for building **
 
 ## How Deployment Works
 
-After scaffolding your AppKit app, the 5-phase workflow progresses from mock data to a fully wired Lakebase backend:
+After scaffolding your AppKit app, the workflow progresses from mock data to a wired backend, with optional branches for agent chat, a separate Agent App proxy, chat history, and feedback:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    AppKit Workshop Phases                            │
+│                    AppKit Workshop Lifecycle                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  Phase 1: SCAFFOLD + BUILD     Phase 2: DEPLOY (mock data)         │
@@ -257,9 +292,16 @@ After scaffolding your AppKit app, the 5-phase workflow progresses from mock dat
 │                                                                     │
 │  Phase 3: SETUP LAKEBASE       Phase 4: WIRE LAKEBASE              │
 │  ──────────────────────        ─────────────────────               │
-│  Create Lakebase project       Add Lakebase plugin (skill 04)      │
+│  Add Lakebase bundle config    Add Lakebase plugin (skill 04)      │
 │  Configure endpoint + compute  DDL, API routes, frontend (skill 05)│
 │  Record host in state file     Test locally with mock fallback      │
+│                                                                     │
+│  Optional Agent Branches                                             │
+│  ───────────────────────                                             │
+│  Skill 06: Model Serving / Agent endpoint                            │
+│  Skill 06d: Separate Agent App proxy with OBO forwarding             │
+│  Skill 07: Persistent chat history                                   │
+│  Skill 08: User feedback linked to MLflow assessments                │
 │                                                                     │
 │  Phase 5: DEPLOY + E2E TEST                                        │
 │  ────────────────────────                                           │
@@ -324,7 +366,7 @@ Use the `04-appkit-plugin-add` skill to add capabilities:
 Read @apps_lakebase/skills/04-appkit-plugin-add/SKILL.md and add the Lakebase plugin to my app.
 ```
 
-Available plugins: `analytics`, `lakebase`, `genie`, `files`
+Available plugins: `analytics`, `lakebase`, `genie`, `files`, `serving`
 
 ### Adding Dependencies
 
@@ -385,6 +427,7 @@ npm run dev
 - [PRE-REQUISITES.md](PRE-REQUISITES.md) — Workshop prerequisites checklist
 - [Workshop Presentation](presentations/README.md) — Marp slide deck (HTML, PDF, PPTX)
 - [AppKit Workshop Guide](apps_lakebase/Instructions.md) — Databricks App workshop guide
+- [GenAI Agent Prompt Guide](genai-agents/PROMPT-GUIDE.md) — canonical Track A + AppKit 2-Apps course prompts
 - [Data Product Accelerator QUICKSTART](data_product_accelerator/QUICKSTART.md) — 9-stage pipeline guide
 - [Databricks AppKit Documentation](https://databricks.github.io/appkit/) — AppKit SDK reference
 - [Databricks Apps Documentation](https://docs.databricks.com/dev-tools/databricks-apps/)
@@ -393,6 +436,10 @@ npm run dev
 - [Unity Catalog](https://docs.databricks.com/unity-catalog/)
 - [Delta Live Tables](https://docs.databricks.com/dlt/)
 - [Metric Views](https://docs.databricks.com/metric-views/)
+
+### Authoritative upstream skill registries
+
+For canonical Databricks-platform skills (Apps, Lakebase, Model Serving, DABs, Pipelines, Core), see [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills). The local skills in this repo extend or specialize those for our workshop and accelerator use cases. Where a local skill genuinely derives from an upstream skill, its frontmatter records a structured `upstream_sources` entry that the freshness scanner audits for drift; lighter "see also" references appear as a `## See Also` footer in the skill body. The `databricks-solutions/ai-dev-kit` registry remains a parallel authoritative source for accelerator-specific medallion / semantic-layer / ML patterns.
 
 ---
 
@@ -404,6 +451,7 @@ This is a **Git template repository**. To use it:
 2. Choose your starting point:
    - **Build a Databricks App:** Follow the [AppKit workshop guide](apps_lakebase/Instructions.md) — scaffold, build, deploy, and wire Lakebase
    - **Build a data product:** Drop a schema CSV in `data_product_accelerator/context/` and follow the [9-stage guide](data_product_accelerator/QUICKSTART.md)
+   - **Build a GenAI agent:** Start with [genai-agents/00-course-orchestrator/SKILL.md](genai-agents/00-course-orchestrator/SKILL.md) and use [genai-agents/PROMPT-GUIDE.md](genai-agents/PROMPT-GUIDE.md) for the AppKit 2-Apps walkthrough
    - **Build agents:** Use the prompts in `agentic-framework/agents/` to scaffold multi-agent systems
 3. Iterate with your AI coding assistant — the agent skills handle the patterns
 

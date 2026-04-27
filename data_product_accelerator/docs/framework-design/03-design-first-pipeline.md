@@ -229,7 +229,7 @@ Set up the ML pipeline using @data_product_accelerator/skills/ml/00-ml-pipeline-
 
 | Field | Value |
 |-------|-------|
-| **Orchestrator** | `genai-agents/00-genai-agents-setup` |
+| **Orchestrator** | `genai-agents/00-course-orchestrator` |
 | **Input** | GenAI manifest + Gold tables + Genie Spaces |
 | **Workers Used** | `01-responses-agent-patterns`, `02-mlflow-genai-evaluation`, `03-lakebase-memory-patterns`, `04-prompt-registry-patterns`, `05-multi-agent-genie-orchestration`, `06-deployment-automation`, `07-production-monitoring`, `08-mlflow-genai-foundation` |
 | **Duration** | 8-16 hours |
@@ -243,7 +243,7 @@ Set up the ML pipeline using @data_product_accelerator/skills/ml/00-ml-pipeline-
 
 **Prompt:**
 ```
-Set up GenAI agents using @data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md
+Set up GenAI agents using @genai-agents/00-course-orchestrator/SKILL.md
 ```
 
 ---

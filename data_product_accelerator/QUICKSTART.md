@@ -406,13 +406,13 @@ Build AI agents with Genie Space integration, evaluation, and deployment.
 **Prompt:**
 
 ```
-Set up GenAI agents using @data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md
+Set up GenAI agents using @genai-agents/00-course-orchestrator/SKILL.md
 
 This will involve the following end-to-end workflow:
 
 - **Read plan manifests** — extract agent specifications from the genai-agents-manifest.yaml (from Step 5 planning)
-- **Build ResponsesAgent** — implement an MLflow 3.0 ResponsesAgent with streaming support, tool integration, and conversation history
-- **Configure multi-agent Genie orchestration** — set up intent classification to route natural language queries across multiple Genie Spaces
+- **Route through the current course** — use the GenAI orchestrator to select foundation, Track A/B/C, SDLC, or capstone skills
+- **Build the agent runtime** — implement the selected agent pattern with streaming support, tool integration, and memory
 - **Create evaluation pipelines** — build LLM judge scorers for relevance, groundedness, and safety, then run evaluations against benchmark datasets
 - **Set up deployment automation** — create Model Serving endpoint configuration with traffic routing, A/B testing, and scale-to-zero
 - **Configure production monitoring** — set up registered scorers for real-time agent quality monitoring with alerting thresholds

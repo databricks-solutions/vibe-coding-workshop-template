@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document explains how the AI agent navigates the 59 Agent Skills in the Data Product Accelerator framework. An **interactive animated visualization** is available in the companion file:
+This document explains how the AI agent navigates the 77 Agent Skills in the Data Product Accelerator framework. An **interactive animated visualization** is available in the companion file:
 
 > **[Open the Interactive Animation](10-skill-navigation-visual-guide.html)** — a self-contained HTML file with step-through animation, keyboard controls, and narrated walkthrough. Open it in any browser.
 

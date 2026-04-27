@@ -16,7 +16,7 @@ metadata:
     - semantic-layer/00-semantic-layer-setup
     - monitoring/00-observability-setup
     - ml/00-ml-pipeline-setup
-    - genai-agents/00-genai-agents-setup
+    - genai-agents/00-course-orchestrator
   last_verified: "2026-04-16"
   volatility: low
   upstream_sources: []  # Internal naming convention

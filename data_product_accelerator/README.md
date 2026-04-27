@@ -139,7 +139,7 @@ Skills follow an **orchestrator/worker** pattern: orchestrators (prefixed `00-`)
 | **Semantic** | `00-semantic-layer-setup` | 4 | Metric Views, TVFs, Genie Spaces, export/import API |
 | **Monitoring** | `00-observability-setup` | 4 | Monitors, dashboards, SQL alerts |
 | **ML** | `00-ml-pipeline-setup` | 0 | MLflow, Feature Store, inference |
-| **GenAI** | `00-genai-agents-setup` | 9 | ResponsesAgent, evaluation, deployment, simple agent scaffold |
+| **GenAI** | `00-course-orchestrator` | 9 | GenAI course routing, Track A/B/C agents, evaluation, deployment, monitoring |
 | **Exploration** | `00-adhoc-exploration-notebooks` | 0 | Ad-hoc analysis notebooks |
 | **Common** | — | 8 | Asset Bundles, naming, constraints, imports |
 

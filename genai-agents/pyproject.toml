@@ -1,0 +1,20 @@
+[project]
+name = "genai-agents-course"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "GenAI Agent Development Course — SDLC scripts and utilities"
+dependencies = [
+    "mlflow[databricks]>=3.10.1",
+    "databricks-sdk>=0.40.0",
+    "databricks-agents>=1.1.0",
+    "databricks-openai>=0.3.0",
+    "openai>=1.17",
+    "pandas>=2.0",
+]
+
+[tool.uv.scripts]
+register-prompts = "python sdlc/01-prompt-registry/scripts/register_prompts.py"
+create-eval-dataset = "python sdlc/02-evaluation-datasets/scripts/create_eval_dataset.py"
+run-evaluation = "python sdlc/04-evaluation-runs/scripts/run_evaluation.py"
+register-model = "python sdlc/05-logged-model-and-uc-registration/scripts/register_model.py"
+register-scorers = "python sdlc/07-production-monitoring/scripts/register_production_scorers.py"

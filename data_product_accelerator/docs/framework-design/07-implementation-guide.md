@@ -214,7 +214,7 @@ Set up the ML pipeline using @data_product_accelerator/skills/ml/00-ml-pipeline-
 ## Phase 9: GenAI Agents (8-16 hours, optional)
 
 ```
-Set up GenAI agents using @data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md
+Set up GenAI agents using @genai-agents/00-course-orchestrator/SKILL.md
 ```
 
 ---

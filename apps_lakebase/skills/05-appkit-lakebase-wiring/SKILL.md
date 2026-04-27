@@ -18,11 +18,23 @@ metadata:
   domain: apps
   role: lakebase-wiring
   standalone: false
-  last_verified: "2026-04-12"
+  last_verified: "2026-04-27"
   volatility: medium
   upstream_sources:
-    - https://databricks.github.io/appkit/docs/plugins/lakebase
-    - https://github.com/databricks/databricks-agent-skills
+    - name: "databricks-agent-skills/databricks-lakebase"
+      repo: "databricks/databricks-agent-skills"
+      paths:
+        - "skills/databricks-lakebase/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-04-27"
+      sync_commit: "manifest-v2-2026-04-22"
+    - name: "databricks-agent-skills/databricks-apps"
+      repo: "databricks/databricks-agent-skills"
+      paths:
+        - "skills/databricks-apps/SKILL.md"
+      relationship: "extended"
+      last_synced: "2026-04-27"
+      sync_commit: "manifest-v2-2026-04-22"
 ---
 
 # Wire Lakebase Backend into AppKit
@@ -480,3 +492,11 @@ Detailed callouts are embedded inline at the relevant step. This table is a comp
 | Derive schema name | `DB_SCHEMA=$(echo "$APP_NAME" \| tr '-' '_')` |
 | Build gate | `npm run build` (must pass with zero errors) |
 | Test health endpoint (after deploy) | `curl -s "$APP_URL/api/health/lakebase" -H "Authorization: Bearer $TOKEN" \| jq .` |
+
+---
+
+## See Also
+
+- Upstream platform skills: [`databricks-lakebase`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-lakebase) and [`databricks-apps`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-apps) (both tracked in `upstream_sources`).
+- AppKit Lakebase plugin docs: [databricks.github.io/appkit/docs/plugins/lakebase](https://databricks.github.io/appkit/docs/plugins/lakebase)
+

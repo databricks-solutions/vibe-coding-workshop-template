@@ -1,0 +1,133 @@
+# =============================================================
+# databricks.yml — Bundle configuration template for
+# deploying an agent as a Databricks App (Track A)
+#
+# Usage:
+#   databricks bundle validate
+#   databricks bundle deploy
+#   databricks bundle run my_agent_app
+#
+# Key fix: experiment is a bundle-managed resource, not a blank
+# placeholder. See https://github.com/databricks/app-templates/issues/162
+# =============================================================
+
+bundle:
+  name: my_agent_app
+
+variables:
+  app_name:
+    description: "App name (must be unique in workspace)"
+    default: "my-agent-app"
+  catalog:
+    description: "Unity Catalog name"
+    default: "main"
+  schema:
+    description: "Schema within the catalog"
+    default: "my_schema"
+  warehouse_id:
+    description: "SQL Warehouse ID for query execution"
+
+resources:
+
+  # ── MLflow Experiment (bundle-managed) ──────────────────────
+  # The bundle creates and owns this experiment. The app resource
+  # references it via interpolation — no hardcoded IDs needed.
+  experiments:
+    agent_experiment:
+      name: /Users/${workspace.current_user.userName}/${var.app_name}
+      permissions:
+        - group_name: "users"
+          level: "CAN_READ"
+
+  # ── App Resource ─────────────────────────────────────────
+  apps:
+    my_agent_app:
+      name: ${var.app_name}
+      description: "Agent application deployed via DABs"
+      source_code_path: ./
+
+      # OBO scopes (if app calls APIs on behalf of users)
+      # user_api_scopes:
+      #   - "dashboards.genie"
+      #   - "catalog.catalogs:read"
+      #   - "sql"
+
+      config:
+        command: ["uv", "run", "start-app"]
+        env:
+          - name: MLFLOW_TRACKING_URI
+            value: "databricks"
+          - name: MLFLOW_REGISTRY_URI
+            value: "databricks-uc"
+          # See genai-agents/foundation/02-experiment-tracing-and-uc-storage/references/prod-tracing-deployment.md
+          # for the full env-var matrix (ENABLE_MLFLOW_TRACING, SP CAN_EDIT, OAuth vs PAT) and the Git-folder caveat.
+          # APP_ENVIRONMENT: app code reads this and overrides mlflow.source.type via metadata.
+          # See genai-agents/foundation/02c-trace-context-and-environments/SKILL.md.
+          - name: MLFLOW_EXPERIMENT_ID
+            value_from: "experiment"
+          - name: ENABLE_MLFLOW_TRACING
+            value: "true"
+          - name: APP_ENVIRONMENT
+            value: "production"
+          - name: LLM_MODEL
+            value: "databricks-claude-sonnet-4-6"
+          - name: WAREHOUSE_ID
+            value: ${var.warehouse_id}
+          - name: API_PROXY
+            value: "http://localhost:8000/invocations"
+          - name: CHAT_APP_PORT
+            value: "3000"
+          - name: CHAT_PROXY_TIMEOUT_SECONDS
+            value: "300"
+
+      resources:
+        - name: "experiment"
+          experiment:
+            experiment_id: ${resources.experiments.agent_experiment.id}
+            permission: "CAN_MANAGE"
+        - name: "sql-warehouse"
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: "CAN_USE"
+
+      permissions:
+        - user_name: "users"
+          level: "CAN_USE"
+
+  # ── Lakebase Resource (if using persistent state) ────────
+  # Lakebase autoscaling instances are not yet expressible as
+  # bundle resources. After `databricks bundle deploy`, attach
+  # Lakebase via REST API or CLI:
+  #
+  #   databricks apps update <app-name> --add-resources '[
+  #     {"name": "lakebase", "lakebase": {
+  #       "instance_name": "my-instance", "permission": "CAN_USE"}}
+  #   ]'
+  #
+  # See references/lakebase-permissions.md for details.
+
+# Deployment targets
+targets:
+  dev:
+    mode: development
+    default: true
+    # workspace:
+    #   host: https://dev-workspace.cloud.databricks.com
+
+  staging:
+    mode: production
+    # workspace:
+    #   host: https://staging-workspace.cloud.databricks.com
+    resources:
+      apps:
+        my_agent_app:
+          name: "${var.app_name}-staging"
+
+  prod:
+    mode: production
+    # workspace:
+    #   host: https://prod-workspace.cloud.databricks.com
+    resources:
+      apps:
+        my_agent_app:
+          name: ${var.app_name}

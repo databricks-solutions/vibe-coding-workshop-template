@@ -51,7 +51,7 @@ This framework uses a **Design-First** pipeline: design the target Gold model fr
 | 6 | Semantic Layer | `semantic-layer/00-semantic-layer-setup` | Metric Views, TVFs, Genie Spaces |
 | 7 | Observability | `monitoring/00-observability-setup` | Monitors, dashboards, alerts |
 | 8 | ML | `ml/00-ml-pipeline-setup` | ML experiments, models, inference |
-| 9 | GenAI Agents | `genai-agents/00-genai-agents-setup` | Agents, evaluation, deployment |
+| 9 | GenAI Agents | `genai-agents/00-course-orchestrator` | Agents, evaluation, deployment |
 
 ```
 data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Observability (7) → ML (8) → GenAI (9)
@@ -200,7 +200,7 @@ domain-folder/
 | "semantic layer", "build Genie", "Metric Views and TVFs" | Semantic | `semantic-layer/00-semantic-layer-setup` (stage 6) |
 | "observability", "monitoring setup", "dashboards and alerts" | Monitoring | `monitoring/00-observability-setup` (stage 7) |
 | "MLflow", "ML pipeline", "model training" | ML | `ml/00-ml-pipeline-setup` (stage 8) |
-| "GenAI agent", "build agent", "ResponsesAgent" | GenAI | `genai-agents/00-genai-agents-setup` (stage 9) |
+| "GenAI agent", "build agent", "ResponsesAgent" | GenAI | `genai-agents/00-course-orchestrator` (stage 9) |
 
 ### Worker Routes (for standalone/specific tasks)
 
@@ -382,16 +382,12 @@ skills/
 │   └── 00-ml-pipeline-setup/SKILL.md                     # ORCHESTRATOR: ML patterns [stage 8]
 │
 ├── genai-agents/
-│   ├── 00-genai-agents-setup/SKILL.md                    # ORCHESTRATOR: GenAI agents [stage 9]
-│   ├── 01-responses-agent-patterns/SKILL.md                     # Worker: ResponsesAgent [stage 9]
-│   ├── 02-mlflow-genai-evaluation/SKILL.md                      # Worker: LLM evaluation [stage 9]
-│   ├── 03-lakebase-memory-patterns/SKILL.md                     # Worker: Agent memory [stage 9]
-│   ├── 04-prompt-registry-patterns/SKILL.md                     # Worker: Prompt registry [stage 9]
-│   ├── 05-multi-agent-genie-orchestration/SKILL.md              # Worker: Multi-agent [stage 9]
-│   ├── 06-deployment-automation/SKILL.md                        # Worker: Agent CI/CD [stage 9]
-│   ├── 07-production-monitoring/SKILL.md                        # Worker: Prod monitoring [stage 9]
-│   ├── 08-mlflow-genai-foundation/SKILL.md                      # Worker: MLflow GenAI basics [stage 9]
-│   └── 09-simple-agent-scaffold/SKILL.md                        # Worker: Minimal MCP tool-calling agent [stage 9]
+│   ├── 00-course-orchestrator/SKILL.md                   # ORCHESTRATOR: GenAI course router [stage 9]
+│   ├── foundation/                                       # Foundation: UC, MLflow, tracing, tools, AI Gateway
+│   ├── tracks/                                           # Track A/B/C agent implementations
+│   ├── sdlc/                                             # Prompt registry, evaluation, deploy, monitor
+│   ├── capstone/                                         # Optional Genie orchestrator capstone
+│   └── 09-simple-agent-scaffold/SKILL.md                 # Worker: Minimal MCP tool-calling agent [stage 9]
 │
 ├── exploration/
 │   └── 00-adhoc-exploration-notebooks/SKILL.md                  # Utility: Exploration [standalone]

@@ -20,7 +20,7 @@ metadata:
   consumes:
     - plans/manifests/ml-manifest.yaml
   consumes_fallback: "Gold table inventory (self-discovery from catalog)"
-  last_verified: "2026-02-07"
+  last_verified: "2026-04-27"
   volatility: high
   upstream_sources:
     - name: "ai-dev-kit"
@@ -29,8 +29,20 @@ metadata:
         - "databricks-skills/databricks-model-serving/SKILL.md"
         - "databricks-skills/databricks-vector-search/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
+      last_synced: "2026-04-27"
+      sync_commit: "latest"
+    - name: "databricks-docs-feature-store"
+      url: "https://docs.databricks.com/aws/en/machine-learning/feature-store/"
+      relationship: "upstream"
+      last_synced: "2026-04-27"
+    - name: "databricks-docs-feature-tables-uc"
+      url: "https://docs.databricks.com/aws/en/machine-learning/feature-store/uc/feature-tables-uc"
+      relationship: "upstream"
+      last_synced: "2026-04-27"
+    - name: "databricks-docs-feature-store-python-api"
+      url: "https://docs.databricks.com/aws/en/machine-learning/feature-store/python-api"
+      relationship: "upstream"
+      last_synced: "2026-04-27"
 ---
 
 # MLflow & ML Models Patterns
@@ -218,11 +230,11 @@ resources/ml/
 
 | # | Rule | Pattern | Why It Fails Otherwise |
 |---|------|---------|----------------------|
-| 0 | **Pin Package Versions** | `mlflow==3.7.0` (exact) in training AND inference | Version mismatch warnings, deserialization failures |
+| 0 | **Pin Package Versions Consistently** | Pin the **same** mlflow / sklearn / xgboost versions in training AND inference (exact pins); the `mlflow==3.7.0` value in this skill's templates is a repo-template baseline, not an official Databricks requirement — match the version you actually train with | Version mismatch warnings, deserialization failures, autologging behavior drift |
 | 1 | **Experiment Path** | `/Shared/{project}_ml_{model_name}` | `/Users/...` fails silently if subfolder doesn't exist |
 | 2 | **Dataset Logging** | Inside `mlflow.start_run()` context | Won't associate with run, invisible in UI |
 | 3 | **Exit Signal** | `dbutils.notebook.exit("SUCCESS")` | Job status unclear, may show SUCCESS on failure |
-| 4 | **UC Model Logging** | Use `fe.log_model()` with `output_schema` (PRIMARY) or `infer_signature` (alternative) | Unity Catalog rejects models without output spec |
+| 4 | **UC Model Logging** | Prefer `fe.log_model()` with `infer_input_example=True`; supply `output_schema` only when the `training_set` has no label column (or the model returns a non-default output shape) — current Feature Engineering docs treat `output_schema` as a fallback, not a universal UC requirement | Unity Catalog model fails to register or returns the wrong output spec at inference |
 | 5 | **Feature Engineering Workflow** | `FeatureLookup` + `create_training_set` + `fe.log_model` | Feature skew between training and inference |
 | 6 | **NaN Handling at Source** | Clean NaN/Inf at **feature table creation** with `clean_numeric()` | sklearn GradientBoosting fails at inference; XGBoost handles NaN but sklearn doesn't |
 | 7 | **Label Binarization** | Convert 0-1 rates to binary for classifiers | `XGBoostError: base_score must be in (0,1)` |
@@ -267,11 +279,11 @@ mlflow.set_registry_uri("databricks-uc")
 fe.log_model(
     model=model,
     artifact_path="model",
-    flavor=mlflow.sklearn,  # REQUIRED
+    flavor=mlflow.sklearn,  # required
     training_set=training_set,
     registered_model_name=f"{catalog}.{schema}.{model_name}",
-    infer_input_example=True,
-    output_schema=output_schema  # REQUIRED for UC
+    infer_input_example=True,  # preferred per current Feature Engineering docs
+    output_schema=output_schema,  # required only when training_set has no label, or to override inferred shape
 )
 ```
 
@@ -539,6 +551,12 @@ Asset Bundle job template for batch inference with `fe.score_batch`. Includes pi
 
 ## Version History
 
+### v5.1 (April 27, 2026)
+- Reframed Rule #0: explicit version pins are a template-compatibility choice (training and inference must match), not an official Databricks requirement. The `mlflow==3.7.0` value in templates is a baseline.
+- Reworded Rule #4 and the model-registration example: `infer_input_example=True` is the preferred path per current Feature Engineering docs; `output_schema` is a fallback for training sets without a label or non-default output shapes — not a universal UC requirement.
+- Replaced 404/legacy Feature Store doc links (`feature-store/uc/index.html`, `feature-tables-uc.html`) with current docs paths under `/machine-learning/feature-store/...`.
+- Added current Feature Store capability links: Online Feature Stores (Lakebase), automatic feature lookup at serving, feature serving endpoints, on-demand feature computation, point-in-time joins, declarative features, and UC feature lineage.
+
 ### v5.0 (February 2026)
 - Merged comprehensive implementation guide (12-ml-models-prompt.md)
 - Added Quick Start, Architecture, Directory Structure, Time Estimates
@@ -583,7 +601,7 @@ Asset Bundle job template for batch inference with `fe.score_batch`. Includes pi
 **Previous stage:** `monitoring/00-observability-setup` → Monitoring, dashboards, and alerts should be configured
 
 **Next stage:** After completing ML setup, proceed to:
-- **`genai-agents/00-genai-agents-setup`** — Implement GenAI agents with ResponsesAgent, Genie Spaces, and evaluation
+- **`genai-agents/00-course-orchestrator`** — Route GenAI agent implementation, evaluation, deployment, and monitoring
 
 ---
 
@@ -617,19 +635,34 @@ End with:
 ## References
 
 ### Official Documentation
-- [FeatureEngineeringClient.log_model API](https://api-docs.databricks.com/python/feature-engineering/latest/feature_engineering.client.html)
-- [MLflow Experiments - Databricks](https://learn.microsoft.com/en-us/azure/databricks/mlflow/experiments)
-- [MLflow 3.1 LoggedModel](https://docs.databricks.com/aws/en/mlflow/logged-model)
+- [FeatureEngineeringClient Python API reference](https://api-docs.databricks.com/python/feature-engineering/latest/feature_engineering.client.html)
+- [MLflow Experiments on Databricks](https://learn.microsoft.com/en-us/azure/databricks/mlflow/experiments)
+- [MLflow 3.x LoggedModel](https://docs.databricks.com/aws/en/mlflow/logged-model)
 - [Unity Catalog Model Registry](https://learn.microsoft.com/en-us/azure/databricks/machine-learning/manage-model-lifecycle/)
-- [Databricks Feature Store](https://learn.microsoft.com/en-us/azure/databricks/machine-learning/feature-store/)
+- [Databricks Feature Store overview](https://docs.databricks.com/aws/en/machine-learning/feature-store/)
 
-### Feature Engineering
-- [Unity Catalog Feature Engineering](https://docs.databricks.com/aws/en/machine-learning/feature-store/uc/index.html)
-- [FeatureLookup API](https://docs.databricks.com/aws/en/machine-learning/feature-store/uc/feature-tables-uc.html)
-- [fe.score_batch for Inference](https://docs.databricks.com/aws/en/machine-learning/feature-store/uc/feature-tables-uc.html#score-batch)
-- [Model Signatures](https://mlflow.org/docs/latest/models.html#model-signature)
+### Feature Engineering on Databricks (Unity Catalog)
+- [Feature Store overview and glossary](https://docs.databricks.com/aws/en/machine-learning/feature-store/concepts)
+- [Create and work with feature tables](https://docs.databricks.com/aws/en/machine-learning/feature-store/uc/feature-tables-uc)
+- [Train models with feature tables](https://docs.databricks.com/aws/en/machine-learning/feature-store/train-models-with-feature-store)
+- [Python API reference (FeatureLookup, create_training_set, log_model, score_batch)](https://docs.databricks.com/aws/en/machine-learning/feature-store/python-api)
+- [Point-in-time feature joins](https://docs.databricks.com/aws/en/machine-learning/feature-store/time-series)
+- [Databricks Online Feature Stores (powered by Lakebase)](https://docs.databricks.com/aws/en/machine-learning/feature-store/online-feature-store)
+- [Model Serving with automatic feature lookup](https://docs.databricks.com/aws/en/machine-learning/feature-store/automatic-feature-lookup)
+- [Feature Serving endpoints](https://docs.databricks.com/aws/en/machine-learning/feature-store/feature-function-serving)
+- [On-demand feature computation](https://docs.databricks.com/aws/en/machine-learning/feature-store/on-demand-features)
+- [Feature governance and lineage in Unity Catalog](https://docs.databricks.com/aws/en/machine-learning/feature-store/lineage)
+- [Declarative features and materialization](https://docs.databricks.com/aws/en/machine-learning/feature-store/declarative-apis)
+- [MLflow Model Signatures](https://mlflow.org/docs/latest/models.html#model-signature)
 
 ### Related Skills
 - `databricks-python-imports` - sys.path setup for Asset Bundles
 - `databricks-asset-bundles` - Infrastructure-as-code patterns
 - `databricks-autonomous-operations` - **Troubleshooting:** Read when jobs fail — provides Deploy → Poll → Diagnose → Fix → Redeploy autonomous loop, error-solution matrix, and self-healing patterns
+
+---
+
+## See Also
+
+- Authoritative upstream (alternate registry): [databricks-agent-skills / `databricks-model-serving`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-model-serving) — canonical Model Serving endpoint guidance. (Pairs with the existing `ai-dev-kit` `upstream_sources` entry on this skill.)
+

@@ -26,13 +26,11 @@ These skills have content that directly draws from or extends AI-Dev-Kit. Upstre
 
 | Our Skill | AI-Dev-Kit Path(s) | Relationship | Raw URL for Audit |
 |---|---|---|---|
-| `genai-agents/00-genai-agents-setup` | `databricks-skills/databricks-agent-bricks/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-agent-bricks/SKILL.md) |
-| `genai-agents/01-responses-agent-patterns` | `databricks-skills/databricks-agent-bricks/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-agent-bricks/SKILL.md) |
-| `genai-agents/05-multi-agent-genie-orchestration` | `databricks-skills/databricks-agent-bricks/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-agent-bricks/SKILL.md) |
-| `genai-agents/06-deployment-automation` | `databricks-skills/databricks-model-serving/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-model-serving/SKILL.md) |
-| `genai-agents/08-mlflow-genai-foundation` | `databricks-skills/databricks-agent-bricks/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-agent-bricks/SKILL.md) |
-| `genai-agents/02-mlflow-genai-evaluation` | `databricks-skills/databricks-mlflow-evaluation/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-mlflow-evaluation/SKILL.md) |
-| `genai-agents/03-lakebase-memory-patterns` | `databricks-skills/databricks-lakebase-provisioned/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-lakebase-provisioned/SKILL.md) |
+| `genai-agents/00-course-orchestrator` | `databricks-skills/databricks-agent-bricks/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-agent-bricks/SKILL.md) |
+| `genai-agents/foundation/01-mlflow-genai-foundation` | `databricks-skills/databricks-agent-bricks/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-agent-bricks/SKILL.md) |
+| `genai-agents/sdlc/06-deployment-and-automation` | `databricks-skills/databricks-model-serving/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-model-serving/SKILL.md) |
+| `genai-agents/sdlc/04-evaluation-runs` | `databricks-skills/databricks-mlflow-evaluation/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-mlflow-evaluation/SKILL.md) |
+| `genai-agents/tracks/A-custom-agent-apps/05-lakebase-memory` | `databricks-skills/databricks-lakebase-provisioned/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-lakebase-provisioned/SKILL.md) |
 | `monitoring/02-databricks-aibi-dashboards` | `databricks-skills/databricks-aibi-dashboards/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-aibi-dashboards/SKILL.md) |
 | `silver/00-silver-layer-setup` | `databricks-skills/databricks-spark-declarative-pipelines/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-spark-declarative-pipelines/SKILL.md) |
 | `silver/01-dlt-expectations-patterns` | `databricks-skills/databricks-spark-declarative-pipelines/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-spark-declarative-pipelines/SKILL.md) |
@@ -56,10 +54,8 @@ These skills reference upstream for accuracy but their content is largely origin
 
 | Our Skill | AI-Dev-Kit Path(s) | Relationship | Raw URL for Audit |
 |---|---|---|---|
-| `genai-agents/02-mlflow-genai-evaluation` | `databricks-tools-core/databricks_tools_core/sql/` | reference | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-tools-core/databricks_tools_core/sql/sql.py) |
-| `genai-agents/03-lakebase-memory-patterns` | `databricks-builder-app/` (Lakebase patterns) | reference | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-builder-app/README.md) |
-| `genai-agents/04-prompt-registry-patterns` | `databricks-skills/databricks-agent-bricks/SKILL.md` | reference | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-agent-bricks/SKILL.md) |
-| `genai-agents/07-production-monitoring` | `databricks-skills/databricks-agent-bricks/SKILL.md` | reference | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-agent-bricks/SKILL.md) |
+| `genai-agents/sdlc/01-prompt-registry` | `databricks-skills/databricks-agent-bricks/SKILL.md` | reference | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-agent-bricks/SKILL.md) |
+| `genai-agents/sdlc/07-production-monitoring` | `databricks-skills/databricks-mlflow-evaluation/SKILL.md` | reference | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-mlflow-evaluation/SKILL.md) |
 | `common/databricks-python-imports` | `databricks-skills/databricks-config/SKILL.md` | reference | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-config/SKILL.md) |
 
 ---
