@@ -429,7 +429,7 @@ kinds — do not wrap them in `uc_securable`.
 | Resource | Bundle kind | Permission | Inner identifier field |
 |----------|-------------|------------|------------------------|
 | SQL warehouse | `sql_warehouse` | `CAN_USE` | `id:` |
-| LLM / chat model endpoint | `serving_endpoint` | `CAN_QUERY` | `name:` |
+| LLM / chat model endpoint (route from `runtime_config.llm`) | `serving_endpoint` | `CAN_QUERY` | `name:` |
 | Knowledge Assistant endpoint | `serving_endpoint` | `CAN_QUERY` | `name:` (the KA's serving endpoint name) |
 | Vector Search endpoint | `serving_endpoint` | `CAN_QUERY` | `name:` |
 | Genie Space | `genie_space` | `CAN_RUN` | `space_id:` (NOT `id:` — see note below) |
@@ -446,6 +446,11 @@ kinds — do not wrap them in `uc_securable`.
 > bare `id:` like `sql_warehouse` does. Using `id:` silently fails
 > validation in some CLI versions and leaves the app unable to resolve the
 > resource at runtime. Always use `name` + `space_id`.
+
+Model grants are derived from `docs/agent_tool_plan.yaml.runtime_config.llm`.
+
+- When `provider == "databricks"`, grant `CAN_QUERY` on `runtime_config.llm.endpoint`.
+- When `provider == "ai_gateway"`, do not create or configure Gateway. Verify the pre-provisioned endpoint and required permissions are documented, then leave provisioning to the optional Gateway hardening step.
 
 Verify the bundle schema accepts each kind your agent needs before deploying:
 

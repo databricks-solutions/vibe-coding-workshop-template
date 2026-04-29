@@ -168,7 +168,7 @@ Live state files are gitignored. Templates live in:
 | "TypeScript tracing", "Node tracing", "mlflow-tracing npm", "tracedOpenAI" | `../foundation/02b-typescript-tracing/SKILL.md` | F2b |
 | "trace user", "trace session", "APP_ENVIRONMENT", "client_request_id", "trace context", "environment metadata" | `../foundation/02c-trace-context-and-environments/SKILL.md` | F2c |
 | "MCP", "tools", "Genie tool", "Vector Search MCP", "SQL tool", "UC Functions", "external MCP", "resource grants" | `../foundation/03-tools-and-data-access/SKILL.md` | F3 |
-| "AI Gateway", "guardrails", "rate limits", "usage tracking", "inference tables", "LLM endpoint governance" | `../foundation/04-ai-gateway/SKILL.md` | F4, usually during S6 |
+| "AI Gateway", "guardrails", "rate limits", "usage tracking", "inference tables", "LLM endpoint governance" | `../foundation/04-ai-gateway/SKILL.md` | F4, optional hardening after core Track A; only with pre-provisioned Gateway or public admin APIs |
 | "Knowledge Assistant", "document Q&A", "KA endpoint", "sync documents", "citations" | `../foundation/05-knowledge-assistant/SKILL.md` | F5 |
 
 ### Track A Routes

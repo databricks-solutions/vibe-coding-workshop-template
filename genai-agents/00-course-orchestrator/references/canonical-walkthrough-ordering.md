@@ -28,7 +28,7 @@ flowchart LR
     S8choice -->|"no"| S5
     S8b --> S5[S5 register]
     S8 --> S5
-    S5 --> S6["S6 deploy + AI Gateway (F4)"]
+    S5 --> S6["S6 deploy + automation; optional AI Gateway hardening (F4) when pre-provisioned"]
     S6 --> S7[S7 monitoring]
     S7 --> S4c[S4c end-user feedback]
     S4c --> A8[A8 debugging — ongoing]
@@ -40,7 +40,7 @@ flowchart LR
 
 - **Foundation** — UC schemas + volumes, MLflow, tracing, tools/data, Knowledge Assistant (~2.5 hours)
 - **Agent Build** — Track A custom agent on Databricks Apps (~6.5 hours)
-- **SDLC Pipeline** — Prompt registry → eval → sign-off → (optional iteration) → register → deploy + AI Gateway → monitor → end-user feedback (~7 hours)
+- **SDLC Pipeline** — Prompt registry → eval → sign-off → (optional iteration) → register → deploy + automation; optional AI Gateway hardening (F4) when pre-provisioned → monitor → end-user feedback (~7 hours)
 
 Total canonical path: **~16 hours**, plus optional ~2 hr capstone, plus 1–2 hr if
 the iteration loop runs.
@@ -393,7 +393,7 @@ architecture review) or when the gap is tool/retrieval-shaped.
 | Verify access via chat UI | Working deployment |
 | Define CI/CD job (evaluate → sign-off → register → deploy) | Automation pipeline |
 
-**Gate:** Agent deployed and accessible. AI Gateway active. CI/CD pipeline defined.
+**Gate:** Agent deployed and accessible through the configured model route. CI/CD pipeline defined. Optional AI Gateway route configured only when pre-provisioned.
 
 **Note:** Per SkyLoyalty Prompt 21, this step folds in `foundation/04-ai-gateway/SKILL.md` (gateway in front of `llm_role_endpoints.agent_chat.endpoint` with PII + safety guardrails and rate limits).
 

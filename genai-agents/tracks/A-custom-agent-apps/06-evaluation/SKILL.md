@@ -56,6 +56,8 @@ and human feedback labeling. Think of A6 as "does my agent work?" and S4 as
 
 ## Step 6a: Run the Built-In Evaluation
 
+Smoke evaluation uses the configured model route from `docs/agent_tool_plan.yaml.runtime_config.llm`. The evaluation runner must not substitute a hardcoded model endpoint. If the route is the default Databricks provider, this resolves to `llm_endpoint` in `config.yml`.
+
 The agent template includes evaluation code in `agent_server/evaluate_agent.py`
 (or `tests/evaluate_agent.py` depending on your template version). Run it:
 

@@ -430,6 +430,8 @@ or dependency issues.
 
 ## Validation Gate
 
+Deployment verifies the configured model route, not a specific provider. The core Track A path requires `provider: databricks` and does not require AI Gateway. If `provider: ai_gateway` appears, treat it as pre-provisioned configuration and verify queryability; do not create or configure Gateway here.
+
 All must pass before proceeding to debugging:
 
 - [ ] **Pre-deploy:** `f2_grants_complete: true` in state (F2 contract); `otel_table_prefix`, `mlflow_tracing_sql_warehouse_id`, `app_service_principal_grants[]` all present

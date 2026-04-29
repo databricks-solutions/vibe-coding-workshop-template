@@ -19,6 +19,7 @@ metadata:
 fields_read:
   - agent.system_prompt
   - agent.capabilities
+  - agent.model
   - agent.tools
   - agent.mcp_servers
   - agent.knowledge_base_backend
@@ -58,6 +59,7 @@ Use this skill for:
 | `prd_path` | yes | Usually `docs/design_prd.md`. |
 | `agent_spec_path` | yes | Usually `docs/agent_spec.yaml`. |
 | `agent_tool_plan_path` | yes | Usually `docs/agent_tool_plan.yaml`. |
+| `agent_model` | no | Databricks serving endpoint used by the agent LLM. Defaults to `databricks-claude-sonnet-4-6`. |
 | `agent_sql_catalog` | no | Catalog the SQL MCP may query. |
 | `agent_sql_schema` | no | Schema the SQL MCP may query. |
 | `agent_sql_warehouse_id` | no | Warehouse for SQL MCP `_meta.warehouse_id`. |
@@ -96,6 +98,39 @@ Required top-level keys:
 - `resource_grants`
 - `runtime_guardrails`
 - `verification`
+
+## Runtime Model Route Rule
+
+`docs/agent_spec.yaml` must include the backing Databricks model serving endpoint at:
+
+```yaml
+agent:
+  model: "databricks-claude-sonnet-4-6"
+```
+
+`docs/agent_tool_plan.yaml` must convert that backing model into the runtime route:
+
+```yaml
+runtime_config:
+  llm:
+    provider: "databricks"
+    endpoint: "docs/agent_spec.yaml.agent.model"
+    api_base_url: null
+    api_mode: "databricks_openai_compatible"
+    model_config:
+      endpoint_key: "llm_endpoint"
+      api_base_url_key: "llm_api_base_url"
+      api_mode_key: "llm_api_mode"
+```
+
+Rules:
+
+1. Treat `agent.model` as a raw/backing Databricks serving endpoint name.
+2. If the user supplies `agent_model`, copy it exactly into `agent.model`.
+3. If the user does not supply `agent_model`, set `agent.model` to `databricks-claude-sonnet-4-6`.
+4. Do not store vague labels such as `Claude`, `GPT`, `best model`, or `small model`.
+5. Do not require AI Gateway in the core flow. Gateway can be introduced later by changing only `runtime_config.llm`.
+6. The Track A agent must consume `runtime_config.llm` through `ModelConfig` as `llm_endpoint`, `llm_api_base_url`, and `llm_api_mode`, not by hardcoding any endpoint in Python.
 
 ## Dynamic SQL MCP Rule
 
@@ -159,8 +194,10 @@ Before exiting either prompt:
 
 1. Parse the YAML.
 2. Confirm all required top-level keys exist.
-3. Confirm every `selected_tools[].mcp_server_ref` resolves to a
+3. Confirm `agent.model` is present and is not `n/a`.
+4. Confirm `agent.model` does not contain spaces and does not look like a prose label.
+5. Confirm every `selected_tools[].mcp_server_ref` resolves to a
    `selected_mcp_servers[].name`.
-4. Confirm SQL MCP is read-only unless the user explicitly selected write access.
-5. Confirm KA is either selected with a source strategy or skipped with
+6. Confirm SQL MCP is read-only unless the user explicitly selected write access.
+7. Confirm KA is either selected with a source strategy or skipped with
    `knowledge_assistant.selected: false`.

@@ -17,7 +17,7 @@ agent:
   system_prompt: "<draft prompt>"
   capabilities:
     - "<capability>"
-  model: "databricks-claude-sonnet-4-6"
+  model: "databricks-claude-sonnet-4-6"  # Databricks serving endpoint name; user-overridable via agent_model
   auth_mode: "hybrid"
   memory:
     provider: "lakebase"
@@ -61,3 +61,12 @@ governance:
       text: "<guideline>"
       threshold: 0.8
 ```
+
+## Model Field Rules
+
+- `agent.model` is required.
+- The value is the raw/backing Databricks model serving endpoint name for the agent.
+- Default is `databricks-claude-sonnet-4-6`.
+- Prompt generators should ask the user for `agent_model`; if absent, use the default.
+- Do not put AI Gateway endpoint names, provider labels, or vague model family labels in `agent.model`.
+- Downstream Track A code must not read `agent.model` directly from Python. The Tool Plan converts this value into `runtime_config.llm`, and the agent consumes that through `ModelConfig`.

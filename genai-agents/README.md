@@ -95,7 +95,7 @@ route you correctly.
 | F1 | [MLflow GenAI Foundation](./foundation/01-mlflow-genai-foundation/SKILL.md) | MLflow 3.x, autolog, ResponsesAgent rules, env detection | 30 min |
 | F2 | [Experiment Tracing & UC OTEL](./foundation/02-experiment-tracing-and-uc-storage/SKILL.md) | Experiment paths, tracing, UC OTEL Delta tables | 1 hr |
 | F3 | [Tools and Data Access](./foundation/03-tools-and-data-access/SKILL.md) | Managed MCP, UC functions, Genie, Vector Search | 1 hr |
-| F4 | [AI Gateway](./foundation/04-ai-gateway/SKILL.md) | Rate limits, PII, fallbacks on serving endpoints | 30 min |
+| F4 (optional hardening) | [AI Gateway](./foundation/04-ai-gateway/SKILL.md) | Rate limits, PII, fallbacks on serving endpoints; only with pre-provisioned Gateway or public admin APIs | 30 min |
 | F5 (optional) | [Knowledge Assistant Lifecycle](./foundation/05-knowledge-assistant/SKILL.md) | Managed document-Q&A endpoint; emits `ka_endpoint_name` and `knowledge_assistant_id` | 30 min |
 
 ## Module 2: Agent Creation (pick one)
@@ -176,6 +176,10 @@ The SDLC pipeline (evaluation, registration, monitoring) consumes this interface
 It doesn't care how the agent was built — only that it accepts a dict and returns a string.
 
 ## Artifact Flow
+
+The core Track A path is AI-Gateway-ready but not AI-Gateway-dependent: the agent reads its model route from configuration, so a pre-provisioned Gateway can be introduced later without changing agent logic.
+
+Sequence: Agent Spec -> Tool Plan -> UC resources -> MLflow tracing -> optional KA -> Track A clone/framework -> tools -> auth/memory -> eval/deploy -> AppKit proxy -> feedback
 
 ```
 Design:
