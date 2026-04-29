@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -152,6 +154,24 @@ def main() -> None:
         assert_contains(text, "section_tag:", legacy.name)
 
     print("PASS agent track flow structure")
+    _run_section_lint()
+
+
+def _run_section_lint() -> int:
+    """Run lint_section_prompts as INFORMATIONAL (non-strict) — prints
+    failures but always returns 0 so out-of-scope thin sections don't
+    block CI. Closeout (Task C.1) flips this to --strict once Phase 5+6
+    files all pass."""
+    proc = subprocess.run(
+        [sys.executable,
+         str(ROOT / "apps_lakebase" / "prompts" / "lint_section_prompts.py")],
+        check=False,
+    )
+    if proc.returncode != 0:
+        print("[section-lint] informational failures above — non-blocking until "
+              "Phases 5+6 land (see retrospectives/plans/"
+              "2026-04-29-section-prompts-quality-lift.md Task C.1).")
+    return 0
 
 
 if __name__ == "__main__":
