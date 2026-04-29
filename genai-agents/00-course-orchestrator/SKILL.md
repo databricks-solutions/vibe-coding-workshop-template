@@ -162,6 +162,7 @@ Live state files are gitignored. Templates live in:
 | Task keywords | Route to | Position |
 |---|---|---|
 | "UC resources", "Unity Catalog schemas", "managed volumes", "knowledge_sources volume", "signoff volume" | `../foundation/00-uc-resources-foundation/SKILL.md` | F0 |
+| "agent spec", "Agent Spec", "tool selection", "agent_tool_selection", "SQL MCP catalog", "SQL MCP schema", "MCP recommendations", "web search MCP" | `../foundation/00b-agent-spec-and-tool-plan/SKILL.md` | F0b |
 | "MLflow setup", "GenAI foundation", "autolog", "ResponsesAgent signature", "connection pooling" | `../foundation/01-mlflow-genai-foundation/SKILL.md` | F1 |
 | "experiment path", "MLflow tracing", "UC OTEL", "trace storage", "trace_location", "monitoring SQL warehouse" | `../foundation/02-experiment-tracing-and-uc-storage/SKILL.md` | F2 |
 | "TypeScript tracing", "Node tracing", "mlflow-tracing npm", "tracedOpenAI" | `../foundation/02b-typescript-tracing/SKILL.md` | F2b |
@@ -244,6 +245,7 @@ genai-agents/
 ├── vibecoding-state/SKILL.md                             # Runtime contract: state, gates, retrospectives
 ├── foundation/
 │   ├── 00-uc-resources-foundation/SKILL.md               # F0: UC schemas and managed volumes
+│   ├── 00b-agent-spec-and-tool-plan/SKILL.md            # F0b: PRD -> Agent Spec -> Tool Plan
 │   ├── 01-mlflow-genai-foundation/SKILL.md               # F1: MLflow GenAI setup and autolog
 │   ├── 02-experiment-tracing-and-uc-storage/SKILL.md     # F2: experiments, tracing, UC OTEL storage
 │   ├── 02b-typescript-tracing/SKILL.md                   # F2b: Node/TypeScript MLflow tracing

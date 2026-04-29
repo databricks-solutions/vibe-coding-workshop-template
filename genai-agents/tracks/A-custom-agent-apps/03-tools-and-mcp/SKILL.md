@@ -20,6 +20,8 @@ fields_read:
   - agent.tools
   - agent.mcp_servers
   - agent.knowledge_base_backend
+  - docs.agent_tool_plan.selected_tools
+  - docs.agent_tool_plan.selected_mcp_servers
 ---
 
 # Track A Step 3: Agent SDK Tool Wiring
@@ -31,6 +33,32 @@ This step focuses on **how to wire tools into the Agent class**. For
 background on which MCP servers exist, how external MCP works, resource
 grants, and retriever schemas, see
 [F3: Tools and Data Access](../../../foundation/03-tools-and-data-access/SKILL.md).
+
+## Tool Plan Input Contract
+
+For the Agents Accelerator, prefer `docs/agent_tool_plan.yaml` over inferred
+defaults. Wire only the tools listed in `selected_tools[]`.
+
+Tool families not selected are skipped and recorded in verification as skipped,
+not failed.
+
+For SQL MCP, enforce the read-only guardrails from the plan before any smoke
+test. Reject generated SQL containing `INSERT`, `UPDATE`, `DELETE`, `DROP`,
+`ALTER`, `CREATE`, `MERGE`, or `TRUNCATE` when `readonly: true`.
+
+Use `docs/agent_tool_plan.yaml.verification.tool_smoke_tests[]` as the source
+of smoke prompts. Every selected tool must produce at least one MLflow TOOL span.
+
+OpenAI Agents SDK SQL MCP wiring example:
+
+```python
+from agents.mcp import MCPServerSse
+
+sql_mcp = MCPServerSse(
+    url=f"{host}/api/2.0/mcp/sql",
+    headers={"Authorization": f"Bearer {workspace_client.config.token}"},
+)
+```
 
 ## When to Use
 

@@ -91,6 +91,7 @@ route you correctly.
 
 | Step | Skill | Purpose | Time |
 |------|-------|---------|------|
+| F0b | [Agent Spec and Tool Plan](./foundation/00b-agent-spec-and-tool-plan/SKILL.md) | `docs/design_prd.md` to `docs/agent_spec.yaml` and `docs/agent_tool_plan.yaml`; supports MCP web research and dynamic SQL MCP catalog/schema | 45 min |
 | F1 | [MLflow GenAI Foundation](./foundation/01-mlflow-genai-foundation/SKILL.md) | MLflow 3.x, autolog, ResponsesAgent rules, env detection | 30 min |
 | F2 | [Experiment Tracing & UC OTEL](./foundation/02-experiment-tracing-and-uc-storage/SKILL.md) | Experiment paths, tracing, UC OTEL Delta tables | 1 hr |
 | F3 | [Tools and Data Access](./foundation/03-tools-and-data-access/SKILL.md) | Managed MCP, UC functions, Genie, Vector Search | 1 hr |
@@ -177,7 +178,11 @@ It doesn't care how the agent was built — only that it accepts a dict and retu
 ## Artifact Flow
 
 ```
+Design:
+  design_prd.md -> agent_spec.yaml -> agent_tool_plan.yaml
+
 Foundation:
+  F0b → agent_spec.yaml, agent_tool_plan.yaml (Track A only)
   F1 → mlflow_environment
   F2 → experiment_paths, uc_otel_tables
 
