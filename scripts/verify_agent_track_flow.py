@@ -84,6 +84,13 @@ def main() -> None:
     assert_contains(agent_spec, "agent_model", "agent_spec_design")
     assert_contains(agent_spec, "agent.model", "agent_spec_design")
     assert_contains(agent_spec, "databricks-claude-sonnet-4-6", "agent_spec_design")
+    assert_contains(agent_spec, "docs/ui_design.md", "agent_spec_design")
+    assert_contains(agent_spec, ".vibecoding-state.md", "agent_spec_design")
+    assert_contains(agent_spec, "Prior App Context", "agent_spec_design")
+    assert_contains(agent_spec, "step 03", "agent_spec_design")
+    assert_contains(agent_spec, "step 04", "agent_spec_design")
+    assert_contains(agent_spec, "steps 04-07", "agent_spec_design")
+    assert_contains(agent_spec, "Bronze, Gold, Genie", "agent_spec_design")
 
     tool_selection = read(SECTIONS / "39-agent_tool_selection.md")
     assert_contains(tool_selection, "docs/agent_spec.yaml", "agent_tool_selection")
@@ -95,15 +102,51 @@ def main() -> None:
     assert_contains(tool_selection, "runtime_config", "agent_tool_selection")
     assert_contains(tool_selection, "llm:", "agent_tool_selection")
     assert_contains(tool_selection, 'provider: "databricks"', "agent_tool_selection")
-    assert_contains(tool_selection, 'endpoint: "docs/agent_spec.yaml.agent.model"', "agent_tool_selection")
     assert_contains(tool_selection, "api_base_url: null", "agent_tool_selection")
     assert_contains(tool_selection, 'api_mode: "databricks_openai_compatible"', "agent_tool_selection")
     assert_contains(tool_selection, "llm_api_base_url", "agent_tool_selection")
     assert_contains(tool_selection, "llm_api_mode", "agent_tool_selection")
+    assert_contains(tool_selection, "Placeholder Handling", "agent_tool_selection")
+    assert_contains(tool_selection, "ASK ME", "agent_tool_selection")
+    assert_contains(tool_selection, "COPY the SCALAR value", "agent_tool_selection")
+    assert_contains(tool_selection, "databricks-claude-sonnet-4-6", "agent_tool_selection")
+    assert_contains(tool_selection, "# copied from agent.model", "agent_tool_selection")
+    assert_not_contains(
+        tool_selection,
+        'endpoint: "docs/agent_spec.yaml.agent.model"',
+        "agent_tool_selection",
+    )
+    assert_not_contains(
+        tool_selection,
+        'name: "docs/agent_spec.yaml.agent.model"',
+        "agent_tool_selection",
+    )
+
+    uc_foundation = read(SECTIONS / "40-uc_resources_foundation.md")
+    assert_contains(uc_foundation, "Optional bring-your-own tool inputs", "uc_resources_foundation")
+    assert_contains(uc_foundation, "agent_sql_catalog", "uc_resources_foundation")
+    assert_contains(uc_foundation, "agent_sql_schema", "uc_resources_foundation")
+    assert_not_contains(
+        uc_foundation,
+        "`bronze_table_metadata` (input_id 5)",
+        "uc_resources_foundation",
+    )
+    assert_not_contains(
+        uc_foundation,
+        "`bronze_layer_creation` (input_id 7)",
+        "uc_resources_foundation",
+    )
+    assert_not_contains(
+        uc_foundation,
+        "`genie_space` (input_id 11)",
+        "uc_resources_foundation",
+    )
 
     ka = read(SECTIONS / "42-knowledge_assistant_create.md")
     assert_contains(ka, "docs/agent_tool_plan.yaml", "knowledge_assistant_create")
     assert_contains(ka, "Skipped - KA not selected", "knowledge_assistant_create")
+    assert_contains(ka, "Conditional execution", "knowledge_assistant_create")
+    assert_not_contains(ka, "Bronze + Genie Space prompts also completed", "knowledge_assistant_create")
 
     clone = read(SECTIONS / "43-track_a_agent_app_clone_framework.md")
     assert_not_contains(clone, '"knowledge_assistant_create", gate: "KA READY"', "track_a_agent_app_clone_framework")
@@ -119,6 +162,85 @@ def main() -> None:
     assert_contains(tools, "SQL MCP", "track_a_agent_ka_genie_tools")
     assert_contains(tools, "serving_endpoints", "track_a_agent_ka_genie_tools")
     assert_contains(tools, "CAN_QUERY", "track_a_agent_ka_genie_tools")
+    assert_contains(tools, "Selected Backend Sources", "track_a_agent_ka_genie_tools")
+    assert_contains(tools, "Bring your own", "track_a_agent_ka_genie_tools")
+    assert_contains(
+        tools,
+        'docs/agent_tool_plan.yaml.selected_tools[? type == "genie"]',
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        'docs/agent_tool_plan.yaml.selected_tools[? type == "vector_search"]',
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        'docs/agent_tool_plan.yaml.selected_tools[? type == "uc_function"]',
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        'docs/agent_tool_plan.yaml.selected_mcp_servers[? type == "external"]',
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_not_contains(
+        tools,
+        '`genie_space_id: "{genie_space_id}"`',
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_not_contains(
+        tools,
+        "walks 6 ordered phases against `state://AgentSpec` and `state://DataSpec`",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_not_contains(
+        tools,
+        "reads the resolved `state://AgentSpec` and `state://DataSpec`",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_not_contains(
+        tools,
+        "captured upstream when the Genie Space was created over the Bronze tables",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_not_contains(
+        tools,
+        "`genie_space` (input_id 11)",
+        "track_a_agent_ka_genie_tools",
+    )
+
+    # SQL-level: the Agents Accelerator section header must list the visible
+    # upstream path and must NOT list Bronze / Genie / AIBI Dashboard rows as
+    # consumed by this section.
+    header_anchor = "Phase 3: AppKit Integration     (input_ids 207, 208)"
+    next_anchor = "-- Step 38:"
+    h_start = sql.find(header_anchor)
+    h_end = sql.find(next_anchor, h_start) if h_start != -1 else -1
+    if h_start == -1 or h_end == -1:
+        raise AssertionError("Could not locate Agents Accelerator section header in seed SQL")
+    section_header = sql[h_start:h_end]
+    for forbidden in (
+        "bronze_table_metadata   (input_id 5)",
+        "bronze_layer_creation   (input_id 7)",
+        "aibi_dashboard          (input_id 12)",
+        "genie_space             (input_id 11)",
+    ):
+        assert_not_contains(section_header, forbidden, "agents_accelerator_sql_header")
+    for required in (
+        "prd_generation              (input_id 1)",
+        "cursor_copilot_ui_design    (input_id 3)",
+        "workspace_setup_deploy      (input_id 4)",
+        "setup_lakebase              (input_id 16)",
+        "wire_ui_lakebase            (input_id 108)",
+        "deploy_databricks_app       (input_id 110)",
+    ):
+        assert_contains(section_header, required, "agents_accelerator_sql_header")
+    assert_contains(
+        section_header,
+        "Bronze, Gold, Genie, and AIBI Dashboard rows are NOT prerequisites of this section.",
+        "agents_accelerator_sql_header",
+    )
 
     eval_deploy = read(SECTIONS / "46-track_a_agent_eval_deploy.md")
     assert_contains(eval_deploy, "configured model route", "track_a_agent_eval_deploy")
@@ -148,6 +270,385 @@ def main() -> None:
     assert_contains(skill, "agent_model", "00b-agent-spec-and-tool-plan")
     assert_contains(skill, "agent.model", "00b-agent-spec-and-tool-plan")
     assert_contains(skill, "Runtime Model Route Rule", "00b-agent-spec-and-tool-plan")
+
+    # Pass 3: vibecoding-state hydrate_from_files operation + provenance v3.0
+    state_skill = read(ROOT / "genai-agents" / "vibecoding-state" / "SKILL.md")
+    assert_contains(state_skill, "hydrate_from_files", "vibecoding-state SKILL.md")
+    assert_contains(state_skill, "Operation: `hydrate_from_files`", "vibecoding-state SKILL.md")
+    assert_contains(state_skill, "agent_spec_yaml", "vibecoding-state SKILL.md")
+    assert_contains(state_skill, "agent_tool_plan_yaml", "vibecoding-state SKILL.md")
+    assert_contains(state_skill, "ui_design_md", "vibecoding-state SKILL.md")
+    assert_contains(state_skill, "prd_path", "vibecoding-state SKILL.md")
+    assert_contains(state_skill, 'resolver_version: "3.0"', "vibecoding-state SKILL.md")
+    assert_contains(state_skill, "hydrated_from_files: true", "vibecoding-state SKILL.md")
+    assert_contains(state_skill, "optional: true", "vibecoding-state SKILL.md")
+    assert_contains(
+        state_skill,
+        "docs/agent_spec.yaml.agent.model",
+        "vibecoding-state SKILL.md",
+    )
+
+    spec_schema = read(ROOT / "genai-agents" / "vibecoding-state" / "references" / "spec-schema.md")
+    assert_contains(spec_schema, "hydrated_from_files", "spec-schema.md")
+    assert_contains(spec_schema, '"3.0"', "spec-schema.md")
+    assert_contains(spec_schema, "resources.optional", "spec-schema.md")
+    assert_contains(spec_schema, "hydrate_from_files", "spec-schema.md")
+
+    # Pass 3: Step 40 must invoke hydrate_from_files between enter and the
+    # foundation skill, and the captured state must record the hydration flags.
+    assert_contains(
+        uc_foundation,
+        "`genai-agents/vibecoding-state` op `hydrate_from_files`",
+        "uc_resources_foundation",
+    )
+    assert_contains(
+        uc_foundation,
+        'agent_spec_yaml: "docs/agent_spec.yaml"',
+        "uc_resources_foundation",
+    )
+    assert_contains(
+        uc_foundation,
+        'agent_tool_plan_yaml: "docs/agent_tool_plan.yaml"',
+        "uc_resources_foundation",
+    )
+    assert_contains(
+        uc_foundation,
+        'ui_design_md: "docs/ui_design.md"',
+        "uc_resources_foundation",
+    )
+    assert_contains(
+        uc_foundation,
+        'prd_path: "docs/design_prd.md"',
+        "uc_resources_foundation",
+    )
+    assert_contains(uc_foundation, "hydrated_from_files: true", "uc_resources_foundation")
+    assert_contains(uc_foundation, 'resolver_version: "3.0"', "uc_resources_foundation")
+    assert_contains(uc_foundation, "Phase 0.5 (hydrate)", "uc_resources_foundation")
+    assert_contains(uc_foundation, "State hydration:", "uc_resources_foundation")
+
+    # Pass 3: Step 42 branch (C) — must read docs/design_prd.md + agent_spec
+    # capabilities, and must NOT consult state://DataSpec.glossary.
+    assert_contains(
+        ka,
+        "docs/agent_spec.yaml.agent.capabilities",
+        "knowledge_assistant_create",
+    )
+    assert_not_contains(
+        ka,
+        "state://DataSpec.glossary",
+        "knowledge_assistant_create",
+    )
+    assert_contains(
+        ka,
+        "docs/design_prd.md",
+        "knowledge_assistant_create",
+    )
+    assert_contains(
+        ka,
+        "Do **not** consult `state://DataSpec.*`",
+        "knowledge_assistant_create",
+    )
+
+    # Pass 3.5 follow-up: Step 42 Resources Created checklist must split
+    # into "If KA selected" vs "If KA not selected" branches mirroring
+    # step 44's pattern. The skipped branch must capture the explicit
+    # `n/a` stub and confirm step 44 cleanly ignores the KA family.
+    assert_contains(
+        ka,
+        "If `docs/agent_tool_plan.yaml.knowledge_assistant.selected == true`",
+        "knowledge_assistant_create",
+    )
+    assert_contains(
+        ka,
+        "If `docs/agent_tool_plan.yaml.knowledge_assistant.selected == false`",
+        "knowledge_assistant_create",
+    )
+    assert_contains(
+        ka,
+        '`doc_qa_backend: "n/a"`, `ka_endpoint_name: "n/a"`, `knowledge_assistant_id: "n/a"`',
+        "knowledge_assistant_create",
+    )
+    assert_contains(
+        ka,
+        "no `tools/ka.py` is generated",
+        "knowledge_assistant_create",
+    )
+    assert_contains(
+        ka,
+        "no KA TOOL span appears in MLflow",
+        "knowledge_assistant_create",
+    )
+
+    # Pass 3: Step 44 — CAN_QUERY must target the scalar value at
+    # runtime_config.llm.endpoint, never the literal YAML-path string. The
+    # Expected Output must be conditional per Tool Plan family.
+    assert_contains(
+        tools,
+        "Read the SCALAR value at docs/agent_tool_plan.yaml.runtime_config.llm.endpoint",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        "NEVER grant on the literal YAML path string",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_not_contains(
+        tools,
+        "grant `CAN_QUERY` on `docs/agent_spec.yaml.agent.model`",
+        "track_a_agent_ka_genie_tools",
+    )
+    # Conditional Expected Output bullets
+    assert_contains(
+        tools,
+        "Conditional on Tool Plan selection:",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        "If `docs/agent_tool_plan.yaml.knowledge_assistant.selected == true`",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        'If any `selected_tools[].type == "genie"`',
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        'If any `selected_tools[].type == "vector_search"`',
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        'If any `selected_tools[].type == "uc_function"`',
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        'If any `selected_mcp_servers[].type == "external"`',
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        "Model route (always applicable):",
+        "track_a_agent_ka_genie_tools",
+    )
+    # Old unconditional bullets must be gone.
+    assert_not_contains(
+        tools,
+        "- [ ] KA tool wired against `{ka_endpoint_name}`\n",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_not_contains(
+        tools,
+        "- [ ] Genie tool wired against `{genie_space_id}`\n",
+        "track_a_agent_ka_genie_tools",
+    )
+
+    # Pass 3.5: Step 44 prerequisite must cite `tool_recommendations` (loose) +
+    # `selected_tools` (binding); the legacy `agent.tools[]` line must be gone.
+    assert_contains(
+        tools,
+        "`tool_recommendations` populated",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        "Final binding selections live in `docs/agent_tool_plan.yaml.selected_tools[]`",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        "vibecoding-state.hydrate_from_files",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_not_contains(
+        tools,
+        "- `agent.tools[]` populated in `docs/agent_spec.yaml`.\n",
+        "track_a_agent_ka_genie_tools",
+    )
+
+    # Pass 3.5 follow-up: no remaining prose references that treat
+    # `docs/agent_spec.yaml.agent.tools[]` as the canonical tool source. The
+    # canonical, binding tool list is `docs/agent_tool_plan.yaml.selected_tools[]`;
+    # `agent.tools[]` is a state-projection field only.
+    assert_not_contains(
+        tools,
+        "docs/agent_spec.yaml.agent.tools",
+        "track_a_agent_ka_genie_tools",
+    )
+    # The UC Functions row must point at the Tool Plan, not at agent.tools[].target.
+    assert_not_contains(
+        tools,
+        "`agent.tools[].target` paths",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        '`selected_tools[? type == "uc_function"].target` paths',
+        "track_a_agent_ka_genie_tools",
+    )
+    # The smoke-test step in "Steps to Apply" must cite selected_tools[] as the
+    # canonical source (no compound "spec.agent.tools[] resolved through plan"
+    # phrasing).
+    assert_contains(
+        tools,
+        "smoke test against every tool declared in `docs/agent_tool_plan.yaml.selected_tools[]`",
+        "track_a_agent_ka_genie_tools",
+    )
+    # The "One @function_tool per declared tool" best-practice row must count
+    # entries in selected_tools[], not agent.tools[].
+    assert_contains(
+        tools,
+        "Every entry in `docs/agent_tool_plan.yaml.selected_tools[]`",
+        "track_a_agent_ka_genie_tools",
+    )
+    assert_contains(
+        tools,
+        "count entries in `selected_tools[]`",
+        "track_a_agent_ka_genie_tools",
+    )
+
+    # Pass 3.5: vibecoding-state SKILL.md must document the
+    # `tool_recommendations` + `selected_tools` projection rule and link to
+    # `references/hydrator-prompt.md`.
+    assert_contains(
+        state_skill,
+        "tool_recommendations.managed_databricks[]",
+        "vibecoding-state SKILL.md",
+    )
+    assert_contains(
+        state_skill,
+        "Overlay `docs/agent_tool_plan.yaml.selected_tools[]`",
+        "vibecoding-state SKILL.md",
+    )
+    assert_contains(
+        state_skill,
+        "binding selection wins over loose recommendation",
+        "vibecoding-state SKILL.md",
+    )
+    assert_contains(
+        state_skill,
+        "references/hydrator-prompt.md",
+        "vibecoding-state SKILL.md",
+    )
+
+    # Pass 3.5: hydrator-prompt.md must exist and ground the LLM driver.
+    hydrator_prompt = read(
+        ROOT / "genai-agents" / "vibecoding-state" / "references" / "hydrator-prompt.md"
+    )
+    assert_contains(hydrator_prompt, "Hydrator Prompt", "hydrator-prompt.md")
+    assert_contains(hydrator_prompt, "hydrate_from_files", "hydrator-prompt.md")
+    assert_contains(hydrator_prompt, 'resolver_version: "3.0"', "hydrator-prompt.md")
+    assert_contains(hydrator_prompt, "hydrated_from_files: true", "hydrator-prompt.md")
+    assert_contains(hydrator_prompt, "Post-hydration Guards", "hydrator-prompt.md")
+    assert_contains(
+        hydrator_prompt,
+        "docs/agent_spec.yaml.agent.model",
+        "hydrator-prompt.md",
+    )
+    assert_contains(
+        hydrator_prompt,
+        "docs/agent_tool_plan.yaml.runtime_config.llm.endpoint",
+        "hydrator-prompt.md",
+    )
+    assert_contains(
+        hydrator_prompt,
+        "Tool Projection",
+        "hydrator-prompt.md",
+    )
+    assert_contains(
+        hydrator_prompt,
+        "mutually exclusive on",
+        "hydrator-prompt.md",
+    )
+
+    # Pass 3.5: resolver-prompt.md must no longer claim resolver_version is
+    # "always 2.0", and must forbid regressing 3.0 -> 2.0.
+    resolver_prompt = read(
+        ROOT / "genai-agents" / "vibecoding-state" / "references" / "resolver-prompt.md"
+    )
+    assert_not_contains(
+        resolver_prompt,
+        '`spec_provenance.resolver_version` — always `"2.0"`.',
+        "resolver-prompt.md",
+    )
+    assert_contains(resolver_prompt, "do NOT overwrite", "resolver-prompt.md")
+    assert_contains(resolver_prompt, "regress `\"3.0\"` to `\"2.0\"`", "resolver-prompt.md")
+    assert_contains(resolver_prompt, "hydrator-prompt.md", "resolver-prompt.md")
+
+    # Pass 3.5: state-template.md must show the hydrated provenance + optional
+    # resources example.
+    state_template = read(
+        ROOT / "genai-agents" / "vibecoding-state" / "references" / "state-template.md"
+    )
+    assert_contains(state_template, "Hydrated example", "state-template.md")
+    assert_contains(state_template, "hydrated_from_files: true", "state-template.md")
+    assert_contains(state_template, 'resolver_version: "3.0"', "state-template.md")
+    assert_contains(state_template, "optional: true", "state-template.md")
+    assert_contains(state_template, "no Lakehouse track", "state-template.md")
+
+    # Pass 3.5: hydrated test fixture exists with the right shape.
+    hydrated_fixture = read(
+        ROOT
+        / "genai-agents"
+        / "vibecoding-state"
+        / "references"
+        / "test-fixtures"
+        / "agents-only-hydrated-state.md"
+    )
+    assert_contains(hydrated_fixture, 'resolver_version: "3.0"', "agents-only-hydrated-state.md")
+    assert_contains(hydrated_fixture, "hydrated_from_files: true", "agents-only-hydrated-state.md")
+    assert_contains(hydrated_fixture, "optional: true", "agents-only-hydrated-state.md")
+    assert_contains(hydrated_fixture, "no Lakehouse track", "agents-only-hydrated-state.md")
+    assert_contains(hydrated_fixture, "## Agent", "agents-only-hydrated-state.md")
+    assert_contains(hydrated_fixture, "tools:", "agents-only-hydrated-state.md")
+    assert_contains(
+        hydrated_fixture,
+        "databricks-claude-sonnet-4-6",
+        "agents-only-hydrated-state.md",
+    )
+
+    # Pass 3.5: Tool Plan schema reference must use the scalar endpoint name,
+    # never the literal YAML-path string Pass 2 forbade.
+    tool_plan_schema = read(
+        ROOT
+        / "genai-agents"
+        / "foundation"
+        / "00b-agent-spec-and-tool-plan"
+        / "references"
+        / "tool-plan-schema.md"
+    )
+    assert_not_contains(
+        tool_plan_schema,
+        'endpoint: "docs/agent_spec.yaml.agent.model"',
+        "tool-plan-schema.md",
+    )
+    assert_not_contains(
+        tool_plan_schema,
+        'name: "docs/agent_spec.yaml.agent.model"',
+        "tool-plan-schema.md",
+    )
+    assert_contains(
+        tool_plan_schema,
+        'endpoint: "databricks-claude-sonnet-4-6"',
+        "tool-plan-schema.md",
+    )
+    assert_contains(
+        tool_plan_schema,
+        'name: "databricks-claude-sonnet-4-6"',
+        "tool-plan-schema.md",
+    )
+    assert_contains(
+        tool_plan_schema,
+        "MUST be a **scalar Databricks serving-endpoint name**",
+        "tool-plan-schema.md",
+    )
+    assert_contains(
+        tool_plan_schema,
+        "39-agent_tool_selection.md",
+        "tool-plan-schema.md",
+    )
 
     for legacy in LEGACY_FILES:
         text = read(legacy)

@@ -761,3 +761,51 @@ from the LLM output (after validation). Do NOT fill them in by hand.
 See `genai-agents/vibecoding-state/references/spec-schema.md` for the full
 field list and validation rules.
 -->
+
+## Hydrated example (Agents Accelerator visible path)
+
+When a workshop runs the Agents Accelerator visible path, prompt 40
+(`uc_resources_foundation`) calls `vibecoding-state.hydrate_from_files` to
+populate `## Agent`, `## UI`, `## Resources` (as `optional: true` when no
+Lakehouse track ran), and `## Spec Provenance` from the four design files
+(`docs/agent_spec.yaml`, `docs/agent_tool_plan.yaml`, `docs/ui_design.md`,
+`docs/design_prd.md`). The hydrated `## Spec Provenance` block looks like:
+
+```yaml
+## Spec Provenance
+spec_provenance:
+  resolved_at: "2026-04-29T20:00:00Z"
+  resolver_version: "3.0"      # set by hydrate_from_files
+  schema_version: "2.0"
+  prd_sha256: "<computed>"
+  llm_endpoint: "n/a"          # hydration does not call an LLM
+  hydrated_from_files: true
+```
+
+When the Lakehouse track has not run, `## Resources` is the optional stub:
+
+```yaml
+## Resources
+resources:
+  optional: true
+  mark_skipped: "no Lakehouse track"
+  tables: []
+  knowledge_bases: []
+  genie_spaces: []
+  vector_indexes: []
+  dabs_bundle:
+    path: "n/a"
+    setup_commands: []
+  sample_data:
+    required: false
+    row_counts: {}
+    distribution_constraints: "n/a"
+```
+
+Downstream prompts (KA branch C in prompt 42, tool wiring in prompt 44, MLflow
+SDLC in prompts 50–56) treat `optional: true` as "fall back to `docs/*` files;
+skip Lakehouse-specific tools".
+
+See [`hydrator-prompt.md`](./hydrator-prompt.md) for the LLM driver prompt that
+produces this hydrated state and the post-hydration guards that enforce
+`resolver_version: "3.0"` provenance.
