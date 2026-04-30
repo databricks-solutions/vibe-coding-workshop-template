@@ -29,7 +29,9 @@ When you deploy with `databricks.agents.deploy(...)`, MLflow traces are
 import mlflow
 from databricks import agents
 
-mlflow.set_experiment("/Shared/my-agent/eval")  # NOT a Git-folder experiment
+# Use the user-and-use-case-pinned path
+# (/Users/<user_email>/mlflow/<APP_NAME>-eval), NOT a Git-folder experiment.
+mlflow.set_experiment(state["Resources"]["mlflow_experiment_path"].replace("-agent", "-eval"))
 
 with mlflow.start_run():
     model_info = mlflow.pyfunc.log_model(
@@ -57,8 +59,8 @@ What auto-traces:
 If your experiment lives **inside a Databricks Git folder**, traces from
 the deployed endpoint may not flow back to the experiment. Always:
 
-1. Create the experiment in a **non-Git** path (e.g. `/Shared/...` or `/Users/<you>/...`).
-2. `mlflow.set_experiment("/Shared/...")` to that non-Git path **before**
+1. Create the experiment in a **non-Git** path. The workshop's canonical pattern (`/Users/<user_email>/mlflow/<APP_NAME>-{agent|eval|feedback}`) is already non-Git — use it as-is.
+2. `mlflow.set_experiment(...)` to that non-Git path **before**
    `agents.deploy(...)`.
 
 If you ignore this, traces silently land in the workspace default

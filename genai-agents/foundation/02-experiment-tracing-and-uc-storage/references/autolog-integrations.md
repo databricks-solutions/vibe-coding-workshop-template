@@ -20,7 +20,9 @@ the right one for your stack.
 ```python
 import mlflow
 
-mlflow.set_experiment("/Shared/my-agent/traces")
+# Read the canonical path from state — pinned to
+# /Users/<user_email>/mlflow/<APP_NAME>-agent by vibecoding-state.migrate_canonical.
+mlflow.set_experiment(state["Resources"]["mlflow_experiment_path"])
 
 mlflow.openai.autolog()   # any supported library
 
@@ -97,7 +99,8 @@ import mlflow
 from langgraph.graph import StateGraph
 from openai import OpenAI
 
-mlflow.set_experiment("/Shared/my-agent/traces")
+mlflow.set_experiment(state["Resources"]["mlflow_experiment_path"])
+# /Users/<user_email>/mlflow/<APP_NAME>-agent
 
 # Enable every framework you use
 mlflow.langchain.autolog()   # LangChain + LangGraph

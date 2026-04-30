@@ -74,7 +74,7 @@ Legend: `req` = required, `opt` = optional, `—` = skip.
 - **app_url:** `n/a`
 - **serving_endpoint_name:** `sample-support-agent-endpoint`
 - **ai_gateway_endpoint:** `n/a`
-- **mlflow_experiment_path:** `/Users/operator@example.com/mlflow/sample-support-agent`
+- **mlflow_experiment_path:** `/Users/operator@example.com/mlflow/sample-support-agent-agent`  <!-- /Users/<user_email>/mlflow/<AGENT_NAME>-agent — leaf doubles "agent" because this fixture's AGENT_NAME already ends with "-agent" -->
 - **mlflow_feedback_experiment_path:** `n/a`
 - **lakebase_project:** `n/a`
 - **lakebase_host:** `n/a`

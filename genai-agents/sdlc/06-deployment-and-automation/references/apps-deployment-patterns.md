@@ -260,16 +260,19 @@ experiment.
 
 ### 5.2 Post-Deploy Experiment Directory Permissions
 
-The app's SP needs write access to the experiment's parent directory:
+The app's SP needs write access to the experiment's parent directory. The
+workshop pins experiments at `/Users/<user_email>/mlflow/<APP_NAME>-{agent|eval|feedback}`,
+so the parent the SP needs to manage is `/Users/<user_email>/mlflow`:
 
 ```bash
-SHARED_EXP_ROOT="/Shared/my-agent-experiments"
-databricks workspace mkdirs "$SHARED_EXP_ROOT" 2>/dev/null || true
+USER_EMAIL=$(databricks current-user me --output json | jq -r '.userName')
+EXP_ROOT="/Users/${USER_EMAIL}/mlflow"
+databricks workspace mkdirs "$EXP_ROOT" 2>/dev/null || true
 
-SHARED_DIR_OBJ_ID=$(databricks workspace get-status "$SHARED_EXP_ROOT" -o json \
+EXP_DIR_OBJ_ID=$(databricks workspace get-status "$EXP_ROOT" -o json \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['object_id'])")
 
-databricks api patch "/api/2.0/permissions/directories/$SHARED_DIR_OBJ_ID" \
+databricks api patch "/api/2.0/permissions/directories/$EXP_DIR_OBJ_ID" \
   --json "{\"access_control_list\": [{
     \"service_principal_name\": \"$SP_CLIENT_ID\",
     \"permission_level\": \"CAN_MANAGE\"

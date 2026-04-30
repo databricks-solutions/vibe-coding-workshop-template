@@ -40,7 +40,12 @@ Run these checks to verify:
 python3 -c "import mlflow; assert tuple(int(x) for x in mlflow.__version__.split('.')[:2]) >= (3,10); mlflow.openai.autolog(); print('F1: OK')" 2>/dev/null || echo "F1: FAIL"
 
 # F2 check: MLflow experiment exists
-python3 -c "import mlflow; e = mlflow.get_experiment_by_name('${EXPERIMENT_PATH:-/Shared/my-agent/traces}'); assert e, 'No experiment'; print('F2: OK')" 2>/dev/null || echo "F2: FAIL"
+# EXPERIMENT_PATH MUST be set to the user-and-use-case-pinned path
+#   /Users/<user_email>/mlflow/<APP_NAME>-agent
+# (read it from .vibecoding-state.md → mlflow_experiment_path).
+# The check fails fast if EXPERIMENT_PATH is unset rather than papering over
+# it with a generic /Shared/my-agent/traces default.
+python3 -c "import mlflow, os; p = os.environ.get('EXPERIMENT_PATH'); assert p, 'EXPERIMENT_PATH not set — read mlflow_experiment_path from .vibecoding-state.md'; e = mlflow.get_experiment_by_name(p); assert e, f'No experiment at {p}'; print('F2: OK')" 2>/dev/null || echo "F2: FAIL"
 ```
 
 **If F1 fails:** Stop. **Load and execute**

@@ -133,8 +133,8 @@ Vector Search indexes, Knowledge Assistants, custom tools).
 - **app_url:** `<pending | n/a>`
 - **serving_endpoint_name:** `<pending | n/a>`   <!-- n/a for A and B -->
 - **ai_gateway_endpoint:** `<pending | n/a>`     <!-- n/a for A and B -->
-- **mlflow_experiment_path:** `<pending | n/a>`  <!-- n/a for A and B -->
-- **mlflow_feedback_experiment_path:** `<pending | n/a>` <!-- n/a for A, B, D -->
+- **mlflow_experiment_path:** `<pending | n/a>`  <!-- n/a for A and B. Derivation rule (Pathways C and D): `/Users/<user_email>/mlflow/<APP_NAME or AGENT_NAME>-agent` (e.g. `/Users/jane.doe@example.com/mlflow/jane-d-stayfinder-agent`). NEVER set this to a generic suffix like `Tracing`, `traces`, or `my-agent`; the leaf MUST carry the same `${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}` identity that backs `APP_NAME` / `AGENT_NAME` so attendees on a shared workspace never collide. F2 (`02-experiment-tracing-and-uc-storage`) consumes this; do not let it construct its own. -->
+- **mlflow_feedback_experiment_path:** `<pending | n/a>` <!-- n/a for A, B, D. Derivation rule (Pathway C only): `/Users/<user_email>/mlflow/<APP_NAME>-feedback`. Mirrors `mlflow_experiment_path` so the AppKit feedback skill (`08-appkit-feedback`) never falls back to generic placeholders like `/Shared/my-app-feedback`. -->
 - **lakebase_project:** `<pending | n/a>`        <!-- n/a for A and D -->
 - **lakebase_host:** `<pending | n/a>`           <!-- n/a for A and D -->
 - **doc_qa_backend:** `<pending | n/a>`          <!-- "knowledge_assistant" | "vector_search" ; n/a for A, B -->

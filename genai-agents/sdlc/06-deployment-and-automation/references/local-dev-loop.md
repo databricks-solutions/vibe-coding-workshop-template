@@ -165,10 +165,12 @@ DATABRICKS_TOKEN=  # leave empty to use CLI OAuth
 LLM_MODEL=databricks-claude-sonnet-4-6
 WAREHOUSE_ID=abc123def456
 
-# MLflow
+# MLflow — MLFLOW_EXPERIMENT_ID must be the user-and-use-case-pinned path
+# /Users/<user_email>/mlflow/<APP_NAME>-agent (read from .vibecoding-state.md
+# mlflow_experiment_path). Never use a generic /Shared/my-agent/dev placeholder.
 MLFLOW_TRACKING_URI=databricks
 MLFLOW_REGISTRY_URI=databricks-uc
-MLFLOW_EXPERIMENT_ID=/Shared/my-agent/dev
+MLFLOW_EXPERIMENT_ID=/Users/<user_email>/mlflow/<APP_NAME>-agent
 
 # Lakebase (if applicable)
 LAKEBASE_HOST=your-lakebase-host.cloud.databricks.com

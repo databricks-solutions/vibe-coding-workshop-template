@@ -246,7 +246,11 @@ Other halt conditions (not numbered above): missing state file, unresolved `<pen
 
 1. Move `example/<use_case_slug>/.vibecoding-state.md` to `apps_lakebase/<app_name>/.vibecoding-state.md` (A/B/C) or `agents/<agent_name>/.vibecoding-state.md` (D).
 2. Update `Global Variables.APP_NAME` (or `AGENT_NAME`).
-3. All subsequent `enter` calls resolve to the canonical path automatically.
+3. **Pin MLflow experiment paths to the user-and-use-case identity.** At the same prompt that first resolves `$APP_NAME` / `$AGENT_NAME`, also resolve any `<pending>` MLflow experiment paths in `Captured Resource IDs` so downstream skills (F2, SDLC 04c, 08-appkit-feedback) consume the value from state instead of constructing their own — generic leaves like `Tracing`, `traces`, or `my-app-feedback` are forbidden:
+   - `mlflow_experiment_path` → `/Users/<user_email>/mlflow/<APP_NAME>-agent` (Pathway C) or `/Users/<user_email>/mlflow/<AGENT_NAME>-agent` (Pathway D). `n/a` for Pathways A and B.
+   - `mlflow_feedback_experiment_path` → `/Users/<user_email>/mlflow/<APP_NAME>-feedback` (Pathway C only). `n/a` for A, B, D.
+   - The leaf MUST carry the same `${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}` shape that backs `APP_NAME` so concurrent workshop attendees on a shared workspace cannot collide on a single MLflow experiment.
+4. All subsequent `enter` calls resolve to the canonical path automatically.
 
 **Outputs:** Path of the canonical state file.
 

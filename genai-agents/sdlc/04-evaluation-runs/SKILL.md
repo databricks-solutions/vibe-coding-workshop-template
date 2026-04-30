@@ -90,8 +90,12 @@ MLflow passes **one row’s `inputs`** into `predict_fn` (as a dict). The provid
 Your track's `predict_fn(inputs: dict) -> str` works as-is with `run_evaluation.py`:
 
 ```bash
+# --experiment-path MUST be the user-and-use-case-pinned eval experiment, e.g.
+#   /Users/<user_email>/mlflow/<APP_NAME>-eval
+# Read it from .vibecoding-state.md (mlflow_experiment_path with -eval leaf swap)
+# instead of using a literal /Shared/my-agent/traces.
 uv run run_evaluation.py --predict-module predict_fn.py \
-  --experiment-path /Shared/my-agent/traces \
+  --experiment-path /Users/<user_email>/mlflow/<APP_NAME>-eval \
   --dataset-table catalog.schema.benchmarks \
   --thresholds '{"safety/mean": 0.7, "relevance_to_query/mean": 0.7}'
 ```
