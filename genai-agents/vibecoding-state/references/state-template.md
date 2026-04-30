@@ -14,10 +14,15 @@ WORKFLOW:
   2. Replace <USE_CASE_SLUG> in the title and <ISO timestamp> placeholders.
      Fill Workshop Choices from the PRD.
   3. `vibecoding-state.resolve_spec` (schema v2.0) runs once, deriving
-     `variant_id` from Workshop Choices (pathway+track) and appending six
-     spec sections below Per-Step Log:
-       ## Variant, ## Resources, ## UI, ## Agent, ## Governance, ## Spec Provenance.
-     See `spec-schema.md` and `resolver-prompt.md` for the exact shape.
+     `variant_id` from Workshop Choices (pathway+track) and writing the six
+     spec sections — ## Variant, ## Resources, ## UI, ## Agent, ## Governance,
+     ## Spec Provenance — into the header (above the history marker that
+     immediately precedes ## Per-Step Log). `## Per-Step Log` is the only
+     section that lives below the history marker; everything `enter` may
+     read (workshop choices, captured ids, the six spec sections, contracts,
+     and audits) lives above. See `spec-schema.md` and `resolver-prompt.md`
+     for the exact shape, and the "State File Size Discipline" section in
+     this skill's SKILL.md for the header/history split rationale.
      ## Bootstrap Preflight is written by the bootstrap operation BEFORE the spec is resolved; it sits above ## Per-Step Log so its values are visible to every prompt that reads state.
      ## State File Set and ## Canonical Names also sit above ## Per-Step Log: ## State File Set is filled in (or left at defaults) by `bootstrap` and consulted by `enter` whenever a prompt must read both an AppKit and an agent state file; ## Canonical Names is the registry of pinned spellings (env vars, headers, jq paths, prompts:/ scheme, eval dataset columns) and is read by every prompt and by `state_contract_audit`.
      ## State Overrides, ## Deferred Actions, ## MLflow Eval Known Quality Issues, ## Gate Load Bearing Checks, ## Productized Debts, ## Preflight Check Registry, ## System Prompt Review, and ## Skill Helper Resolutions also sit above ## Per-Step Log: they are the fail-closed contract `enter` (and `audit_debts`, `skill_helper_resolution`) consults on every prompt. State overrides are the only way past a failed gate / hard_assert / preflight / pathway-applicability check (cross-session continuity is recorded here, not in prose). Deferred actions are the canonical baseline of cross-prompt dependencies that block downstream prompts until their `divergence_check` returns true. Known quality issues block the listed `target_prompt_roles_blocked[]` until status flips off `open`. Gate load-bearing checks back the verify-job `warning_policy: block_if_load_bearing` rule. Productized debts record workarounds the workshop deliberately ships with — `audit_debts` evaluates each `remove_when` predicate and flips `debt_lifted: true` when the workaround can be removed. The preflight check registry is the canonical map of named preflight checks (owner skill/prompt + `blocks_prompt_roles[]`); `enter` halts every listed prompt role until the matching state field records the check as passing. The system-prompt review records the pre-eval worked-example audit of `agent.must_do` / `agent.must_not_do` (defaults: `complete: false`, both example arrays empty); `enter` halts the first scored eval prompt until each rule has at least one worked example and the operator has signed off. Skill helper resolutions record the concrete shape selected for every skill-prescribed helper contract probed at runtime (defaults: empty list); consuming skills cite resolved helpers via `skill_helper_resolutions[contract_name='<name>'].selected_value`.
@@ -658,6 +663,8 @@ skill_helper_resolutions: []
 ```
 
 ---
+
+<!-- HISTORY -->
 
 ## Per-Step Log
 

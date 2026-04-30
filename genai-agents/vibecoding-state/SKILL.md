@@ -13,11 +13,11 @@ description: >
 license: Apache-2.0
 compatibility: "Works with any workshop that follows the vibecoding state schema in references/state-template.md. Pathways A, B, C write to apps_lakebase/$APP_NAME/.vibecoding-state.md; Pathway D writes to agents/$AGENT_NAME/.vibecoding-state.md."
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-04-30"
   volatility: low
   upstream_sources: []
   author: "prashanth-subrahmanyam"
-  version: "2.0.0"
+  version: "2.1.0"
   domain: "genai-agents"
   role: "runtime-contract"
   operations: "bootstrap, resolve_spec, hydrate_from_files, enter, migrate_canonical, exit, retrospective.per_prompt, retrospective.rollup, state_contract_audit, endpoint_guardrail_audit, llm_role_endpoint_probe, audit_debts, skill_helper_resolution"
@@ -590,6 +590,27 @@ The same matrix is mirrored into the live state file at `bootstrap` so every `en
 | Session rollup file (live, gitignored) | `example/<use_case_slug>/retrospective-rollup.md` |
 
 Live state and retrospective files are gitignored. Only the two files under `references/` are committed.
+
+---
+
+## State File Size Discipline
+
+The live state file is read top-to-bottom by every `enter` call. Without size discipline it grows linearly with prompt count and the per-prompt token cost climbs every step.
+
+**Header / History split.** Every state file MUST contain the literal marker line:
+
+```
+<!-- HISTORY -->
+```
+
+- **Above the marker** (the *header*): everything `enter` may need to decide whether a prompt can run, including `Workshop Choices`, `Global Variables`, `Captured Resource IDs`, the six spec sections (`## Variant`, `## Resources`, `## UI`, `## Agent`, `## Governance`, `## Spec Provenance`), `## State File Set`, `## Canonical Names`, `## Pathway Applicability Matrix`, `## State Overrides`, `## Deferred Actions`, `## MLflow Eval Known Quality Issues`, `## Gate Load Bearing Checks`, `## Preflight Check Registry`, `## Productized Debts`, `## Endpoint Guardrail Audit`, `## Evaluation Runs Preflight`, `## System Prompt Review`, `## Skill Helper Resolutions`, and `## State Contract Audit`. The header is rewritten in place by `exit` / audit operations.
+- **Below the marker** (the *history*): `## Per-Step Log` entries are appended chronologically. **Never re-rewritten**, only appended.
+
+**Default `enter` read.** `enter` reads the entire file end-to-end (the existing contract is preserved). However, when a future lightweight operation is explicitly documented as `header_only`, it may stop reading at the `<!-- HISTORY -->` marker. Do not add a new `enter` parameter in this task unless every prompt invocation is also updated; the first change is the file-layout discipline.
+
+**Soft size budget.** When the file exceeds **800 lines above the marker**, `state_contract_audit` raises a `state_file_header_oversized` warning. The audit emits a remediation hint listing collapsible sections (typically `Endpoint Guardrail Audit` history, resolved deferred actions, audited debts). The warning never blocks; it documents drift so a future audit can refactor.
+
+**No-op when the marker is missing.** Pre-existing state files without the marker are not auto-migrated; `enter` continues to read the whole file. The marker is added to new state files by the template and may be introduced to live files only after confirming the six spec sections are above it. This rule is non-breaking by construction.
 
 ---
 

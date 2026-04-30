@@ -14,11 +14,11 @@ description: >
 license: Apache-2.0
 compatibility: "Requires MLflow 3.1+ (`mlflow[databricks]>=3.1.0` or `mlflow-tracing` for production), tracing already enabled on the agent (Track A 02-agent-framework). Works with both Databricks Apps (canonical) and Model Serving (alternate)."
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-04-30"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"
-  version: "1.1.0"
+  version: "1.2.0"
   domain: "genai-agents"
   pipeline_position: "S4c"
   consumes: "deployed_agent, trace_id"
@@ -84,7 +84,9 @@ Frontend calls POST /feedback
         │
         ▼
 Backend route (Track A Agent App or AppKit server)
-  resolves user_id from OBO token (workspace_client.current_user.me().user_name)
+  resolves user_id from x-app-user-email / x-forwarded-email first,
+  then falls back to OBO current_user.me() only when the inbound Bearer is
+  the user's own OBO token.
         │
         ▼
 mlflow.log_feedback(
@@ -110,7 +112,7 @@ The two **correlation IDs** you can use:
 
 | ID | Source | When to pick |
 |---|---|---|
-| `trace_id` | `mlflow.get_current_active_span().trace_id` (or `mlflow.get_last_active_trace_id()` after the call) | **Default.** Simplest; no extra plumbing. Works for non-streaming responses. |
+| `trace_id` | `_resolve_active_trace_id()` — wraps `mlflow.get_current_active_span()` with `mlflow.tracing.fluent.get_last_active_trace_id()` fallback | **Default.** Simplest; no extra plumbing. Works for non-streaming responses. |
 | `client_request_id` | Frontend-generated UUID, passed in the request, attached to the trace via `mlflow.update_current_trace(client_request_id=...)` | Pick when you can't return `trace_id` synchronously (deeply async pipelines, WebSockets where the UI generates IDs first). |
 
 Both end up on the same trace; you choose which one the **feedback POST** carries.
@@ -133,7 +135,7 @@ Example: `trace:/main.skyloyalty_ops.agent_traces/0a1b2c3d4e5f...`. This is the 
 
 ### Form 2 — Assessments backend form
 
-The MLflow Assessments API (`mlflow.log_feedback`, `MlflowClient.delete_assessment`) accepts whatever the **target runtime** requires. Concretely:
+The MLflow Assessments API (`mlflow.log_feedback`, `mlflow.override_feedback`, `mlflow.delete_assessment`) accepts whatever the **target runtime** requires. Concretely:
 
 - On Databricks workspaces running MLflow 3.1+, the backend accepts the UC v4 URI directly.
 - On older runtimes or self-hosted MLflow, the backend wants the bare id (`<bare_id>`) and resolves the trace from the configured experiment.
@@ -156,79 +158,62 @@ Document at the top of the feedback route which form your runtime accepts. Cross
 
 ## Trace assessment round-trip gate
 
-Before declaring feedback wired-up, exercise the full assessment lifecycle against a **single trace** and verify the result reads back from the SQL warehouse. The gate is `log_feedback + delete_assessment + re-log` — log a feedback, delete the assessment, log it again, then SELECT from the trace assessment table:
+Before declaring feedback wired-up, exercise the full assessment lifecycle against a **single trace** and verify the result reads back from the SQL warehouse. Run the gate against a known trace from a real `/chat` round trip:
 
-```python
-import os
-import time
-import mlflow
-from mlflow.client import MlflowClient
-from mlflow.entities import AssessmentSource
-from databricks import sql
-
-client = MlflowClient()
-trace_id = "<known good trace id from a real /chat round trip>"  # client form
-source = AssessmentSource(source_type="HUMAN", source_id="gate@example.com")
-
-# 1. log_feedback
-first = mlflow.log_feedback(
-    trace_id=trace_id, name="user_feedback", value=True, source=source,
-    rationale="round-trip gate first write",
-)
-assert first and first.assessment_id
-
-# 2. delete_assessment
-client.delete_assessment(trace_id=trace_id, assessment_id=first.assessment_id)
-
-# 3. re-log
-second = mlflow.log_feedback(
-    trace_id=trace_id, name="user_feedback", value=False, source=source,
-    rationale="round-trip gate second write",
-)
-assert second and second.assessment_id
-assert second.assessment_id != first.assessment_id, "re-log must mint a fresh assessment"
-
-# 4. Verify against the SQL warehouse — closes the loop end-to-end.
-warehouse_id = os.environ["MLFLOW_TRACING_SQL_WAREHOUSE_ID"]
-with sql.connect(
-    server_hostname=os.environ["DATABRICKS_HOST"].replace("https://", ""),
-    http_path=f"/sql/1.0/warehouses/{warehouse_id}",
-    access_token=os.environ["DATABRICKS_TOKEN"],
-) as conn, conn.cursor() as cur:
-    cur.execute(
-        """
-        SELECT assessment_id, name, value, rationale
-        FROM <catalog>.<schema>.trace_assessments
-        WHERE trace_id = %(tid)s AND name = 'user_feedback'
-        ORDER BY create_time_ms DESC
-        """,
-        {"tid": trace_id},
-    )
-    rows = cur.fetchall()
-
-# Latest row must be the re-log; the deleted first write must NOT come back.
-assert rows, "warehouse returned no rows for the round-trip trace"
-assert rows[0][0] == second.assessment_id
-assert first.assessment_id not in {r[0] for r in rows[1:]}, (
-    "deleted assessment leaked back into the warehouse view"
-)
+```bash
+python genai-agents/sdlc/04c-end-user-feedback/scripts/feedback_round_trip.py \
+    --trace-id "$KNOWN_GOOD_TRACE_ID" \
+    --user-id "$EXPECTED_USER_EMAIL" \
+    --assessments-table "$MLFLOW_TRACING_TABLE_PREFIX"_assessments \
+    --warehouse-id "$MLFLOW_TRACING_SQL_WAREHOUSE_ID"
 ```
 
-Wire this gate into the same CI step that runs the dataset / scorer smoke tests. Required env:
+The script exercises `log_feedback → override_feedback → delete_assessment → re-log` and verifies via the SQL warehouse that:
 
-- `MLFLOW_TRACING_SQL_WAREHOUSE_ID` — the SQL warehouse the trace tables are surfaced through. The gate **must** read from this warehouse rather than hitting `mlflow.get_trace` only, so a warehouse-side caching or replication bug surfaces here instead of in production.
-- `DATABRICKS_HOST` / `DATABRICKS_TOKEN` (or OAuth equivalent) for the warehouse connection.
+1. `log_feedback` returns a non-empty `assessment_id`.
+2. `override_feedback` preserves `assessment_id`.
+3. `delete_assessment` succeeds.
+4. The re-log mints a fresh `assessment_id` distinct from the deleted one.
+5. The latest warehouse row matches the re-log id and the deleted id does not leak back.
+
+Wire this into the same CI step that runs the dataset / scorer smoke tests. Required env for the warehouse verify: `MLFLOW_TRACING_SQL_WAREHOUSE_ID`, `MLFLOW_TRACING_TABLE_PREFIX`, `DATABRICKS_HOST`, `DATABRICKS_TOKEN`. Missing warehouse inputs fail by default. Use `--api-only` only for a local smoke test that intentionally does not claim end-to-end verification.
 
 If any step fails — `log_feedback` rejects the id, `delete_assessment` 404s, the re-log mints the same id, or the SQL warehouse omits or duplicates rows — the deployment is blocked. The two most common failures this gate catches:
 
 1. The frontend stored the bare id instead of the UC v4 URI, so the backend can't resolve the trace.
-2. The runtime accepts `log_feedback` but the warehouse lag means the row isn't queryable yet — the gate forces an explicit `time.sleep` / retry policy here instead of debugging it post-launch.
+2. The runtime accepts `log_feedback` but the warehouse lag means the row isn't queryable yet — the script's `--warehouse-wait-seconds` flag (default 10s) absorbs replication lag instead of debugging it post-launch.
 
 ---
 
 ## Step 1 — Return `trace_id` from the agent response
 
 The trace id must reach the frontend *somehow*. Pick **one** of three patterns based on your transport.
+
+### Defensive `trace_id` capture
+
+Both `mlflow.get_current_active_span()` and `mlflow.tracing.fluent.get_last_active_trace_id()` are valid sources, but each can return `None` depending on **when** in the request lifecycle you call it. Use this helper everywhere instead of either bare call:
+
+```python
+import mlflow
+
+def _resolve_active_trace_id() -> str | None:
+    """Return the current trace id, defensively.
+
+    Tries the active span first (works inside a traced handler before the
+    span closes). Falls back to the most recently completed trace on this
+    thread (works after the function returns and the span auto-closes).
+    Returns None only when there is genuinely no trace on this thread —
+    in which case feedback should be disabled in the UI for this turn.
+    """
+    span = mlflow.get_current_active_span()
+    if span is not None:
+        return span.trace_id
+    try:
+        from mlflow.tracing.fluent import get_last_active_trace_id
+        return get_last_active_trace_id()
+    except Exception:
+        return None
+```
 
 ### Pattern A — Non-streaming `@invoke` (canonical, easiest)
 
@@ -241,7 +226,9 @@ from mlflow.genai import agent_server
 @agent_server.invoke
 async def invoke(request, context):
     response_text = await run_agent(request)
-    trace_id = mlflow.get_current_active_span().trace_id
+    trace_id = _resolve_active_trace_id()
+    if trace_id is None:
+        raise RuntimeError("no active or recent trace; tracing not enabled")
     return {
         "output_text": response_text,
         "trace_id": trace_id,
@@ -264,7 +251,7 @@ async def stream(request, context):
     with mlflow.start_span(name="agent_turn") as span:
         async for token in run_agent_streaming(request):
             yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
-        trace_id = span.trace_id
+        trace_id = span.trace_id or _resolve_active_trace_id()
         yield f"data: {json.dumps({'type': 'done', 'trace_id': trace_id})}\n\n"
 ```
 
@@ -317,7 +304,7 @@ This is the **canonical write-path**. Same code regardless of where it runs (Tra
 
 ```python
 from typing import Optional
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Header, Query, Request
 from pydantic import BaseModel
 import mlflow
 from mlflow.entities import AssessmentSource
@@ -332,9 +319,9 @@ class FeedbackBody(BaseModel):
 def submit_feedback(
     body: FeedbackBody,
     trace_id: str = Query(..., description="Trace id returned by /chat"),
-    x_forwarded_access_token: Optional[str] = Header(None),
+    request: Request,
 ):
-    user_id = _resolve_user_id(x_forwarded_access_token)
+    user_id = _resolve_user_id(dict(request.headers))
     mlflow.log_feedback(
         trace_id=trace_id,
         name="user_feedback",
@@ -348,18 +335,41 @@ def submit_feedback(
     return {"status": "ok", "trace_id": trace_id}
 ```
 
-`_resolve_user_id` turns the OBO token into a stable user identity:
+`_resolve_user_id` resolves the originating end-user identity from inbound headers, with a clear priority order so 2-Apps Pathway-C deployments do not attribute feedback to the AppKit service principal:
 
 ```python
 from databricks.sdk import WorkspaceClient
-from databricks_app.utils import get_user_workspace_client  # canonical OBO helper
+from databricks_app.utils import get_user_workspace_client
 
-def _resolve_user_id(x_forwarded_access_token: str | None) -> str:
-    if not x_forwarded_access_token:
-        return "anonymous"
-    w: WorkspaceClient = get_user_workspace_client(x_forwarded_access_token)
-    return w.current_user.me().user_name  # email, e.g. "user@company.com"
+def _resolve_user_id(headers: dict[str, str]) -> str:
+    """Resolve the originating end-user's identity.
+
+    Priority order (high → low):
+
+      1. x-app-user-email          — set by an AppKit Pathway-C proxy (skill 06d)
+                                     when the inbound Bearer is the AppKit SP.
+      2. x-forwarded-email         — set by the Apps platform on direct
+                                     end-user requests (1-App pathway).
+      3. x-forwarded-preferred-username — fallback when email is missing.
+      4. OBO -> current_user.me()  — works only when the inbound Bearer is
+                                     the user's own OBO token, NOT an SP.
+      5. "anonymous"               — last resort, breaks per-user dashboards.
+    """
+    for key in ("x-app-user-email", "x-forwarded-email", "x-forwarded-preferred-username"):
+        v = headers.get(key) or headers.get(key.title())
+        if v:
+            return v
+    obo = headers.get("x-forwarded-access-token")
+    if obo:
+        try:
+            w: WorkspaceClient = get_user_workspace_client(obo)
+            return w.current_user.me().user_name
+        except Exception:
+            pass
+    return "anonymous"
 ```
+
+> **2-Apps Pathway-C note.** When the agent sits behind an AppKit proxy (skill [`06d-appkit-agent-app-proxy`](../../../apps_lakebase/skills/06d-appkit-agent-app-proxy/SKILL.md)), the inbound `Authorization: Bearer` token is the AppKit service principal — `current_user.me()` would attribute every assessment to the SP UUID. The proxy stamps the originating user's email as `x-app-user-email`; the resolver above checks that header first. The four-probe verification script in 06d (`feedback_source_id` probe) asserts this end-to-end.
 
 > **Canonical name:** use `name="user_feedback"` for the binary thumbs assessment. Downstream dashboards, the `04-evaluation-runs` analysis snippet, and the AppKit feedback skill all assume this name. If you must rename, update **all three** places in lockstep.
 
@@ -379,26 +389,40 @@ def _resolve_user_id(x_forwarded_access_token: str | None) -> str:
 
 ## Step 3 — Update or delete an existing assessment
 
-Users change their minds. Two operations:
+Users change their minds. Three operations:
 
 ```python
 import mlflow
-from mlflow.client import MlflowClient
+from mlflow.entities import AssessmentSource
 
-client = MlflowClient()
+source = AssessmentSource(source_type="HUMAN", source_id=user_id)
 
-# Update — re-log with the same name; latest wins for downstream queries
-mlflow.log_feedback(
+# 1. Create — first thumb / first comment for this user-message
+created = mlflow.log_feedback(
     trace_id=trace_id,
     name="user_feedback",
+    value=True,
+    rationale="Helpful",
+    source=source,
+)
+assessment_id = created.assessment_id  # store this alongside the trace_id
+
+# 2. Update in place — preferred when you already have assessment_id
+#    Preserves assessment_id and produces a single audit row per user-message.
+mlflow.override_feedback(
+    trace_id=trace_id,
+    assessment_id=assessment_id,
     value=False,
     rationale="Actually missed the policy citation",
-    source=AssessmentSource(source_type="HUMAN", source_id=user_id),
 )
 
-# Delete — remove an assessment entirely (e.g. accidental click)
-client.delete_assessment(trace_id=trace_id, assessment_id=assessment_id)
+# 3. Delete — accidental click or thumbs withdrawn
+mlflow.delete_assessment(trace_id=trace_id, assessment_id=assessment_id)
 ```
+
+> **When to use which.** If the frontend stores `assessment_id` per assistant message (recommended — it is returned by `log_feedback`), prefer `mlflow.override_feedback` for thumbs-toggle. Use bare `mlflow.log_feedback` again only when the frontend has lost the `assessment_id` (cold reload, no chat history) — that path mints a fresh row and the latest-by-`create_time_ms` wins for downstream queries.
+
+> **API surface note:** `mlflow.delete_assessment(...)` is the top-level callable. Earlier MLflow snippets called `MlflowClient().delete_assessment(...)`; on current Databricks-bundled MLflow that attribute does not exist and the call fails with `AttributeError: 'MlflowClient' object has no attribute 'delete_assessment'`. Always use the top-level function.
 
 The MLflow Trace UI shows the latest value as primary; older versions remain in the assessment history.
 
@@ -419,9 +443,9 @@ class DetailedFeedbackBody(BaseModel):
 def submit_detailed_feedback(
     body: DetailedFeedbackBody,
     trace_id: str = Query(...),
-    x_forwarded_access_token: Optional[str] = Header(None),
+    request: Request,
 ):
-    user_id = _resolve_user_id(x_forwarded_access_token)
+    user_id = _resolve_user_id(dict(request.headers))
     source = AssessmentSource(source_type="HUMAN", source_id=user_id)
     for dimension, score in {
         "user_accuracy": body.accuracy,
@@ -576,7 +600,7 @@ When the frontend uses SSE / WebSockets:
 |---|---|---|
 | Naming | `name="user_feedback"` for binary thumbs; `name="user_<dimension>"` for ratings. | Pick a different name in each frontend (AppKit vs template UI vs Slack) — analysis breaks. |
 | Source | `AssessmentSource(source_type="HUMAN", source_id=<email-from-OBO>)`. | Use `"anonymous"` when you have an OBO token; you'll lose per-user dashboards. |
-| Auth | Resolve user via `get_user_workspace_client(x-forwarded-access-token).current_user.me()`. | Read `DATABRICKS_TOKEN` from env; that's the SP, not the user. |
+| Source | Resolve end-user identity from `x-app-user-email`, then `x-forwarded-email`, then OBO `current_user.me()` when the Bearer is user-scoped. | Infer the user from the app-to-app `Authorization` Bearer; in 2-Apps deployments that token belongs to the AppKit SP. |
 | Trace id | Return from `@invoke` body; yield as `done` event from `@stream`. | Try to reconstruct it on the client; it doesn't exist until the server span closes. |
 | Update | `mlflow.log_feedback(...)` again with same name to overwrite. | Manually `PATCH` the assessment unless you specifically need to keep `assessment_id` stable. |
 | Streaming | Final event carries `trace_id`. | Send the trace id as the **first** event — it's wrong (the trace hasn't closed yet). |
@@ -591,7 +615,7 @@ When the frontend uses SSE / WebSockets:
 - [ ] `/feedback` route added to the Agent App (or AppKit sidecar) and protected by the same OBO check as `/chat`.
 - [ ] Frontend stores `trace_id` per assistant message and clears it on new turns.
 - [ ] Frontend stores the **UC v4 client form** (`trace:/<catalog>.<schema>.<prefix>/<bare_id>`) per assistant message; the feedback route normalizes it to whatever the Assessments backend requires before calling `log_feedback`.
-- [ ] Round-trip gate runs: `log_feedback + delete_assessment + re-log` against a known trace, then verifies the result via `MLFLOW_TRACING_SQL_WAREHOUSE_ID` — the latest row matches the re-log assessment id and the deleted assessment id does not leak back.
+- [ ] Round-trip gate runs: `log_feedback + override_feedback + delete_assessment + re-log` against a known trace, verifying `override_feedback` preserves `assessment_id` and the deleted id does not leak back via the SQL warehouse (`MLFLOW_TRACING_SQL_WAREHOUSE_ID`).
 - [ ] One curl-test that POSTs feedback with a real `trace_id` succeeds and the assessment shows up in the MLflow Trace UI within ~10s.
 - [ ] Positive rate query (Step 6) runs cleanly on the experiment after at least one round of test feedback.
 - [ ] Weekly cron / job that materializes negative-feedback traces into a UC eval dataset.

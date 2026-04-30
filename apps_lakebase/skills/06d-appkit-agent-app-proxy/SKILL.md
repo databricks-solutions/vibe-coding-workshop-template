@@ -29,11 +29,11 @@ fields_read:
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.1.0"
   domain: apps
   role: serving-wiring
   standalone: false
-  last_verified: "2026-04-27"
+  last_verified: "2026-04-30"
   volatility: medium
   upstream_sources:
     - name: "databricks-agent-skills/databricks-model-serving"
@@ -226,6 +226,49 @@ See [`references/dual-format-streaming.md`](references/dual-format-streaming.md)
 | Timeout | 120000 ms (2 min) | Agents can be slow; first-request cold-start ~20 s |
 | Serving plugin? | **No** — use vanilla `server()` + `server.extend()` | Serving plugin's resource shape is wrong for Apps backends |
 | Agent App URL env var | `AGENT_APP_URL` via `valueFrom: agent-backend` | Explicit, avoids platform-derived names that vary across CLI versions |
+
+---
+
+## Step 0: Workspace alignment preflight
+
+`app:` resource binding (Step 1) **only** works when the AppKit App and the Agent App live in the same Databricks workspace. Cross-workspace bindings are silently dropped at deploy time. Run this preflight before declaring the resource — it takes 30 seconds and prevents a multi-hour migration loop.
+
+```bash
+profile_host() {
+  local profile="$1"
+  databricks auth profiles --skip-validate --output json \
+    | jq -r --arg p "$profile" '.profiles[] | select(.name == $p) | .host'
+}
+
+APPKIT_PROFILE="${APPKIT_PROFILE:-$PROFILE}"
+AGENT_PROFILE="${AGENT_PROFILE:-$PROFILE}"
+
+APPKIT_HOST=$(profile_host "$APPKIT_PROFILE")
+AGENT_HOST=$(profile_host "$AGENT_PROFILE")
+
+if [ -z "$APPKIT_HOST" ] || [ -z "$AGENT_HOST" ]; then
+  echo "FAIL: could not resolve both Databricks profile hosts."
+  echo "      APPKIT_PROFILE=$APPKIT_PROFILE -> ${APPKIT_HOST:-<missing>}"
+  echo "      AGENT_PROFILE=$AGENT_PROFILE -> ${AGENT_HOST:-<missing>}"
+  exit 1
+fi
+
+[ "$APPKIT_HOST" = "$AGENT_HOST" ] || {
+  echo "FAIL: AppKit ($APPKIT_HOST) and Agent ($AGENT_HOST) live in different workspaces."
+  echo "      app: resource binding requires same-workspace deployment."
+  exit 1
+}
+
+echo "OK: AppKit and Agent App are in the same workspace ($APPKIT_HOST)."
+```
+
+> **Why this halts not warns.** A cross-workspace `app:` binding produces a misleading error chain at deploy time: `databricks bundle deploy` succeeds, the app starts in `RUNNING` state, but every `/api/chat` request returns `403 App not authorized` with no clear diagnostic. The four-probe script's Probe 2 (`appkit_sp_only`) catches it eventually, but only after a full deploy cycle. Better to halt here.
+
+**Lakebase / MLflow caveat.** Do not compare `lakebase_host` string prefixes against the workspace host; Lakebase/Postgres endpoint hostnames are not guaranteed to share the workspace URL prefix. The right checks are: the AppKit and Agent App profiles resolve to the same Databricks workspace host, the AppKit bundle target host equals that host, and the MLflow experiment / UC trace tables are created in that same workspace context.
+
+**Captured state.** Record the verified workspace host in the state file under `Captured Resource IDs` as `apps_workspace_host: <host>`. Step 1 (resource binding) reads this value to confirm the bundle target matches.
+
+**Gate:** `APPKIT_HOST == AGENT_HOST`, and the AppKit bundle target host matches that same value.
 
 ---
 

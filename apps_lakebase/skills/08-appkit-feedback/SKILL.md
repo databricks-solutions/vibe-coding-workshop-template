@@ -14,11 +14,11 @@ compatibility: Requires 07-appkit-chat-history complete (Vote table + traceId co
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.0.1"
   domain: apps
   role: feedback
   standalone: false
-  last_verified: "2026-04-27"
+  last_verified: "2026-04-30"
   volatility: medium
   upstream_sources:
     - name: "databricks-agent-skills/databricks-apps"
@@ -211,7 +211,11 @@ AppKit.server.extend((app) => {
   // POST /api/feedback — submit or update feedback
   app.post("/api/feedback", async (req, res) => {
     const { chatId, messageId, isUpvoted } = req.body;
-    const userId = req.session!.userId;
+    const forwardedEmail = req.headers["x-forwarded-email"];
+    const userId =
+      typeof forwardedEmail === "string" && forwardedEmail.length > 0
+        ? forwardedEmail
+        : req.session!.userId;
 
     if (!chatId || !messageId || typeof isUpvoted !== "boolean") {
       return res
@@ -355,6 +359,8 @@ full REST API reference and AppKit auth rationale.
 See [references/trace-extraction.md](references/trace-extraction.md) for
 trace ID extraction patterns (already wired into
 [07-appkit-chat-history](../07-appkit-chat-history/SKILL.md) Step 4a).
+
+For 2-Apps Pathway-C, `source_id` must be the originating user's email. The app-to-app bearer identifies the AppKit SP, so do not derive MLflow `AssessmentSource.source_id` from that bearer.
 
 ### User vs. Service Principal Auth for MLflow
 
