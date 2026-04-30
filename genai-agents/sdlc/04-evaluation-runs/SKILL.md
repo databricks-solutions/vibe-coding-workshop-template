@@ -30,6 +30,18 @@ metadata:
       sync_commit: "281d9acd92d936bd5294f78bd7ec68fb12d4a696"
 fields_read:
   - agent.reviewer_role
+  - agent.must_do
+  - agent.must_not_do
+  - docs.agent_tool_plan.selected_tools
+inputs:
+  - name: agent_tool_plan_ref
+    required: false
+    description: >
+      Path to docs/agent_tool_plan.yaml. When set, failure-shape classification
+      scopes primary_shape: tool_call_empty (and the tool_call_empty routing
+      branch) to tools present in selected_tools[] only. Tools that were never
+      wired cannot trigger this branch. The retrieval routing branch only
+      exists when KA or Vector Search appears in selected_tools[].
 ---
 
 # Evaluation runs (MLflow GenAI)

@@ -60,12 +60,55 @@ resource_grants:
 runtime_guardrails:
   sql_readonly_default: true
   require_tool_citations: true
+  tool_shaped_scorers:                        # derived mechanically from selected_tools[] — see Tool-shaped Derivation
+    - "sql_readonly_compliance"
+    - "sql_fully_qualified_names"
 verification:
-  tool_smoke_tests:
+  tool_smoke_tests:                            # REQUIRED — one entry per selected_tools[] entry
     - tool_name: "sql_uc_schema_query"
       prompt: "Show five rows from an allowed table."
       expected_signal: "SELECT-only query with fully qualified table name."
 ```
+
+## Tool-shaped Derivation Rules
+
+`verification.tool_smoke_tests[]` and `runtime_guardrails.tool_shaped_scorers[]` are **mechanically derived from `selected_tools[]`** by prompt 39 (`agent_tool_selection`). The Spec contains no tool-shaped fields — those live here, in the Plan, where the actual selection is known.
+
+### Per-tool smoke test contract
+
+For every entry in `selected_tools[]`, prompt 39 emits one entry under `verification.tool_smoke_tests[]`:
+
+```yaml
+- tool_name: "<selected_tools[].name>"
+  prompt: "<use-case query that exercises this specific tool>"
+  expected_signal: "<observable success signal — TOOL span present, citation present, valid SQL, etc.>"
+```
+
+The `prompt` is shaped by the use case (industry, capabilities, schema names) — never a generic placeholder like "list 5 rows". Tool families with no entry in `selected_tools[]` contribute zero smoke tests.
+
+### Tool-shaped scorer mapping
+
+Prompt 39 walks `selected_tools[]` and emits the union (deduped) of these contributions to `runtime_guardrails.tool_shaped_scorers[]`:
+
+| Selected tool family | Scorer hints to add |
+|---|---|
+| Knowledge Assistant | `ka_citation_present`, `RetrievalGroundedness` |
+| Vector Search (managed MCP) | `RetrievalGroundedness` (deduped if KA already added it) |
+| Genie | `genie_sql_correctness`, `genie_response_grounded_in_table` |
+| SQL MCP | `sql_readonly_compliance`, `sql_fully_qualified_names` |
+| UC Functions | `uc_function_signature_match` |
+| External MCP (per descriptor) | one entry per high-confidence descriptor (`mcp_research.candidates[].confidence == high` AND selected) |
+
+Tool families absent from `selected_tools[]` (or with `selected: false`) contribute nothing. Section 51 (`mlflow_scorers_and_judges`) reads `runtime_guardrails.tool_shaped_scorers[]` and registers these as additional scorers on top of the generic `governance.scorer_suite.*` registered from the Spec. `RetrievalGroundedness` is therefore registered ONLY if a retrieval tool (KA or Vector Search) appears in `selected_tools[]` — never by default.
+
+### Consumer union semantics
+
+| Consumer prompt | Generic source (Spec) | Tool-shaped source (Plan) | Behavior |
+|---|---|---|---|
+| 46 (smoke eval + deploy) | `governance.verification.smoke_test_cases[]` | `verification.tool_smoke_tests[]` | Smoke set = union |
+| 50 (eval datasets) | `agent.benchmark_seeds.seed_examples[]` (≥20 rows) | `verification.tool_smoke_tests[]` (≥1 row each) | Append |
+| 51 (scorers and judges) | `governance.scorer_suite.{guidelines, custom_scorer_rules, judge_questions}` | `runtime_guardrails.tool_shaped_scorers[]` | Union, deduped |
+| 52 (first scored eval) | `agent.must_do[]` / `agent.must_not_do[]` for preflight; benchmark table | `selected_tools[]` for failure-shape routing | Failure-shape `tool_call_empty` only fires for tools in `selected_tools[]` |
 
 ## Runtime Model Route Rules
 

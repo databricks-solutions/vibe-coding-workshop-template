@@ -91,6 +91,16 @@ def main() -> None:
     assert_contains(agent_spec, "step 04", "agent_spec_design")
     assert_contains(agent_spec, "steps 04-07", "agent_spec_design")
     assert_contains(agent_spec, "Bronze, Gold, Genie", "agent_spec_design")
+    # Dynamic-eval contract: 38 authors tool-AGNOSTIC eval/governance fields under unified paths.
+    assert_contains(agent_spec, "agent.benchmark_seeds.coverage_buckets", "agent_spec_design")
+    assert_contains(agent_spec, "agent.benchmark_seeds.seed_examples", "agent_spec_design")
+    assert_contains(agent_spec, "governance.scorer_suite.guidelines", "agent_spec_design")
+    assert_contains(agent_spec, "governance.scorer_suite.custom_scorer_rules", "agent_spec_design")
+    assert_contains(agent_spec, "governance.scorer_suite.judge_questions", "agent_spec_design")
+    assert_contains(agent_spec, "governance.verification.smoke_test_cases", "agent_spec_design")
+    assert_contains(agent_spec, "DO NOT predict tool selections", "agent_spec_design")
+    # 38 must NOT carry tool-shaped scorer hints — those live in the Tool Plan.
+    assert_not_contains(agent_spec, "tool_shaped_scorers", "agent_spec_design")
 
     tool_selection = read(SECTIONS / "39-agent_tool_selection.md")
     assert_contains(tool_selection, "docs/agent_spec.yaml", "agent_tool_selection")
@@ -111,6 +121,14 @@ def main() -> None:
     assert_contains(tool_selection, "COPY the SCALAR value", "agent_tool_selection")
     assert_contains(tool_selection, "databricks-claude-sonnet-4-6", "agent_tool_selection")
     assert_contains(tool_selection, "# copied from agent.model", "agent_tool_selection")
+    # Dynamic-eval contract: 39 mechanically derives tool-shaped scorers + smoke tests from selected_tools[].
+    assert_contains(tool_selection, "Tool-Shaped Derivation", "agent_tool_selection")
+    assert_contains(tool_selection, "verification.tool_smoke_tests", "agent_tool_selection")
+    assert_contains(tool_selection, "runtime_guardrails.tool_shaped_scorers", "agent_tool_selection")
+    assert_contains(tool_selection, "ka_citation_present", "agent_tool_selection")
+    assert_contains(tool_selection, "RetrievalGroundedness", "agent_tool_selection")
+    assert_contains(tool_selection, "sql_readonly_compliance", "agent_tool_selection")
+    assert_contains(tool_selection, "genie_sql_correctness", "agent_tool_selection")
     assert_not_contains(
         tool_selection,
         'endpoint: "docs/agent_spec.yaml.agent.model"',
@@ -246,6 +264,27 @@ def main() -> None:
     assert_contains(eval_deploy, "configured model route", "track_a_agent_eval_deploy")
     assert_contains(eval_deploy, "runtime_config.llm", "track_a_agent_eval_deploy")
     assert_core_prompt_gateway_optional(eval_deploy, "track_a_agent_eval_deploy")
+    # Dynamic-eval contract: 46 unions Spec smoke cases with Plan tool smoke tests.
+    assert_contains(eval_deploy, "agent_tool_plan_ref", "track_a_agent_eval_deploy")
+    assert_contains(eval_deploy, "verification.tool_smoke_tests", "track_a_agent_eval_deploy")
+
+    datasets = read(SECTIONS / "50-mlflow_evaluation_datasets.md")
+    assert_contains(datasets, "agent_tool_plan_ref", "mlflow_evaluation_datasets")
+    assert_contains(datasets, "verification.tool_smoke_tests", "mlflow_evaluation_datasets")
+    assert_contains(datasets, "agent.benchmark_seeds.coverage_buckets", "mlflow_evaluation_datasets")
+    assert_contains(datasets, "agent.benchmark_seeds.seed_examples", "mlflow_evaluation_datasets")
+
+    scorers = read(SECTIONS / "51-mlflow_scorers_and_judges.md")
+    assert_contains(scorers, "agent_tool_plan_ref", "mlflow_scorers_and_judges")
+    assert_contains(scorers, "runtime_guardrails.tool_shaped_scorers", "mlflow_scorers_and_judges")
+    assert_contains(scorers, "governance.scorer_suite.guidelines", "mlflow_scorers_and_judges")
+    assert_contains(scorers, "RetrievalGroundedness", "mlflow_scorers_and_judges")
+    assert_contains(scorers, "ONLY if KA or Vector Search appears in `selected_tools[]`", "mlflow_scorers_and_judges")
+
+    eval_runs = read(SECTIONS / "52-mlflow_evaluation_runs_and_iteration.md")
+    assert_contains(eval_runs, "agent_tool_plan_ref", "mlflow_evaluation_runs_and_iteration")
+    assert_contains(eval_runs, "selected_tools", "mlflow_evaluation_runs_and_iteration")
+    assert_contains(eval_runs, "tools present in `docs/agent_tool_plan.yaml.selected_tools[]`", "mlflow_evaluation_runs_and_iteration")
 
     for filename, label in [
         ("38-agent_spec_design.md", "agent_spec_design"),

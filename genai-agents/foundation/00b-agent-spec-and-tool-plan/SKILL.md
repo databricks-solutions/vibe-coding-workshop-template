@@ -20,10 +20,23 @@ fields_read:
   - agent.system_prompt
   - agent.capabilities
   - agent.model
+  - agent.must_do
+  - agent.must_not_do
+  - agent.benchmark_seeds.coverage_buckets
+  - agent.benchmark_seeds.seed_examples
   - agent.tools
   - agent.mcp_servers
   - agent.knowledge_base_backend
   - agent.external_integrations
+  - governance.scorer_suite.guidelines
+  - governance.scorer_suite.custom_scorer_rules
+  - governance.scorer_suite.judge_questions
+  - governance.verification.smoke_test_cases
+  - governance.llm_role_endpoints.llm_judge_default.endpoint
+  - selected_tools
+  - selected_mcp_servers
+  - runtime_guardrails.tool_shaped_scorers
+  - verification.tool_smoke_tests
 ---
 
 # Agent Spec And Tool Plan
@@ -59,6 +72,8 @@ Use this skill for:
 | `prd_path` | yes | Usually `docs/design_prd.md`. |
 | `agent_spec_path` | yes | Usually `docs/agent_spec.yaml`. |
 | `agent_tool_plan_path` | yes | Usually `docs/agent_tool_plan.yaml`. |
+| `agent_spec_ref` | no | Path to existing Agent Spec for downstream skills that consume it (alias of `agent_spec_path`). |
+| `agent_tool_plan_ref` | no | Path to existing Tool Plan for downstream skills that consume it (alias of `agent_tool_plan_path`). |
 | `agent_model` | no | Databricks serving endpoint used by the agent LLM. Defaults to `databricks-claude-sonnet-4-6`. |
 | `agent_sql_catalog` | no | Catalog the SQL MCP may query. |
 | `agent_sql_schema` | no | Schema the SQL MCP may query. |
@@ -74,12 +89,11 @@ Required top-level keys:
 
 - `schema_version`
 - `source_prd`
-- `agent`
+- `agent` (includes `must_do[]`, `must_not_do[]`, `benchmark_seeds.coverage_buckets[]`, `benchmark_seeds.seed_examples[]`)
 - `tool_recommendations`
 - `mcp_research`
 - `knowledge_assistant`
-- `evaluation`
-- `governance`
+- `governance` (includes `scorer_suite.{guidelines, custom_scorer_rules, judge_questions}`, `verification.smoke_test_cases[]`, `llm_role_endpoints.llm_judge_default.endpoint`)
 
 The spec may recommend tools, but it must not mark every recommendation as
 selected. Final selection belongs in `docs/agent_tool_plan.yaml`.
@@ -92,12 +106,35 @@ Required top-level keys:
 
 - `schema_version`
 - `source_agent_spec`
+- `runtime_config` (includes `llm.{provider, endpoint, api_base_url, api_mode, model_config}`)
 - `selected_tools`
 - `selected_mcp_servers`
 - `knowledge_assistant`
 - `resource_grants`
-- `runtime_guardrails`
-- `verification`
+- `runtime_guardrails` (includes `tool_shaped_scorers[]` derived mechanically from `selected_tools[]`)
+- `verification` (includes `tool_smoke_tests[]` — one entry per `selected_tools[]` entry)
+
+## Eval Authoring Rule
+
+Eval/governance content is **layered across three places**, and each place has a strict tool-awareness contract.
+
+| Layer | Where | Tool-aware? | What lives here |
+|---|---|---|---|
+| Spec (generic) | `docs/agent_spec.yaml` | **No** — tools are not yet selected | `agent.must_do[]`, `agent.must_not_do[]`, `agent.benchmark_seeds.{coverage_buckets, seed_examples}`, `governance.scorer_suite.{guidelines, custom_scorer_rules, judge_questions}`, `governance.verification.smoke_test_cases[]`, `governance.llm_role_endpoints.llm_judge_default.endpoint` |
+| Plan (tool-shaped) | `docs/agent_tool_plan.yaml` | **Yes** — derived mechanically from `selected_tools[]` | `verification.tool_smoke_tests[]` (one per selected tool, use-case-shaped prompt + observable signal); `runtime_guardrails.tool_shaped_scorers[]` (e.g. `ka_citation_present`, `RetrievalGroundedness`, `genie_sql_correctness`, `sql_readonly_compliance`) |
+| Consumer (union) | sections 46/50/51/52 | Reads BOTH | Smoke set = Spec ∪ Plan; benchmark rows = Spec base ∪ Plan tool-shaped append; scorer suite = Spec generic ∪ Plan tool-shaped (deduped); failure-shape `tool_call_empty` only fires for tools in `selected_tools[]` |
+
+**Authoring rules:**
+
+1. **Section 38 (Spec)** never authors tool-shaped fields. No `ka_citation_present`, no `RetrievalGroundedness`, no `genie_*`, no `sql_*` scorer hints. No assertions like "use Genie to look up X" in seed_examples. Tools are not selected at this step.
+2. **Section 39 (Plan)** mechanically derives the tool-shaped fields from `selected_tools[]` using the table in `references/tool-plan-schema.md` § *Tool-shaped Derivation Rules*. Tool families absent from `selected_tools[]` contribute zero entries.
+3. **Sections 46/50/51/52 (Consumers)** read both files and union them. KA absent in the Plan ⇒ no KA scorer registered, no KA smoke test, no KA dataset row, no KA failure-shape branch.
+
+**Validation at exit (section 39):**
+
+- `verification.tool_smoke_tests[]` length equals `selected_tools[]` length.
+- Every `runtime_guardrails.tool_shaped_scorers[]` entry maps to a tool family present in `selected_tools[]`.
+- No `tool_shaped_scorers[]` entry exists for a tool family that is `selected: false` or absent.
 
 ## Runtime Model Route Rule
 

@@ -32,6 +32,16 @@ fields_read:
   - ui.user_journeys
   - agent.benchmark_seeds.coverage_buckets
   - agent.benchmark_seeds.seed_examples
+  - docs.agent_tool_plan.selected_tools
+  - docs.agent_tool_plan.verification.tool_smoke_tests
+inputs:
+  - name: agent_tool_plan_ref
+    required: false
+    description: >
+      Path to docs/agent_tool_plan.yaml. When set, the skill APPENDS one
+      tool-shaped benchmark row per verification.tool_smoke_tests[] entry on top
+      of the generic Spec rows. Tool families absent from selected_tools[]
+      contribute zero appended rows.
 ---
 
 # Evaluation Dataset Creation

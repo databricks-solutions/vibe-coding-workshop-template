@@ -21,6 +21,17 @@ metadata:
 fields_read:
   - agent.benchmark_seeds.seed_examples
   - governance.verification.smoke_test_cases
+  - docs.agent_tool_plan.selected_tools
+  - docs.agent_tool_plan.verification.tool_smoke_tests
+inputs:
+  - name: agent_tool_plan_ref
+    required: false
+    description: >
+      Path to docs/agent_tool_plan.yaml. When set, the smoke set is the UNION
+      of governance.verification.smoke_test_cases[] (Spec) and
+      verification.tool_smoke_tests[] (Plan, one per selected_tools[] entry).
+      The fail-closed gate's "any tool returns empty output" condition is
+      scoped to selected_tools[] — tools that were never wired cannot trip it.
 ---
 
 # Track A Step 6: Evaluate the Agent
