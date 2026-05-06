@@ -1,0 +1,194 @@
+# Golden Queries Template for Genie Space Optimization v2.0
+#
+# Structure: domain → list of benchmark questions
+#
+# Required fields:
+#   - id: Unique identifier (domain_NNN format)
+#   - question: Natural language question
+#   - expected_sql: Working SQL that returns correct result (validated via spark.sql())
+#   - expected_asset: MV (Metric View), TVF (Table-Valued Function), or TABLE
+#   - category: aggregation, ranking, time-series, comparison, detail, list, threshold
+#   - source: user, synthetic, or augmented (tracks how the benchmark was obtained)
+#
+# Optional fields (v2.0):
+#   - required_tables: Tables referenced by expected_sql (auto-populated or manual)
+#   - required_columns: Specific columns needed for the query
+#   - required_joins: Expected join relationships
+#   - required_business_logic: Business rules the SQL implements
+#   - expected_facts: Key facts the answer should contain (for completeness judge)
+#   - expected_result_hash: MD5 hash of result DataFrame (auto-populated by GT validation)
+#   - expected_result_sample: First 5 rows as JSON (auto-populated by GT validation)
+#   - expected_row_count: Total result rows (auto-populated by GT validation)
+#   - expected_columns: Column names from GT result (auto-populated by GT validation)
+#   - guidelines: Per-question evaluation criteria (maps to expectations.guidelines in MLflow)
+#
+# Optional fields (v3.0 — benchmark splits & dependency map):
+#   - split: train|val|held_out (auto-assigned by assign_splits(), 60/20/20)
+#   - priority: P0|P1|P2 (P0 = hard gate, never regress; default P1)
+#
+# MLflow Evaluation Dataset Mapping:
+#   question          → inputs.question
+#   expected_sql      → expectations.expected_response
+#   expected_asset    → expectations.expected_asset
+#   category          → expectations.category
+#   expected_facts    → expectations.expected_facts
+#   guidelines        → expectations.guidelines
+#   expected_result_* → expectations.expected_result_*
+#   required_*        → expectations.required_*
+#
+# Ground Truth Validation:
+#   Every expected_sql MUST be executed via spark.sql() before acceptance.
+#   Use validate_ground_truth_sql() from optimization-code-patterns.md.
+#   On failure, LLM regenerates SQL (max 3 attempts).
+#   Result hash + sample are stored for Layer 2 result_correctness comparison.
+#
+# Coverage Guidelines:
+#   - At least 10 questions per domain
+#   - At least 4 different categories
+#   - Include synonym variations for key queries
+#   - Include date range variations
+#   - Include edge cases (nulls, empty results)
+
+# =============================================================================
+# Example Domain: Cost Intelligence
+# =============================================================================
+
+cost:
+  # --- Aggregation Queries (Metric View) ---
+  - id: "cost_001"
+    question: "What is our total compute spend this month?"
+    expected_sql: >
+      SELECT MEASURE(total_cost)
+      FROM ${catalog}.${gold_schema}.mv_cost_analytics
+      WHERE usage_date >= DATE_TRUNC('month', CURRENT_DATE())
+    expected_asset: "MV"
+    category: "aggregation"
+    source: "user"
+    required_tables: ["mv_cost_analytics"]
+    required_columns: ["total_cost", "usage_date"]
+    expected_facts: ["Returns a single aggregate cost value for the current month"]
+    # expected_result_hash: ""    # Auto-populated by GT validation
+    # expected_result_sample: ""  # Auto-populated by GT validation
+    # expected_row_count: 0       # Auto-populated by GT validation
+
+  - id: "cost_002"
+    question: "How much have we spent?"
+    expected_sql: >
+      SELECT MEASURE(total_cost)
+      FROM ${catalog}.${gold_schema}.mv_cost_analytics
+    expected_asset: "MV"
+    category: "aggregation"
+    source: "augmented"
+
+  - id: "cost_003"
+    question: "What is our average daily cost?"
+    expected_sql: >
+      SELECT MEASURE(avg_daily_cost)
+      FROM ${catalog}.${gold_schema}.mv_cost_analytics
+    expected_asset: "MV"
+    category: "aggregation"
+    source: "synthetic"
+
+  # --- Ranking Queries (TVF) ---
+  - id: "cost_010"
+    question: "Show the top 10 most expensive workspaces"
+    expected_sql: >
+      SELECT *
+      FROM ${catalog}.${gold_schema}.get_top_cost_contributors('30', 'workspace')
+      LIMIT 10
+    expected_asset: "TVF"
+    category: "ranking"
+    required_tables: ["get_top_cost_contributors"]
+    expected_facts: ["Returns ranked workspaces by cost", "Limited to top 10"]
+
+  - id: "cost_011"
+    question: "Which SKUs cost the most?"
+    expected_sql: >
+      SELECT *
+      FROM ${catalog}.${gold_schema}.get_top_cost_contributors('30', 'sku')
+    expected_asset: "TVF"
+    category: "ranking"
+
+  # --- Time-Series Queries (TVF) ---
+  - id: "cost_020"
+    question: "Show daily cost breakdown for the last 2 weeks"
+    expected_sql: >
+      SELECT *
+      FROM ${catalog}.${gold_schema}.get_daily_cost_summary(
+        CAST(DATE_SUB(CURRENT_DATE(), 14) AS STRING),
+        CAST(CURRENT_DATE() AS STRING)
+      )
+    expected_asset: "TVF"
+    category: "time-series"
+
+  - id: "cost_021"
+    question: "What was our daily spend last month?"
+    expected_sql: >
+      SELECT *
+      FROM ${catalog}.${gold_schema}.get_daily_cost_summary(
+        CAST(DATE_TRUNC('month', ADD_MONTHS(CURRENT_DATE(), -1)) AS STRING),
+        CAST(LAST_DAY(ADD_MONTHS(CURRENT_DATE(), -1)) AS STRING)
+      )
+    expected_asset: "TVF"
+    category: "time-series"
+
+  # --- Comparison Queries ---
+  - id: "cost_030"
+    question: "Compare this month's cost to last month"
+    expected_sql: >
+      SELECT
+        'This Month' as period,
+        MEASURE(total_cost) as cost
+      FROM ${catalog}.${gold_schema}.mv_cost_analytics
+      WHERE usage_date >= DATE_TRUNC('month', CURRENT_DATE())
+      UNION ALL
+      SELECT
+        'Last Month',
+        MEASURE(total_cost)
+      FROM ${catalog}.${gold_schema}.mv_cost_analytics
+      WHERE usage_date >= DATE_TRUNC('month', ADD_MONTHS(CURRENT_DATE(), -1))
+        AND usage_date < DATE_TRUNC('month', CURRENT_DATE())
+    expected_asset: "MV"
+    category: "comparison"
+
+  # --- Detail / List Queries ---
+  - id: "cost_040"
+    question: "What SKU categories do we use?"
+    expected_sql: >
+      SELECT DISTINCT sku_category, sku_description
+      FROM ${catalog}.${gold_schema}.dim_sku
+      ORDER BY sku_category
+    expected_asset: "TABLE"
+    category: "list"
+
+  # --- Synonym Variations ---
+  - id: "cost_050"
+    question: "What are our total costs?"
+    expected_sql: >
+      SELECT MEASURE(total_cost)
+      FROM ${catalog}.${gold_schema}.mv_cost_analytics
+    expected_asset: "MV"
+    category: "aggregation"
+
+  - id: "cost_051"
+    question: "Total DBU consumption this quarter"
+    expected_sql: >
+      SELECT MEASURE(total_dbus)
+      FROM ${catalog}.${gold_schema}.mv_cost_analytics
+      WHERE usage_date >= DATE_TRUNC('quarter', CURRENT_DATE())
+    expected_asset: "MV"
+    category: "aggregation"
+
+
+# =============================================================================
+# Add your domain benchmarks below using the same structure
+# =============================================================================
+
+# reliability:
+#   - id: "rel_001"
+#     question: "..."
+#     expected_sql: "..."
+#     expected_asset: "MV|TVF|TABLE"
+#     category: "..."
+#     required_tables: []
+#     expected_facts: []

@@ -87,10 +87,6 @@ End-to-end workflow for building the Databricks semantic layer — Metric Views,
 | Need Genie API automation? | Read `semantic-layer/04-genie-space-export-import-api/SKILL.md` directly |
 | Need to optimize Genie accuracy? | Read `semantic-layer/05-genie-optimization-orchestrator/SKILL.md` directly |
 
-### Routing Safety Net
-
-> If a user asks to **deploy TVFs, Metric Views, and/or Genie Spaces** and `@`-references only leaf skills (e.g., `databricks-asset-bundles`, `genie-space-export-import-api`), **this orchestrator still applies**. Any task touching 2+ semantic-layer asset types must route here first — the leaf skills handle individual assets; this orchestrator handles Phase 0 (gold inventory), phase gates, and template-first workflow. Skipping it is the documented root cause of multi-cycle debug spirals.
-
 ---
 
 ## Mandatory Skill Dependencies
@@ -111,22 +107,9 @@ End-to-end workflow for building the Databricks semantic layer — Metric Views,
 |-------|-------------|------------------|
 | `semantic-layer/01-metric-views-patterns` | **MUST read** at Phase 1 | YAML syntax, validation, joins, window measures |
 | `semantic-layer/02-databricks-table-valued-functions` | **MUST read** at Phase 2 | STRING params, Genie compatibility, null safety |
-| `semantic-layer/03-genie-space-patterns` | **MUST read** at Phase 3 | 8-section deliverable, agent instructions, SQL expressions, benchmark Qs |
+| `semantic-layer/03-genie-space-patterns` | **MUST read** at Phase 3 | 7-section deliverable, agent instructions, benchmark Qs |
 | `semantic-layer/04-genie-space-export-import-api` | **MUST read** at Phase 3 (JSON config) and Phase 6 (API deployment) | REST API JSON schema, programmatic deployment |
 | `semantic-layer/05-genie-optimization-orchestrator` | **External** — run separately after deployment | Benchmark testing, 6 control levers, optimization loop |
-
-### Enforcement: Confirm Common Skills Read (MANDATORY GATE)
-
-**STOP. Before proceeding past Phase 0, confirm you have read the common skills by listing the key pattern from each:**
-
-| Skill | Key Pattern to Confirm |
-|-------|-----------------------|
-| `databricks-python-imports` | Bundle root: `rsplit('/src/', 1)[0]` |
-| `databricks-asset-bundles` | Job `base_parameters` must include all widget params |
-| `databricks-expert-agent` | "Extract names from source, never hardcode" |
-| `naming-tagging-standards` | CM-02 dual-purpose COMMENT with PURPOSE/BEST FOR/NOT FOR |
-
-**If you cannot produce these patterns from memory, you have not read the skills. Read them now.** Skipping common skills is the #1 cause of downstream bugs in semantic layer setup (see retrospective evidence: fragile workspace paths, missing job parameters, wrong ID fields).
 
 ---
 
@@ -214,18 +197,7 @@ with open(manifest_path) as f:
 planning_mode = manifest.get('planning_mode', 'acceleration')
 if planning_mode == 'workshop':
     print("⚠️  Workshop mode active — creating ONLY the artifacts listed in the manifest")
-```
 
-**Workshop mode error handling:** When `planning_mode: workshop`, creation scripts should log failures but exit 0 to allow downstream tasks to run:
-
-```python
-if failures and planning_mode == "workshop":
-    print(f"WARNING: {len(failures)} artifact(s) failed (workshop mode -- continuing)")
-elif failures:
-    raise RuntimeError(f"{len(failures)} artifact(s) failed")
-```
-
-```python
 # Extract implementation checklist from manifest
 domains = manifest.get('domains', {})
 total_mvs, total_tvfs, total_genie = 0, 0, 0
@@ -261,14 +233,6 @@ assert total_genie == int(summary.get('total_genie_spaces', total_genie)), \
 
 **Key principle:** Create ONLY the artifacts listed in the manifest. Do NOT add Metric Views, TVFs, or Genie Spaces beyond what the plan specified. If the plan missed something, update the plan first — then re-run this orchestrator.
 
-**User-referenced file check:** If the user's request references specific plan addendum files (e.g., `plans/phase1-addendum-1.2-tvfs.md`), verify each exists before proceeding. **Always verify the filename against [`planning/00-project-planning/assets/addendum-numbering.md`](../../planning/00-project-planning/assets/addendum-numbering.md) — the canonical numbering table.** A common failure mode is referencing a stale name (e.g. `phase1-addendum-1.1-dashboards.md`) that no longer exists; the orchestrator must halt and prompt the user to reconcile, never silently skip.
-
-If any referenced files are missing, inform the user:
-
-> "The following referenced files do not exist: {list}. The manifest contains sufficient detail to proceed. Continue with only the manifest, or create these files first?"
-
-Do NOT silently skip missing user-referenced files.
-
 #### Gold Schema Extraction (Anti-Hallucination — MANDATORY)
 
 **After the manifest check, build a verified `gold_inventory` dict before any artifact creation begins.** This dict is the ONLY source of table/column names for Phases 1-3. No artifact may reference a table or column not in this inventory.
@@ -300,64 +264,6 @@ gold_inventory = {
 
 ---
 
-### Phase 0.5: Local Pre-Flight (MANDATORY, 10 minutes)
-
-**Why:** Every hour spent in Phases 1–6 without pre-flight has produced an average of 3 deploy cycles in the retrospective. The four checks below run locally in ≤ 10 minutes and collectively catch ~80 % of the issues that cause a failed `bundle deploy`/`bundle run`. Do NOT skip — each of these has fixed a real outage.
-
-**Context setup:** No new skills loaded. Use the Python and SQL you already have from Phase 0.
-
-| # | Check | How | Fail-loud contract |
-|---|---|---|---|
-| 1 | **Variable enumeration** (dashboards, Metric Views, Genie configs) | `monitoring/02-databricks-aibi-dashboards/scripts/deploy_dashboard.py::enumerate_required_variables` — run against `src/dashboards/*.lvdash.json`, `src/semantic/metric_views/*.yaml`, and `src/genie_spaces/*.json`. | `RuntimeError` if any `${var}` is unresolved by the caller's variables dict. |
-| 2 | **DDL smoke test** (Metric Views + TVFs) | Parse each `src/semantic/metric_views/*.yaml` and each TVF CREATE statement; run an `EXPLAIN` against a warehouse. Alternatively use `spark.sql("SELECT * FROM {view} LIMIT 0")` after a dry-run CREATE in a throwaway schema. | `RuntimeError` listing every failing artifact. |
-| 3 | **Genie validator** | Run `semantic-layer/04-genie-space-export-import-api`'s `_assert_sql_arrays(space)` over every rendered Genie Space JSON. | `RuntimeError` on first serialized_space invariant violation. |
-| 4 | **Live-catalog intersection** | Re-run the Phase 0 gold intersection from `planning/00-project-planning/SKILL.md` Phase 2 Step 6 against the fully-rendered semantic-layer manifest (post-variable-substitution). Catches late-added table/column references that never hit the planning manifest. | `RuntimeError` + regenerate `plans/gold-gap-remediation.md` if gap. |
-
-**Orchestration recipe (paste into a scratch notebook or a `scripts/preflight.py`):**
-
-```python
-from pathlib import Path
-
-# Check 1: dashboard + metric view + genie variable enumeration
-from scripts.deploy_dashboard import enumerate_required_variables
-
-variables = {"catalog": catalog, "gold_schema": gold_schema,
-             "warehouse_id": warehouse_id, "feature_schema": feature_schema}
-
-for pattern in ["src/dashboards/*.lvdash.json",
-                "src/semantic/metric_views/*.yaml",
-                "src/genie_spaces/*.json"]:
-    files = list(Path(".").glob(pattern))
-    required = enumerate_required_variables(files)
-    missing = {n: fs for n, fs in required.items() if variables.get(n) in (None, "")}
-    if missing:
-        raise RuntimeError(
-            f"[preflight/{pattern}] missing vars: "
-            + ", ".join(f"{n} (used by {len(fs)} files)" for n, fs in missing.items())
-        )
-
-# Check 2: DDL smoke test — EXPLAIN every Metric View & TVF
-#   (skip here — see references/pre-flight-ddl-smoke.md for the templates)
-
-# Check 3: Genie serialized_space invariants
-import json
-from scripts.deploy_genie_spaces import _assert_sql_arrays, process_json_values
-for gf in Path("src/genie_spaces").glob("*.json"):
-    raw = json.loads(gf.read_text())
-    rendered = process_json_values(raw, variables)
-    _assert_sql_arrays(rendered)   # raises on any violation
-
-# Check 4: Live-catalog intersection against the rendered manifest
-#   (re-use the block from planning/00-project-planning/SKILL.md
-#    Phase 2 Step 6 — do not duplicate it here)
-
-print("✅ Phase 0.5 pre-flight passed — safe to proceed to Phase 1.")
-```
-
-**STOP Rule:** Every Phase 0.5 check failure must halt the orchestrator. Do not "run bundle deploy anyway to see what the cluster says" — every minute you spend in that loop is 10x the cost of fixing the pre-flight failure locally.
-
----
-
 ### Phase 1: Metric Views (1-2 hours)
 
 **Context setup:** Read the skills below just-in-time. After this phase, persist the "Metric Views Notes to Carry Forward" and discard the full skill content.
@@ -382,16 +288,6 @@ print("✅ Phase 0.5 pre-flight passed — safe to proceed to Phase 1.")
 5. Test each Metric View with sample queries
 6. Track completion: check off each manifest entry as its Metric View is confirmed created
 
-#### Phase 1 Completion Gate (MANDATORY)
-
-**DO NOT proceed to Phase 2 until you have:**
-1. Written all Phase 1 artifacts to disk
-2. **Run the `create_metric_views` per-task verification row** from the "Per-task verification" table in Phase 5 *against a scratch dev target* — do not wait until the full bundle runs. Verifying now catches ~40 % of the defects that otherwise surface in Phase 5.
-3. Presented the user with a summary: artifact names, paths, key design decisions
-4. Asked: "Phase 1 is complete. Shall I proceed to Phase 2 (TVFs), or review/modify first?"
-
-Bulk creation without checkpoints causes cascading failures. A 2-minute pause catches issues that take 30 minutes to debug post-deployment.
-
 ### Phase 2: Table-Valued Functions (1-2 hours)
 
 **Context setup:** Discard Phase 1 skill content. Keep only `gold_inventory` + Phase 1's "Metric Views Notes to Carry Forward". Read the skills below just-in-time.
@@ -413,16 +309,6 @@ Bulk creation without checkpoints causes cascading failures. A 2-minute pause ca
 6. Validate with test queries
 7. Track completion: check off each manifest entry as its TVF is confirmed created
 
-#### Phase 2 Completion Gate (MANDATORY)
-
-**DO NOT proceed to Phase 3 until you have:**
-1. Written all Phase 2 artifacts to disk
-2. **Run the `create_tvfs` per-task verification row** from the "Per-task verification" table in Phase 5 *against a scratch dev target*. Every TVF must return at least one row on a smoke input — silent empty results mean the TVF is broken for Genie.
-3. Presented the user with a summary: artifact names, paths, key design decisions
-4. Asked: "Phase 2 is complete. Shall I proceed to Phase 3 (Genie Space), or review/modify first?"
-
-Bulk creation without checkpoints causes cascading failures. A 2-minute pause catches issues that take 30 minutes to debug post-deployment.
-
 ### Phase 3: Genie Space Setup (1 hour)
 
 **Context setup:** Discard Phase 2 skill content. Keep `gold_inventory` + Phase 1 notes (MV names/paths) + Phase 2's "TVF Notes to Carry Forward" (TVF names/paths). Read the skills below just-in-time. Phase 3 uses TWO worker skills — Genie Space Patterns (for design) and Export/Import API (for JSON config generation).
@@ -431,7 +317,7 @@ Bulk creation without checkpoints causes cascading failures. A 2-minute pause ca
 |---|------------|------------------|
 | 1 | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Extract asset references from `gold_inventory` |
 | 2 | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | Table/column COMMENTs required by Genie |
-| 3 | `data_product_accelerator/skills/semantic-layer/03-genie-space-patterns/SKILL.md` | 8-section deliverable, agent instructions, SQL expressions, benchmark questions |
+| 3 | `data_product_accelerator/skills/semantic-layer/03-genie-space-patterns/SKILL.md` | 7-section deliverable, agent instructions, benchmark questions |
 | 4 | `data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/SKILL.md` | JSON schema, array sorting, ID generation, idempotent deployment |
 
 **Input:** For each domain in `manifest['domains']`, iterate over `domain['genie_spaces']`. Each entry defines `name`, `warehouse`, `assets` (metric_views, tvfs, tables), `benchmark_questions_count`, and `benchmark_questions`. Do NOT create Genie Spaces not listed in the manifest.
@@ -447,15 +333,6 @@ Bulk creation without checkpoints causes cascading failures. A 2-minute pause ca
 6. Configure Serverless SQL Warehouse (as specified in manifest's `warehouse` field)
 7. **Generate API-compatible Genie Space JSON config file** using the `genie-space-export-import-api` JSON schema. Save to `src/{project}_semantic/genie_configs/`. Use template variables (`${catalog}`, `${gold_schema}`) for portability.
 8. Track completion: check off each manifest entry as its Genie Space config is confirmed generated
-
-#### Phase 3 Completion Gate (MANDATORY)
-
-**DO NOT proceed to Phase 4 until you have:**
-1. Written all Phase 3 artifacts to disk
-2. Presented the user with a summary: artifact names, paths, key design decisions
-3. Asked: "Phase 3 is complete. Shall I proceed to Phase 4 (Asset Bundle), or review/modify first?"
-
-Bulk creation without checkpoints causes cascading failures. A 2-minute pause catches issues that take 30 minutes to debug post-deployment.
 
 ### Phase 4: Asset Bundle Configuration (30 min)
 
@@ -524,17 +401,13 @@ See `assets/templates/semantic-layer-job-template.yml` for the starter template.
 
 Databricks enforces the `depends_on` chain: Metric Views are created first, then TVFs, then Genie Spaces. If any task fails, downstream tasks do not run.
 
-**Per-task verification (MANDATORY — run AFTER each task completes, not at the end of the job).** Do NOT batch verifications at the end of the Phase. A silent success upstream produces wasted downstream work when verification only runs at the end.
+**Verification:**
+- Check all 3 task statuses in the job run output
+- Verify Metric Views: `SHOW VIEWS IN {catalog}.{gold_schema}`
+- Verify TVFs: `SHOW FUNCTIONS IN {catalog}.{gold_schema}`
+- Verify Genie Spaces: check Genie UI or use `export_genie_space.py --list`
 
-| Task | Verification SQL / API | Pass criterion | STOP rule on fail |
-|---|---|---|---|
-| `create_metric_views` | `SHOW VIEWS IN {catalog}.{gold_schema}` filtered to expected names; plus `DESCRIBE EXTENDED {catalog}.{gold_schema}.{mv_name}` returns YAML metric body non-empty. | Every manifest-declared Metric View present; `DESCRIBE EXTENDED` shows `METRICS LANGUAGE YAML`. | STOP — do NOT run TVFs. Re-run `create_metric_views` with the specific failing YAML fixed. |
-| `create_tvfs` | `SHOW FUNCTIONS IN {catalog}.{gold_schema} LIKE '*'` filtered to expected names; plus a sample `SELECT * FROM {catalog}.{gold_schema}.{tvf}(...) LIMIT 1` for each. | Every manifest-declared TVF present and callable with smoke input. | STOP — do NOT deploy Genie Spaces. |
-| `deploy_genie_spaces` | GET `/api/2.0/genie/spaces/{id}?include_serialized_space=true` for every deployed space. | Response non-empty; `data_sources.tables` + `data_sources.metric_views` non-empty; `instructions.sql_functions[*].sql` all `List[str]`. | STOP — do NOT deploy dashboards that query Genie. |
-| `deploy_dashboards` | For every dashboard file: after `ws.workspace.import_`, `ws.workspace.get_status(target_path)` returns `object_type=FILE` and size > the pre-upload file size. | Every target path exists and is non-zero bytes. | STOP — re-upload failing files only; do NOT re-run the whole deploy. |
-| `databricks bundle run` (overall) | All task statuses = `SUCCESS` AND all per-task verifications above have passed. | No task stuck in `INTERNAL_ERROR` / `FAILED` / `SKIPPED`. | STOP — follow the `databricks-autonomous-operations` diagnose loop for the specific failing task. |
-
-**On failure:** Follow the `databricks-autonomous-operations` diagnose → fix → redeploy loop. **Do NOT** attempt to patch the problem in the workspace and continue — the Asset Bundle workspace copy will be overwritten on the next `bundle deploy`, hiding the fix.
+**On failure:** Follow the `databricks-autonomous-operations` diagnose → fix → redeploy loop.
 
 ### Phase 6: API Deployment (Recommended, 30 min)
 

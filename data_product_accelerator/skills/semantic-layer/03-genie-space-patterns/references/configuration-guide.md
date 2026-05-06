@@ -1,10 +1,10 @@
 # Genie Space Configuration Guide
 
-Complete guide for configuring Databricks Genie Spaces with the mandatory 8-section structure.
+Complete guide for configuring Databricks Genie Spaces with the mandatory 7-section structure.
 
-## Mandatory 8-Section Deliverable Structure
+## Mandatory 7-Section Deliverable Structure
 
-**Every Genie Space setup MUST produce a document with ALL 8 sections below.**
+**Every Genie Space setup MUST produce a document with ALL 7 sections below.**
 **Missing any section = INCOMPLETE and REJECTED deliverable.**
 
 | Section | What to Provide | Format |
@@ -16,7 +16,6 @@ Complete guide for configuring Databricks Genie Spaces with the mandatory 8-sect
 | **E. General Instructions** | **≤20 LINES** LLM behavior rules | Concise numbered list |
 | **F. TVFs** | ALL functions with signatures | Table + detailed specs |
 | **G. Benchmark Questions** | 10-15 with **EXACT SQL** | Question + Working SQL + Expected result |
-| **H. SQL Expressions** | Measures, Filters, Dimensions | Structured `sql_snippets` definitions |
 
 ---
 
@@ -211,24 +210,6 @@ USE CASES:
    - When metric views/TVFs insufficient
    - Performance considerations
 
-### Column Configs for Trusted Assets
-
-Every trusted asset table should have `column_configs` in the Genie Space JSON that include:
-
-| Property | Purpose | When to Set |
-|---|---|---|
-| `synonyms` | User-friendly alternative names for NLQ matching | All dimension columns users might reference by alternate names |
-| `get_example_values` | Genie samples real values for LLM context | All filterable dimension columns |
-| `build_value_dictionary` | Low-cardinality lookup for exact matching | Text columns with < ~100 distinct values that users filter by |
-| `enable_format_assistance` | Genie assists with value formatting | All dimension columns (dates, text, IDs, flags) |
-| `enable_entity_matching` | Fuzzy entity name matching | Text/categorical columns users filter by (names, codes, flags) |
-
-**Synonym Placement:**
-- **column_configs `synonyms`** → Genie Space JSON (or metric view YAML `synonyms` field)
-- **UC COMMENT** → Business definition, grain, valid values — NOT synonyms
-
-See [Agent Instructions Guide](./agent-instructions.md#column-config-flags-for-genie) for the full pattern by column type.
-
 ---
 
 ## Section E: General Instructions (20 Lines MAX)
@@ -259,25 +240,6 @@ You are an expert {domain} analyst. Follow these rules:
 ```
 
 See [Agent Instructions Guide](./agent-instructions.md) for extended patterns and best practices.
-
-### Extended Instructions (13-Section Structure)
-
-For production Genie Spaces, the 20-line General Instructions should be complemented by
-**Extended Instructions** following the 13-section structure:
-
-**PURPOSE → ASSET ROUTING → BUSINESS DEFINITIONS → DISAMBIGUATION → AGGREGATION RULES → FUNCTION ROUTING → JOIN GUIDANCE → QUERY RULES → QUERY PATTERNS → TEMPORAL FILTERS → DATA QUALITY NOTES → CONSTRAINTS → SQL EXPRESSIONS**
-
-The Extended Instructions go into the `text_instructions` field of the Genie Space JSON
-(or are appended to the General Instructions). They provide the full domain playbook that
-powers accurate SQL generation. Section 13 (SQL EXPRESSIONS) documents which business
-concepts to promote into structured `sql_snippets` for direct Genie matching.
-
-See [Agent Instructions Guide — 13 Mandatory Sections](./agent-instructions.md#the-13-mandatory-sections) for the complete template.
-
-**Key guidance when updating instructions:**
-- **Append new rules** to existing instructions — never replace the entire block
-- **Number rules sequentially** (existing 1-14, new rules start at 15+)
-- **Run all existing benchmarks** after any instruction change to verify no regression
 
 ---
 
@@ -331,8 +293,6 @@ SELECT * FROM get_function_name(params);
 
 **⚠️ REQUIREMENT: 10-15 benchmark questions with WORKING SQL.**
 
-**⚠️ JSON field name:** In the API-compatible JSON export, benchmark SQL goes in `answer: [{format: "SQL", content: ["SELECT ..."]}]` — **NOT** in a field called `expected_sql`. The term "Expected SQL" here refers to the content, not the JSON field name. See `genie-space-export-import-api` for the exact `BenchmarkQuestion` schema.
-
 ### Critical SQL Rules
 
 #### MEASURE() Uses Column Names, NOT Display Names
@@ -383,161 +343,6 @@ SELECT * FROM ${catalog}.${gold_schema}.get_revenue_by_period('2024-01-01', '202
 | "X last month" | TVF | Specific dates |
 | "X for Q4 2024" | TVF | Specific dates |
 | "X trend for [period]" | TVF | Date range |
-
----
-
-## Section H: SQL Expressions
-
-SQL Expressions (`sql_snippets` in the API) provide structured, parseable definitions of business concepts that Genie can match directly against user questions. They complement text instructions and example SQL queries.
-
-### When to Use SQL Expressions vs Other Instruction Types
-
-| Instruction Type | Purpose | Format | Best For |
-|---|---|---|---|
-| **SQL Expressions (Measures)** | Structured KPI definitions | `SUM(table.column)` | Top 10-20 KPIs users ask about frequently |
-| **SQL Expressions (Filters)** | Pre-built WHERE clauses | `table.col = 'value'` | Common business conditions (region, status, tier) |
-| **SQL Expressions (Dimensions)** | Grouping/derived attributes | `table.column` or `CASE WHEN...` | Key grouping attributes with user synonyms |
-| **Text Instructions** | Free-form behavioral guidance | Markdown text | Routing rules, disambiguation, aggregation rules |
-| **Example SQL Queries** | Full query templates | Complete SQL statements | Teaching Genie how to approach common question patterns |
-
-**Key Insight:** SQL Expressions define **individual reusable concepts**. Text instructions define **behavioral rules**. Example SQL queries demonstrate **complete query patterns**. Use all three together for best results.
-
-### The "Promote" Pattern
-
-The recommended workflow for SQL Expressions:
-
-1. **Write business definitions in text instructions first** (Section 3: BUSINESS DEFINITIONS in Extended Instructions)
-2. **Identify the top KPIs, common filters, and key dimensions** from those definitions
-3. **Promote them into structured `sql_snippets`** for better Genie matching
-
-This avoids duplication while ensuring the most important concepts get structured treatment.
-
-### JSON Schema
-
-SQL Expressions live in `serialized_space.instructions.sql_snippets` with three arrays:
-
-```json
-"sql_snippets": {
-  "filters": [
-    {
-      "id": "01f0ad10a1cd17470000000000000001",
-      "sql": ["${catalog}.${gold_schema}.dim_store.state = 'CA'"],
-      "display_name": "California Stores",
-      "instruction": ["Use this filter when the user asks about California, CA, or the state of California."],
-      "synonyms": ["california", "CA", "state of california"]
-    }
-  ],
-  "expressions": [
-    {
-      "id": "01f0ad10ec6214390000000000000001",
-      "sql": ["${catalog}.${gold_schema}.dim_date.month_name"],
-      "display_name": "Month Name",
-      "instruction": ["Use as a grouping dimension when the user asks for data by month."],
-      "synonyms": ["month", "monthly", "by month"]
-    }
-  ],
-  "measures": [
-    {
-      "id": "01f0ad10c9a616dc0000000000000001",
-      "sql": ["SUM(${catalog}.${gold_schema}.fact_sales.net_revenue)"],
-      "display_name": "Total Revenue",
-      "instruction": ["Use for revenue, sales, or dollar amount questions."],
-      "synonyms": ["revenue", "sales", "total sales", "dollars"]
-    }
-  ]
-}
-```
-
-### Field Requirements
-
-Every SQL Expression entry **MUST** include:
-
-| Field | Type | Requirement |
-|---|---|---|
-| `id` | string | 32-character hex ID (use `hashlib.md5` or UUID) |
-| `sql` | string[] | Working SQL fragment referencing `table.column` from trusted assets |
-| `display_name` | string | User-friendly name shown in Genie UI |
-| `instruction` | string[] | When and how Genie should apply this expression |
-| `synonyms` | string[] | 2-5 alternative terms users might use |
-
-### SQL Requirements by Type
-
-| Type | JSON Key | SQL Must... | Example |
-|---|---|---|---|
-| **Measure** | `measures` | Use an aggregation function (`SUM`, `AVG`, `COUNT`, etc.) | `SUM(table.total_sales_usd)` |
-| **Filter** | `filters` | Evaluate to a boolean condition | `table.country_code = 'US'` |
-| **Dimension** | `expressions` | Reference a column or derive a value per row (no aggregation) | `table.zone_combination` or `CASE WHEN ... END` |
-
-### UI Terminology Mapping
-
-The Databricks UI uses different labels than the JSON keys:
-
-| Databricks UI Label | JSON key in `sql_snippets` |
-|---|---|
-| Measure | `measures` |
-| Filter | `filters` |
-| Dimension | `expressions` |
-
-### What to Promote into SQL Expressions
-
-| Source (Text Instructions Section) | Promote To | Criteria |
-|---|---|---|
-| Section 3: BUSINESS DEFINITIONS — KPI formulas | `measures` | Top 10-20 KPIs users ask about |
-| Section 5: AGGREGATION RULES — common WHERE clauses | `filters` | Conditions appearing in 3+ benchmark queries |
-| Section 4: DISAMBIGUATION — grouping attributes | `expressions` | Columns with synonyms users commonly reference |
-
-### Build Script Pattern
-
-When generating Genie Space JSON programmatically, add `sql_snippets` to the `instructions` dict:
-
-```python
-SQL_EXPRESSIONS = {
-    "filters": [
-        {
-            "display_name": "California Stores",
-            "sql": f"{DIM_LOC}.state_name = 'CA'",
-            "instruction": "Use when filtering to California.",
-            "synonyms": ["california", "CA", "state of california"],
-        },
-    ],
-    "expressions": [
-        {
-            "display_name": "Zone",
-            "sql": f"{MV_METRIC}.zone_combination",
-            "instruction": "Use when grouping by zone.",
-            "synonyms": ["zone", "zone vp", "franchise zone"],
-        },
-    ],
-    "measures": [
-        {
-            "display_name": "Total Revenue",
-            "sql": f"SUM({MV_METRIC}.total_sales_usd)",
-            "instruction": "Use for revenue or sales questions.",
-            "synonyms": ["revenue", "sales", "total sales"],
-        },
-    ],
-}
-
-# In the build function:
-"instructions": {
-    "text_instructions": [...],
-    "example_question_sqls": [...],
-    "join_specs": [...],
-    "sql_snippets": {
-        k: [
-            {
-                "id": _id(f"sqlexpr_{k}_{i}"),
-                "sql": [expr["sql"]],
-                "display_name": expr["display_name"],
-                "instruction": [expr["instruction"]],
-                "synonyms": expr["synonyms"],
-            }
-            for i, expr in enumerate(v)
-        ]
-        for k, v in SQL_EXPRESSIONS.items()
-    },
-}
-```
 
 ---
 
@@ -705,9 +510,8 @@ Before submitting ANY Genie Space document:
 | **E. General Instructions** | ≤20 lines | ☐ |
 | **F. TVFs** | All functions with signatures | ☐ |
 | **G. Benchmark Questions** | 10-15 with SQL answers | ☐ |
-| **H. SQL Expressions** | Measures, filters, dimensions as `sql_snippets` | ☐ |
 
-**🔴 ALL 8 SECTIONS REQUIRED. NO EXCEPTIONS. 🔴**
+**🔴 ALL 7 SECTIONS REQUIRED. NO EXCEPTIONS. 🔴**
 
 ---
 
@@ -783,72 +587,6 @@ Before launching to users:
 - [ ] Troubleshooting guide created
 - [ ] Contact information provided
 ```
-
----
-
-## Post-Deployment Audit
-
-After deployment, Genie Space configuration can drift through manual UI edits. Use a structured audit workflow to detect and remediate drift.
-
-### Audit Workflow
-
-```bash
-# 1. Export the live Genie Space config
-python scripts/audit_genie_space.py \
-  --space-id ${space_id} \
-  --source-json src/${project}_semantic/genie_configs/${space_name}.json \
-  --output audit_report.md
-
-# 2. Review the diff report
-# The script compares live vs source and flags:
-# - Added/removed trusted assets
-# - Modified instructions (line count, content)
-# - Changed/removed benchmark questions
-# - Modified SQL Expressions (sql_snippets)
-# - Warehouse reassignment
-
-# 3. Remediate
-# Option A: Update source JSON to reflect intentional UI changes
-# Option B: Re-deploy from source JSON to revert unintentional changes
-```
-
-### What Gets Audited
-
-| Section | JSON Path | Drift Impact |
-|---------|-----------|-------------|
-| Trusted assets | `serialized_space.data_sources` | 🔴 Affects query routing |
-| General Instructions | `serialized_space.instructions.text` | 🔴 Instructions > 20 lines get truncated |
-| SQL Expressions | `serialized_space.instructions.sql_snippets` | 🔴 KPI/filter matching breaks |
-| Benchmark questions | `serialized_space.benchmarks` | 🟡 Reduces validation coverage |
-| Sample questions | `serialized_space.config.sample_questions` | 🟢 Cosmetic only |
-| Warehouse ID | `warehouse_id` | 🔴 Non-serverless degrades performance |
-
-### Integration with CI/CD
-
-Add audit as a pre-promotion gate:
-
-```yaml
-# In your DAB or CI/CD pipeline
-steps:
-  - name: audit-genie-spaces
-    script: |
-      for config in src/${project}_semantic/genie_configs/*.json; do
-        space_name=$(basename "$config" .json)
-        space_id=$(jq -r '.space_id' "$config")
-        python scripts/audit_genie_space.py \
-          --space-id "$space_id" \
-          --source-json "$config" \
-          --fail-on-drift
-      done
-```
-
-### Audit Cadence
-
-| Environment | Frequency | Purpose |
-|---|---|---|
-| Development | After each manual UI edit | Catch unintentional changes |
-| Staging | Before promotion to production | Gate for config integrity |
-| Production | Weekly (scheduled) | Detect drift from UI editors |
 
 ---
 

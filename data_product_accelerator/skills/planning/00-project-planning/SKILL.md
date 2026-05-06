@@ -27,8 +27,6 @@ metadata:
     - plans/manifests/observability-manifest.yaml
     - plans/manifests/ml-manifest.yaml
     - plans/manifests/genai-agents-manifest.yaml
-    - plans/manifests/gold-dependency-manifest.yaml
-    - plans/gold-gap-remediation.md   # emitted ONLY when live-catalog intersection finds missing tables/columns
   reads:
     - gold_layer_design/yaml/
     - gold_layer_design/erd_master.md
@@ -80,36 +78,6 @@ Use this skill when:
 - Developing agent-based frameworks for platform management
 - Creating frontend applications for data platform interaction
 - Starting a new project after Gold layer is complete
-
-## Idempotency Guard (Run FIRST)
-
-**Before regenerating plans, detect existing artifacts to avoid clobbering work-in-progress.** A common failure mode is regenerating `plans/` wholesale on a re-run and overwriting user edits to manifests, addendums, or the Use Case Catalog.
-
-```python
-from pathlib import Path
-
-PLANS_DIR = Path("plans")
-if PLANS_DIR.exists() and any(PLANS_DIR.iterdir()):
-    existing = sorted(p.relative_to(".") for p in PLANS_DIR.rglob("*") if p.is_file())
-    print("Existing plan artifacts detected:")
-    for p in existing:
-        print(f"  {p}  (mtime={Path(p).stat().st_mtime})")
-    print(
-        "\nHow would you like to proceed?\n"
-        "  - regenerate  (DELETE and rebuild all plan files — destructive)\n"
-        "  - incremental (keep existing files, only emit MISSING artifacts)\n"
-        "  - skip        (exit this orchestrator — recommended default)\n"
-    )
-```
-
-**Rules:**
-- **Default is `skip`.** If the user is silent or ambiguous, assume `skip` and exit with a summary of existing files.
-- `regenerate` must be explicit. Confirm the action ("I will delete N files under `plans/` — proceed?") before doing anything destructive.
-- `incremental` is the right choice when downstream orchestrators (semantic-layer, observability, ml, genai-agents) reported a missing manifest — only emit the missing manifest, not the whole tree.
-
-**Escape flag:** Users can set `planning_allow_overwrite: true` in their prompt to skip the idempotency check (equivalent to choosing `regenerate` without interactive confirmation).
-
----
 
 ## Quick Start (5 Minutes)
 
@@ -182,17 +150,6 @@ This orchestrator spans 3 phases. To maintain coherence without context pollutio
 
 Derive domains from your business questions and Gold table groupings (see Artifact Rationalization Framework). Do not force a fixed number — let the data model and use cases determine natural boundaries.
 
-##### Required Reads (Before Proceeding)
-
-Before defining domains and use cases, you MUST have read these references. Check each off in your Skill Usage Summary:
-
-- [ ] `references/rationalization-framework.md` — domain sizing rules, TVF creation gate, Genie Space capacity planning, naming conventions
-- [ ] `references/worked-example-wanderbricks.md` (if the project is WanderBricks or a hospitality/vacation-rental domain) OR `references/industry-domain-patterns.md` (otherwise) — domain naming, use case card depth, reference SQL patterns
-
-If a worked example matches your project, treat it as the **primary format reference** for use case cards and artifact designs — adapt, don't reinvent. "MANDATORY" means read it; note in the Skill Usage Summary if the reference did not change your decisions, but still read it.
-
-**Workshop mode:** `references/workshop-mode-profile.md` should already be loaded when `planning_mode: workshop` was detected — see its **Document Scope** section, since workshop mode changes artifact counts but NOT which documents to produce.
-
 | Domain | Icon | Focus Area | Key Gold Tables | Est. Business Questions |
 |--------|------|------------|-----------------|------------------------|
 | {Domain 1} | {emoji} | {focus} | {tables} | {count} |
@@ -244,12 +201,7 @@ After defining business questions and selecting addendums, consolidate into a **
 
 See [Worked Example: Wanderbricks](references/worked-example-wanderbricks.md) for 3 fully worked-out use case cards.
 
-**Stakeholder Checkpoint:** After generating the use case catalog, present the Use Case Summary table to the user for review. Whether to block depends on prompt specificity:
-
-- **If the user's prompt listed explicit output steps** (e.g., "analyze Gold layer, generate use-case plans, produce manifests"): treat as pre-approval. Include the summary table at the top of your response and proceed without blocking. Note: *"Use cases derived from Gold layer analysis — let me know if adjustments are needed before the next pipeline stage."*
-- **If the user's prompt was open-ended** (e.g., "create a plan"): pause and ask for confirmation before proceeding to addendum generation.
-
-If the user requests changes after seeing the summary, update the catalog and domain questions before continuing.
+**Stakeholder Checkpoint:** After generating the use case catalog, pause and present the Use Case Summary table to the user for confirmation before proceeding to addendum generation. If the user requests changes, update the catalog and domain questions before continuing.
 
 ### Phase 2: Plan Document Generation
 
@@ -265,144 +217,6 @@ Create plan documents using templates in the following order:
    - Genie Spaces — `assets/templates/phase1-genie-spaces-template.md`
 6. **Phase 2** — `assets/templates/phase2-agent-framework-template.md` (AI agents)
 7. **Phase 3** — `assets/templates/phase3-frontend-template.md` (user interface)
-
-#### Phase 2 Completion Gate
-
-Before proceeding to Phase 3 (Manifests), verify that ALL selected plan documents exist on disk.
-
-> **CANONICAL NUMBERING REFERENCE.** Every filename in the table below matches [`assets/addendum-numbering.md`](./assets/addendum-numbering.md) — the single source of truth for Phase 1 addendum numbers. If you are adding a new addendum, extend `addendum-numbering.md` **first**, then use the new name here. Never invent a number (e.g. the stale `phase1-addendum-1.1-dashboards.md` is forbidden — dashboards are `1.5-aibi-dashboards.md`).
-
-| Document | Template | Required? |
-|----------|----------|-----------|
-| `plans/README.md` | `plans-readme-template.md` | ALWAYS |
-| `plans/prerequisites.md` | `prerequisites-template.md` | ALWAYS |
-| `plans/use-case-catalog.md` | `use-case-catalog-template.md` | ALWAYS |
-| `plans/phase1-use-cases.md` | `phase1-use-cases-template.md` | ALWAYS |
-| `plans/phase1-addendum-1.2-tvfs.md` | `phase1-tvfs-template.md` | If TVFs selected |
-| `plans/phase1-addendum-1.3-metric-views.md` | (inline) | If Metric Views selected |
-| `plans/phase1-addendum-1.6-genie-spaces.md` | `phase1-genie-spaces-template.md` | If Genie Spaces selected |
-| `plans/phase1-addendum-1.4-lakehouse-monitoring.md` | (inline) | If Monitoring selected |
-| `plans/phase1-addendum-1.5-aibi-dashboards.md` | (inline) | If Dashboards selected |
-| `plans/phase1-addendum-1.7-alerting.md` | `phase1-alerting-template.md` | If Alerting selected |
-| `plans/phase1-addendum-1.1-ml-models.md` | (inline) | If ML selected |
-
-**If any required document is missing, create it from its template before generating manifests.** Manifests reference these files in `generated_from.plan_addendums` — they must exist on disk. **Workshop mode does not waive this gate**: artifact counts inside each document are capped, but the document set is unchanged.
-
-#### Phase 2 Step 5 — Emit Gold Dependency Manifest (MANDATORY)
-
-**Before Phase 3 manifest generation, extract every Gold table/column referenced across all plan addendums into a single machine-readable manifest.** This becomes the contract validated against the live catalog in the next step.
-
-Write `plans/manifests/gold-dependency-manifest.yaml` with the following shape:
-
-```yaml
-# plans/manifests/gold-dependency-manifest.yaml
-planning_mode: acceleration  # or workshop — mirror the manifest's planning_mode
-generated_from:
-  plan_addendums:
-    - plans/phase1-use-cases.md
-    - plans/phase1-addendum-1.2-tvfs.md
-    - plans/phase1-addendum-1.3-metric-views.md
-    - plans/phase1-addendum-1.5-aibi-dashboards.md
-    - plans/phase1-addendum-1.6-genie-spaces.md
-gold_dependencies:
-  - table: fact_booking_daily
-    columns: [booking_key, property_key, booking_date, net_revenue, nights]
-    referenced_by:
-      - semantic-layer/metric_views/revenue_analytics_metrics.yaml
-      - semantic-layer/tvfs/get_revenue_by_property
-      - observability/dashboards/revenue_overview.lvdash.json
-  - table: dim_property
-    columns: [property_key, property_name, destination_id, is_current]
-    referenced_by:
-      - semantic-layer/metric_views/revenue_analytics_metrics.yaml
-summary:
-  total_tables: 12
-  total_columns: 84
-  total_referenced_by: 37
-```
-
-**Rules:**
-- One entry per **distinct** Gold table; union all column references from all plan addendums.
-- `referenced_by` uses relative artifact paths (e.g., `semantic-layer/metric_views/*.yaml`) so downstream fixes can trace artifacts back to the missing column.
-- Emit this manifest even if `planning_mode: workshop` — the workshop cap applies to artifact counts, not to manifest accuracy.
-
-#### Phase 2 Step 6 — Live-Catalog Intersection (STOP Rule, MANDATORY)
-
-**Immediately after emitting the Gold dependency manifest, query the live catalog and cross-reference every table/column reference.** Downstream stages (semantic-layer, observability) all assume Gold is complete — catching gaps HERE saves 5+ deploy cycles later.
-
-```python
-import yaml
-from pathlib import Path
-from pyspark.sql import SparkSession
-
-spark = SparkSession.builder.getOrCreate()
-catalog = "<lakehouse_default_catalog>"
-gold_schema = "<gold_schema>"  # e.g., "{user_schema_prefix}_gold"
-
-manifest = yaml.safe_load(Path("plans/manifests/gold-dependency-manifest.yaml").read_text())
-
-# Pull every Gold table and column from the live catalog in one shot.
-live_cols = (
-    spark.sql(f"""
-      SELECT table_name, column_name, full_data_type
-      FROM {catalog}.information_schema.columns
-      WHERE table_schema = '{gold_schema}'
-    """).collect()
-)
-live_index = {}
-for row in live_cols:
-    live_index.setdefault(row.table_name, {})[row.column_name] = row.full_data_type
-
-# Intersect
-missing_tables, missing_columns = [], []
-for dep in manifest["gold_dependencies"]:
-    tbl = dep["table"]
-    if tbl not in live_index:
-        missing_tables.append({
-            "table": tbl,
-            "referenced_by": dep["referenced_by"],
-        })
-        continue
-    for col in dep["columns"]:
-        if col not in live_index[tbl]:
-            missing_columns.append({
-                "table": tbl,
-                "column": col,
-                "referenced_by": dep["referenced_by"],
-            })
-
-if missing_tables or missing_columns:
-    # Emit a remediation doc and STOP — do NOT generate downstream manifests.
-    remediation = Path("plans/gold-gap-remediation.md")
-    remediation.write_text(
-        "# Gold Dependency Gap Remediation\n\n"
-        "The following Gold references in plan addendums do not exist in "
-        f"`{catalog}.{gold_schema}`. Downstream orchestrators (semantic-layer, "
-        "observability, ml, genai-agents) cannot proceed until Gold is fixed.\n\n"
-        "## Missing tables\n\n"
-        + "\n".join(f"- **{m['table']}** — referenced by {m['referenced_by']}"
-                    for m in missing_tables)
-        + "\n\n## Missing columns\n\n"
-        + "\n".join(
-            f"- **{m['table']}.{m['column']}** — referenced by {m['referenced_by']}"
-            for m in missing_columns
-        )
-        + "\n\n## Next steps\n\n"
-        "1. Add the missing tables/columns to `gold_layer_design/yaml/` "
-        "(`gold/00-gold-layer-design`).\n"
-        "2. Re-run `gold/01-gold-layer-setup` to deploy the updated Gold layer.\n"
-        "3. Re-run this Planning skill to regenerate manifests.\n"
-    )
-    raise RuntimeError(
-        f"Gold gap detected: {len(missing_tables)} missing tables, "
-        f"{len(missing_columns)} missing columns. See plans/gold-gap-remediation.md. "
-        "STOP — downstream orchestrators cannot proceed."
-    )
-
-print("✅ Gold dependency manifest intersected cleanly with live catalog.")
-```
-
-**Escape flag:** If the user has an out-of-band reason to bypass the gap (e.g., Gold is intentionally incomplete for a phased rollout), they can pass `planning_allow_gold_gap: true` in their prompt. In that case, still emit `plans/gold-gap-remediation.md` as a warning, but proceed to Phase 3 with a prominent `gold_gap_acknowledged: true` marker in every downstream manifest.
 
 ### Phase 3: Manifest Generation (Plan-as-Contract)
 
@@ -588,8 +402,6 @@ For detailed architecture, design patterns, "Why Genie Spaces" comparison, and t
 | One Genie Space per domain when assets are thin | Consolidate thin domains (<10 assets) into fewer spaces |
 | TVF that duplicates a Metric View | TVFs only when multi-period/multi-table parameterized logic is needed |
 | Forcing a fixed domain count | Let business questions determine domains — 2-3 focused > 5-6 thin |
-| Counting a Genie Space as artifact coverage for a use-case question | Genie Space is an interface layer, not an implementing artifact. Every question must be answerable by at least one TVF, Metric View, or listed Gold table in the Genie Space's asset list. |
-| Inventing new YAML keys when the manifest template doesn't fit | Adapt within the template schema first. If the template is truly insufficient (e.g., unified cross-domain Genie Space), extend the template with a documented key (e.g., `unified_genie_space`) — never ship ad-hoc schema a downstream consumer doesn't know to look for. |
 
 ## Reference Files
 

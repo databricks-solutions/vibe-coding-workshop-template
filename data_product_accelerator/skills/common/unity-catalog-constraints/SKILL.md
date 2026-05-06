@@ -3,11 +3,11 @@ name: unity-catalog-constraints
 description: Unity Catalog Primary Key and Foreign Key constraint patterns for proper relational modeling in Databricks. Use when implementing star schema dimensional models with PK/FK relationships in Gold layer tables. Covers surrogate keys as PRIMARY KEYS (not business keys), facts referencing surrogate PKs via FOREIGN KEY constraints, NOT NULL requirements for PK columns, proper dimensional modeling patterns (SCD Type 1/2, date dimensions), production deployment error prevention (never define FK inline in CREATE TABLE, DATE type casting from DATE_TRUNC, avoid module imports, widget parameter naming consistency), and validation checklists. Critical for ensuring proper relational modeling and preventing constraint application errors during Gold layer deployment.
 metadata:
   author: prashanth subrahmanyam
-  version: "2.1"
+  version: "2.0"
   domain: infrastructure
   role: shared
   used_by_stages: [3, 4]
-  last_verified: "2026-04-16"
+  last_verified: "2026-02-07"
   volatility: medium
   upstream_sources:
     - name: "ai-dev-kit"
@@ -36,18 +36,6 @@ Use this skill when:
 - Creating fact tables that reference dimension tables
 - Troubleshooting constraint application errors
 - Preventing common production deployment failures
-
-## Most Common Failure
-
-> **FK constraints referencing business keys instead of surrogate PK columns.**
->
-> This is the single highest-impact failure observed in production.
-> The Gold design YAML may generate `references: dim_user(user_id)` but the PK
-> is `user_key`. Unity Catalog will reject the FK with:
-> `foreign key parent columns do not match the referenced primary key.`
->
-> **Before applying ANY FK constraint, verify the target column is a PRIMARY KEY.**
-> See the [Pre-Apply Checklist](#pre-apply-checklist) below.
 
 ## Critical Rules
 
@@ -175,32 +163,6 @@ ALTER TABLE fact_sales
 6. **Module imports in notebooks** - Inline helper functions or use pure Python
 7. **Widget parameter name mismatch** - YAML parameters must match `dbutils.widgets.get()`
 
-## Serverless Limitations
-
-UNIQUE constraints require `spark.databricks.sql.dsv2.unique.enabled = true`.
-This config **cannot be set in serverless compute** (Spark config is read-only).
-
-**Impact:** `spark.conf.set(...)` will crash the job in serverless.
-
-**Workarounds:**
-- Use classic (non-serverless) compute for the constraint application job
-- Skip UNIQUE constraints on serverless; rely on surrogate PK + FK only
-- Use a DAB job definition that targets a classic job cluster for constraint tasks
-
-## Pre-Apply Checklist
-
-Before executing any FK ALTER TABLE statement:
-
-1. **Verify target column is a PK** -- run `SHOW CONSTRAINTS IN <schema>` or `DESCRIBE EXTENDED <dim_table>` to confirm the referenced column has a PRIMARY KEY constraint
-2. **Verify PK constraint exists** -- if the dimension table was just created but PK not yet applied, the FK will fail
-3. **Verify serverless compatibility** -- if running on serverless, skip UNIQUE constraints (see Serverless Limitations above)
-4. **Verify YAML FK format** -- the `references:` field must use surrogate key columns (e.g., `dim_store(store_key)`), NOT business keys (e.g., `dim_store(store_number)`)
-
-## Cross-Skill Dependencies
-
-- **Gold Design skill** (`gold/00-gold-layer-design`): The YAML schema generator may produce FK references to business keys. During Gold implementation, validate that all `references:` fields in YAML point to surrogate PK columns before applying constraints.
-- **Gold Setup skill** (`gold/01-gold-layer-setup`): The `fk-constraint-patterns.md` reference defers to this skill for PK/FK rules. Ensure the FK application script verifies PK existence first.
-
 ## Reference Files
 
 ### [constraint-patterns.md](references/constraint-patterns.md)
@@ -225,9 +187,8 @@ Validation patterns and troubleshooting:
 
 ### [apply_constraints.py](scripts/apply_constraints.py)
 Python utility for applying constraints:
-- `verify_pk_exists()` - Verify PK constraint exists before applying FK (pre-flight check)
 - `add_primary_key()` - Add PRIMARY KEY constraint
-- `add_foreign_key()` - Add FOREIGN KEY constraint (with optional PK verification)
+- `add_foreign_key()` - Add FOREIGN KEY constraint
 - `add_unique_constraint()` - Add UNIQUE constraint (for business keys)
 - `drop_constraint()` - Drop constraint (for idempotency)
 - `apply_all_constraints()` - Example function applying all constraints

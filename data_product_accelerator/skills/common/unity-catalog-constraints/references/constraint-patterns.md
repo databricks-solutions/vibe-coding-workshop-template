@@ -82,7 +82,7 @@ CREATE TABLE ${catalog}.${schema}.dim_date (
     fiscal_year INT NOT NULL,
     fiscal_quarter INT NOT NULL,
     CONSTRAINT pk_dim_date PRIMARY KEY (date_key) NOT ENFORCED,
-    CONSTRAINT uk_date_value UNIQUE (date) NOT ENFORCED
+    CONSTRAINT uk_date UNIQUE (date) NOT ENFORCED
 )
 USING DELTA
 CLUSTER BY AUTO
@@ -168,26 +168,6 @@ ALTER TABLE ${catalog}.${schema}.fact_sales_daily
     FOREIGN KEY (date_key) 
     REFERENCES ${catalog}.${schema}.dim_date(date_key) NOT ENFORCED;
 ```
-
-## FK Must Reference Primary Key Columns
-
-**This is the most common failure in production.** Foreign keys MUST reference
-PRIMARY KEY columns. Unity Catalog will reject FKs that reference non-PK columns,
-even with NOT ENFORCED.
-
-**Error:** `foreign key parent columns do not match the referenced primary key.`
-
-**Verification before applying FK:**
-
-```sql
--- Confirm the target column is a PK
-DESCRIBE EXTENDED ${catalog}.${schema}.dim_store;
--- Look for: PRIMARY KEY (store_key) in the Constraints section
-```
-
-**Common mistake from YAML:** If the Gold design YAML contains
-`references: dim_store(store_number)`, this references the business key, not the
-surrogate PK (`store_key`). Fix the YAML before applying.
 
 ## Correct vs Incorrect Patterns
 

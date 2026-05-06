@@ -2801,7 +2801,7 @@ Timing: ~2 min
 ### Repository
 - [AGENTS.md](AGENTS.md) — Root navigator
 - [QUICKSTART.md](data_product_accelerator/QUICKSTART.md) — 9-stage prompts
-- [Instructions.md](apps_lakebase/Instructions.md) — AppKit workshop guide
+- [prompts/README.md](apps_lakebase/prompts/README.md) — AppKit Genie order · [Instructions.md](apps_lakebase/Instructions.md) — overview
 - [PRE-REQUISITES.md](PRE-REQUISITES.md) — Setup checklist
 
 ### AppKit Documentation

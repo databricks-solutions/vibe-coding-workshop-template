@@ -263,68 +263,6 @@ update_set[milestone] = (
 
 ---
 
-## Issue 12: FK Constraint References Non-PK Column
-
-**Error:** `The foreign key parent columns do not match the referenced primary key child columns`
-
-**Cause:** The YAML `foreign_keys` entry references a business key column (e.g., `dim_user(user_id)`) but the PK of that dimension is a surrogate key (e.g., `user_key`). Unity Catalog requires FK references to target PRIMARY KEY or UNIQUE columns. In serverless compute, UNIQUE constraints are unavailable, so only PK columns work.
-
-**Solution:** The `add_fk_constraints.py` script should catch the exception and log a warning:
-
-```python
-except Exception as e:
-    print(f"  ⚠️ Warning: Could not add FK constraint: {e}")
-    # FK failures are non-fatal — constraint is informational only
-```
-
-Do NOT attempt to fix this by calling `spark.conf.set("spark.databricks.sql.dsv2.unique.enabled", "true")` — this will crash in serverless (see Issue 13).
-
-**Skill Reference:** `references/fk-constraint-patterns.md` section "Serverless FK Limitation", `unity-catalog-constraints/SKILL.md`
-
----
-
-## Issue 13: spark.conf.set Fails in Serverless
-
-**Error:** Job crashes with an error when calling `spark.conf.set()` on an internal Databricks configuration in serverless compute.
-
-**Cause:** Serverless compute (`environment_version: "4"`) does not allow setting internal Spark configurations like `spark.databricks.sql.dsv2.unique.enabled`. These configs are managed by the platform.
-
-**Solution:** Never call `spark.conf.set()` on internal Databricks configs in serverless. If a config check is unavoidable, wrap it:
-
-```python
-try:
-    spark.conf.set("some.config", "value")
-except Exception as e:
-    print(f"  ⚠️ Config not settable in serverless: {e}")
-```
-
-**Prevention:** Before using `spark.conf.set`, check if the job runs on serverless (`environment_version: "4"`). If so, assume internal configs are not settable.
-
----
-
-## Issue 14: DROP CASCADE Destroys Schema Before Error-Prone Code
-
-**Scenario:** `setup_tables.py` runs `DROP SCHEMA ... CASCADE` early in the script, then subsequent code (e.g., config setting, YAML loading) fails. The schema is already gone, so both setup AND merge jobs must be re-run from scratch.
-
-**Cause:** Destructive operation (DROP) placed before code that might fail, leaving the schema empty on error.
-
-**Solution:** Use `CREATE OR REPLACE TABLE` instead of DROP+CREATE where possible. If DROP CASCADE is required (e.g., user explicitly requested clean rebuild):
-
-```python
-# Validate all preconditions BEFORE the destructive operation
-yaml_base = find_yaml_base()  # Fails fast if YAML not found
-yaml_files = list(yaml_base.rglob("*.yaml"))
-assert yaml_files, "No YAML files found — aborting before DROP"
-
-# Only now is it safe to drop
-spark.sql(f"DROP SCHEMA IF EXISTS {catalog}.{schema} CASCADE")
-spark.sql(f"CREATE SCHEMA {catalog}.{schema}")
-```
-
-**Prevention:** Place destructive operations as close as possible to the reconstruction (CREATE). Validate all preconditions — imports, config, file discovery — before any DROP.
-
----
-
 ## Quick Diagnosis Flowchart
 
 ```
@@ -338,9 +276,6 @@ Error during Gold layer?
 ├── Milestone not updating → Use conditional UPDATE SET (accumulating snapshot)
 ├── Factless fact empty → Remove aggregation, use INSERT-only MERGE
 ├── 'int' object not callable → Rename shadowed variable
-├── FK constraint failed (depends_on) → Check depends_on in job YAML
-├── FK "parent columns do not match" → FK references non-PK column; warn + skip (Issue 12)
-├── spark.conf.set crash → Never set internal configs in serverless (Issue 13)
-├── Schema empty after failure → Move DROP CASCADE after precondition checks (Issue 14)
+├── FK constraint failed → Check depends_on in job YAML
 └── Schema mismatch → Cast DATE_TRUNC to DATE
 ```

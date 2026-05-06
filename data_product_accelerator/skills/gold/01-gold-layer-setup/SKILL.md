@@ -103,7 +103,6 @@ These defaults are ALWAYS applied. There are NO exceptions, NO overrides, NO alt
 | **Change Data Feed** | `'delta.enableChangeDataFeed' = 'true'` | Every table's TBLPROPERTIES | ❌ NEVER omit (required for incremental propagation) |
 | **Row Tracking** | `'delta.enableRowTracking' = 'true'` | Every table's TBLPROPERTIES | ❌ NEVER omit (breaks downstream MV refresh) |
 | **notebook_task** | `notebook_task:` with `base_parameters:` | Every task in job YAML | ❌ NEVER use `python_task:` or CLI-style `parameters:` |
-| **FK graceful failure** | Warn + continue | Every FK in `add_fk_constraints.py` | ❌ NEVER raise/crash if FK constraint fails (serverless cannot apply FKs to non-PK columns) |
 
 See [Setup Script Patterns](references/setup-script-patterns.md) for DDL template and [Asset Bundle Job Patterns](references/asset-bundle-job-patterns.md) for job YAML template.
 
@@ -191,14 +190,6 @@ This orchestrator spans 5+ phases. To maintain coherence without context polluti
 
 **Gate:** ALL contracts must show PASSED in the script output before proceeding to Phase 1.
 
-**Minimum-viable validation (if scripts unavailable or context-constrained):**
-For each Gold table you plan to implement, run `DESCRIBE TABLE {catalog}.{silver_schema}.{silver_table}` and confirm every non-GENERATED `silver_column` in its YAML lineage exists. Output one line per table:
-```
-dim_destination: 7 lineage columns validated against silver_destinations — PASS
-dim_user: 9 lineage columns validated against silver_users — PASS
-```
-If ANY column is missing, fix the YAML lineage before proceeding.
-
 **Backup guardrail:** The merge template (`scripts/merge_gold_tables_template.py`) also embeds `validate_upstream_contracts()` as a fail-fast check in `main()`. Even if Phase 0 is skipped, the merge job will abort with a clear error before any MERGE executes.
 
 **Output:** Column resolution reports for all Gold tables, confirming source→Gold mappings are correct.
@@ -207,13 +198,7 @@ If ANY column is missing, fix the YAML lineage before proceeding.
 
 ### Phase 1: YAML-Driven Table Creation (30 min)
 
-**MANDATORY: Read each skill below using the Read tool BEFORE writing any code for this phase.**
-
-If context-constrained, read AT MINIMUM these two (they prevent the most common errors):
-- `data_product_accelerator/skills/common/unity-catalog-constraints/SKILL.md` — prevents FK-to-non-PK errors (the #1 Gold layer failure mode)
-- `data_product_accelerator/skills/gold/pipeline-workers/01-yaml-table-setup/SKILL.md` — prevents DDL and YAML discovery errors
-
-Full list:
+**MANDATORY: Read each skill below using the Read tool BEFORE writing any code for this phase:**
 
 1. `data_product_accelerator/skills/gold/pipeline-workers/01-yaml-table-setup/SKILL.md` — YAML-to-DDL patterns, `find_yaml_base()`, `build_create_table_ddl()`
 2. `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` — Standard TBLPROPERTIES by layer
@@ -266,13 +251,7 @@ These patterns extend Phase 1 based on design decisions from `design-workers/02-
 
 ### Phase 2: MERGE Script Implementation (2 hours)
 
-**MANDATORY: Read each skill below using the Read tool BEFORE writing any merge code.**
-
-If context-constrained, read AT MINIMUM these two:
-- `data_product_accelerator/skills/gold/pipeline-workers/03-deduplication/SKILL.md` — prevents MERGE duplicate-row errors (the #1 merge failure mode)
-- `data_product_accelerator/skills/gold/pipeline-workers/05-schema-validation/SKILL.md` — prevents schema mismatch at runtime
-
-Full list:
+**MANDATORY: Read each skill below using the Read tool BEFORE writing any merge code:**
 
 1. `data_product_accelerator/skills/gold/pipeline-workers/02-merge-patterns/SKILL.md` — SCD Type 1/2, fact aggregation, column mapping, `spark_sum` alias
 2. `data_product_accelerator/skills/gold/pipeline-workers/03-deduplication/SKILL.md` — Deduplication before MERGE (ALWAYS required, prevents `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE`)

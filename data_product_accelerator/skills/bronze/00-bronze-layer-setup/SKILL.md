@@ -141,27 +141,11 @@ This orchestrator spans 5 steps (Step 6 is user-triggered). To maintain coherenc
 
 ### Step 1: Gather Requirements (15 min)
 
-**🔴 MANDATORY — DO NOT SKIP even if the user's request seems complete.**
-
 Fill in the requirements template: [references/requirements-template.md](references/requirements-template.md)
 
 - Project name, entity list (5-10 tables), data source approach
 - Domain taxonomy, data classification, record counts
 - Business/technical ownership
-
-The template captures per-table governance metadata that is REQUIRED for Bronze TBLPROPERTIES in Step 3. Missing any field here cascades into governance gaps downstream:
-
-| Field | Drives TBLPROPERTY | Consequence of Skipping |
-|-------|--------------------|-------------------------|
-| Entity type (dim/fact) | `entity_type` | Missing governance metadata; Silver/Gold mis-classification |
-| Has PII (yes/no) | `contains_pii` + `class.*` governed tags | PII columns untagged; compliance risk |
-| Data classification | `data_classification` | Missing compliance metadata |
-| Business owner | `business_owner` | Unowned tables |
-| Primary key | PK constraint | Missing constraint metadata |
-
-**For Approach B/C (existing tables / external copy):** The user specifies a source but rarely specifies per-table classification. The agent MUST still fill the template by inferring from the source schema (see the "Approach C Inference Playbook" section of [references/requirements-template.md](references/requirements-template.md)). Ask the user ONLY for fields that cannot be inferred — typically just `business_owner`.
-
-**Gate:** Do not proceed to Step 2 until the requirements template is filled (inferred defaults are acceptable).
 
 ### Step 2: Choose Data Source Approach
 
@@ -306,7 +290,6 @@ TBLPROPERTIES (
 | Step | Read Skill (MANDATORY) | What It Provides |
 |------|------------------------|------------------|
 | All steps | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Core extraction principle: extract names from source, never hardcode |
-| Step 1, Step 3 | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | Table naming prefixes (`bronze_`), schema COMMENTs, PII governed tags, workflow tags |
 | Step 3 (DDLs) | `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` | Bronze TBLPROPERTIES, `CLUSTER BY AUTO`, governance metadata |
 | Step 3 (DDLs) | `data_product_accelerator/skills/common/schema-management-patterns/SKILL.md` | `CREATE SCHEMA IF NOT EXISTS`, Predictive Optimization |
 | Step 4 (Data) | `data_product_accelerator/skills/bronze/01-faker-data-generation/SKILL.md` | Faker corruption patterns, function signatures, provider examples |
@@ -315,7 +298,6 @@ TBLPROPERTIES (
 | Step 6 (if user-triggered) | `data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs fail |
 
 **NEVER do these without FIRST reading the corresponding skill:**
-- NEVER name a table or schema without reading `naming-tagging-standards`
 - NEVER write `TBLPROPERTIES` without reading `databricks-table-properties`
 - NEVER write Faker generators without reading `faker-data-generation`
 - NEVER write Asset Bundle YAML without reading `databricks-asset-bundles`

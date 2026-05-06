@@ -70,7 +70,7 @@ End-to-end workflow for setting up Databricks observability — Lakehouse Monito
 | Setting up observability end-to-end? | **Use this skill** — it orchestrates everything |
 | Only need Lakehouse Monitoring? | Read `monitoring/01-lakehouse-monitoring-comprehensive/SKILL.md` directly |
 | Only need Anomaly Detection? | Read `monitoring/04-anomaly-detection/SKILL.md` directly |
-| Only need AI/BI Dashboards? | Read `monitoring/02-databricks-aibi-dashboards/SKILL.md` directly. **Still load common skills first:** `databricks-expert-agent`, `naming-tagging-standards` |
+| Only need AI/BI Dashboards? | Read `monitoring/02-databricks-aibi-dashboards/SKILL.md` directly |
 | Only need SQL Alerts? | Read `monitoring/03-sql-alerting-patterns/SKILL.md` directly |
 
 ---

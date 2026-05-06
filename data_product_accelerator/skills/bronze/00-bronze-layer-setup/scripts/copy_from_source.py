@@ -70,12 +70,7 @@ def copy_table(spark, source_catalog, source_schema, source_table,
     count = spark.table(target_full_name).count()
     print(f"Copied {count:,} records to {target_full_name}")
 
-    # Full Bronze TBLPROPERTIES — see common/databricks-table-properties/SKILL.md
-    # The generating agent MUST substitute {domain}, {entity_type}, {contains_pii},
-    # {data_classification}, and {business_owner} from the requirements template
-    # (see references/requirements-template.md) BEFORE this script is run.
-    # Leaving the raw {placeholders} in place will raise a NameError at runtime —
-    # this is the intended fail-loud signal that Step 1 (Gather Requirements) was skipped.
+    # Enable Change Data Feed
     spark.sql(f"""
         ALTER TABLE {target_full_name}
         SET TBLPROPERTIES (
@@ -84,12 +79,6 @@ def copy_table(spark, source_catalog, source_schema, source_table,
             'delta.autoOptimize.autoCompact' = 'true',
             'layer' = 'bronze',
             'source_system' = 'copied_from_{source_catalog}.{source_schema}',
-            'domain' = '{domain}',
-            'entity_type' = '{entity_type}',
-            'contains_pii' = '{contains_pii}',
-            'data_classification' = '{data_classification}',
-            'business_owner' = '{business_owner}',
-            'technical_owner' = 'Data Engineering',
             'data_purpose' = 'testing_demo',
             'is_production' = 'false'
         )

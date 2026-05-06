@@ -3,11 +3,11 @@ name: databricks-table-properties
 description: Provides standard TBLPROPERTIES and metadata patterns for Unity Catalog Delta tables across Bronze, Silver, and Gold medallion layers. Ensures governance compliance, performance optimization, and proper metadata tagging for all table creation operations. Covers required TBLPROPERTIES by layer (Bronze, Silver DLT, Gold), mandatory CLUSTER BY AUTO configuration, Change Data Feed (CDF) enablement, auto-optimize settings, table and column comment patterns (LLM-friendly for Bronze/Silver, dual-purpose for Gold), domain values, data classification tags, and validation checklists. Use when creating Delta tables, configuring table properties, enabling CDF, setting up auto-optimize, or ensuring governance metadata consistency. Critical for preventing missing properties, incorrect clustering configurations, and governance compliance issues.
 metadata:
   author: prashanth subrahmanyam
-  version: "1.1"
+  version: "1.0"
   domain: infrastructure
   role: shared
   used_by_stages: [1, 2, 3, 4]
-  last_verified: "2026-04-16"
+  last_verified: "2026-02-07"
   volatility: medium
   upstream_sources:
     - name: "ai-dev-kit"
@@ -28,7 +28,7 @@ Every table creation (Bronze, Silver, Gold) uses a consistent set of TBLPROPERTI
 
 See `assets/templates/table-properties.sql` for complete SQL templates.
 
-### Bronze Layer Tables (11 required properties + optional retention)
+### Bronze Layer Tables
 
 ```python
 TBLPROPERTIES (
@@ -48,7 +48,7 @@ TBLPROPERTIES (
 )
 ```
 
-### Silver Layer DLT Tables (15 required properties)
+### Silver Layer DLT Tables
 
 ```python
 table_properties={
@@ -70,7 +70,7 @@ table_properties={
 }
 ```
 
-### Gold Layer Tables (14 required properties)
+### Gold Layer Tables
 
 ```python
 TBLPROPERTIES (
@@ -212,8 +212,6 @@ Standard domains used in this project:
 ## Validation Checklist
 
 When creating any table, ensure:
-- [ ] **Property count**: Bronze tables have 11+ TBLPROPERTIES, Silver have 15, Gold have 14
-- [ ] **Cross-reference**: Properties match THIS skill's layer section, not just the calling template
 - [ ] `layer` property matches the actual layer
 - [ ] `domain` is from the standard list
 - [ ] `entity_type` is dimension, fact, or quarantine
@@ -260,12 +258,6 @@ TBLPROPERTIES (
 CLUSTER BY AUTO
 COMMENT 'LLM: Bronze layer dimension table containing retail store location details with full UC compliance. Store details to link across other views and ensure accuracy of data linkage.'
 ```
-
-## Gotchas
-
-- **Templates in worker skills may be incomplete.** The `copy_from_source.py` template and `data-source-approaches.md` examples in the Bronze skill contain only performance properties (CDF, auto-optimize). After copying from ANY template, cross-check every table against the required property list for its layer in THIS skill. Anti-pattern: assuming the template has all properties.
-- **DEEP CLONE preserves some properties but not all.** DEEP CLONE preserves CDF settings, CLUSTER BY AUTO, column COMMENTs, PK constraints, and row tracking metadata. It does NOT automatically set governance properties (`domain`, `entity_type`, `contains_pii`, `data_classification`, `business_owner`, `technical_owner`). After every DEEP CLONE, apply the remaining enterprise TBLPROPERTIES with `ALTER TABLE ... SET TBLPROPERTIES`. See `assets/templates/table-properties.sql` for the post-clone template.
-- **Skipping requirements collection makes correct properties impossible.** If per-table metadata (`entity_type`, `contains_pii`, `data_classification`) is never collected from the user or schema CSV, the agent cannot set the right values. Always resolve these before writing DDL.
 
 ## References
 

@@ -12,7 +12,7 @@ metadata:
   called_by:
     - gold-layer-design
   standalone: true
-  last_verified: "2026-04-17"
+  last_verified: "2026-02-19"
   volatility: low
   upstream_sources: []
 ---
@@ -318,142 +318,6 @@ def validate_yaml_mandatory_fields(yaml_dir: Path) -> dict:
     }
 ```
 
-## Validation 5: Cross-Worker Semantic Rule Compliance
-
-### What to Check
-
-Structural validations 1-4 only confirm that fields exist and references resolve. They pass even when the design has used the wrong transformation type, paraphrased the FK shape, left `true`/`false` in business dimensions, or forgot an unknown-member row. Validation 5 closes this gap by enforcing the semantic rules shared across the design-worker skills.
-
-### Rule Table
-
-| # | Rule | Authoritative source | How to detect a violation |
-|---|------|---------------------|---------------------------|
-| 1 | No `BOOLEAN` columns in business-sourced dimensions | `design-workers/02-dimension-patterns` Rule 3 | `col.type == "BOOLEAN"` in any `dim_*.yaml` except `dim_date` / `dim_time` whitelist |
-| 2 | Every dimension referenced by a `nullable: true` FK declares `unknown_member:` | `references/yaml-schema-patterns.md` Unknown Member section | Scan fact YAMLs for `nullable: true` FKs, then check target dim has an `unknown_member` block |
-| 3 | Every `lineage.transformation` value is in the 15-item enum | `00-gold-layer-design/SKILL.md` Phase 4 | `transformation not in STANDARD_TRANSFORMATIONS` |
-| 4 | Every `foreign_keys:` entry uses `{columns, references, nullable}` shape | `DESIGN_DECISIONS.md` FK contract | Missing any of the three keys, or extra keys |
-| 5 | No literal `[`, `]`, `<`, or `>` characters inside `description:` strings | `common/naming-tagging-standards` description pattern | `re.search(r"[\[\]<>]", description)` matches |
-| 6 | Mandatory top-level YAML keys present (`table_name`, `domain`, `description`, `table_properties`, `clustering`, `columns`, `primary_key`) | `DESIGN_DECISIONS.md` top-level key contract | Any mandatory key missing |
-| 7 | Fact measures declare `additivity: additive | semi_additive | non_additive` | `design-workers/03-fact-patterns` | `measures` entry missing `additivity` |
-
-### Validation Pattern
-
-```python
-import re
-import yaml
-from pathlib import Path
-
-# Authoritative constants (copy-paste into the validation subagent)
-STANDARD_TRANSFORMATIONS = {
-    "DIRECT_COPY", "RENAME", "CAST",
-    "AGGREGATE_SUM", "AGGREGATE_SUM_CONDITIONAL",
-    "AGGREGATE_COUNT", "AGGREGATE_AVG",
-    "DERIVED_CALCULATION", "DERIVED_CONDITIONAL",
-    "HASH_MD5", "HASH_SHA256",
-    "COALESCE", "DATE_TRUNC", "GENERATED", "LOOKUP",
-}
-
-MANDATORY_FK_KEYS = {"columns", "references", "nullable"}
-
-# Description must NOT contain placeholder-bracket characters as literals
-DESC_FORBIDDEN_CHARS = re.compile(r"[\[\]<>]")
-
-BOOLEAN_DIM_WHITELIST = {"dim_date", "dim_time"}
-
-
-def validate_semantic_rules(yaml_dir: Path) -> dict:
-    """Cross-worker semantic rule compliance (Validation 5)."""
-    issues = []
-    dim_unknown_members = {}  # dim_name -> bool (has unknown_member?)
-    fact_nullable_fks = []    # list of (fact_name, target_dim)
-
-    # Pass 1: scan every YAML
-    for yaml_file in yaml_dir.rglob("*.yaml"):
-        with open(yaml_file) as f:
-            spec = yaml.safe_load(f)
-        table_name = spec.get("table_name", yaml_file.stem)
-        is_dim = table_name.startswith("dim_")
-        is_fact = table_name.startswith("fact_")
-
-        # Rule 6: top-level key presence
-        for key in ("table_name", "domain", "description", "table_properties", "clustering", "columns", "primary_key"):
-            if key not in spec:
-                issues.append(f"{table_name}: missing mandatory top-level key '{key}'")
-
-        # Rule 1: no BOOLEAN in business dims
-        if is_dim and table_name not in BOOLEAN_DIM_WHITELIST:
-            for col in spec.get("columns", []):
-                if col.get("type") == "BOOLEAN":
-                    issues.append(
-                        f"{table_name}.{col['name']}: BOOLEAN not allowed in business dimension "
-                        f"(convert to STRING per 02-dimension-patterns Rule 3)"
-                    )
-
-        # Rule 2 prep: track unknown_member presence
-        if is_dim:
-            dim_unknown_members[table_name] = "unknown_member" in spec
-
-        # Rule 4: FK shape
-        for fk in spec.get("foreign_keys", []):
-            keys = set(fk.keys())
-            missing = MANDATORY_FK_KEYS - keys
-            if missing:
-                issues.append(
-                    f"{table_name}: foreign_keys entry missing keys {sorted(missing)} "
-                    f"(got {sorted(keys)})"
-                )
-            if is_fact and fk.get("nullable") is True:
-                # Resolve target dim name from 'references: dim_X(col)'
-                ref = fk.get("references", "")
-                target = ref.split("(")[0].strip()
-                if target:
-                    fact_nullable_fks.append((table_name, target))
-
-        # Rules 3 and 5 per column
-        for col in spec.get("columns", []):
-            desc = col.get("description", "")
-            if DESC_FORBIDDEN_CHARS.search(desc):
-                issues.append(
-                    f"{table_name}.{col['name']}: description contains literal bracket/angle char "
-                    f"(placeholders are not literal per naming-tagging-standards)"
-                )
-            lineage = col.get("lineage") or {}
-            tfm = lineage.get("transformation")
-            if tfm and tfm not in STANDARD_TRANSFORMATIONS:
-                issues.append(
-                    f"{table_name}.{col['name']}: transformation '{tfm}' not in 15-type enum "
-                    f"(see 00-gold-layer-design Phase 4 edge-case mapping)"
-                )
-
-        # Rule 7: fact measures must declare additivity
-        if is_fact:
-            for m in spec.get("measures", []):
-                if "additivity" not in m:
-                    issues.append(
-                        f"{table_name}: measure '{m.get('name', '?')}' missing 'additivity' "
-                        f"(additive | semi_additive | non_additive)"
-                    )
-
-    # Rule 2 resolve: every dim referenced by nullable FK must have unknown_member
-    for fact_name, target_dim in fact_nullable_fks:
-        if target_dim in dim_unknown_members and not dim_unknown_members[target_dim]:
-            issues.append(
-                f"{target_dim}: referenced by {fact_name} with nullable: true FK, "
-                f"but dimension does not declare 'unknown_member:' block"
-            )
-
-    return {"valid": len(issues) == 0, "issues": issues}
-```
-
-### Wiring Into the Full Workflow
-
-Add Validation 5 alongside the existing four in `run_design_validation`:
-
-```python
-# Validation 5: Cross-Worker Semantic Rule Compliance
-results["semantic_rules"] = validate_semantic_rules(yaml_dir)
-```
-
 ## Complete Design Validation Workflow
 
 Run all four validations as a comprehensive pre-handoff check:
@@ -516,7 +380,6 @@ Before handing off to implementation:
 - [ ] **Mandatory Fields:** All YAML schemas include `clustering: auto`, CDF, row tracking, auto-optimize, layer tag
 - [ ] **PK NOT NULL:** All PRIMARY KEY columns have `nullable: false`
 - [ ] **Grain Documented:** All fact tables have explicit `grain` and `grain_type` in YAML
-- [ ] **Semantic rule compliance:** Transformation enum, FK format, description format, booleans, unknown_member — all pass (Validation 5)
 
 ## Reference Files
 

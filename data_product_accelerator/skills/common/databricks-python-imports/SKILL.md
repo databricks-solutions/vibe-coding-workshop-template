@@ -1,13 +1,13 @@
 ---
 name: databricks-python-imports
-description: Patterns for sharing code between Databricks notebooks using pure Python files and standard imports. Covers Asset Bundle path setup (rsplit canonical pattern), notebook-to-module conversion, import patterns vs %run magic commands, job submission context vs notebook context, MLflow model packaging path requirements, and troubleshooting ModuleNotFoundError. Use when creating shared modules, deploying jobs that import local code, or packaging MLflow models with local dependencies.
+description: Patterns for sharing code between Databricks notebooks using pure Python files and standard imports. Enables code reuse across notebooks, especially after dbutils.library.restartPython(). Covers Asset Bundle path setup, notebook-to-module conversion, import patterns vs %run magic commands, and troubleshooting ModuleNotFoundError. Use when creating shared configuration modules, utility functions, or helper code that needs to be imported across multiple notebooks in serverless environments.
 metadata:
   author: prashanth subrahmanyam
-  version: "1.1"
+  version: "1.0"
   domain: infrastructure
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-  last_verified: "2026-04-16"
+  last_verified: "2026-02-07"
   volatility: medium
   upstream_sources:
     - name: "ai-dev-kit"
@@ -19,76 +19,6 @@ metadata:
       sync_commit: "97a3637"
 ---
 # Databricks Python Imports and Code Sharing
-
-## CRITICAL: Canonical Path Resolution
-
-The ONLY acceptable pattern for computing the Asset Bundle root is `rsplit`:
-
-```python
-_bundle_root = "/Workspace" + str(_notebook_path).rsplit('/src/', 1)[0]
-```
-
-NEVER use project-specific `.replace()` calls. This is the #1 failure mode observed in production.
-
-| Pattern | Verdict |
-|---------|---------|
-| `rsplit('/src/', 1)[0]` | CORRECT -- works for any project |
-| `.replace("/src/my_project", "")` | WRONG -- breaks when project name changes |
-| `.replace("/src/booking_app_semantic", "")` | WRONG -- hardcoded to one project |
-
-## Shared Helper: `_notebook_paths.py` (PREFERRED)
-
-**New scripts must use the shared helper — do not re-implement bundle-root resolution inline.**
-
-- **Source of truth:** [`assets/_notebook_paths.py`](assets/_notebook_paths.py)
-- **Exports:** `resolve_bundle_root`, `ensure_bundle_root_on_path`, `bundle_path`, `fail_loud`
-- **Scaffold placement:** copy to `src/common/_notebook_paths.py` in the generated project so every notebook can import it with `from src.common._notebook_paths import ...`.
-
-### Canonical notebook header (new scripts)
-
-```python
-# Databricks notebook source
-import sys, os
-from pathlib import Path
-
-# Minimal bootstrap: prepend bundle root to sys.path so we can import the helper.
-try:
-    _nb = (
-        dbutils.notebook.entry_point.getDbutils()
-        .notebook().getContext().notebookPath().get()
-    )
-    _root = "/Workspace" + str(_nb).rsplit("/src/", 1)[0]
-    if _root not in sys.path:
-        sys.path.insert(0, _root)
-except Exception:
-    pass  # Local execution
-
-from src.common._notebook_paths import ensure_bundle_root_on_path, bundle_path, fail_loud
-
-BUNDLE_ROOT = ensure_bundle_root_on_path(verbose=True)
-# ... the rest of your notebook follows ...
-```
-
-### Fail-loud rule (CRITICAL)
-
-**Never use `sys.exit(0)` to report a failure.** Exit code 0 is success — Databricks Jobs will mark the run as green and silently propagate broken deploys to downstream tasks.
-
-| Pattern | Verdict |
-|---------|---------|
-| `raise RuntimeError("…")` / `fail_loud("…")` | CORRECT — job marked FAILED, traceback visible |
-| `sys.exit(0)` after printing an error | WRONG — run shows green, failure hidden |
-| `sys.exit(1)` | Acceptable for top-level CLI; prefer `raise` in notebooks |
-
-### `__file__` is undefined in notebook cells
-
-Do not use `__file__` to locate asset files inside a Databricks notebook — it raises `NameError` once the code runs in the notebook context. Always use `bundle_path("src", "semantic", "metric_views", "revenue.yaml")` (or the raw `rsplit` pattern) instead.
-
-## When NOT to Use This Skill
-
-Skip this skill entirely when:
-- Single-notebook scenarios with no cross-notebook imports
-- Notebooks that don't share code with other notebooks or pure Python modules
-- Pure SQL notebooks or `%run`-only workflows without `restartPython()`
 
 ## Core Principle: Pure Python Files for Importable Code
 
@@ -223,7 +153,35 @@ from monitor_configs import get_all_monitor_configs  # ❌ ModuleNotFoundError
 
 ## Conversion Pattern
 
-To convert a Databricks notebook to an importable pure Python file, remove the `# Databricks notebook source` header line. That is the only change required. See [references/import-patterns-and-examples.md](references/import-patterns-and-examples.md) for a detailed before/after walkthrough.
+### Converting Databricks Notebook to Pure Python File
+
+**BEFORE (Notebook - Not Importable):**
+```python
+# Databricks notebook source
+
+"""
+Centralized Monitor Configuration
+"""
+
+from databricks.sdk.service.catalog import MonitorTimeSeries
+
+def get_all_configs():
+    return [...]
+```
+
+**AFTER (Pure Python - Importable):**
+```python
+"""
+Centralized Monitor Configuration
+"""
+
+from databricks.sdk.service.catalog import MonitorTimeSeries
+
+def get_all_configs():
+    return [...]
+```
+
+**Change Required:** Remove line 1: `# Databricks notebook source`
 
 ## Import Patterns
 
@@ -280,28 +238,182 @@ exec(open("config_module.py").read())
 - Code duplication creates maintenance burden
 - `exec()` is a security risk and hard to debug
 
-## Job Submission Context vs Notebook Context
+## Use Cases
 
-When code runs as a **job submission** (not interactive notebook), key differences apply:
+### Shared Configuration Modules
 
-- **CWD is `/`**, not the notebook directory -- relative file paths fail
-- **MLflow `log_model()` copies code to a temp directory** -- relative file references (e.g., `model_config="agent-config.yaml"`) will fail unless the file is co-located or referenced with an absolute path
-- **`mlflow[databricks]`** is required on Azure (not just `mlflow`) -- without it, `mlflow.register_model()` raises `ModuleNotFoundError: azure.core`
+**Pattern:** Configuration loaded in multiple notebooks/jobs
 
-See [references/job-context-guide.md](references/job-context-guide.md) for full patterns and examples.
+```python
+# monitor_configs.py (pure Python file)
+"""
+Centralized monitor configurations for all monitoring jobs.
+"""
 
-## Use Cases and Examples
+from databricks.sdk.service.catalog import MonitorTimeSeries
 
-Common patterns: shared configuration modules (monitor configs, DQ rules), utility functions used across layers (Bronze/Silver/Gold), and helper functions (surrogate keys, transformations). See [references/import-patterns-and-examples.md](references/import-patterns-and-examples.md) for detailed code examples and a decision table for when to use pure Python files vs notebooks vs `%run`.
+def get_all_monitor_configs(catalog: str, schema: str):
+    """Returns list of monitor configurations with custom metrics."""
+    return [
+        {
+            "table_name": f"{catalog}.{schema}.fact_sales",
+            "custom_metrics": _get_sales_metrics(),
+            ...
+        }
+    ]
 
-## Common Mistakes and Troubleshooting
+def _get_sales_metrics():
+    """99 custom metrics for sales monitoring."""
+    return [...]
+```
 
-See [references/troubleshooting.md](references/troubleshooting.md) for diagnosis steps and fixes for:
-- `ModuleNotFoundError` after `restartPython()` (notebook header issue)
-- `NameError` after `%run` and `restartPython()` (use standard import)
-- `ModuleNotFoundError: azure.core` on Azure (use `mlflow[databricks]`)
-- `FileNotFoundError` for `model_config` YAML in job context (use absolute paths)
-- Project-specific `.replace()` anti-pattern (use `rsplit`)
+**Usage in Multiple Notebooks:**
+
+```python
+# setup_monitors.py
+from monitor_configs import get_all_monitor_configs
+
+configs = get_all_monitor_configs(catalog, schema)
+workspace_client.quality_monitors.create(**configs[0])
+```
+
+```python
+# update_monitors.py
+from monitor_configs import get_all_monitor_configs
+
+configs = get_all_monitor_configs(catalog, schema)
+workspace_client.quality_monitors.update(**configs[0])
+```
+
+### Shared Utility Functions
+
+**Pattern:** Utility functions used across layers
+
+```python
+# data_quality_rules.py (pure Python file)
+"""
+Centralized data quality rules for all DLT tables.
+"""
+
+def get_critical_rules_for_table(table_name: str):
+    """Returns critical DQ rules that will drop records."""
+    return {...}
+
+def get_warning_rules_for_table(table_name: str):
+    """Returns warning DQ rules that will log but pass."""
+    return {...}
+```
+
+**Usage in DLT Notebooks:**
+
+```python
+# silver_transactions.py
+import dlt
+from data_quality_rules import get_critical_rules_for_table
+
+@dlt.table(...)
+@dlt.expect_all_or_fail(get_critical_rules_for_table("silver_transactions"))
+def silver_transactions():
+    return dlt.read_stream("bronze_transactions")
+```
+
+### Shared Helper Functions
+
+```python
+# helpers.py (pure Python file)
+"""
+Common helper functions for data transformations.
+"""
+
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import col, sha2, concat_ws
+
+def generate_surrogate_key(df: DataFrame, key_columns: list) -> DataFrame:
+    """Generates MD5 surrogate key from specified columns."""
+    return df.withColumn(
+        "surrogate_key",
+        sha2(concat_ws("||", *[col(c) for c in key_columns]), 256)
+    )
+```
+
+## When Each Approach Is Appropriate
+
+### Use Pure Python File When:
+- ✅ Code needs to be imported in multiple notebooks
+- ✅ Configuration shared across create/update operations
+- ✅ Utility functions used across layers (Bronze/Silver/Gold)
+- ✅ Need code after `restartPython()` (SDK upgrades)
+- ✅ Want standard Python import semantics
+
+### Use Databricks Notebook When:
+- ✅ Executable job/task (not shared code)
+- ✅ Interactive development and testing
+- ✅ Running as workflow step
+- ✅ Not imported by other notebooks
+- ✅ Need Databricks magic commands (`%run`, `%sql`, etc.)
+
+### Use %run When:
+- ✅ **Before** `restartPython()` only
+- ✅ One-time code execution in interactive notebooks
+- ❌ **Not** after `restartPython()` in Asset Bundles
+- ❌ **Not** for shared code that needs to persist
+
+## Common Mistakes
+
+### ❌ Mistake 1: Notebook Header in Shared Code
+
+```python
+# config.py
+# Databricks notebook source  # ❌ Makes it a notebook!
+
+def get_config():
+    return {...}
+```
+
+**Fix:** Remove the notebook header
+
+```python
+# config.py
+def get_config():
+    return {...}
+```
+
+### ❌ Mistake 2: Trying to Import Notebook
+
+```python
+# job.py
+%pip install --upgrade "databricks-sdk>=0.28.0" --quiet
+dbutils.library.restartPython()
+
+from config import get_config  # ❌ Fails if config.py is notebook
+```
+
+**Error:** `ModuleNotFoundError: No module named 'config'`
+
+**Fix:** Convert `config.py` to pure Python file (remove notebook header)
+
+### ❌ Mistake 3: Using %run After restartPython()
+
+```python
+# job.py
+%pip install --upgrade "databricks-sdk>=0.28.0" --quiet
+dbutils.library.restartPython()
+
+%run ./config  # ❌ Doesn't work in deployed Asset Bundles
+
+get_config()  # ❌ NameError: name 'get_config' is not defined
+```
+
+**Fix:** Convert to pure Python file and use standard import
+
+```python
+%pip install --upgrade "databricks-sdk>=0.28.0" --quiet
+dbutils.library.restartPython()
+
+from config import get_config  # ✅ Works with pure Python file
+
+get_config()  # ✅ Available
+```
 
 ## Validation Checklist
 
@@ -322,11 +434,51 @@ When importing shared code:
 - [ ] No sys.path manipulation needed
 - [ ] No code duplication
 
-When using Asset Bundle path setup:
+## Troubleshooting
 
-- [ ] Uses `rsplit('/src/', 1)[0]` -- NEVER `.replace()` with project-specific strings
-- [ ] Path setup block is immediately after `# Databricks notebook source`
-- [ ] On Azure with MLflow: using `mlflow[databricks]`, not just `mlflow`
+### Problem: ModuleNotFoundError after restartPython()
+
+**Symptoms:**
+```python
+dbutils.library.restartPython()
+from config import get_config
+# ModuleNotFoundError: No module named 'config'
+```
+
+**Diagnosis Steps:**
+1. Check if `config.py` has `# Databricks notebook source` header
+2. Verify file is in same directory as importing notebook
+3. Check file has `.py` extension
+
+**Solution:**
+```python
+# In config.py, remove this line if present:
+# Databricks notebook source  # ❌ Remove this!
+
+# File should start with module docstring:
+"""
+Configuration module
+"""
+```
+
+### Problem: NameError after %run and restartPython()
+
+**Symptoms:**
+```python
+%run ./config
+dbutils.library.restartPython()
+get_config()  # NameError: name 'get_config' is not defined
+```
+
+**Root Cause:** `restartPython()` clears all function definitions, including from `%run`
+
+**Solution:** Use standard import instead of `%run`
+
+```python
+dbutils.library.restartPython()
+from config import get_config  # ✅ Persistent import
+get_config()  # ✅ Works
+```
 
 ## References
 
@@ -342,6 +494,6 @@ When using Asset Bundle path setup:
 
 ---
 
-**Last Updated:** April 16, 2026  
+**Last Updated:** October 24, 2025  
 **Pattern Origin:** Production issue resolution - update_monitors job  
-**Key Lesson:** Always use `rsplit('/src/', 1)[0]` for path resolution; always check if shared code is pure Python file vs. Databricks notebook
+**Key Lesson:** Always check if shared code is pure Python file vs. Databricks notebook

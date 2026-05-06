@@ -31,26 +31,6 @@ Workshop mode produces a **minimal representative plan** for Learning & Enableme
 | 1.3 Metric Views | 1.5 AI/BI Dashboards | Phase 2 (Agents) |
 | 1.6 Genie Spaces | 1.7 Alerting | Phase 3 (Frontend) |
 
-## Document Scope
-
-Workshop mode caps **artifact counts within documents**, not **which documents to produce**. All Phase 2 plan documents from the main SKILL.md remain required:
-
-| Document | Required? | Workshop Behavior |
-|----------|-----------|-------------------|
-| `plans/README.md` | YES | Same structure; workshop scope noted |
-| `plans/prerequisites.md` | YES | Bronze/Silver/Gold summary unchanged |
-| `plans/use-case-catalog.md` | YES | 2-4 workshop-capped use cases |
-| `plans/phase1-use-cases.md` | YES | Master with workshop-capped artifact summary |
-| `plans/phase1-addendum-1.2-tvfs.md` | YES | Lists 3-5 TVFs only |
-| `plans/phase1-addendum-1.3-metric-views.md` | YES | Lists 1-2 MVs only |
-| `plans/phase1-addendum-1.6-genie-spaces.md` | YES | Lists 1 unified space |
-| Addendums for 1.4 / 1.5 / 1.7 / 1.1 | IF REQUESTED | Workshop-capped counts |
-| `plans/manifests/*.yaml` | YES | 4 manifests with `planning_mode: workshop` |
-
-**Anti-pattern to avoid:** *"Workshop mode = read less, write less."* WRONG. Workshop mode = **same reads, same document set, fewer artifacts per document**. The addendum documents ARE the human-readable plan; manifests are the machine-readable contract. Both are required regardless of mode.
-
-Also see: Phase 2 Completion Gate in the main [SKILL.md](../SKILL.md) — it enforces this document set with a pre-manifest validation step.
-
 ## Selection Principle
 
 Pick the **most representative** artifact for each pattern type. Prefer **variety of patterns** over depth in a single domain:

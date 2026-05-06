@@ -1,9 +1,9 @@
 ---
 name: naming-tagging-standards
-description: Enforces enterprise naming conventions (snake_case, table prefixes, approved abbreviations), dual-purpose COMMENT formats for tables/columns/TVFs/metric views/dashboards/Genie Spaces, and config-aware tagging standards. Scans context/ for customer tagging standards in any format (YAML, CSV, Markdown, JSON, TXT); derives meaningful smart defaults when none supplied. Uses Databricks Data Classification class.* system governed tags for PII (always inferred from column names + customer declarations). Ensures tag consistency across all project assets. Triggers on "naming", "comment", "COMMENT", "schema COMMENT", "tag", "PII", "cost_center", "snake_case", "dim_", "fact_", "governed tag", "budget policy", "class.*", "data classification", "dashboard", "metric view", "Genie Space".
+description: Enforces enterprise naming conventions (snake_case, table prefixes, approved abbreviations), dual-purpose COMMENT formats for tables/columns/TVFs/metric views, and config-aware tagging standards. Scans context/ for customer tagging standards in any format (YAML, CSV, Markdown, JSON, TXT); derives meaningful smart defaults when none supplied. Uses Databricks Data Classification class.* system governed tags for PII (always inferred from column names + customer declarations). Ensures tag consistency across all project assets. Triggers on "naming", "comment", "COMMENT", "tag", "PII", "cost_center", "snake_case", "dim_", "fact_", "governed tag", "budget policy", "class.*", "data classification".
 metadata:
   author: prashanth subrahmanyam
-  version: "3.1"
+  version: "3.0"
   domain: common
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -17,7 +17,7 @@ metadata:
     - monitoring/00-observability-setup
     - ml/00-ml-pipeline-setup
     - genai-agents/00-genai-agents-setup
-  last_verified: "2026-04-16"
+  last_verified: "2026-02-07"
   volatility: low
   upstream_sources: []  # Internal naming convention
 ---
@@ -35,18 +35,6 @@ After reading this skill, retain these 5 rules and release the full content:
 3. **Dual-purpose COMMENT pattern** — `[Definition]. Business: [context]. Technical: [details].`
 4. **Mandatory tags** — `layer`, `domain`, `PII` (via `class.*` governed tags) on every table; `team`, `cost_center`, `environment` on every workflow
 5. **Budget policy tag** — all serverless resources must use approved budget policies
-
-## Naming Quick Test (5-Point Gate)
-
-Before generating ANY DDL, YAML, or Asset Bundle resource, verify all 5:
-
-1. **Layer prefix?** — `bronze_`, `silver_`, `dim_`, `fact_`, `bridge_`, `agg_`
-2. **snake_case?** — No camelCase, PascalCase, SCREAMING_CASE, kebab-case, or spaces
-3. **Schema COMMENT?** — Every schema has a COMMENT via `COMMENT ON SCHEMA`
-4. **Table/column COMMENTs?** — Dual-purpose format on every table and column
-5. **PII governed tags?** — Scanned column names for `class.*` tag candidates
-
-**If ANY answer is NO, stop and fix before proceeding.**
 
 ## Golden Rules
 
@@ -182,9 +170,6 @@ The canonical schema the agent normalizes to is defined in [references/canonical
 | Function | `get_{entity}_{action}` | `get_daily_sales` |
 | Job | `[${bundle.target}] {Domain} - {Action} {Entity}` | `[dev] Sales - Merge Orders` |
 | Pipeline | `[${bundle.target}] {Layer} {Domain} Pipeline` | `[dev] Silver Sales Pipeline` |
-| Dashboard | `{Domain} - {Report Type}` | `Sales - Revenue Overview` |
-| Metric View | `mv_{domain}_{entity}` | `mv_billing_cost_summary` |
-| Genie Space | `{Domain} {Description} Space` | `Hospitality Booking Analytics Space` |
 
 **Never use:** `camelCase`, `PascalCase`, `SCREAMING_CASE`, `kebab-case`, or spaces.
 
@@ -247,8 +232,6 @@ All DDL must include `/* */` block comments with purpose, grain, and source:
 ```
 [One-line description]. Business: [use cases, consumers]. Technical: [grain, source, update frequency].
 ```
-
-> **Note:** Square brackets `[]` above are placeholders — replace with actual content. Do not include literal brackets in the output.
 
 Examples:
 

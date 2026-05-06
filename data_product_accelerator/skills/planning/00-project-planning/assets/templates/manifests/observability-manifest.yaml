@@ -41,21 +41,10 @@ gold_schema: ${gold_schema}
 lakehouse_monitors:
   # ---------------------------------------------------------------------------
   # Fact table monitors (highest priority — TimeSeries)
-  #
-  # TIMESTAMP SELECTION RULE (CRITICAL): For TimeSeries monitors,
-  # `timestamp_column` MUST be a business event date/timestamp — the column
-  # with an FK to `dim_date` (e.g., `booking_date`, `payment_date`,
-  # `review_date`). NEVER use audit columns like `record_created_timestamp`
-  # or `record_updated_timestamp`. Audit timestamps reflect pipeline cadence,
-  # not business event cadence, and produce false positives on every late
-  # or early pipeline run.
-  #
-  # Selection rule: choose the DATE or TIMESTAMP column that represents
-  # WHEN THE BUSINESS EVENT OCCURRED, not when the row was ingested.
   # ---------------------------------------------------------------------------
   - table_name: "fact_{entity}"
     monitor_type: TimeSeries
-    timestamp_column: "{business_event_date_column}"  # FK to dim_date — NOT an audit timestamp
+    timestamp_column: "{timestamp_column}"
     domain: "{domain}"
     use_case_refs:              # Links back to plans/use-case-catalog.md
       - "UC-001"                # {Use case name}

@@ -11,14 +11,8 @@ resources:
       name: "[${bundle.target}] {Project} Gold Layer - MERGE Updates"
       description: "Periodic MERGE operations from Silver to Gold"
 
-      environments:
-        - environment_key: "default"
-          spec:
-            environment_version: "4"
-
       tasks:
         - task_key: merge_gold_tables
-          environment_key: default
           notebook_task:
             notebook_path: ../../src/{project}_gold/merge_gold_tables.py
             base_parameters:

@@ -77,8 +77,7 @@ End-to-end workflow for creating production-grade Silver layer pipelines using S
 | DQ rules table | `common/unity-catalog-constraints` | PRIMARY KEY constraint syntax |
 | Rules loader | `common/databricks-python-imports` | Pure Python module patterns (NO notebook header) |
 | DLT notebooks | `common/databricks-table-properties` | Silver-layer TBLPROPERTIES (CDF, row tracking, auto-optimize) |
-| Pipeline config | `common/databricks-asset-bundles` | DLT pipeline YAML, job YAML, serverless config, multi-user `user_prefix` pattern |
-| Pipeline config | `common/naming-tagging-standards` | Enterprise naming, COMMENTs, tags, PII classifications for every DDL and resource |
+| Pipeline config | `common/databricks-asset-bundles` | DLT pipeline YAML, job YAML, serverless config |
 | Deployment (if user-triggered) | `common/databricks-autonomous-operations` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs/pipelines fail |
 
 **NEVER do these without FIRST reading the corresponding skill:**
@@ -87,26 +86,6 @@ End-to-end workflow for creating production-grade Silver layer pipelines using S
 - NEVER write Asset Bundle YAML without reading `databricks-asset-bundles`
 - NEVER write `CREATE SCHEMA` without reading `schema-management-patterns`
 - NEVER define PK/FK constraints without reading `unity-catalog-constraints`
-- NEVER skip a `references/*.md` file when the SKILL.md links to it with `See: references/...`
-- NEVER skip the requirements template in Phase 1 — it forces structured design decisions
-
-> **🔴 CRITICAL — Follow `See: references/...` links.**
-> When a SKILL.md (or this orchestrator) says `See: references/xxx.md for complete pattern`,
-> you MUST Read that reference file. The SKILL.md is a **summary**; the `references/*.md`
-> file contains the complete, production-ready pattern. Skipping references means generating
-> from memory rather than from the specification.
->
-> For Silver specifically, these are the references most often skipped — read ALL of them
-> during their relevant phase:
->
-> | Reference | Phase | Why |
-> |-----------|-------|-----|
-> | `silver/00-silver-layer-setup/assets/templates/requirements-template.md` | Phase 1 | Forces Bronze→Silver mapping, DQ strategy, quarantine decisions before any code |
-> | `silver/01-dlt-expectations-patterns/references/expectation-patterns.md` | Phase 2/4 | Complete DQ rules table DDL, loader implementation, population examples |
-> | `silver/01-dlt-expectations-patterns/references/quarantine-patterns.md` | Phase 4 | Complete quarantine table implementation with diagnostic columns |
-> | `silver/00-silver-layer-setup/references/silver-table-patterns.md` | Phase 4 | DLT table templates, `get_bronze_table()` helper, derived-field patterns |
-> | `silver/00-silver-layer-setup/references/monitoring-patterns.md` | Phase 5 | DQ monitoring views, referential integrity, data freshness |
-> | `silver/00-silver-layer-setup/references/pipeline-configuration.md` | Phase 6 | Silver-specific DLT pipeline YAML + DQ setup job YAML |
 
 ### 🔴 Non-Negotiable Defaults (Applied to EVERY Silver Table and Pipeline)
 
@@ -244,22 +223,12 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
 2. Read `common/schema-management-patterns/SKILL.md` - Use for Silver schema DDL
 
 **Steps:**
-1. **MUST Read AND fill** `assets/templates/requirements-template.md` before writing any code:
+1. Fill in requirements template: `assets/templates/requirements-template.md`
    - Map Bronze tables to Silver tables
    - Define DQ rules per entity (critical vs warning)
    - Identify quarantine candidates
-   - Skipping this step consistently leads to incomplete DQ coverage and ad-hoc quarantine patterns
 2. Create Silver schema using pattern from `schema-management-patterns`
-3. Verify Bronze tables exist — run SQL, do NOT infer from local files:
-   ```bash
-   databricks api post /api/2.0/sql/statements -p $PROFILE --json '{
-     "warehouse_id": "<WAREHOUSE_ID>",
-     "catalog": "<CATALOG>",
-     "statement": "SHOW TABLES IN <CATALOG>.<BRONZE_SCHEMA>",
-     "wait_timeout": "30s"
-   }'
-   ```
-   If the Bronze schema doesn't exist or has zero tables, STOP and report — the Bronze layer must be completed first. Reading a clone script or inferring from the schema CSV is NOT runtime verification.
+3. Verify Bronze tables exist and extract their schemas (don't hardcode column names)
 
 ---
 
@@ -342,7 +311,6 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
 3. Set DLT Direct Publishing Mode: `catalog` + `schema` fields (NOT `target`)
 4. Pass configuration: `catalog`, `bronze_schema`, `silver_schema`
 5. Set: `serverless: true`, `edition: ADVANCED`, `photon: true`
-6. **Multi-user safety:** In shared workspaces, include `${var.user_prefix}` in every pipeline/job `name:` field. See `common/databricks-asset-bundles` → "Shared Workspace Naming" section for the exact pattern. Without it, the second user to deploy hits a `pipeline name is already used` error — and `--force` does NOT fix it (see `common/databricks-asset-bundles/references/common-errors.md` Error 17).
 
 **See:** `references/pipeline-configuration.md` for Silver-specific examples
 
@@ -364,33 +332,12 @@ databricks bundle deploy -t dev
 # 2. Run DQ rules setup FIRST (creates dq_rules table)
 databricks bundle run silver_dq_setup_job -t dev
 
-# 3. Verify rules table exists (NOTE: raw `databricks api` calls do NOT inherit
-#    the profile from databricks.yml — pass `-p <profile>` explicitly. See
-#    common/databricks-autonomous-operations/SKILL.md "Profile & Workspace Resolution".)
+# 3. Verify rules table exists
 # SELECT * FROM {catalog}.{silver_schema}.dq_rules
 
 # 4. THEN run DLT pipeline (loads rules from table)
-databricks pipelines start-update --pipeline-name "[dev ${var.user_prefix}] Silver Layer Pipeline"
+databricks pipelines start-update --pipeline-name "[dev] Silver Layer Pipeline"
 ```
-
----
-
-### Post-Run Verification (after pipeline completes)
-
-After the DLT pipeline finishes, verify expectations were applied using the DLT system `event_log()` TVF. **Do NOT use `databricks pipelines list-pipeline-events`** — it returns lifecycle events but lacks per-expectation pass/fail counts.
-
-```sql
-SELECT
-  event_type,
-  details:flow_progress.data_quality.dropped_records AS dropped,
-  details:flow_progress.data_quality.expectations     AS expectations
-FROM event_log("<PIPELINE_ID>")
-WHERE details:flow_progress.data_quality IS NOT NULL
-ORDER BY timestamp DESC
-LIMIT 10;
-```
-
-**See:** `silver/01-dlt-expectations-patterns/SKILL.md` (Pattern 5) for the Silver-table-scoped variant, and `common/databricks-autonomous-operations/references/dlt-pipeline-troubleshooting.md` for the full DLT verification playbook.
 
 ---
 

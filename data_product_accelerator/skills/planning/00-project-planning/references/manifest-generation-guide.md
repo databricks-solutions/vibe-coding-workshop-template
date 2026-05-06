@@ -116,30 +116,6 @@ def validate_manifest(manifest_path: str, gold_yaml_dir: str):
 
 ---
 
-## Unified Genie Space Handling
-
-Most projects map 1 Genie Space per domain under `domains[].genie_spaces[]`. Some projects (workshop mode, or projects with ≤ 15 total queryable assets) consolidate into a single **unified** Genie Space spanning multiple domains.
-
-For the unified case, use the documented `unified_genie_space` key (singular) at the top level of `semantic-layer-manifest.yaml`:
-
-```yaml
-unified_genie_space:
-  name: "{Project} Intelligence"
-  domains_covered: ["{domain_1}", "{domain_2}"]
-  assets:
-    metric_views: [...]
-    tvfs: [...]
-    tables: [...]
-  total_asset_count: "{N}"   # Must be ≤ 25
-```
-
-**Downstream precedence rule:** The semantic-layer orchestrator MUST check for `unified_genie_space` FIRST.
-
-- If `unified_genie_space` is present: create that single space and SKIP per-domain `genie_spaces[]` entries.
-- If `unified_genie_space` is absent: iterate `domains[].genie_spaces[]` normally.
-
-**Anti-pattern — schema deviation:** Do NOT invent alternative keys (e.g., `unified_genie_spaces` plural, `cross_domain_genie`, `shared_space`). Downstream consumers only recognize `unified_genie_space` (singular). If you find the template truly insufficient for your case, extend the template with a documented new key and update this guide BEFORE emitting the manifest — never ship ad-hoc schema.
-
 ## Consumption Pattern
 
 ### How Downstream Orchestrators Use Manifests

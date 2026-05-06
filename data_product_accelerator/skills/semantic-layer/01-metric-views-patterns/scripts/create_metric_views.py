@@ -37,19 +37,6 @@ from pathlib import Path
 
 # ===========================================================================
 # PATH SETUP FOR ASSET BUNDLE IMPORTS
-# ---------------------------------------------------------------------------
-# CANONICAL PATTERN — do NOT replace with project-specific `.replace()`.
-# The `rsplit('/src/', 1)[0]` split is project-invariant and is the single
-# source of truth documented at:
-#   data_product_accelerator/skills/common/databricks-python-imports/SKILL.md
-#
-# For NEW scripts, prefer the shared helper:
-#   from src.common._notebook_paths import ensure_bundle_root_on_path
-#   BUNDLE_ROOT = ensure_bundle_root_on_path()
-#
-# This inline block is kept ONLY so this file works before the shared helper
-# has been copied into `src/common/`. Never call sys.exit(0) to report
-# failures — raise RuntimeError instead so the job is marked FAILED.
 # ===========================================================================
 try:
     _notebook_path = (

@@ -15,7 +15,7 @@ This module (`data_product_accelerator/`) contains the framework — skills, doc
 repo-root/                           <-- workspace root / agent CWD
 ├── data_product_accelerator/        <-- framework (skills, docs, context)
 │   ├── AGENTS.md
-│   ├── skills/                      <-- 55 agent skills (read-only)
+│   ├── skills/                      <-- 59 agent skills (read-only)
 │   ├── context/                     <-- customer schema CSV (input)
 │   └── docs/                        <-- framework documentation
 │
@@ -37,7 +37,7 @@ repo-root/                           <-- workspace root / agent CWD
 ## Design-First Pipeline
 
 ```
-data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Observability (7) → ML (8) → GenAI (9)
+data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Silver (3) → Gold Impl (4) → Planning (5) → Semantic (6) → Genie Optimization (6b) → Observability (7) → ML (8) → GenAI (9)
 ```
 
 **New project?** Start at stage 1: place schema CSV in `data_product_accelerator/context/`, then read `data_product_accelerator/skills/gold/00-gold-layer-design/SKILL.md`.
@@ -52,7 +52,8 @@ data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Si
 | "Silver", "DLT", "expectations", "data quality" | 3 | `data_product_accelerator/skills/silver/00-silver-layer-setup/SKILL.md` |
 | "Gold tables", "merge scripts", "Gold setup" | 4 | `data_product_accelerator/skills/gold/01-gold-layer-setup/SKILL.md` |
 | "project plan", "architecture plan", "planning", "planning_mode: workshop" | 5 | `data_product_accelerator/skills/planning/00-project-planning/SKILL.md` |
-| "metric view", "TVF", "Genie Space", "semantic layer", "semantic layer deployment", "deploy TVFs", "deploy metric views", "deploy genie", "deploy semantic", "data intelligence assets" | 6 | `data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md` |
+| "metric view", "TVF", "Genie Space", "semantic layer" | 6 | `data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/SKILL.md` |
+| "optimize Genie", "Genie accuracy", "benchmark", "judge evaluation", "control lever" | 6b | `data_product_accelerator/skills/semantic-layer/05-genie-optimization-orchestrator/SKILL.md` |
 | "monitoring", "dashboard", "alert", "observability" | 7 | `data_product_accelerator/skills/monitoring/00-observability-setup/SKILL.md` |
 | "MLflow", "ML model", "training", "inference" | 8 | `data_product_accelerator/skills/ml/00-ml-pipeline-setup/SKILL.md` |
 | "GenAI agent", "ResponsesAgent", "AI agent" | 9 | `data_product_accelerator/skills/genai-agents/00-genai-agents-setup/SKILL.md` |
@@ -68,6 +69,7 @@ data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Si
 | "TBLPROPERTIES", "CDF", "auto-optimize", "table properties" | `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` |
 | "CREATE SCHEMA", "schema setup", "predictive optimization" | `data_product_accelerator/skills/common/schema-management-patterns/SKILL.md` |
 | "PRIMARY KEY", "FOREIGN KEY", "constraint", "PK/FK" | `data_product_accelerator/skills/common/unity-catalog-constraints/SKILL.md` |
+| "Genie optimization", "8 judges", "GEPA", "metadata optimization", "dual persistence" | `data_product_accelerator/skills/semantic-layer/05-genie-optimization-orchestrator/SKILL.md` |
 | "audit skills", "check freshness", "stale skills", "verify skills" | `data_product_accelerator/skills/admin/skill-freshness-audit/SKILL.md` |
 
 ## Orchestrator Deep Dives (optional learning resources)
@@ -80,6 +82,7 @@ For detailed walkthroughs of how orchestrators manage context and load workers:
 | Silver Setup (stage 3) | [`docs/framework-design/14-silver-orchestrator-walkthrough.md`](data_product_accelerator/docs/framework-design/14-silver-orchestrator-walkthrough.md) |
 | Gold Implementation (stage 4) | [`docs/framework-design/15-gold-pipeline-orchestrator-walkthrough.md`](data_product_accelerator/docs/framework-design/15-gold-pipeline-orchestrator-walkthrough.md) |
 | Semantic Layer (stage 6) | [`docs/framework-design/12-semantic-layer-orchestrator-walkthrough.md`](data_product_accelerator/docs/framework-design/12-semantic-layer-orchestrator-walkthrough.md) |
+| Genie Optimization (stage 6b) | [`docs/agent-walkthrough.md`](data_product_accelerator/docs/agent-walkthrough.md) |
 
 These walkthroughs show progressive disclosure patterns, context management, and worker skill loading strategies. Read them to understand how orchestrators minimize token usage while maximizing context relevance.
 
@@ -124,7 +127,7 @@ For full agent behavior, read: `data_product_accelerator/skills/common/databrick
 
 ## Skills Location
 
-All 55 Agent Skills are in `data_product_accelerator/skills/` using the open [SKILL.md format](https://agentskills.io). Each skill directory contains:
+All 59 Agent Skills are in `data_product_accelerator/skills/` using the open [SKILL.md format](https://agentskills.io). Each skill directory contains:
 
 ```
 skill-name/
@@ -139,6 +142,23 @@ Skills follow an **orchestrator/worker** pattern:
 - `01-` prefix or named directories = **Workers** (specific patterns, called by orchestrators or used standalone)
 - Gold workers are organized into `design-workers/` and `pipeline-workers/` subdirectories for clear separation
 
+## Genie Code Environment
+
+When running in **Databricks Genie Code** (notebook-based agent), these constraints apply:
+
+- **No terminal / CLI / shell.** All operations use the Databricks Python SDK (`WorkspaceClient`).
+- **No `databricks bundle` commands.** Bundles are deployed via a deploy job or by the admin. Use SDK `w.jobs.run_now_and_wait()` to run already-deployed jobs.
+- **Auth is automatic.** `WorkspaceClient()` auto-detects notebook credentials.
+- **No localhost.** Testing happens via deployed endpoints only.
+- **For Apps / Lakebase operations:** Use MCP AppKit tools where available:
+  - `appkit_get_app_status` — check app status and deployments
+  - `appkit_list_apps` — list all workspace apps
+  - `appkit_deploy` — deploy an app
+  - `appkit_provision_lakebase` — provision a Lakebase instance for an app
+  - `appkit_manage_app_resources` — bind Lakebase or other resources to an app
+
+Skills marked with `variant: genie-code` in their frontmatter have been adapted with SDK equivalents for all CLI commands.
+
 ## IDE Compatibility
 
 This framework is built on the open [Agent Skills (SKILL.md)](https://agentskills.io) format and works with any AI coding assistant that can read files.
@@ -146,6 +166,7 @@ This framework is built on the open [Agent Skills (SKILL.md)](https://agentskill
 | IDE / Agent | How It Discovers This File | File Reference Syntax |
 |-------------|---------------------------|----------------------|
 | **Cursor** | Auto-loads `AGENTS.md` | `@path/to/SKILL.md` |
+| **Genie Code** | Reads `AGENTS.md` or skills directly | Reference files by path in notebook |
 | **Claude Code** | Reads `AGENTS.md` (or `CLAUDE.md`) at repo root | Reference files by path in conversation |
 | **Windsurf** | Reads `AGENTS.md` or `.windsurfrules` at repo root | `@path/to/SKILL.md` |
 | **Copilot** | Reads `AGENTS.md` or `.github/copilot-instructions.md` | `#file:path/to/SKILL.md` |

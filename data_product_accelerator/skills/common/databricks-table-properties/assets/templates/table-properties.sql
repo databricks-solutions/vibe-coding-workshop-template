@@ -87,23 +87,6 @@ TBLPROPERTIES (
 COMMENT 'Gold layer ${entity_type} table with ${description}. Business: ${business_context}. Technical: ${technical_details}.';
 
 -- ============================================================================
--- POST-DEEP-CLONE TBLPROPERTIES (Bronze)
--- ============================================================================
--- DEEP CLONE preserves: CDF, CLUSTER BY AUTO, column COMMENTs, PK constraints,
--- row tracking. Apply remaining governance properties after clone:
-ALTER TABLE ${catalog}.${bronze_schema}.${table_name}
-SET TBLPROPERTIES (
-    'layer' = 'bronze',
-    'source_system' = '${source_system}',
-    'domain' = '${domain}',
-    'entity_type' = '${entity_type}',
-    'contains_pii' = '${contains_pii}',
-    'data_classification' = '${data_classification}',
-    'business_owner' = '${business_owner}',
-    'technical_owner' = 'Data Engineering'
-);
-
--- ============================================================================
 -- NOTES
 -- ============================================================================
 -- 1. Always use CLUSTER BY AUTO (never specify columns manually)

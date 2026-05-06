@@ -41,24 +41,6 @@ Use this skill when you need to:
 - **Validate Genie Space JSON structure** before deployment
 - **Understand the complete GenieSpaceExport schema** (config, data_sources, instructions, benchmarks)
 
-## Start From Templates (Mandatory)
-
-**NEVER write the deployment notebook or job YAML from scratch.** Writing these from scratch is the #1 source of deployment failures — copy the template, then customize:
-
-- `assets/templates/deploy_genie_spaces.py` → copy to `src/{project}_semantic/deploy_genie_spaces.py`
-- `assets/templates/genie-deployment-job-template.yml` → copy to `resources/semantic/genie_deploy_job.yml`
-
-The templates encode the correct notebook cell separators, `extract_space_config()` (wrapped vs raw format handling), `validate_genie_json_structure()`, array sorting, and `base_parameters` wiring. Hand-written versions routinely miss one of these and fail in deploy cycles 2–9 (see the retrospective in `references/` or the project's retrospectives directory).
-
-## End-to-End Deployment? Use the Orchestrator
-
-If you are deploying **TVFs + Metric Views + Genie Spaces together** (not just a standalone Genie Space), **STOP and read `semantic-layer/00-semantic-layer-setup/SKILL.md` first.** That orchestrator:
-- Mandates a Gold schema inventory query before artifact creation (prevents phantom table errors)
-- Coordinates skill loading across 6 phases with validation gates
-- Provides combined job templates with `depends_on` chains
-
-This skill handles **individual Genie Space API operations.** The orchestrator handles the **end-to-end semantic layer lifecycle.**
-
 ## Quick Reference
 
 ### API Operations
@@ -79,175 +61,6 @@ This skill handles **individual Genie Space API operations.** The orchestrator h
 | `benchmarks.questions` | **Max 50** | Truncate in generation script |
 | `data_sources.tables` | No hard limit | Keep ~25-30 for performance |
 | `data_sources.metric_views` | No hard limit | Keep ~5-10 per space |
-
-### Required Root Field
-
-Every Genie Space JSON MUST include `"version": 2` at the root of `serialized_space`:
-
-```json
-{"version": 2, "config": {...}, "data_sources": {...}, "instructions": {...}, "benchmarks": {...}}
-```
-
-Omitting `"version": 2` causes silent failures or API rejection. The API does NOT default to version 2.
-
-### Required `serialized_space` Invariants (MANDATORY — validate BEFORE every POST / PATCH)
-
-Genie Space creation silently succeeds but produces a broken room when these invariants are violated. The API's validation surface is narrow — once the space exists, the only way to diagnose is inspecting the UI. Always run the validator below *before* calling `POST /api/2.0/genie/spaces` or `PATCH /api/2.0/genie/spaces/{id}`.
-
-| Field path (inside `serialized_space`) | Required type | Non-negotiable invariants |
-|---|---|---|
-| `version` | `int` | Must equal `2`. |
-| `config.title` | `str` | Non-empty. Mirrors top-level `title` in the POST envelope. |
-| `config.description` | `str` | Non-empty. |
-| `config.semantic_warehouse_id` | `str` (24 hex chars) | Must be the **deploy-time** warehouse id (see Action S10). Never a template placeholder. |
-| `data_sources.tables` | `list[object]` | Each entry: `{id: uuid4.hex, table_full_name: "catalog.schema.table"}`. **Sorted by `table_full_name`** to keep diffs stable. |
-| `data_sources.metric_views` | `list[object]` | Each entry: `{id: uuid4.hex, metric_view_full_name: "catalog.schema.mv_name"}`. Sorted. |
-| `instructions.general_instructions` | `list[str]` | List of plain strings — no nested objects. |
-| `instructions.sql_functions` | `list[object]` | Each: `{id, function_full_name, sql: List[str]}`. **`sql` MUST be a `List[str]`**, never a single string. Max 50 entries. |
-| `instructions.sample_queries` / `benchmarks.questions` | `list[object]` | Each: `{id, question: str, sql: List[str]}`. **`sql` MUST be a `List[str]`**, never a string. Max 50 entries for `benchmarks.questions`. |
-| Every `id` field | `str` (32 hex chars) | `uuid.uuid4().hex` — lowercase, no dashes. Regenerate on every new deploy (never copy/paste IDs across environments). |
-
-**The #1 silent-failure mode observed in production:** `sql_functions[].sql` or `sample_queries[].sql` submitted as a single SQL string. The API accepts it, but the resulting space has empty/broken example queries because Genie serializes only the first character and then errors internally on render. There is no error surfaced on POST.
-
-#### Validator — `_assert_sql_arrays`
-
-Run this against every `serialized_space` dict BEFORE `json.dumps(...)` and BEFORE the POST/PATCH. Failing loud here saves ~10–15 minutes of UI-round-trip debugging per iteration.
-
-```python
-import re
-import uuid as _uuid_mod
-from typing import Any, List
-
-_UUID_HEX_RE = re.compile(r"^[0-9a-f]{32}$")
-_WAREHOUSE_ID_RE = re.compile(r"^[0-9a-f]{16,}$")  # Databricks warehouse ids are hex
-
-
-def _is_uuid_hex(value: Any) -> bool:
-    return isinstance(value, str) and bool(_UUID_HEX_RE.match(value))
-
-
-def _assert_sql_arrays(space: dict) -> None:
-    """
-    Validate serialized_space invariants before POST / PATCH.
-    Raises RuntimeError on the FIRST violation — never returns False / warns.
-
-    Specifically enforces the #1 silent-failure: every `sql` field inside
-    instructions.sql_functions / sample_queries / benchmarks.questions must
-    be a List[str], never a single string.
-    """
-    errors: List[str] = []
-
-    # Root invariants
-    if space.get("version") != 2:
-        errors.append("serialized_space.version must be exactly 2 (got %r)" % space.get("version"))
-
-    cfg = space.get("config") or {}
-    if not isinstance(cfg.get("title"), str) or not cfg.get("title"):
-        errors.append("config.title must be a non-empty string")
-    if not isinstance(cfg.get("description"), str) or not cfg.get("description"):
-        errors.append("config.description must be a non-empty string")
-
-    wh = cfg.get("semantic_warehouse_id")
-    if not isinstance(wh, str) or not _WAREHOUSE_ID_RE.match(wh or ""):
-        errors.append(
-            "config.semantic_warehouse_id must be a concrete warehouse id baked at deploy time; "
-            f"got {wh!r}. Template placeholders like '${{warehouse_id}}' are never acceptable."
-        )
-
-    # Data sources — sorted + shape
-    ds = space.get("data_sources") or {}
-    for key, name_field in [("tables", "table_full_name"), ("metric_views", "metric_view_full_name")]:
-        items = ds.get(key) or []
-        if not isinstance(items, list):
-            errors.append(f"data_sources.{key} must be a list")
-            continue
-        names = [it.get(name_field, "") for it in items]
-        if names != sorted(names):
-            errors.append(f"data_sources.{key} must be sorted by {name_field} (got {names})")
-        for it in items:
-            if not _is_uuid_hex(it.get("id")):
-                errors.append(f"data_sources.{key} entry missing 32-hex uuid4 id: {it}")
-            if not isinstance(it.get(name_field), str) or "." not in (it.get(name_field) or ""):
-                errors.append(f"data_sources.{key} entry {name_field} must be 'catalog.schema.name': {it}")
-
-    # CRITICAL: sql[] invariants
-    def _check_sql_list(path: str, entries: Any) -> None:
-        if entries is None:
-            return
-        if not isinstance(entries, list):
-            errors.append(f"{path} must be a list (got {type(entries).__name__})")
-            return
-        for idx, it in enumerate(entries):
-            if not isinstance(it, dict):
-                errors.append(f"{path}[{idx}] must be an object")
-                continue
-            if not _is_uuid_hex(it.get("id")):
-                errors.append(f"{path}[{idx}].id must be uuid4.hex (32 hex chars)")
-            sql_field = it.get("sql")
-            if not isinstance(sql_field, list):
-                errors.append(
-                    f"{path}[{idx}].sql must be List[str] — got {type(sql_field).__name__}. "
-                    f"This is the #1 silent-failure mode: the API accepts a bare string but the "
-                    f"resulting space has broken example queries. Wrap your SQL in `[\"...\"]`."
-                )
-                continue
-            for sidx, s in enumerate(sql_field):
-                if not isinstance(s, str) or not s.strip():
-                    errors.append(f"{path}[{idx}].sql[{sidx}] must be a non-empty string")
-
-    instr = space.get("instructions") or {}
-    _check_sql_list("instructions.sql_functions", instr.get("sql_functions"))
-    _check_sql_list("instructions.sample_queries", instr.get("sample_queries"))
-    _check_sql_list("benchmarks.questions", (space.get("benchmarks") or {}).get("questions"))
-
-    # Limits
-    if len(instr.get("sql_functions") or []) > 50:
-        errors.append("instructions.sql_functions exceeds 50-entry limit — truncate before POST")
-    if len((space.get("benchmarks") or {}).get("questions") or []) > 50:
-        errors.append("benchmarks.questions exceeds 50-entry limit — truncate before POST")
-
-    # general_instructions must be List[str]
-    gi = instr.get("general_instructions")
-    if gi is not None:
-        if not isinstance(gi, list) or not all(isinstance(x, str) for x in gi):
-            errors.append("instructions.general_instructions must be List[str]")
-
-    if errors:
-        joined = "\n  - ".join(errors)
-        raise RuntimeError(
-            f"serialized_space validation failed — refusing to POST/PATCH:\n  - {joined}"
-        )
-
-
-# Usage:
-#   _assert_sql_arrays(space_dict)
-#   payload = {"title": ..., "warehouse_id": ..., "serialized_space": json.dumps(space_dict)}
-#   ws.api_client.do("POST", "/api/2.0/genie/spaces", body=payload)
-```
-
-**Where to wire this in:**
-- `scripts/import_genie_space.py` — immediately before `json.dumps(space)` in every path (initial POST and incremental PATCH).
-- `assets/templates/deploy_genie_spaces.py` — at the top of each per-space loop iteration.
-- Local Phase 0.5 pre-flight (see Action S7 in `00-semantic-layer-setup/SKILL.md`) — enumerated against the rendered config BEFORE `bundle validate`.
-
-### `semantic_warehouse_id` MUST be baked at deploy time (NOT a runtime `--var`)
-
-`serialized_space.config.semantic_warehouse_id` is consumed by the Genie runtime when it renders example queries and routes natural-language questions. The id is **embedded in the POSTed JSON body** — once the space exists, the Genie service does not re-read it from the Asset Bundle.
-
-That means it must be a concrete 16+ character hex warehouse id at the moment `deploy_genie_spaces.py` calls `POST /api/2.0/genie/spaces`. Any of the following produces a broken room:
-
-| Value at POST time | Outcome |
-|---|---|
-| `abc0123def456789` (real id) | ✅ Space works. |
-| `${var.warehouse_id}` (unrendered) | ❌ Space created; every query fails with "warehouse not found". |
-| `${warehouse_id}` (shell-style placeholder) | ❌ Same failure mode. |
-| Empty string / missing field | ❌ API rejects with `INVALID_PARAMETER_VALUE`. |
-
-**Rule:** Resolve `warehouse_id` at `databricks bundle deploy` time (deploy-time baking — see `common/databricks-asset-bundles/SKILL.md` §Pitfall: `--var` at run time does NOT override deploy-time-baked values) and pass the resolved value into the notebook task via `base_parameters.warehouse_id`. The `deploy_space` helper in `assets/templates/deploy_genie_spaces.py` stamps this value into `serialized_space.config.semantic_warehouse_id` automatically, so you only need to ensure the value reaching the notebook widget is concrete.
-
-**Validation:** `_assert_sql_arrays` enforces a hex-only `semantic_warehouse_id` on every POST/PATCH. If you see `config.semantic_warehouse_id must be a concrete deploy-time warehouse id` in a pre-flight error, the root cause is always that `warehouse_id` reached the notebook as a template placeholder — fix it in the bundle YAML, not in the Genie config.
-
-**Post-deploy rotation:** If the workspace's semantic warehouse id changes (e.g. migration to serverless), the fix is NOT a runtime override. It's a `bundle deploy` with the new id + a PATCH of every existing space via `deploy_genie_spaces.py` (which will now take the update path because the space ids are persisted per Action S9).
 
 ### Core Workflow
 
@@ -294,26 +107,12 @@ def generate_id() -> str:
     return uuid.uuid4().hex  # e.g., "a1b2c3d4e5f6789012345678abcdef01"
 ```
 
-**Required ID fields** (every one must be a fresh `uuid.uuid4().hex`).
-
-Use the canonical nested-schema field paths below. Any older guidance that listed flat `space.tables[].id` / `space.materialized_views[].id` / `space.sql_functions[].id` / `space.example_question_sqls[].id` as required was for a deprecated flat schema and is superseded by this list:
-
-- `config.sample_questions[].id`
-- `instructions.sql_functions[].id`
-- `instructions.text_instructions[].id`
-- `instructions.example_question_sqls[].id`
-- `instructions.sql_snippets.measures[].id`
-- `instructions.sql_snippets.filters[].id`
-- `instructions.sql_snippets.expressions[].id`
-- `benchmarks.questions[].id`
-
-**❌ Arrays that MUST NOT have an `id`** (adding one causes `Cannot find field: id in message ...` errors — see Common Errors):
-
-- `data_sources.tables[]` — use only `identifier` and optional `description`
-- `data_sources.metric_views[]` — use only `identifier` and optional `description`
-- `benchmarks.questions[].answer[]` — use only `format` and `content`
-
-This is the single source of truth for ID placement. The no-id list later in this section and in Section 7 intentionally restates it for retrieval during debugging — keep both lists consistent if editing.
+**Required ID fields** (every one must be a fresh `uuid.uuid4().hex`):
+- `space.id`
+- `space.tables[].id`
+- `space.sql_functions[].id`
+- `space.example_question_sqls[].id`
+- `space.materialized_views[].id`
 
 **❌ WRONG IDs (will cause import failures):**
 ```python
@@ -324,13 +123,6 @@ hashlib.md5(name.encode()).hexdigest()  # ❌ Deterministic, not UUID4
 ```
 
 **✅ CORRECT: Always use `uuid.uuid4().hex`** — nothing else.
-
-**Arrays that do NOT have `id` fields — NEVER add one:**
-- `data_sources.tables[]` — uses `identifier` only
-- `data_sources.metric_views[]` — uses `identifier` only
-- `benchmarks.questions[].answer[]` — uses `format` + `content` only
-
-A common agent error is applying `regenerate_ids()` universally across all arrays. The function must SKIP `data_sources.tables` and `data_sources.metric_views`.
 
 ### Section 5: Array Format Requirements
 
@@ -373,22 +165,6 @@ def substitute_variables(data: dict, variables: dict) -> dict:
 ```
 
 ### 5. Asset Inventory-Driven Generation
-
-**Step 0 — Verify assets exist before referencing them:**
-
-```sql
--- Run this BEFORE creating or editing any Genie Space JSON
-SELECT table_name, table_type
-FROM {catalog}.information_schema.tables
-WHERE table_schema = '{gold_schema}'
-ORDER BY table_type, table_name;
-
-SELECT routine_name
-FROM {catalog}.information_schema.routines
-WHERE routine_schema = '{gold_schema}';
-```
-
-**Only include assets that appear in these results.** A Genie Space that references a non-existent table fails with `Table '...' does not exist` during space creation. This is the #1 cause of deployment failures. Do NOT trust a pre-generated manifest as ground truth — query the live catalog.
 
 **NEVER manually edit `data_sources`.** Generate from verified inventory:
 
@@ -460,9 +236,6 @@ genie_config['data_sources']['tables'] = [
 | `instructions.sql_functions` | `(id, identifier)` | Ascending |
 | `instructions.text_instructions` | `id` | Ascending |
 | `instructions.example_question_sqls` | `id` | Ascending |
-| `instructions.sql_snippets.measures` | `id` | Ascending |
-| `instructions.sql_snippets.filters` | `id` | Ascending |
-| `instructions.sql_snippets.expressions` | `id` | Ascending |
 | `config.sample_questions` | `id` | Ascending |
 | `benchmarks.questions` | `id` | Ascending |
 
@@ -489,13 +262,6 @@ def sort_genie_config(config: dict) -> dict:
                     config["instructions"][key],
                     key=lambda x: x.get("id", ""),
                 )
-        if "sql_snippets" in config["instructions"]:
-            for key in ["measures", "filters", "expressions"]:
-                if key in config["instructions"]["sql_snippets"]:
-                    config["instructions"]["sql_snippets"][key] = sorted(
-                        config["instructions"]["sql_snippets"][key],
-                        key=lambda x: x.get("id", ""),
-                    )
     if "config" in config and "sample_questions" in config["config"]:
         config["config"]["sample_questions"] = sorted(
             config["config"]["sample_questions"],
@@ -556,9 +322,6 @@ else:
 | `expected_sql` field not recognized | Used `expected_sql` instead of `answer` | Use `answer: [{format: "SQL", content: ["SELECT ..."]}]` |
 | `Invalid export proto: data_sources.tables must be sorted by identifier` | Arrays not sorted — sort key is `identifier` (not `table_name`) for tables/metric_views, `id` for all others | Call `sort_genie_config()` before every PATCH (see Section 8) |
 | Invalid ID format | ID is not 32-char hex, contains dashes, or is prefixed | Use `uuid.uuid4().hex` exclusively |
-| `Cannot find field: id in message ...MetricView` | Added `id` to `data_sources.metric_views[]` | Remove `id` — use only `identifier` and `description` (see Section 4) |
-| `Cannot find field: id in message ...BenchmarkAnswer` | Added `id` to `benchmarks.questions[].answer[]` | Remove `id` — use only `format` and `content` |
-| `Invalid export proto: ExportConverter supports versions 1 and 2, but got 0` | Missing top-level `version` field in `serialized_space` | Add `"version": 2` at the root before `json.dumps()` (see "Required Root Field" above) |
 
 See [Troubleshooting Guide](references/troubleshooting.md) for detailed fix scripts.
 
@@ -568,33 +331,12 @@ See [Troubleshooting Guide](references/troubleshooting.md) for detailed fix scri
 - **[Workflow Patterns](references/workflow-patterns.md)**: Detailed GenieSpaceExport schema (config, data_sources, instructions, benchmarks), ID generation, serialization patterns, variable substitution, asset inventory-driven generation, complete examples
 - **[Troubleshooting](references/troubleshooting.md)**: Common production errors with Python fix scripts, validation checklists, deployment checklist, error recovery patterns, field-level format requirements
 
-## Implementation: Start from Templates (MANDATORY)
+## Assets
 
-**NEVER write deployment notebooks or job YAMLs from scratch.** The templates below handle pre-flight JSON validation, correct ID field scoping, `extract_space_config()` for wrapped/raw formats, array sorting (via the canonical `sort_genie_config()`), and `version: 2` injection. Writing from scratch bypasses these safeguards.
+- **`assets/templates/genie-deployment-job-template.yml`** — Standalone Asset Bundle job using `notebook_task` for Genie Space deployment (for combined deployment, use the orchestrator's `semantic-layer-job-template.yml`)
+- **`assets/templates/deploy_genie_spaces.py`** — Databricks notebook template for Asset Bundle `notebook_task` deployment. Uses `dbutils.widgets.get()` for parameters. Copy to `src/{project}_semantic/deploy_genie_spaces.py` and customize.
 
-**Step 1 — Copy the notebook template into your project:**
-
-```bash
-cp data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/assets/templates/deploy_genie_spaces.py \
-   src/{project}_semantic/deploy_genie_spaces.py
-```
-
-**Step 2 — Copy the job YAML template:**
-
-```bash
-cp data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/assets/templates/genie-deployment-job-template.yml \
-   resources/semantic/genie_deploy_job.yml
-```
-
-**Step 3 — Customize:**
-- In the notebook: populate `GENIE_SPACE_METADATA` with your `{space_name: genie_space_id_<name>}` mapping
-- In the job YAML: update `notebook_path` and `base_parameters` to match your bundle layout
-
-**Available templates:**
-- **`assets/templates/deploy_genie_spaces.py`** — Databricks notebook for Asset Bundle `notebook_task` deployment (parameters via `dbutils.widgets.get()`)
-- **`assets/templates/genie-deployment-job-template.yml`** — Standalone Asset Bundle job YAML (for combined deployment, the orchestrator provides `semantic-layer-job-template.yml`)
-
-> **CLI vs Notebook:** `scripts/import_genie_space.py` is the CLI tool (`argparse`) for local/CI use. The notebook template (`dbutils.widgets.get()`) is for Asset Bundle `notebook_task` deployment.
+> **CLI vs Notebook:** `scripts/import_genie_space.py` is the CLI tool (uses `argparse`) for local/CI use. `assets/templates/deploy_genie_spaces.py` is the notebook template (uses `dbutils.widgets.get()`) for Asset Bundle `notebook_task` deployment.
 
 ## Scripts
 
@@ -663,28 +405,6 @@ After completing Genie Space API deployment, carry these notes to the next worke
 | Mistake | Consequence | Fix |
 |---------|-------------|-----|
 | GET space without `?include_serialized_space=true` | Response contains only top-level metadata (title, description, space_id); `data_assets`, `general_instructions`, and nested config are omitted — space appears empty | Always append `?include_serialized_space=true` to the Get Space endpoint |
-| PATCH `/api/2.0/data-rooms/{id}` with a partial payload | **Silently wipes `serialized_space` to `{}`.** `start-conversation` reports "no tables or functions are available"; downstream agents hit misleading `PERMISSION_DENIED: No access to table X` errors | NEVER PATCH `/api/2.0/data-rooms/{id}`. The only supported mutation surface is `PATCH /api/2.0/genie/spaces/{id}` with a full `{"serialized_space": "<full JSON string>"}` payload. See the anti-pattern block below. |
-
-### ❌ Anti-pattern: `PATCH /api/2.0/data-rooms/{id}` is destructive-by-default
-
-`/api/2.0/data-rooms/{id}` is an **internal** API surface that lives adjacent to the supported `/api/2.0/genie/spaces/{id}` endpoint — similar name, very different semantics. Partial PATCH payloads on `/data-rooms/{id}` (for example, attempting to flip `run_as_type`, `display_name`, or `warehouse_id` in isolation) **silently wipe the space's `serialized_space`**.
-
-Symptoms after the wipe:
-
-- `GET /api/2.0/genie/spaces/{id}?include_serialized_space=true` returns `serialized_space = {}`.
-- `databricks genie start-conversation $SPACE_ID --content "..."` returns "no tables or functions are available in this Genie space schema".
-- Downstream agents (e.g., endpoints deployed via `agents.deploy()`) return `PERMISSION_DENIED: No access to table X` — even though the SP has all the right UC grants. The error is misleading: the real cause is that the space is empty.
-
-The only supported mutation endpoint is:
-
-```
-PATCH /api/2.0/genie/spaces/{id}
-Body: {"serialized_space": "<full JSON string>"}
-```
-
-To recover from an accidental wipe, use the `restore-genie-space.py` helper in `data_product_accelerator/skills/genai-agents/09-simple-agent-scaffold/references/restore-genie-space.py`. It reads your source-of-truth `genie_configs/*.json`, substitutes template vars (`${catalog}`, `${gold_schema}`, `${semantic_warehouse_id}`), sorts the `tables`/`functions` arrays by identifier (required by the API), and PATCHes the correct endpoint. Cross-reference: `09-simple-agent-scaffold/SKILL.md` "Do NOT PATCH `/api/2.0/data-rooms/{id}` with partial payloads" anti-pattern block.
-
-There is no supported public API for flipping `run_as_type` on an existing space — rebuild the space via the Genie UI or re-run this skill's deploy script.
 
 ## Next Step
 

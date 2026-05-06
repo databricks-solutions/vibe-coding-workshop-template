@@ -34,9 +34,6 @@ env:
 | `DATABRICKS_WAREHOUSE_ID` | `sql-warehouse` | Analytics, Genie |
 | `LAKEBASE_ENDPOINT` | `postgres` | Lakebase |
 | `DATABRICKS_VOLUME_*` | `volume` | Files |
-| `DATABRICKS_SERVING_ENDPOINT_NAME` | `serving-endpoint` | Serving |
-
-> **Serving env vars:** The platform injects `SERVING_ENDPOINT=<name>` via the resource binding, but the AppKit Serving plugin reads `DATABRICKS_SERVING_ENDPOINT_NAME`. Declare the env var explicitly in `app.yaml` with `valueFrom: serving-endpoint`. The serving endpoint must be added as an app resource with `CAN_QUERY` permission.
 
 > **Lakebase env vars:** Use `valueFrom: postgres` in `app.yaml` with bundle-managed `postgres_project`/`postgres_branch`/`postgres_endpoint` resources in `databricks.yml`. The platform auto-injects `PGHOST`, `PGPORT`, `PGDATABASE`, `PGSSLMODE`.
 

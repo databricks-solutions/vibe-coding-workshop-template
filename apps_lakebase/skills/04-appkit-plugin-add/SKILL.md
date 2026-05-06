@@ -2,17 +2,15 @@
 name: 04-appkit-plugin-add
 description: >
   Add plugins to an existing Databricks AppKit project. Covers Lakebase (PostgreSQL),
-  Analytics (SQL queries + dashboards), Genie (natural language AI/BI), Files
-  (UC Volumes), and Serving (Model Serving / Agent endpoints). Guides through plugin
-  registration, environment variables, app.yaml configuration, and frontend integration.
-  Use when asked to add a plugin to an existing app, integrate Lakebase, add analytics,
-  connect a Genie space, enable file uploads, add a serving endpoint, or extend an
-  AppKit project with new capabilities. Triggers on "add plugin", "add lakebase",
-  "add analytics", "add genie", "add files plugin", "add serving", "add agent endpoint",
+  Analytics (SQL queries + dashboards), Genie (natural language AI/BI), and Files
+  (UC Volumes). Guides through plugin registration, environment variables, app.yaml
+  configuration, and frontend integration. Use when asked to add a plugin to an
+  existing app, integrate Lakebase, add analytics, connect a Genie space, enable
+  file uploads, or extend an AppKit project with new capabilities. Triggers on
+  "add plugin", "add lakebase", "add analytics", "add genie", "add files plugin",
   "integrate postgres", "add database", "add dashboards", "add file browser",
-  "extend app", "connect genie space", "model serving plugin". Not for creating a
-  Lakebase project or managing Lakebase via CLI -- use the databricks-lakebase agent
-  skill for that.
+  "extend app", "connect genie space". Not for creating a Lakebase project or
+  managing Lakebase via CLI -- use the databricks-lakebase agent skill for that.
 license: Apache-2.0
 compatibility: Requires an existing AppKit project with Node.js v22+ and Databricks CLI >= 0.295.0
 metadata:
@@ -30,12 +28,12 @@ metadata:
 
 # Add Plugins to an Existing AppKit Project
 
-Add Lakebase, Analytics, Genie, Files, or Serving plugins to a Databricks AppKit project that has already been scaffolded.
+Add Lakebase, Analytics, Genie, or Files plugins to a Databricks AppKit project that has already been scaffolded.
 
 ## When to Use
 
 - Adding a new plugin to an existing AppKit project
-- Integrating PostgreSQL (Lakebase), SQL dashboards (Analytics), natural language queries (Genie), file management (Files), or model serving / agent endpoints (Serving)
+- Integrating PostgreSQL (Lakebase), SQL dashboards (Analytics), natural language queries (Genie), or file management (Files)
 - Extending an app that was scaffolded blank or needs an additional plugin
 
 **Not for scaffolding a new app.** To create a new AppKit project (blank or with plugins), use the `01-appkit-scaffold` skill instead.
@@ -45,7 +43,7 @@ Add Lakebase, Analytics, Genie, Files, or Serving plugins to a Databricks AppKit
 ## Before You Begin
 
 **IMPORTANT — The upstream AppKit docs are the source of truth, not this skill.**
-AppKit may have plugins beyond those listed here. Always check the upstream docs first to discover all available plugins and get the latest configuration details:
+AppKit may have plugins beyond the four listed here. Always check the upstream docs first to discover all available plugins and get the latest configuration details:
 
 - **Plugin docs:** https://databricks.github.io/appkit/docs/plugins/
 - **CLI docs browser:** `npx @databricks/appkit docs "<plugin-name>"`
@@ -65,35 +63,8 @@ The table below covers plugins bundled with this skill. AppKit may offer additio
 | **Analytics** | SQL queries, dashboards, charts, warehouse, data viz | [references/plugin-analytics.md](references/plugin-analytics.md) |
 | **Genie** | Natural language, AI/BI, Genie spaces, conversational | [references/plugin-genie.md](references/plugin-genie.md) |
 | **Files** | File upload/download, UC Volumes, file browser | [references/plugin-files.md](references/plugin-files.md) |
-| **Serving** | Model serving, agent endpoint, inference, LLM, ML model | [references/plugin-serving.md](references/plugin-serving.md) |
 
 If the plugin you need is listed above, **READ its reference file before proceeding** — it contains the import, config, env vars, `app.yaml` changes, frontend hooks, and gotchas. For any other plugin, consult the upstream docs directly.
-
-> **MANDATORY:** You MUST read the plugin's reference file before making any changes. Do not treat the reference as optional supplementary material. For Lakebase specifically, the reference contains critical Terraform state management warnings that prevent destructive deploy failures. After reading, note any "Critical" or "Keep" warnings in `.vibecoding-state.md` under a "Critical Notes for Next Phase" section so downstream agents inherit the context.
-
----
-
-## Step 1b: Verify the Plugin Export Exists (before importing)
-
-Before adding the plugin to `server/server.ts`, confirm it is exported by your installed AppKit version. The server bundler (`tsdown`) does not type-check — a nonexistent import bundles silently and only fails at client build or runtime, usually after a long deploy round-trip.
-
-```bash
-cd apps_lakebase/$APP_NAME
-node -e "const m = require('@databricks/appkit'); console.log(typeof m.<pluginName>);"
-```
-
-- **`function`** → plugin is available, proceed to Step 2.
-- **`undefined`** → plugin is **not** in your installed AppKit version. Do NOT write `import { <pluginName> } from "@databricks/appkit"` — the bundler will accept it and your deploy will fail silently.
-  - If the plugin was recently published to npm: `npm install @databricks/appkit@latest @databricks/appkit-ui@latest` and rerun the check. If this triggers a `package-lock.json` regeneration, read [03-appkit-deploy/references/lockfile-and-recreation.md](../03-appkit-deploy/references/lockfile-and-recreation.md) before deploying.
-  - If the plugin is not yet published: use a custom proxy fallback. For the Serving plugin specifically, read [06-appkit-serving-wiring/references/custom-proxy-fallback.md](../06-appkit-serving-wiring/references/custom-proxy-fallback.md). For other plugins, consult the upstream docs for a supported fallback before hand-rolling one.
-
-Confirm the method / hook names you plan to call the same way — inspect the installed `.d.ts`:
-
-```bash
-find node_modules/@databricks/appkit -name "*.d.ts" | xargs grep -l "<ExportName>" | head -5
-```
-
-> **Anti-pattern — "Import it and see if it compiles."** The server bundler (tsdown) skips type checking and will silently bundle a broken import. The error surfaces only when the client build runs tsc or the server crashes at runtime — usually after a 2-3 minute deploy round-trip. Always run the `node -e` check above before writing the import.
 
 ---
 
@@ -117,7 +88,7 @@ await createApp({
 Plugins compose freely — add as many as needed:
 
 ```typescript
-import { createApp, server, analytics, lakebase, genie, files, serving } from "@databricks/appkit";
+import { createApp, server, analytics, lakebase, genie, files } from "@databricks/appkit";
 
 await createApp({
   plugins: [
@@ -126,7 +97,6 @@ await createApp({
     lakebase(),
     genie(),
     files(),
-    serving(),
   ],
 });
 ```
@@ -142,8 +112,6 @@ Each plugin requires specific environment variables. After reading the plugin re
 
 See the plugin-specific reference for exact variable names and values.
 
-> **After editing `databricks.yml` and `app.yaml`, run `databricks apps validate --profile $PROFILE` to catch YAML syntax or resource binding errors before deploy.**
-
 ---
 
 ## Step 4: Frontend Integration
@@ -156,7 +124,6 @@ Most plugins provide React hooks and/or components from `@databricks/appkit-ui/r
 | **Genie** | `GenieChat` component, `useGenieChat` hook |
 | **Files** | `DirectoryList`, `FileBreadcrumb`, `FilePreviewPanel` components |
 | **Lakebase** | Server-side only (no frontend components) |
-| **Serving** | `useServingStream` hook, `useServingInvoke` hook |
 
 See the plugin-specific reference for usage examples.
 

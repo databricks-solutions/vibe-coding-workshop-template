@@ -211,35 +211,6 @@ table_properties:
 
 ---
 
-## Unknown Member Row Specification
-
-Every dimension that is referenced by a `nullable: true` FK in any fact table MUST declare an `unknown_member:` block. This is the sentinel row that fact loads write when the source system has a NULL, empty string, or unresolvable business key — it lets joins stay inner joins and keeps measures correct.
-
-**Rule:** If a fact YAML has `foreign_keys: - columns: [...] references: dim_X(...) nullable: true`, then `dim_X` MUST define `unknown_member:`.
-
-**Template (add near the top of the dimension YAML, typically right after `table_properties:` and before `columns:`):**
-
-```yaml
-unknown_member:
-  description: "Sentinel row for NULL or missing FK references from fact tables."
-  key_value: "-1"            # surrogate key placeholder used by fact loads
-  business_key_value: -1     # business-key placeholder; use -1 / 'UNKNOWN' per column type
-  attribute_defaults:
-    name: "Unknown"          # every text attribute gets a safe default
-    status: "Not Applicable"
-    # ... one entry per non-key attribute, using safe defaults (never NULL in the unknown row)
-```
-
-**Why this lives in the YAML:** the unknown-member contract is a design-time decision, not a runtime artifact. The Phase 8 validator checks this block exists for every dimension whose surrogate key is the target of a `nullable: true` FK. The Gold implementation stage (stage 4) reads `unknown_member` to generate the seed INSERT that populates the sentinel row before any fact load runs.
-
-**Default conventions:**
-- `key_value: "-1"` for STRING surrogate keys (hashed keys), `-1` for BIGINT surrogate keys.
-- `name` / label-like attributes default to `"Unknown"`.
-- Status / enum-like attributes default to `"Not Applicable"`.
-- Dates default to `1900-01-01` (unknown) or `9999-12-31` (perpetual future), not NULL.
-
----
-
 ## Fact Table YAML Template
 
 **File: `gold_layer_design/yaml/{domain}/fact_sales_daily.yaml`**
@@ -498,12 +469,12 @@ columns:
     description: "Day name (Monday, etc.). Business: Labels. Technical: DATE_FORMAT(date, 'EEEE')."
   
   - name: is_weekend
-    type: BOOLEAN  # Exception: BOOLEAN allowed for generated date dimension indicators per 02-dimension-patterns
+    type: BOOLEAN
     nullable: false
     description: "Weekend indicator. Business: Weekend vs weekday analysis. Technical: day_of_week IN (1, 7)."
-
+  
   - name: is_holiday
-    type: BOOLEAN  # Exception: BOOLEAN allowed for generated date dimension indicators per 02-dimension-patterns
+    type: BOOLEAN
     nullable: true
     description: "Holiday indicator. Business: Holiday impact analysis. Technical: From holiday calendar lookup."
 

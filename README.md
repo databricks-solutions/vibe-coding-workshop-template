@@ -2,7 +2,7 @@
 
 > **Build end-to-end data products on Databricks with AI-assisted development**
 
-This template is a complete **data product builder** powered by vibe coding. Start from a raw customer schema or existing data, and build your way through the full Databricks stack — Databricks Apps with Lakebase, medallion architecture (Bronze, Silver, Gold), semantic layer, Genie Spaces, ML pipelines, and GenAI agents — all guided by 55 agent skills and your AI coding assistant.
+This template is a complete **data product builder** powered by vibe coding. Start from a raw customer schema or existing data, and build your way through the full Databricks stack — Databricks Apps with Lakebase, medallion architecture (Bronze, Silver, Gold), semantic layer, Genie Spaces, ML pipelines, and GenAI agents — all guided by 59 agent skills and your AI coding assistant.
 
 ---
 
@@ -14,7 +14,7 @@ This template is a complete **data product builder** powered by vibe coding. Sta
 
 ## Quick Start
 
-> **Workshop participants:** See [PRE-REQUISITES.md](PRE-REQUISITES.md) for the full setup checklist (workspace access, CLI, IDE, and authentication).
+> **Workshop participants:** See [PRE-REQUISITES.md](PRE-REQUISITES.md) for workspace and Unity Catalog setup (Genie / serverless). **Apps Lakebase with MCP:** admins follow [pre-req-mcp-setup.md](pre-req-mcp-setup.md). **Local IDE + CLI (Path A in QUICKSTART):** use the Prerequisites table below.
 
 ### Prerequisites
 
@@ -38,22 +38,16 @@ cd my-project
 
 #### Path A: Build and Deploy a Databricks App
 
-Build a full-stack TypeScript app on Databricks AppKit, guided by 7 agent skills:
+Build a full-stack TypeScript app on Databricks AppKit, guided by 6 agent skills:
 
-1. Read the workshop guide: [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md)
+1. **Genie Code:** [apps_lakebase/prompts/README.md](apps_lakebase/prompts/README.md) (prompt order). **Context:** [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md) (short overview + links).
 2. Open your AI coding assistant and prompt:
 
 ```
 I want to build a Databricks App. Read @apps_lakebase/skills/01-appkit-scaffold/SKILL.md and scaffold a new AppKit project.
 ```
 
-3. Follow the 5-phase workflow in Instructions.md:
-   - **Phase 1:** Scaffold + build UI from a PRD, test locally (uses `01-appkit-scaffold` and `02-appkit-build` skills)
-   - **Phase 2:** Deploy to Databricks Apps with mock data (uses `03-appkit-deploy` skill)
-   - **Phase 3:** Setup Lakebase project (uses `00-appkit-navigator` skill)
-   - **Phase 4:** Wire Lakebase backend locally (uses `04-appkit-plugin-add` and `05-appkit-lakebase-wiring` skills)
-   - **Phase 4b (optional):** Wire Model Serving / Agent endpoint (uses `04-appkit-plugin-add` and `06-appkit-serving-wiring` skills)
-   - **Phase 5:** Deploy + E2E test with Lakebase (uses `03-appkit-deploy` skill)
+3. **Genie:** follow `apps_lakebase/prompts/README.md` (PRD → UI → Lakebase → wire → deploy). **Local IDE + CLI:** follow [QUICKSTART.md](QUICKSTART.md) Path A and [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md) → `apps_lakebase/skills/`.
 
 #### Path B: Build an End-to-End Data Pipeline
 
@@ -81,32 +75,29 @@ vibe-coding-workshop-template/
 ├── README.md                       # This file
 ├── QUICKSTART.md                   # Quick-start guide with two pathways
 ├── AGENTS.md                       # AI assistant routing (universal entry point)
-├── PRE-REQUISITES.md               # Workshop prerequisites checklist
+├── PRE-REQUISITES.md               # Workshop prerequisites checklist (workspace / UC / compute)
+├── pre-req-mcp-setup.md            # MCP AppKit admin setup (shared MCP app + OAuth scope)
 ├── CONTRIBUTING.md                 # Contribution guidelines
 ├── LICENSE.md                      # License
 ├── SECURITY.md                     # Security policy
 ├── env.example                     # Environment variable template
 │
-├── apps_lakebase/                  # Databricks AppKit Workshop (7 agent skills)
-│   ├── Instructions.md             #   Comprehensive workshop guide
-│   ├── prompts/                    #   Numbered prompt files for each workshop step
+├── apps_lakebase/                  # Databricks AppKit Workshop (6 agent skills)
+│   ├── Instructions.md             #   Genie overview + links (see prompts/README.md)
 │   └── skills/                     #   Agent skills for the full app lifecycle
 │       ├── 00-appkit-navigator/    #     Entry-point navigator (read first)
 │       ├── 01-appkit-scaffold/     #     Scaffold new AppKit projects (+ agent skills install)
 │       ├── 02-appkit-build/        #     Build UI + backend from a PRD
 │       ├── 03-appkit-deploy/       #     Deploy to Databricks Apps
-│       ├── 04-appkit-plugin-add/   #     Add plugins (Lakebase, Analytics, Genie, Files, Serving)
-│       ├── 05-appkit-lakebase-wiring/ #  Wire Lakebase DDL, API routes, frontend hooks
-│       └── 06-appkit-serving-wiring/  #  Wire Model Serving / Agent endpoint to frontend
+│       ├── 04-appkit-plugin-add/   #     Add plugins (Lakebase, Analytics, Genie, Files)
+│       └── 05-appkit-lakebase-wiring/ #  Wire Lakebase DDL, API routes, frontend hooks
 │
-├── presentations/                  # Workshop slide deck (Marp, HTML, PDF, PPTX)
-│
-├── data_product_accelerator/       # 55 Agent Skills for End-to-End Data Products
+├── data_product_accelerator/       # 59 Agent Skills for End-to-End Data Products
 │   ├── AGENTS.md                   #   Detailed skill routing table
 │   ├── QUICKSTART.md               #   One-prompt-per-stage guide (9 stages)
 │   ├── README.md                   #   Accelerator overview
 │   ├── context/                    #   Schema CSV inputs (starting point)
-│   ├── skills/                     #   55 skills across 12 domains
+│   ├── skills/                     #   59 skills across 12 domains
 │   │   ├── admin/                  #     Skill creation, auditing (4)
 │   │   ├── bronze/                 #     Bronze layer + Faker data (2)
 │   │   ├── common/                 #     Cross-cutting shared skills (8)
@@ -157,19 +148,19 @@ Raw Schema CSV or Existing Data
   └─► Databricks App       — AppKit (full-stack TypeScript), deployed on Databricks Apps
 ```
 
-Each stage is driven by a single prompt to your AI coding assistant. The 55 agent skills in `data_product_accelerator/` encode production-tested patterns so you get governed, high-quality output at every step.
+Each stage is driven by a single prompt to your AI coding assistant. The 59 agent skills in `data_product_accelerator/` encode production-tested patterns so you get governed, high-quality output at every step.
 
 ---
 
-## Data Product Accelerator (55 Agent Skills)
+## Data Product Accelerator (59 Agent Skills)
 
-The `data_product_accelerator/` directory contains **55 agent skills** organized by domain that guide your AI assistant through the entire pipeline:
+The `data_product_accelerator/` directory contains **59 agent skills** organized by domain that guide your AI assistant through the entire pipeline:
 
 | Domain | Skills | Focus |
 |--------|--------|-------|
 | **Gold** | 14 | Dimensional modeling, design workers, pipeline workers, ERDs, MERGE scripts |
-| **Semantic Layer** | 5 | Metric Views, TVFs, Genie Spaces, export/import API |
-| **GenAI Agents** | 10 | ResponsesAgent, evaluation, deployment, simple agent scaffold |
+| **Semantic Layer** | 10 | Metric Views, TVFs, Genie Spaces, optimization orchestrator + workers |
+| **GenAI Agents** | 9 | ResponsesAgent, evaluation, deployment |
 | **Common** | 8 | Asset Bundles, naming, constraints, imports |
 | **Monitoring** | 5 | Lakehouse Monitors, dashboards, SQL alerts |
 | **Admin** | 4 | Skill creation, auditing, docs |
@@ -184,9 +175,9 @@ See [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART
 
 ---
 
-## Databricks AppKit Workshop (7 Agent Skills)
+## Databricks AppKit Workshop (6 Agent Skills)
 
-The `apps_lakebase/` directory contains **7 agent skills** and a comprehensive workshop guide for building full-stack TypeScript apps on [Databricks AppKit](https://databricks.github.io/appkit/). The app is **not pre-built** — it gets scaffolded at runtime via `databricks apps init` and built iteratively with your AI coding assistant.
+The `apps_lakebase/` directory contains **6 agent skills** and a comprehensive workshop guide for building full-stack TypeScript apps on [Databricks AppKit](https://databricks.github.io/appkit/). The app is **not pre-built** — it gets scaffolded at runtime via `databricks apps init` and built iteratively with your AI coding assistant.
 
 **What gets built:**
 - Full-stack TypeScript app (React + Tailwind CSS frontend, AppKit backend)
@@ -204,7 +195,6 @@ The `apps_lakebase/` directory contains **7 agent skills** and a comprehensive w
 | `03-appkit-deploy` | Deploy to Databricks Apps, validate configuration |
 | `04-appkit-plugin-add` | Add plugins to an existing AppKit project |
 | `05-appkit-lakebase-wiring` | Wire Lakebase DDL, Express API routes, frontend hooks, mock fallback |
-| `06-appkit-serving-wiring` | Wire Model Serving / Agent endpoint to frontend (streaming, invoke) |
 
 ### Local Development (after scaffolding)
 
@@ -314,7 +304,7 @@ After scaffolding, your generated AppKit app is a full-stack TypeScript project.
 
 ### Adding Backend Routes
 
-Edit `server/server.ts` in your generated app directory to add tRPC routes or custom endpoints. See the `02-appkit-build` skill for patterns.
+Edit `server/server.ts` in your generated app directory to add Express routes via `appkit.server.extend()`. See the `02-appkit-build` skill for patterns.
 
 ### Adding Plugins
 
@@ -382,9 +372,9 @@ npm run dev
 
 ## Resources
 
-- [PRE-REQUISITES.md](PRE-REQUISITES.md) — Workshop prerequisites checklist
-- [Workshop Presentation](presentations/README.md) — Marp slide deck (HTML, PDF, PPTX)
-- [AppKit Workshop Guide](apps_lakebase/Instructions.md) — Databricks App workshop guide
+- [PRE-REQUISITES.md](PRE-REQUISITES.md) — Workshop prerequisites checklist (workspace / UC / compute)
+- [pre-req-mcp-setup.md](pre-req-mcp-setup.md) — MCP AppKit admin setup (`mcp-appkit-skill` + `v2v-gc-agent`)
+- [AppKit workshop overview](apps_lakebase/Instructions.md) + [Genie prompts](apps_lakebase/prompts/README.md)
 - [Data Product Accelerator QUICKSTART](data_product_accelerator/QUICKSTART.md) — 9-stage pipeline guide
 - [Databricks AppKit Documentation](https://databricks.github.io/appkit/) — AppKit SDK reference
 - [Databricks Apps Documentation](https://docs.databricks.com/dev-tools/databricks-apps/)
@@ -402,7 +392,7 @@ This is a **Git template repository**. To use it:
 
 1. Click "Use this template" on GitHub, or clone directly
 2. Choose your starting point:
-   - **Build a Databricks App:** Follow the [AppKit workshop guide](apps_lakebase/Instructions.md) — scaffold, build, deploy, and wire Lakebase
+   - **Build a Databricks App:** [Genie prompts](apps_lakebase/prompts/README.md) + [overview](apps_lakebase/Instructions.md); local CLI: [QUICKSTART.md](QUICKSTART.md) Path A
    - **Build a data product:** Drop a schema CSV in `data_product_accelerator/context/` and follow the [9-stage guide](data_product_accelerator/QUICKSTART.md)
    - **Build agents:** Use the prompts in `agentic-framework/agents/` to scaffold multi-agent systems
 3. Iterate with your AI coding assistant — the agent skills handle the patterns

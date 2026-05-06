@@ -1,9 +1,9 @@
 ---
 name: databricks-aibi-dashboards
-description: Production-grade patterns for Databricks AI/BI (Lakeview) dashboards. Prevents visualization errors, deployment failures, and maintenance issues through widget-query alignment, number formatting, parameter configuration, monitoring table patterns, chart scale properties, and automated deployment workflows. Includes pivot tables with hierarchy drill-down and ratio metrics, point/choropleth maps, sankey diagrams, waterfall and histogram charts, cross-filtering and drill-through patterns, filter defaultSelection/disallowAll configuration, disaggregated vs aggregated query modes, and complete JSON templates for all widget types.
+description: Production-grade patterns for Databricks AI/BI (Lakeview) dashboards. Prevents visualization errors, deployment failures, and maintenance issues through widget-query alignment, number formatting, parameter configuration, monitoring table patterns, chart scale properties, and automated deployment workflows. Includes complete JSON templates, validation scripts, and step-by-step implementation guide.
 metadata:
   author: prashanth subrahmanyam
-  version: "4.1"
+  version: "2.0"
   domain: monitoring
   role: worker
   pipeline_stage: 7
@@ -23,7 +23,7 @@ metadata:
     - sql validation
     - automation
     - production-grade
-  last_verified: "2026-04-16"
+  last_verified: "2026-02-07"
   volatility: medium
   upstream_sources:
     - name: "ai-dev-kit"
@@ -58,10 +58,7 @@ AI/BI Lakeview dashboards provide **visual analytics for business users** with *
 - Number formatting rules (percentages, currency, plain numbers)
 - Parameter configuration (time ranges, multi-select, text input)
 - Monitoring table query patterns (window structs, CASE pivots, custom drift metrics)
-- Chart configuration (pie, bar, line, area, table, pivot, point map, choropleth, sankey)
-- **Pivot tables** with hierarchy expand/collapse and non-additive ratio metric support
-- **Map visualizations** (point maps with lat/lng, choropleth by region)
-- **disaggregated vs aggregated** query mode patterns for correct metric rollups
+- Chart configuration (pie, bar, line, area, table widgets)
 - Pre-deployment SQL validation (90% reduction in dev loop time)
 - UPDATE-or-CREATE deployment pattern (preserves URLs and permissions)
 - Variable substitution (no hardcoded schemas)
@@ -81,26 +78,6 @@ Use this skill when:
 - **Configuring parameters** - Setting up time ranges, filters, and multi-select parameters
 - **Planning dashboard projects** - Using templates to gather requirements and plan implementation
 - **Onboarding new developers** - Teaching AI/BI dashboard best practices with working examples
-
-## Mandatory Skill Dependencies
-
-**Before building dashboard datasets, determine which query pattern the task requires:**
-
-| Query Pattern | Required Pre-Read | Trigger |
-|---|---|---|
-| `MEASURE()` against Metric Views | **MUST READ** `semantic-layer/01-metric-views-patterns/SKILL.md` + [references/metric-view-dashboard-queries.md](references/metric-view-dashboard-queries.md) | User mentions "MEASURE()", "Metric View", or semantic layer queries |
-| Direct Gold table SQL | No additional skill needed | Querying fact/dimension tables directly |
-| Monitoring / system table queries | **MUST READ** `monitoring/01-lakehouse-monitoring-comprehensive/SKILL.md` | Dashboard includes monitoring widgets |
-
-**Always load these common skills first (per AGENTS.md):**
-- `common/databricks-expert-agent/SKILL.md` — "Extract Don't Generate" principle, core SA behavior
-- `common/naming-tagging-standards/SKILL.md` — naming conventions for dashboards and datasets
-
-> **Plan addendum filename:** Dashboards are always planned in `plans/phase1-addendum-1.5-aibi-dashboards.md`. See [`planning/00-project-planning/assets/addendum-numbering.md`](../../planning/00-project-planning/assets/addendum-numbering.md) for the canonical numbering table. The legacy name `phase1-addendum-1.1-dashboards.md` is forbidden — if you see it anywhere, replace it with `1.5-aibi-dashboards.md`.
-
-**Complementary installed skills** (check `available_skills` list):
-- `databricks-lakeview-dashboard` — comprehensive widget JSON patterns for 16+ chart types, **mandatory "TEST EVERY QUERY" validation workflow**
-- `databricks-lakeview-dashboard-analyzer` — analyzing existing dashboards for patterns
 
 ## 🚀 Quick Start (2 Hours)
 
@@ -218,11 +195,7 @@ LIMIT 10
 - Line Chart (trends over time)
 - Bar Chart (category comparisons)
 - Pie Chart (distribution)
-- Pivot Table (hierarchical drill-down with expand/collapse)
-- Table (detailed flat data)
-- Point Map (lat/lng store-level data)
-- Choropleth Map (geographic aggregations by region)
-- Sankey (flow/relationship diagrams)
+- Table (detailed data)
 - Counter/KPI (single metric)
 
 ### Dashboard Pages
@@ -244,20 +217,15 @@ LIMIT 10
 
 ## Quick Reference
 
-### Top 10 Critical Rules
+### Top 5 Critical Rules
 
 | Rank | Issue | Prevention |
 |------|-------|------------|
-| 1 | **Lakeview JSON Format** | Datasets MUST use `queryLines` (array) + `catalog` + `schema` — NOT `query` (string). Textboxes MUST use `multilineTextboxSpec.lines` — NOT `textbox_spec`. Violating this causes ALL visuals to error. |
-| 2 | **Dataset `columns` for Hierarchy Pivots** | Deep hierarchy pivots with `cubeGroupingSets` MUST use dataset `columns` array for ratio calculations + `MEASURE()` references in widget query + `cell` encodings (Pattern A). Do NOT use `values` encoding with `cubeGroupingSets`. |
-| 3 | Widget-Query Column Mismatch | Always use explicit SQL aliases matching widget `fieldName` |
-| 4 | Incorrect Number Formatting | Return raw numbers, not formatted strings |
-| 5 | Missing Parameter Definitions | Define ALL parameters in dataset's `parameters` array |
-| 6 | Ratio Metrics in Pivots | Use `disaggregated: false`. **Always prefer Pattern A** (dataset `columns` + `MEASURE()` + `cell` encoding) — it works in both the UI editor/draft mode and published view. Pattern B (inline expressions + `values` encoding) only renders when published and is invisible in the UI draft editor. Neither pattern uses `transform`. |
-| 7 | Monitoring Table Schema | Use `CASE` pivots on `column_name`, access `window.start` |
-| 8 | Map Coordinates Must Be Numeric | CAST lat/lng to DOUBLE upstream; STRING coordinates render blank maps |
-| 9 | Metric View Column References | Use bare dimension `name` in queries — not `source.col` or `dim.col` prefixes |
-| 10 | Bundle Deploy vs UI Draft | Bundle deploy updates published version; use API PATCH + publish to overwrite UI draft state |
+| 1 | Widget-Query Column Mismatch | Always use explicit SQL aliases matching widget `fieldName` |
+| 2 | Incorrect Number Formatting | Return raw numbers, not formatted strings |
+| 3 | Missing Parameter Definitions | Define ALL parameters in dataset's `parameters` array |
+| 4 | Monitoring Table Schema | Use `CASE` pivots on `column_name`, access `window.start` |
+| 5 | Pie Chart Scale Missing | Add explicit `scale` to both `color` and `angle` encodings |
 
 ### Widget-Query Alignment
 
@@ -338,7 +306,7 @@ WHERE column_name = ':table' AND drift_type = 'CONSECUTIVE'
 **These are non-negotiable for production dashboards:**
 
 - ✅ **6-Column Grid:** NOT 12-column! Widths must be 1-6
-- ✅ **Version Specs:** KPIs use v2, Charts use v3, Tables use v2, Pivots use v3, Choropleth Map (`choropleth-map`) uses v1, Symbol Map (`symbol-map`) uses v2
+- ✅ **Version Specs:** KPIs use v2, Charts use v3, Tables use v1
 - ✅ **Global Filters:** Cross-dashboard filtering on a dedicated page
 - ✅ **DATE Parameters:** Static dates, not DATETIME with dynamic expressions
 - ✅ **Proper JOINs:** Include workspace_id AND entity ID
@@ -615,8 +583,6 @@ ORDER BY window.start
 
 **⚠️ Note:** KPIs use version 2. Do NOT include `period` in encodings.
 
-**Widget version summary:** KPIs=v2, Charts (bar/line/pie/area/scatter)=v3, Pivots=v3, Tables=v2, Sankey=v1, Filters=v2, **Choropleth Map=v1** (`choropleth-map`), **Symbol/Point Map=v2** (`symbol-map`).
-
 ---
 
 ### Bar Chart (Version 3)
@@ -763,7 +729,7 @@ ORDER BY window.start
 
 ---
 
-### Table Widget (Version 2)
+### Table Widget (Version 1)
 
 ```json
 {
@@ -785,7 +751,7 @@ ORDER BY window.start
       }
     ],
     "spec": {
-      "version": 2,
+      "version": 1,
       "widgetType": "table",
       "encodings": {
         "columns": [
@@ -804,352 +770,14 @@ ORDER BY window.start
         "title": "Sales Detail",
         "showDescription": true,
         "description": "Detailed sales by store and product"
-      }
+      },
+      "itemsPerPage": 50,
+      "condensed": true,
+      "withRowNumber": true
     }
   },
   "position": {"x": 0, "y": 16, "width": 6, "height": 6}
 }
-```
-
----
-
-### Pivot Table (Version 3)
-
-Pivot tables display hierarchical data with expand/collapse drill-down (released Feb 2026). Use for Power BI matrix visual equivalents.
-
-**Two query modes** — the choice of `disaggregated` determines how aggregation works:
-
-- `disaggregated: true` — Raw rows flow to the pivot; the pivot applies `transform` (SUM, AVG, etc.) at each hierarchy level. Use for **additive measures only** (totals, counts).
-- `disaggregated: false` — Widget query fields contain aggregate expressions (SUM, computed ratios); the visualization controls the GROUP BY. Use when you need **ratio metrics** (averages, percentages) that must recompute at each hierarchy level.
-
-#### Pivot with Additive Measures Only (disaggregated: true)
-
-```json
-{
-  "widget": {
-    "name": "pivot_hierarchy_additive",
-    "queries": [
-      {
-        "name": "main_query",
-        "query": {
-          "datasetName": "ds_hierarchy",
-          "fields": [
-            {"name": "region", "expression": "`region`"},
-            {"name": "market", "expression": "`market`"},
-            {"name": "store", "expression": "`store`"},
-            {"name": "revenue", "expression": "`revenue`"},
-            {"name": "stores", "expression": "`stores`"}
-          ],
-          "disaggregated": true
-        }
-      }
-    ],
-    "spec": {
-      "version": 3,
-      "widgetType": "pivot",
-      "encodings": {
-        "rows": [
-          {"fieldName": "region", "displayName": "Region"},
-          {"fieldName": "market", "displayName": "Market"},
-          {"fieldName": "store", "displayName": "Store"}
-        ],
-        "values": [
-          {"fieldName": "stores", "displayName": "Store#", "transform": "SUM"},
-          {"fieldName": "revenue", "displayName": "Revenue", "transform": "SUM"}
-        ]
-      },
-      "frame": {
-        "showTitle": true,
-        "title": "Hierarchy Drill-Down"
-      }
-    }
-  },
-  "position": {"x": 0, "y": 0, "width": 6, "height": 8}
-}
-```
-
-#### Pivot with Ratio Metrics — Two Patterns
-
-Non-additive ratio metrics (e.g., avg_revenue = total_revenue / store_count) must recompute at each hierarchy level. Two working patterns exist:
-
-##### Pattern A: Dataset `columns` + `MEASURE()` (for deep hierarchy drill-down)
-
-Use when you need `cubeGroupingSets` for expand/collapse. Define custom calculations on the **dataset** via a `columns` array, then reference via `MEASURE()` in the widget query:
-
-**Dataset** (note the `columns` array):
-```json
-{
-  "name": "ds_hierarchy",
-  "displayName": "Store Hierarchy",
-  "queryLines": ["SELECT region, market, store_id,\n", "  MEASURE(store_count) AS stores,\n", "  MEASURE(total_revenue) AS revenue,\n", "  MEASURE(store_day_count) AS store_days\n", "FROM catalog.schema.mv_store_metrics\n", "GROUP BY ALL"],
-  "columns": [
-    {"displayName": "Store#", "description": "Count of stores", "expression": "SUM(`stores`)"},
-    {"displayName": "Avg Revenue", "description": "Average revenue per store-day", "expression": "SUM(`revenue`) / NULLIF(SUM(`store_days`), 0)"}
-  ],
-  "catalog": "my_catalog",
-  "schema": "my_schema"
-}
-```
-
-**Widget**:
-```json
-{
-  "widget": {
-    "name": "pivot_hierarchy_ratios_a",
-    "queries": [
-      {
-        "name": "main_query",
-        "query": {
-          "datasetName": "ds_hierarchy",
-          "fields": [
-            {"name": "region", "expression": "`region`"},
-            {"name": "market", "expression": "`market`"},
-            {"name": "store_id", "expression": "`store_id`"},
-            {"name": "measure(Store#)", "expression": "MEASURE(`Store#`)"},
-            {"name": "measure(Avg Revenue)", "expression": "MEASURE(`Avg Revenue`)"}
-          ],
-          "cubeGroupingSets": {"sets": [{"fieldNames": ["region", "market", "store_id"]}, {}]},
-          "disaggregated": false
-        }
-      }
-    ],
-    "spec": {
-      "version": 3,
-      "widgetType": "pivot",
-      "encodings": {
-        "rows": [
-          {"fieldName": "region", "displayName": "Region"},
-          {"fieldName": "market", "displayName": "Market"},
-          {"fieldName": "store_id", "displayName": "Store"}
-        ],
-        "cell": {
-          "type": "multi-cell",
-          "fields": [
-            {"fieldName": "measure(Store#)", "cellType": "text"},
-            {"fieldName": "measure(Avg Revenue)", "cellType": "text"}
-          ],
-          "displayAs": "columns"
-        }
-      },
-      "frame": {"showTitle": true, "title": "Hierarchy with Ratio Metrics"}
-    }
-  },
-  "position": {"x": 0, "y": 0, "width": 6, "height": 8}
-}
-```
-
-##### Pattern B: Inline Widget Query Expressions (for flat/shallow groupings)
-
-Use when you don't need `cubeGroupingSets`. Define aggregate expressions directly in widget query `fields`:
-
-```json
-{
-  "widget": {
-    "name": "pivot_hierarchy_ratios_b",
-    "queries": [
-      {
-        "name": "main_query",
-        "query": {
-          "datasetName": "ds_hierarchy_detail",
-          "fields": [
-            {"name": "region", "expression": "`region`"},
-            {"name": "sum_stores", "expression": "SUM(`stores`)"},
-            {"name": "avg_revenue", "expression": "SUM(`revenue`) / NULLIF(SUM(`store_days`), 0)"}
-          ],
-          "disaggregated": false
-        }
-      }
-    ],
-    "spec": {
-      "version": 3,
-      "widgetType": "pivot",
-      "encodings": {
-        "rows": [
-          {"fieldName": "region", "displayName": "Region"}
-        ],
-        "values": [
-          {"fieldName": "sum_stores", "displayName": "Store#"},
-          {"fieldName": "avg_revenue", "displayName": "Avg Revenue"}
-        ]
-      },
-      "frame": {"showTitle": true, "title": "Flat Grouping with Ratios"}
-    }
-  },
-  "position": {"x": 0, "y": 0, "width": 6, "height": 8}
-}
-```
-
-##### Pattern Comparison
-
-| Feature | Pattern A: Dataset `columns` | Pattern B: Inline Expressions |
-|---|---|---|
-| Hierarchy drill-down | Yes (`cubeGroupingSets`) | No |
-| Custom calculations | Dataset `columns` array | Widget query `fields` |
-| Widget references | `MEASURE(\`Display Name\`)` | Direct field names |
-| Encoding type | `cell` (multi-cell) | `values` array |
-| `transform` property | Not used | Not used |
-| **Visible in UI draft mode** | **Yes** — calculations appear in Values panel | **No** — panel is empty in draft, only renders when published |
-| Best for | Deep hierarchies (3+ levels) | Flat/shallow groupings (1-2 levels) |
-| **Recommendation** | **Always prefer this pattern** | Avoid unless you never need to edit in UI |
-
-**When sourcing from Metric Views**, the additive components come from `MEASURE()` calls:
-```sql
-SELECT
-  region, market, store_id,
-  MEASURE(total_revenue) AS revenue,
-  MEASURE(store_day_count) AS store_days,
-  MEASURE(store_count) AS stores
-FROM catalog.schema.mv_store_metrics
-GROUP BY region, market, store_id
-```
-
----
-
-### Point Map / Symbol Map (Version 2)
-
-Requires **numeric** latitude/longitude columns (DOUBLE, not STRING). If upstream tables store coordinates as STRING, cast them to DOUBLE in the materialized view layer.
-
-**CRITICAL:** The widget type is `"symbol-map"` (NOT `"point"`), version is `2` (NOT `3`), and coordinates use a nested `coordinates` object.
-
-```json
-{
-  "widget": {
-    "name": "map_store_locations",
-    "queries": [
-      {
-        "name": "main_query",
-        "query": {
-          "datasetName": "ds_store_points",
-          "fields": [
-            {"name": "latitude", "expression": "`latitude`"},
-            {"name": "longitude", "expression": "`longitude`"},
-            {"name": "region", "expression": "`region`"},
-            {"name": "revenue", "expression": "`revenue`"}
-          ],
-          "disaggregated": true
-        }
-      }
-    ],
-    "spec": {
-      "version": 2,
-      "widgetType": "symbol-map",
-      "encodings": {
-        "coordinates": {
-          "latitude": {"fieldName": "latitude"},
-          "longitude": {"fieldName": "longitude"}
-        },
-        "color": {"fieldName": "region", "scale": {"type": "categorical"}},
-        "size": {"fieldName": "revenue", "scale": {"type": "quantitative"}},
-        "extra": [{"fieldName": "region"}]
-      },
-      "frame": {
-        "showTitle": true,
-        "title": "Store Locations"
-      }
-    }
-  },
-  "position": {"x": 0, "y": 0, "width": 3, "height": 8}
-}
-```
-
----
-
-### Choropleth Map (Version 1)
-
-**CRITICAL:** The widget type is `"choropleth-map"` (NOT `"choropleth"`), version is `1` (NOT `3`), and the geographic encoding uses a `region` object with `regionType` and `admin0`/`admin1` sub-objects. Queries MUST use `disaggregated: false` with aggregate expressions.
-
-Geographic role values:
-- Country by name: `geographicRole: "admin0-name"`
-- Country by 2-letter code: `geographicRole: "admin0-unit-code"`
-- State/Province by name: use `admin1` with `geographicRole: "admin1-name"`
-
-**State/Province (admin1) choropleths:** When mapping at the state/province level, you MUST include BOTH `admin0` (country) AND `admin1` (state) in the `region` encoding. The `admin0` field provides the country context required for Mapbox to resolve state names. State names must be **full names** (e.g., "California", "Ontario"), not abbreviations ("CA", "ON"). If your source data uses abbreviations, apply a CASE expression in the dataset query to convert them.
-
-**Country-level (admin0) example:**
-
-```json
-{
-  "widget": {
-    "name": "map_choropleth",
-    "queries": [
-      {
-        "name": "main_query",
-        "query": {
-          "datasetName": "ds_country_sales",
-          "fields": [
-            {"name": "country_name", "expression": "`country_name`"},
-            {"name": "sum(total_sales)", "expression": "SUM(`total_sales`)"}
-          ],
-          "disaggregated": false
-        }
-      }
-    ],
-    "spec": {
-      "version": 1,
-      "widgetType": "choropleth-map",
-      "encodings": {
-        "region": {
-          "regionType": "mapbox-v4-admin",
-          "admin0": {
-            "fieldName": "country_name",
-            "type": "field",
-            "geographicRole": "admin0-name"
-          }
-        },
-        "color": {
-          "fieldName": "sum(total_sales)",
-          "scale": {"type": "quantitative"}
-        },
-        "extra": [{"fieldName": "country_name"}]
-      },
-      "frame": {
-        "showTitle": true,
-        "title": "Sales by Country"
-      }
-    }
-  },
-  "position": {"x": 3, "y": 0, "width": 3, "height": 8}
-}
-```
-
-**State/Province-level (admin1) example — requires admin0 context:**
-
-```json
-{
-  "spec": {
-    "version": 1,
-    "widgetType": "choropleth-map",
-    "encodings": {
-      "region": {
-        "regionType": "mapbox-v4-admin",
-        "admin0": {
-          "fieldName": "country_name",
-          "type": "field",
-          "geographicRole": "admin0-name"
-        },
-        "admin1": {
-          "fieldName": "state_full_name",
-          "type": "field",
-          "geographicRole": "admin1-name"
-        }
-      },
-      "color": {
-        "fieldName": "total_sales",
-        "scale": {"type": "quantitative"}
-      }
-    }
-  }
-}
-```
-
-State name CASE pattern for abbreviation-to-full-name conversion in dataset SQL:
-```sql
-CASE state_abbr
-  WHEN 'CA' THEN 'California'
-  WHEN 'TX' THEN 'Texas'
-  WHEN 'NY' THEN 'New York'
-  -- ... all states
-END AS state_full_name
 ```
 
 ---
@@ -1168,7 +796,7 @@ END AS state_full_name
           "fields": [
             {"name": "store_name", "expression": "`store_name`"}
           ],
-          "disaggregated": true
+          "disaggregated": false
         }
       }
     ],
@@ -1192,196 +820,6 @@ END AS state_full_name
   },
   "position": {"x": 0, "y": 0, "width": 2, "height": 2}
 }
-```
-
-#### Default Selection and `disallowAll`
-
-To set a default value on a single-select filter (e.g., defaulting to "Day" instead of "All"), use the `selection` and `disallowAll` properties. The `defaultSelection` format requires a typed value structure — a bare string array will silently fall back to "All".
-
-**Correct `defaultSelection` format:**
-```json
-{
-  "spec": {
-    "version": 2,
-    "widgetType": "filter-single-select",
-    "selection": {
-      "defaultSelection": {
-        "values": {
-          "dataType": "STRING",
-          "values": [{"value": "Day"}]
-        }
-      }
-    },
-    "disallowAll": true
-  }
-}
-```
-
-- `disallowAll: true` removes the "All" option, forcing the user to pick one value. Without this, even with a `defaultSelection`, users can revert to "All" and see unfiltered results — which causes double-counting when multiple period rows exist.
-- `dataType` must match the column type (`"STRING"`, `"NUMBER"`, etc.).
-- Each value is an object: `{"value": "Day"}`, not a bare string.
-
-### Filter Widget (Multi Select)
-
-```json
-{
-  "widget": {
-    "name": "filter_region",
-    "queries": [
-      {
-        "name": "main_query",
-        "query": {
-          "datasetName": "ds_region_data",
-          "fields": [
-            {"name": "region", "expression": "`region`"}
-          ],
-          "disaggregated": true
-        }
-      }
-    ],
-    "spec": {
-      "version": 2,
-      "widgetType": "filter-multi-select",
-      "encodings": {
-        "fields": [
-          {
-            "displayName": "Region",
-            "fieldName": "region",
-            "queryName": "main_query"
-          }
-        ]
-      },
-      "frame": {
-        "showTitle": true,
-        "title": "Filter by Region"
-      }
-    }
-  }
-}
-```
-
-### Waterfall Chart (Version 3)
-
-Waterfall charts show additive/subtractive contributions to a total — ideal for decomposing "who helped and who hurt?" (e.g., region contribution to total metric change).
-
-```json
-{
-  "widget": {
-    "name": "region_contribution_waterfall",
-    "queries": [
-      {
-        "name": "main_query",
-        "query": {
-          "datasetName": "ds_region_performance",
-          "fields": [
-            {"name": "region", "expression": "`region`"},
-            {"name": "metric_change", "expression": "`metric_change`"}
-          ],
-          "disaggregated": true
-        }
-      }
-    ],
-    "spec": {
-      "version": 3,
-      "widgetType": "waterfall",
-      "encodings": {
-        "x": {
-          "fieldName": "region",
-          "displayName": "Region",
-          "scale": {"type": "categorical"}
-        },
-        "y": {
-          "fieldName": "metric_change",
-          "displayName": "$ Change",
-          "scale": {"type": "quantitative"}
-        }
-      },
-      "frame": {
-        "showTitle": true,
-        "title": "Region Contribution to Total Change"
-      }
-    }
-  }
-}
-```
-
-### Histogram (Version 3)
-
-Histograms show distribution of a continuous variable — useful for identifying outliers or skewed metric distributions.
-
-```json
-{
-  "widget": {
-    "name": "revenue_distribution",
-    "queries": [
-      {
-        "name": "main_query",
-        "query": {
-          "datasetName": "ds_store_detail",
-          "fields": [
-            {"name": "avg_revenue", "expression": "`avg_revenue`"}
-          ],
-          "disaggregated": true
-        }
-      }
-    ],
-    "spec": {
-      "version": 3,
-      "widgetType": "histogram",
-      "encodings": {
-        "x": {
-          "fieldName": "avg_revenue",
-          "displayName": "Avg Revenue per Store",
-          "scale": {"type": "quantitative"}
-        }
-      },
-      "frame": {
-        "showTitle": true,
-        "title": "Revenue Distribution Across Stores"
-      }
-    }
-  }
-}
-```
-
----
-
-## Cross-Filtering and Drill-Through Patterns
-
-### Cross-Filtering (Same Page, Automatic)
-
-**Golden Rule:** Charts on the same page sharing the **same `datasetName`** automatically cross-filter when a user clicks a data point. Field-name matching alone is NOT sufficient — the charts must reference the identical dataset.
-
-**How it works:** When a user clicks a bar (region "EAST") on a bar chart using `ds_region_pulse`, every other chart on the same page that also uses `ds_region_pulse` filters to rows where the clicked value matches. No additional configuration is required.
-
-**Shared dataset pattern for maps:** A single store-level dataset can power both a choropleth map and a point/symbol map. The choropleth uses `disaggregated: false` (aggregates to state level) while the symbol map uses `disaggregated: true` (shows individual stores). Clicking a state on the choropleth filters the point map to only that state's stores.
-
-**UNION ALL multi-metric dataset:** To enable cross-filtering between a bar chart and a heatmap showing different metrics, pivot N metrics into rows using UNION ALL:
-
-```sql
-SELECT region, 'Revenue %Chg' AS metric, pct_chg_revenue AS metric_value FROM ...
-UNION ALL
-SELECT region, 'Customer %Chg' AS metric, pct_chg_customers AS metric_value FROM ...
-UNION ALL
-SELECT region, 'Avg Txn %Chg' AS metric, pct_chg_avg_txn AS metric_value FROM ...
-```
-
-### Drill-Through (Cross-Page Navigation)
-
-**How it works:** Right-clicking a data point on a supported chart (bar, pie, scatter, heatmap, histogram, point map, box plot) shows a context menu: "Drill to → [Page Name]". The target page opens with filters auto-populated from the clicked data point.
-
-**Configuration requirement:** The target page MUST have filter widgets whose `datasetName` matches the source chart's dataset AND whose `fieldName` matches the clicked dimension. Matching field names across **different** datasets does NOT enable drill-through.
-
-**Design for both simultaneously:** Cross-filtering happens automatically within a page (same dataset). Drill-through navigates between pages (shared dataset + field on target filter). Plan your dataset topology to support both:
-1. Charts that should cross-filter on the same page → share one dataset.
-2. Charts that should drill to a target page → the target page needs a filter widget on the same dataset.
-
-### `COUNT(DISTINCT pk_column)` for Store Counts
-
-In dashboard calculated columns (`columns[]`), prefer `COUNT(DISTINCT location_id)` over `SUM(stores)` for store counts. When a filter defaults to "All" and multiple period rows exist per store, `SUM(stores)` double-counts. `COUNT(DISTINCT pk)` remains correct regardless of filter state.
-
-```json
-{"displayName": "Store#", "description": "Count of stores", "expression": "COUNT(DISTINCT `location_id`)"}
 ```
 
 ---
@@ -1423,30 +861,22 @@ Page: Global Filters
     {
       "name": "kpi_totals",
       "displayName": "KPI Totals",
-      "queryLines": ["SELECT SUM(net_revenue) as total_revenue, SUM(net_units) as total_units, SUM(transaction_count) as total_transactions FROM ${catalog}.${schema}.fact_sales_daily WHERE transaction_date BETWEEN :start_date AND :end_date"],
-      "catalog": "${catalog}",
-      "schema": "${schema}"
+      "query": "SELECT SUM(net_revenue) as total_revenue, SUM(net_units) as total_units, SUM(transaction_count) as total_transactions FROM ${catalog}.${schema}.fact_sales_daily WHERE transaction_date BETWEEN :start_date AND :end_date"
     },
     {
       "name": "revenue_trend",
       "displayName": "Revenue Trend",
-      "queryLines": ["SELECT transaction_date, SUM(net_revenue) as revenue FROM ${catalog}.${schema}.fact_sales_daily WHERE transaction_date BETWEEN :start_date AND :end_date GROUP BY transaction_date ORDER BY transaction_date"],
-      "catalog": "${catalog}",
-      "schema": "${schema}"
+      "query": "SELECT transaction_date, SUM(net_revenue) as revenue FROM ${catalog}.${schema}.fact_sales_daily WHERE transaction_date BETWEEN :start_date AND :end_date GROUP BY transaction_date ORDER BY transaction_date"
     },
     {
       "name": "revenue_by_category",
       "displayName": "Revenue by Category",
-      "queryLines": ["SELECT p.category, SUM(f.net_revenue) as revenue FROM ${catalog}.${schema}.fact_sales_daily f JOIN ${catalog}.${schema}.dim_product p ON f.upc_code = p.upc_code WHERE f.transaction_date BETWEEN :start_date AND :end_date GROUP BY p.category ORDER BY revenue DESC"],
-      "catalog": "${catalog}",
-      "schema": "${schema}"
+      "query": "SELECT p.category, SUM(f.net_revenue) as revenue FROM ${catalog}.${schema}.fact_sales_daily f JOIN ${catalog}.${schema}.dim_product p ON f.upc_code = p.upc_code WHERE f.transaction_date BETWEEN :start_date AND :end_date GROUP BY p.category ORDER BY revenue DESC"
     },
     {
       "name": "store_filter_values",
       "displayName": "Store Filter Values",
-      "queryLines": ["SELECT 'All' as store_name UNION ALL SELECT DISTINCT store_name FROM ${catalog}.${schema}.dim_store WHERE is_current = true ORDER BY store_name"],
-      "catalog": "${catalog}",
-      "schema": "${schema}"
+      "query": "SELECT 'All' as store_name UNION ALL SELECT DISTINCT store_name FROM ${catalog}.${schema}.dim_store WHERE is_current = true ORDER BY store_name"
     }
   ],
   
@@ -1455,6 +885,7 @@ Page: Global Filters
       "name": "page_overview",
       "displayName": "Overview",
       "layout": [
+        // Widgets go here (see widget examples above)
       ]
     },
     {
@@ -1462,6 +893,7 @@ Page: Global Filters
       "displayName": "Global Filters",
       "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
       "layout": [
+        // Global filter widgets
       ]
     }
   ],
@@ -1509,8 +941,6 @@ Page: Global Filters
   }
 }
 ```
-
-**⚠️ CRITICAL:** Note that datasets use `queryLines` (array) + `catalog` + `schema` — NOT `query` (string). Using `query` instead of `queryLines` will cause ALL widgets to error silently.
 
 ---
 
@@ -1633,14 +1063,10 @@ Use `stack: "zero"` in y encoding:
   "y": {
     "fieldName": "run_count",
     "scale": { "type": "quantitative" },
-    "stack": "zero"
+    "stack": "zero"  // CRITICAL for stacking
   }
 }
 ```
-
-### Pattern: Metric View Queries Using MEASURE()
-
-When dashboards query Metric Views, use `MEASURE()` for aggregate datasets (KPIs, trends, breakdowns) and direct Gold SQL for detail tables and filter values. See [Metric View Dashboard Queries](references/metric-view-dashboard-queries.md) for complete syntax, SQL templates, rules, and anti-patterns.
 
 ---
 
@@ -1722,56 +1148,6 @@ json_str = json_str.replace('${gold_schema}', gold_schema)
 
 **Implementation:** See `scripts/deploy_dashboard.py`
 
-#### ⚠️ CRITICAL: Content MUST be base64-encoded (not raw UTF-8 bytes)
-
-The Workspace Import API (`ws.workspace.import_` / `POST /api/2.0/workspace/import`) expects the `content` field to be a **base64-encoded ASCII string**. Passing raw UTF-8 bytes silently produces a corrupt `.lvdash.json` that appears in the workspace tree but fails to open in the AI/BI editor with a generic parse error — the most frustrating failure mode because there is no import-time exception.
-
-```python
-import base64
-
-# ❌ WRONG — uploads the wrong bytes; the file is corrupt on arrival.
-ws.workspace.import_(
-    path=target_path,
-    content=rendered.encode("utf-8"),
-    format=ImportFormat.AUTO,
-    overwrite=True,
-)
-
-# ✅ CORRECT — base64-encode the UTF-8 bytes then decode to ASCII str.
-b64_content = base64.b64encode(rendered.encode("utf-8")).decode("ascii")
-ws.workspace.import_(
-    path=target_path,
-    content=b64_content,
-    format=ImportFormat.AUTO,
-    overwrite=True,
-)
-```
-
-Reference: https://docs.databricks.com/api/workspace/workspace/import
-
-#### ⚠️ CRITICAL: Pre-loop variable enumeration
-
-Before entering the per-dashboard deploy loop, scan **every** `.lvdash.json` file for `${...}` placeholders and fail loud if the caller's `variables` dict does not cover every placeholder. This prevents the partial-deploy failure mode where dashboards N+1…K never get deployed because dashboard N referenced an unsupplied variable mid-loop.
-
-```python
-import re
-_VAR_RE = re.compile(r"(?<!\$)\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
-
-required = {}
-for df in dashboard_files:
-    for name in _VAR_RE.findall(df.read_text()):
-        required.setdefault(name, []).append(df)
-
-missing = {n: fs for n, fs in required.items() if variables.get(n) in (None, "")}
-if missing:
-    raise RuntimeError(
-        "Dashboard deploy pre-flight FAILED — missing variable values:\n"
-        + "\n".join(f"  - ${{{n}}} required by {fs}" for n, fs in sorted(missing.items()))
-    )
-```
-
-The canonical implementation of both guards lives in `scripts/deploy_dashboard.py` (`enumerate_required_variables`, `assert_all_variables_provided`, base64-encoded `deploy_dashboard`). The Phase 0.5 pre-flight in `semantic-layer/00-semantic-layer-setup/SKILL.md` calls `enumerate_required_variables` directly so the failure surfaces BEFORE `bundle validate`.
-
 ---
 
 ### Pre-Deployment Validation
@@ -1793,15 +1169,6 @@ The canonical implementation of both guards lives in `scripts/deploy_dashboard.p
 
 ### Phase-by-Phase Checklist
 
-#### Phase 0: Input Validation (5 min) — MANDATORY
-
-- [ ] **Verify all user-referenced files exist** (plan files, manifests, schemas)
-  - If a referenced file is missing: STOP and ask the user for the correct path or alternative
-  - NEVER silently reconstruct requirements from other sources
-- [ ] **Read observability manifest** (`plans/manifests/observability-manifest.yaml`) if it exists
-  - Check `dashboards:` section for pre-planned dashboard specs
-- [ ] **Load prerequisite skills** (see "Mandatory Skill Dependencies" above)
-
 #### Phase 1: Planning (30 min)
 
 - [ ] Identify KPIs to display
@@ -1812,7 +1179,6 @@ The canonical implementation of both guards lives in `scripts/deploy_dashboard.p
 #### Phase 2: Datasets (30 min)
 
 - [ ] Create dataset for each unique query
-- [ ] Use `queryLines` array format (NOT `query` string)
 - [ ] Add "All" option to filter datasets
 - [ ] Handle NULL values with COALESCE
 - [ ] Test queries in SQL editor first
@@ -1821,7 +1187,7 @@ The canonical implementation of both guards lives in `scripts/deploy_dashboard.p
 
 - [ ] Create KPI counters (version 2)
 - [ ] Create charts (version 3)
-- [ ] Create tables (version 2)
+- [ ] Create tables (version 1)
 - [ ] Create filter widgets (version 2)
 - [ ] Position using 6-column grid
 
@@ -1873,18 +1239,14 @@ The canonical implementation of both guards lives in `scripts/deploy_dashboard.p
 
 - [ ] Pie charts: `color.scale: categorical`, `angle.scale: quantitative`
 - [ ] Bar charts: `x.scale: categorical`, `y.scale: quantitative`
-- [ ] Pivot tables: Ratio metrics use `disaggregated: false`. **Always use Pattern A** (dataset `columns` + `MEASURE()` + `cell` encoding) — it is the only pattern visible in the UI editor. Pattern B (inline expressions) is invisible in draft mode. Neither uses `transform`.
-- [ ] Point maps: Use `widgetType: "symbol-map"` (v2) with nested `coordinates` encoding; `latitude`/`longitude` fields are DOUBLE type (not STRING)
-- [ ] Choropleth maps: Use `widgetType: "choropleth-map"` (v1) with `region` encoding including `geographicRole`
 - [ ] Table widgets: Uses `version: 2`, no invalid properties
 
 #### Before Deploying Dashboard
 
 - [ ] All widget positions use 6-column grid (widths: 1-6)
 - [ ] KPIs use version 2 (not version 3)
-- [ ] Charts use version 3 (bar, line, pie, area, scatter, point, choropleth, pivot)
-- [ ] Tables use version 2
-- [ ] Sankey uses version 1
+- [ ] Charts use version 3
+- [ ] Tables use version 1
 - [ ] Date parameters use DATE type (not DATETIME)
 - [ ] Global Filters page included
 - [ ] All filters have "All" option
@@ -1896,38 +1258,6 @@ The canonical implementation of both guards lives in `scripts/deploy_dashboard.p
 ---
 
 ## Scripts & Automation
-
-### update_dashboard.py — Lakeview Dashboard JSON Utility
-
-A Python utility for robust, programmatic manipulation of `.lvdash.json` files. Copy to your project's `scripts/` folder when needed.
-
-**Location:** [scripts/update_dashboard.py](scripts/update_dashboard.py)
-
-**Key functions:** `load_dashboard`, `save_dashboard`, `find_dataset`, `find_widget`, `add_dataset_columns`, `update_widget_query_fields`, `add_widget_query_fields`, `rename_widget_query_field`, `set_widget_encoding_rows`, `set_widget_encoding_values`, `rename_encoding_field`, `reorder_widget_query_fields`, `reorder_cube_grouping_sets`, `replace_in_dataset_query`, `validate_dashboard`.
-
-**CLI usage:**
-```bash
-python scripts/update_dashboard.py input.lvdash.json output.lvdash.json \
-  --validate
-```
-
-**Common operations:**
-```python
-from update_dashboard import *
-data = load_dashboard("dashboard.lvdash.json")
-
-# Fix hierarchy order
-data = reorder_widget_query_fields(data, "my-pivot", ["region", "market", "store_id"])
-data = reorder_widget_encoding_rows(data, "my-pivot", ["region", "market", "store_id"])
-
-# Add dataset custom calculations (Pattern A)
-data = add_dataset_columns(data, "ds_hierarchy", [
-    {"displayName": "Avg Revenue", "description": "Revenue per store-day", "expression": "SUM(`revenue`) / NULLIF(SUM(`store_days`), 0)"}
-])
-
-warnings = validate_dashboard(data)
-save_dashboard("dashboard.lvdash.json", data)
-```
 
 ### deploy_dashboard.py
 
@@ -2041,80 +1371,6 @@ SELECT DISTINCT store_name FROM stores
 SELECT job_name FROM system.lakeflow.job_task_run_timeline
 ```
 
-#### ❌ Mistake 6: SUM on Ratio Metrics in Pivots
-
-```json
-// Wrong - SUM of pre-computed averages is mathematically incorrect at rolled-up levels
-"values": [{"fieldName": "precomputed_avg", "transform": "SUM"}]
-```
-
-```json
-// Correct (Pattern A — deep hierarchies) - use dataset columns + MEASURE()
-// Dataset: "columns": [{"displayName": "Avg Rev", "expression": "SUM(`revenue`) / NULLIF(SUM(`store_days`), 0)"}]
-// Widget: "fields": [{"name": "measure(Avg Rev)", "expression": "MEASURE(`Avg Rev`)"}]
-// Encodings: "cell": {"fields": [{"fieldName": "measure(Avg Rev)", "cellType": "text"}], "displayAs": "columns"}
-```
-
-#### ❌ Mistake 7: Using `query` Instead of `queryLines` in Datasets
-
-```json
-// Wrong - Lakeview editor will not parse the dataset and ALL widgets will error
-{"name": "ds_example", "query": "SELECT * FROM table"}
-```
-
-```json
-// Correct - use queryLines array + catalog + schema
-{"name": "ds_example", "queryLines": ["SELECT * FROM table"], "catalog": "my_catalog", "schema": "my_schema"}
-```
-
-#### ❌ Mistake 8: Using `textbox_spec` Instead of `multilineTextboxSpec`
-
-```json
-// Wrong - Lakeview editor will not render the textbox
-{"textbox_spec": "### Title"}
-```
-
-```json
-// Correct
-{"multilineTextboxSpec": {"lines": ["### Title"]}}
-```
-
-#### ❌ Mistake 9: Using `values` Encoding with `cubeGroupingSets` for Ratio Metrics
-
-```json
-// Wrong - values with cubeGroupingSets causes ratio metrics to appear as extra rows
-"cubeGroupingSets": {"sets": [{"fieldNames": ["region", "market"]}, {}]},
-"encodings": {"values": [{"fieldName": "avg_revenue", "displayName": "Avg Revenue"}]}
-```
-
-```json
-// Correct - use dataset columns + MEASURE() + cell encoding (Pattern A)
-"cubeGroupingSets": {"sets": [{"fieldNames": ["region", "market"]}, {}]},
-"encodings": {"cell": {"type": "multi-cell", "fields": [{"fieldName": "measure(Avg Revenue)", "cellType": "text"}], "displayAs": "columns"}}
-```
-
-#### ❌ Mistake 10: STRING Coordinates for Maps
-
-```sql
--- Wrong - point map will render blank
-SELECT latitude, longitude FROM dim_location  -- STRING type
-```
-
-```sql
--- Correct - cast in upstream MV
-SELECT CAST(latitude AS DOUBLE) AS latitude, CAST(longitude AS DOUBLE) AS longitude
-```
-
-#### ❌ Mistake 11: Using Source Table Prefix in Metric View Queries
-
-```sql
--- Wrong - metric views flatten dimensions into a single namespace
-WHERE dim_location.is_same_store = 1
-
--- Correct - use bare dimension name
-WHERE is_same_store = 1
-```
-
 ---
 
 ### Common Error Messages
@@ -2123,119 +1379,10 @@ WHERE is_same_store = 1
 |-------|-------|-----|
 | "no fields to visualize" | Widget `fieldName` doesn't match query alias | Align column aliases |
 | "UNRESOLVED_COLUMN" | Column doesn't exist | Check schema, use correct column |
-| "UNRESOLVED_COLUMN" with metric view | Using source table alias (e.g., `dim_location.col`) instead of dimension name | Drop table prefix — use bare dimension `name` from metric view YAML |
 | "UNBOUND_SQL_PARAMETER" | Parameter not defined | Add to `parameters` array |
 | "Unable to render visualization" | Pie chart missing scale | Add `scale` to encodings |
-| Blank point map | lat/lng are STRING type | CAST to DOUBLE in upstream MV |
-| Incorrect pivot rollup totals | Ratio metric summed incorrectly | Use `disaggregated: false` with aggregate expressions. For hierarchies with `cubeGroupingSets`, use Pattern A (dataset `columns` + `MEASURE()` + `cell` encoding). |
 | Empty chart with data | Wrong number format | Return raw numbers, not strings |
 | 0% or 0 in counter | Formatted string or wrong percentage | Return 0-1 decimal for percent |
-| "Visualization has no fields selected" on counter | Invalid encoding key (e.g., `comparison`) in counter spec | Counter widgets (v2) ONLY support `"value"` in encodings. Do NOT add `"comparison"`, `"extra"`, or any other key — it silently breaks the entire widget. |
-
----
-
-## Lessons Learned (Production)
-
-These patterns were discovered through production deployments and iterative dashboard refinement.
-
-### L1: Non-Additive Ratio Metrics in Pivot Hierarchies
-
-**Problem:** Ratio metrics (e.g., avg_revenue = total_revenue / store_count) produce incorrect results when simply summed. The sum of ratios at leaf nodes does not equal the ratio at the rolled-up parent level.
-
-**Solution:** Two patterns exist depending on whether you need hierarchy expand/collapse:
-
-- **Pattern A (Dataset `columns` + `MEASURE()`) — ALWAYS PREFERRED**: Define custom calculated measures in the dataset `columns` array, reference via `MEASURE(\`Display Name\`)` in widget query, use `cell` encodings with `displayAs: "columns"`. Works in both the Lakeview UI editor/draft mode and published view.
-- **Pattern B (Inline widget expressions) — AVOID**: Define aggregate expressions directly in widget query `fields`, use `values` encodings. **Only renders in published view** — the UI editor/draft mode shows an empty Values panel and "No data".
-
-Both patterns use `disaggregated: false`. Neither uses the `transform` property.
-
-### L2: Map Widget Types Use Different Names and Versions Than Standard Charts
-
-**Problem:** Map visualizations show "Visualization has no fields selected" when using `widgetType: "choropleth"` / `"point"` with `version: 3`.
-
-**Fix:**
-- Choropleth: `widgetType: "choropleth-map"`, `version: 1`, use `encodings.region` with `regionType: "mapbox-v4-admin"` and `admin0`/`admin1` sub-objects
-- Point/Symbol Map: `widgetType: "symbol-map"`, `version: 2`, use `encodings.coordinates` with nested `latitude`/`longitude` objects
-
-### L3: Querying Metric Views in Dashboard Datasets
-
-**Problem:** `UNRESOLVED_COLUMN` errors when dashboard SQL references dimensions with source table prefixes.
-
-**Fix:** Reference dimensions by their metric view `name` (not the source table alias):
-```sql
--- ❌ WRONG: WHERE dim_location.is_same_store = 1
--- ✅ CORRECT: WHERE is_same_store = 1
-```
-
-### L4: Dashboard vs Metric View Measure Reusability
-
-**Architecture:** The metric view remains the single source of truth for reusable, context-aware measures (Genie, ad-hoc SQL, KPI counters). Dashboard pivot widget aggregate expressions are a **presentation layer** adaptation specific to the interactive hierarchy, consuming additive components from the metric view.
-
-- **Genie/ad-hoc SQL:** `SELECT MEASURE(avg_revenue) ...` — context-aware, works natively
-- **Dashboard KPIs:** Same as above — single-value counters work with MEASURE() directly
-- **Dashboard pivots:** Must use additive components + aggregate expressions for correct hierarchy rollups
-
-### L5: Bundle Deployment State Management
-
-**Problem:** Repeated `lineage mismatch`, `Node already exists`, or stale resource errors when iterating on dashboards via Databricks Asset Bundles.
-
-**Fix:** Systematic cleanup before redeployment:
-1. Delete local `.databricks/bundle/dev/terraform/terraform.tfstate`
-2. Delete remote bundle workspace directory
-3. Clean orphaned resources (pipelines, jobs, dashboards) by ID if needed
-4. Redeploy: `databricks bundle deploy -t dev --profile <profile>`
-
-### L6: Dataset `columns` for Custom Calculated Measures
-
-**Problem:** Hierarchy pivots with `cubeGroupingSets` cannot use inline widget query aggregate expressions for ratio metrics — the values appear as additional rows instead of columns.
-
-**Solution:** Use the dataset `columns` array to define custom calculated measures that the Lakeview engine evaluates at each hierarchy level. The widget query references these via `MEASURE(\`Display Name\`)` and the encoding uses `cell` with `displayAs: "columns"`.
-
-### L7: Cross-Filtering Is Dataset-Scoped, Not Field-Scoped
-
-**Problem:** Two charts on the same page with the same field name but pointing to different datasets did not cross-filter when clicked.
-
-**Fix:** Consolidate charts that should cross-filter onto a single shared dataset.
-
-### L8: `disallowAll` Prevents Silent Double-Counting
-
-**Problem:** Aggregated metrics showed incorrect values because the period filter silently defaulted to "All", including both Day and MTD rows.
-
-**Fix:** Use the correct `defaultSelection` format with `disallowAll: true` on single-select filters where "All" is not meaningful. Additionally, use `COUNT(DISTINCT pk_column)` instead of `SUM(count_column)` for robustness.
-
-### L9: Choropleth admin1 (State) Maps Require Explicit admin0 (Country) Context
-
-**Problem:** A state-level choropleth map rendered blank even though state names were correctly provided.
-
-**Fix:** Always include both `admin0` and `admin1` in the `region` encoding for state/province choropleths. Convert abbreviations to full names via CASE expressions in the dataset SQL.
-
-### L10: Silent Recovery from Missing Input Files
-
-**Problem:** When a user-referenced file (plan, manifest, schema) is not found, the agent silently reconstructs requirements from secondary sources. The user has no visibility into the gap, and the dashboard may miss specific KPIs, charts, or layout preferences.
-
-**Fix:** Always surface missing files to the user before proceeding. Search for similar filenames and nearby directories, then ask: "The file at [path] was not found. I found [alternatives]. Should I proceed with those, or is the file at a different path?"
-
-### L11: Substituting "Safer" Query Patterns for User-Requested Patterns
-
-**Problem:** When uncertain about MEASURE() syntax, the agent fell back to direct Gold table SQL — contradicting the user's explicit request. The dashboard bypassed the semantic layer entirely.
-
-**Fix:** When uncertain about a query pattern, load the owning skill (e.g., `semantic-layer/01-metric-views-patterns/SKILL.md` for MEASURE()). If the tradeoff involves contradicting a user instruction, surface it to the user — never resolve it unilaterally.
-
-### L12: Producing All Referenced Scripts
-
-**Problem:** The skill references three companion scripts (`validate_dashboard_queries.py`, `validate_widget_encodings.py`, `deploy_dashboard.py`). Agents sometimes create only the "most important" one and skip the others, leaving the dev loop with no live SQL validation or no deployment path.
-
-**Fix:** Treat the "Scripts & Automation" section as a checklist. All three scripts should be created (or copied from the skill's `scripts/` templates) during dashboard builds. If a script is intentionally skipped, state which one and why — do not silently produce a partial deliverable.
-
-### L13: Reading Large Dashboard JSON Examples
-
-**Problem:** Production `.lvdash.json` files can exceed 100K characters. Reading from line 1 returns dataset SQL but misses the widget/page structure — usually the more valuable reference for layout patterns, grid positions, and encodings.
-
-**Fix:** Read strategically instead of from the top:
-1. Grep for `"pages"` to locate where page/widget definitions begin
-2. Read from that line to see widget patterns, grid positions, encodings, and parameter bindings
-3. Read datasets separately only when you need query patterns (usually the SKILL.md and reference files already cover these)
-4. If the file exceeds read limits, prioritize the pages section — it has higher value per token than dataset SQL
 
 ---
 
@@ -2289,17 +1436,8 @@ Examples:
 | Bar Chart | 3 |
 | Line Chart | 3 |
 | Pie Chart | 3 |
-| Area Chart | 3 |
-| Scatter Chart | 3 |
-| Pivot Table | 3 |
-| Symbol/Point Map (`symbol-map`) | 2 |
-| Choropleth Map (`choropleth-map`) | 1 |
-| Table | 2 |
-| Sankey | 1 |
-| Waterfall | 3 |
-| Histogram | 3 |
-| Filter (single/multi) | 2 |
-| Filter (date-range) | 2 |
+| Table | 1 |
+| Filter | 2 |
 
 ### 3. DATE, Not DATETIME
 
@@ -2341,11 +1479,6 @@ Detailed patterns and examples are organized in reference files:
 ### Official Documentation
 
 - [AI/BI Lakeview Dashboards](https://docs.databricks.com/dashboards/lakeview/)
-- [Pivot Table Configuration](https://docs.databricks.com/aws/en/dashboards/manage/visualizations/tables#pivot-table-configuration)
-- [Map Visualizations](https://docs.databricks.com/aws/en/dashboards/manage/visualizations/maps)
-- [Visualization Types](https://docs.databricks.com/aws/en/dashboards/manage/visualizations/types)
-- [Custom Calculations / LOD Expressions](https://docs.databricks.com/aws/en/dashboards/manage/data-modeling/custom-calculations/level-of-detail)
-- [Dashboard Filters](https://docs.databricks.com/aws/en/dashboards/manage/filters/)
 - [System Tables Overview](https://docs.databricks.com/aws/en/admin/system-tables/)
 - [Jobs System Tables](https://docs.databricks.com/aws/en/admin/system-tables/jobs)
 - [Compute System Tables](https://docs.databricks.com/aws/en/admin/system-tables/compute)
@@ -2373,23 +1506,12 @@ Detailed patterns and examples are organized in reference files:
 ### Critical Rules
 
 - 6-column grid (NOT 12!)
-- KPIs: v2, Charts/Pivots: v3, Tables: v2, Sankey: v1, Choropleth: v1, Symbol Map: v2, Waterfall: v3, Histogram: v3
+- KPIs: v2, Charts: v3, Tables: v1
 - DATE type for parameters (not DATETIME)
 - Include Global Filters page
 - Verify system table field names
 - Return raw numbers for formatting
 - Match widget fieldNames to query aliases
-- Ratio metrics in pivots: use `disaggregated: false` with aggregate expressions
-- Map widgets: ensure lat/lng are DOUBLE (not STRING)
-- Metric view queries: reference dimensions by `name`, not by source table alias
-- Cross-filtering: charts must share the same `datasetName` on the same page
-- Drill-through: target page filter widgets must share source chart's dataset AND field
-- Choropleth admin1 (state): always include admin0 (country) field; use full state names
-- Filter `defaultSelection`: use typed value format `{"dataType":"STRING","values":[{"value":"..."}]}`
-- Use `disallowAll: true` on single-select filters where "All" is not meaningful
-- Store counts: prefer `COUNT(DISTINCT pk)` over `SUM(pre_aggregated_count)`
-- Datasets must use `queryLines` (array) — NOT `query` (string)
-- Textboxes must use `multilineTextboxSpec` — NOT `textbox_spec`
 
 ### Time Estimate
 

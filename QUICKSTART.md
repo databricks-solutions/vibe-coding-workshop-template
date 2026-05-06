@@ -2,13 +2,15 @@
 
 Get started building your data product on Databricks. Choose your starting point:
 
-> **Workshop participants:** Complete the [PRE-REQUISITES.md](PRE-REQUISITES.md) checklist before beginning.
+> **Workshop participants:** Complete the [PRE-REQUISITES.md](PRE-REQUISITES.md) checklist before beginning. Rows are tagged **Common**, **DPA**, **AppKit-MCP**, and **Genie** — not every row applies to every path (see the legend at the top of that file). Apps Lakebase with MCP also needs admins to finish **[pre-req-mcp-setup.md](pre-req-mcp-setup.md)** before session start.
+>
+> **Facilitators:** Use the ordered runbook in [WORKSHOP-FACILITATOR-GUIDE.md](WORKSHOP-FACILITATOR-GUIDE.md#0-end-to-end-facilitator-checklist) (section **0 — End-to-end facilitator checklist**) for admin order, optional MCP setup, and day-of track splits.
 
 ---
 
 ## Path A: Build and Deploy a Databricks App
 
-Build a full-stack TypeScript app on Databricks AppKit, guided by 7 agent skills:
+Build a full-stack TypeScript app on Databricks AppKit, guided by 6 agent skills:
 
 ```bash
 # 1. Clone template
@@ -24,7 +26,7 @@ databricks auth login --host https://your-workspace.cloud.databricks.com
 I want to build a Databricks App. Read @apps_lakebase/skills/01-appkit-scaffold/SKILL.md and scaffold a new AppKit project.
 ```
 
-Follow the 5-phase workflow in [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md):
+**Genie Code:** follow [apps_lakebase/prompts/README.md](apps_lakebase/prompts/README.md). **Local IDE:** follow the 5-phase workflow using [apps_lakebase/skills/](apps_lakebase/skills/) (CLI/npm on your machine per each `SKILL.md`); context in [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md):
 
 | Phase | What Happens | Skill Used |
 |-------|-------------|------------|
@@ -32,7 +34,6 @@ Follow the 5-phase workflow in [apps_lakebase/Instructions.md](apps_lakebase/Ins
 | 2 | Deploy to Databricks Apps (mock data) | `03-appkit-deploy` |
 | 3 | Setup Lakebase project | `00-appkit-navigator` |
 | 4 | Wire Lakebase backend (local) | `04-appkit-plugin-add`, `05-appkit-lakebase-wiring` |
-| 4b | Wire Serving / Agent endpoint (optional) | `04-appkit-plugin-add`, `06-appkit-serving-wiring` |
 | 5 | Deploy + E2E test with Lakebase | `03-appkit-deploy` |
 
 ---
@@ -58,8 +59,8 @@ Please design the Gold layer using @data_product_accelerator/skills/gold/00-gold
 
 | Directory | What It Does |
 |-----------|-------------|
-| `apps_lakebase/` | AppKit workshop -- 7 agent skills for building full-stack Databricks Apps |
-| `data_product_accelerator/` | 55 agent skills for building end-to-end data products (9 stages) |
+| `apps_lakebase/` | AppKit workshop -- 6 agent skills for building full-stack Databricks Apps |
+| `data_product_accelerator/` | 59 agent skills for building end-to-end data products (9 stages) |
 | `agentic-framework/` | Multi-agent build framework for Databricks Foundation Models |
 
 ---
@@ -121,4 +122,4 @@ lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 
 ---
 
-**Full docs**: [README.md](README.md) | **Prerequisites**: [PRE-REQUISITES.md](PRE-REQUISITES.md) | **AppKit guide**: [apps_lakebase/Instructions.md](apps_lakebase/Instructions.md) | **9-stage guide**: [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md)
+**Full docs**: [README.md](README.md) | **Prerequisites**: [PRE-REQUISITES.md](PRE-REQUISITES.md) | **AppKit Genie prompts**: [apps_lakebase/prompts/README.md](apps_lakebase/prompts/README.md) · [overview](apps_lakebase/Instructions.md) | **9-stage guide**: [data_product_accelerator/QUICKSTART.md](data_product_accelerator/QUICKSTART.md)

@@ -38,13 +38,7 @@ Create and configure Databricks AppKit projects — blank or with plugins — us
 
 ## Prerequisites
 
-Before scaffolding, run the prerequisites check:
-
-```bash
-bash apps_lakebase/skills/00-appkit-navigator/scripts/validate-prereqs.sh --profile $PROFILE
-```
-
-If the script is unavailable, verify each prerequisite manually:
+Before scaffolding, verify these requirements. Run `bash apps_lakebase/skills/00-appkit-navigator/scripts/validate-prereqs.sh --profile $PROFILE` to check all prerequisites at once, or verify manually:
 
 ```bash
 # 1. Databricks CLI >= 0.295.0
@@ -150,13 +144,13 @@ This is idempotent — safe to run multiple times.
 
 ### Pre-scaffold check
 
-**GATE:** Before scaffolding, verify that agent skills from Step 1 are available:
+Before scaffolding, verify that agent skills from Step 1 are available:
 
 ```bash
 databricks experimental aitools tools --help
 ```
 
-If this command fails or is not recognized, go back to Step 1 and install agent skills first. **Do not proceed without completing Step 1.** Checking the filesystem for skill files is NOT a substitute — the CLI integration may be broken even if files exist.
+If this command fails or is not recognized, go back to Step 1 and install agent skills first. **Do not proceed without completing Step 1.**
 
 ### Discover Available Plugins (Optional)
 
@@ -223,19 +217,7 @@ cd <APP_NAME>
 
 # Verify scaffold produced expected files
 ls app.yaml databricks.yml package.json server/server.ts
-```
 
-**Verify the server entry point uses `await`:**
-
-```bash
-grep -q 'await createApp' server/server.ts && echo "OK" || echo "FIX: replace .catch(console.error) with await"
-```
-
-If the scaffold generated `createApp({...}).catch(console.error)`, replace the file contents with the `await createApp()` pattern from [references/appkit-project-structure.md](references/appkit-project-structure.md) § "Server Entry Point Pattern."
-
-**Note:** `app.yaml` only contains the start command — it does not include a `name` field. The app name is defined in `databricks.yml` under `resources.apps.app.name`.
-
-```bash
 npm install
 npm run dev
 ```
@@ -274,7 +256,7 @@ npx @databricks/appkit docs "<query>"    # search for a specific topic
 npx @databricks/appkit docs --full       # full index with all API entries
 ```
 
-**Read** [references/appkit-project-structure.md](references/appkit-project-structure.md) § "Server Entry Point Pattern" and compare against the generated `server/server.ts`. For the full project layout and dev workflow details, see the same file.
+For project layout and dev workflow details, see [references/appkit-project-structure.md](references/appkit-project-structure.md).
 
 ---
 
