@@ -6,11 +6,32 @@
 
 Workshop mode produces a **minimal representative plan** for Learning & Enablement scenarios. The goal is to teach participants the full pattern vocabulary (TVFs, Metric Views, Genie Spaces, Monitoring, Alerts) with the fewest artifacts possible — just enough to demonstrate each pattern type without overwhelming workshop participants.
 
+## Planning Source Flexibility (and Deployability)
+
+Workshop mode does NOT require a deployed Gold layer. Phase 0 (Planning Source Discovery) in the main SKILL.md picks the highest-fidelity input present, in priority order: deployed Gold → Gold design YAML → deployed Silver → deployed Bronze → source schema CSV. Whichever layer is selected becomes the **planning basis AND the deployment target** for domains, use cases, Metric Views, TVFs, and Genie Spaces in workshop mode.
+
+When the selected layer is below Gold, every emitted manifest carries:
+
+```yaml
+planning_source:
+  selected_layer: deployed_silver | deployed_bronze | source_csv | gold_design
+implementation_readiness: workshop_deployable   # for deployed_silver / deployed_bronze
+                                                # gold_design_only for gold_design
+                                                # workshop_draft only for source_csv
+requires_gold_promotion: false                  # advisory only; recommended for production
+```
+
+Downstream-stage behavior (semantic-layer, observability, ml, genai-agents):
+
+- `workshop_deployable` (Silver/Bronze) — **deploy directly** against the selected layer. The semantic-layer orchestrator builds Metric Views, TVFs, and Genie Spaces on `silver_schema` or `bronze_schema` and prints a quality advisory recommending Gold promotion for production hardening.
+- `workshop_draft` (source CSV) — STOP. There are no live tables to deploy against. The plan is a contract until at least one layer is provisioned.
+- `gold_design_only` — deployable once Gold provisioning is run.
+
 ## Artifact Caps
 
 | Artifact Type | Workshop Cap | Selection Criteria |
 |---------------|-------------|-------------------|
-| **Domains** | 1-2 max | Pick the domain with the richest Gold table relationships |
+| **Domains** | 1-2 max | Pick the domain with the richest **planning-source** relationships (Gold-table relationships if Gold is the selected layer; Silver/Bronze entity relationships otherwise) |
 | **TVFs** | 3-5 total | One per parameter pattern: (1) date-range, (2) entity-filter, (3) top-N. Optionally add (4) cross-domain join and (5) period-comparison if time permits |
 | **Metric Views** | 1-2 total | One per fact table — pick the fact with the most dimension joins |
 | **Genie Spaces** | 1 unified | Combine all workshop assets into a single space |
@@ -38,7 +59,7 @@ Workshop mode caps **artifact counts within documents**, not **which documents t
 | Document | Required? | Workshop Behavior |
 |----------|-----------|-------------------|
 | `plans/README.md` | YES | Same structure; workshop scope noted |
-| `plans/prerequisites.md` | YES | Bronze/Silver/Gold summary unchanged |
+| `plans/prerequisites.md` | YES | Bronze/Silver/Gold summary reflects the layers actually present (each layer marked Complete / Designed only / N/A according to Phase 0); the selected planning source is called out explicitly |
 | `plans/use-case-catalog.md` | YES | 2-4 workshop-capped use cases |
 | `plans/phase1-use-cases.md` | YES | Master with workshop-capped artifact summary |
 | `plans/phase1-addendum-1.2-tvfs.md` | YES | Lists 3-5 TVFs only |
@@ -53,12 +74,12 @@ Also see: Phase 2 Completion Gate in the main [SKILL.md](../SKILL.md) — it enf
 
 ## Selection Principle
 
-Pick the **most representative** artifact for each pattern type. Prefer **variety of patterns** over depth in a single domain:
+Pick the **most representative** artifact for each pattern type. Prefer **variety of patterns** over depth in a single domain. References to "fact" / "dimension" tables below assume Gold is the selected planning source. When the selected layer is Silver or Bronze, substitute the closest equivalent (e.g., the largest Silver event table, the most-joined Silver entity table, or the richest Bronze raw table):
 
 - **TVFs:** Choose examples that show different parameter combinations (date range only, entity filter, top-N with optional parameters). The goal is to demonstrate the TVF pattern vocabulary, not exhaustive coverage.
-- **Metric Views:** Choose the fact table with the richest dimension joins to demonstrate the full YAML syntax (measures, dimensions, joins).
+- **Metric Views:** Choose the table with the richest join potential to demonstrate the full YAML syntax (measures, dimensions, joins).
 - **Genie Space:** One unified space with all workshop assets. Keep under 15 total assets for focused NL quality.
-- **Monitors:** One fact table (demonstrates custom metrics) + one dimension (demonstrates baseline monitoring).
+- **Monitors:** One large/transactional table (demonstrates custom metrics) + one reference/lookup table (demonstrates baseline monitoring).
 - **Alerts:** One CRITICAL threshold alert + one WARNING percentage-change alert (demonstrates severity and query pattern variety).
 
 ## Confirmation Protocol
@@ -87,6 +108,13 @@ Only after confirmation, apply the caps from this profile as upper-bound constra
 version: 1
 manifest_type: semantic-layer
 planning_mode: workshop    # Downstream: do NOT expand beyond listed artifacts
+planning_source:
+  selected_layer: deployed_silver   # or deployed_gold / gold_design / deployed_bronze / source_csv
+  schema: "<catalog>.<schema>"
+implementation_readiness: workshop_deployable   # gold_ready for deployed_gold
+                                                # gold_design_only for gold_design
+                                                # workshop_draft only for source_csv
+requires_gold_promotion: false                  # advisory only; recommended for production
 ```
 
 ## Estimation (Workshop Mode)

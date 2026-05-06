@@ -61,6 +61,13 @@ Use this skill when:
 - Deploying TVFs via Asset Bundles
 - Preventing common SQL errors (parameter types, LIMIT clauses, cartesian products)
 
+> **Layer-aware manifest fields:** TVF manifest entries carry one of two table lists:
+>
+> - `gold_tables_used` — canonical for Gold-based runs (acceleration; workshop on `deployed_gold` / `gold_design`). TVF DDL references `${catalog}.${gold_schema}.*`.
+> - `source_assets_used` — canonical for workshop deployments on `deployed_silver` / `deployed_bronze`. TVF DDL references `${catalog}.${silver_schema}.*` or `${catalog}.${bronze_schema}.*` directly. The orchestrator prints a quality advisory; STRING parameter rules and Genie compatibility are unchanged.
+>
+> The orchestrator (`semantic-layer/00-semantic-layer-setup`) only stops before invoking this skill when `planning_source.selected_layer = source_csv` (no live tables exist). Production TVFs should ultimately reference Gold; promote workshop TVFs to Gold for production hardening.
+
 ## Quick Start (2-3 hours)
 
 **Goal:** Create 10-15 pre-built, parameterized SQL queries for common business questions.
