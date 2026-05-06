@@ -26,8 +26,10 @@ Plus the always-present top-level plan files:
 | File | Template source | Purpose |
 |---|---|---|
 | `plans/phase1-use-cases.md` | `phase1-use-cases-template.md` | Master use-case catalog referenced by every addendum |
-| `plans/manifests/gold-dependency-manifest.yaml` | (emitted by Planning skill) | Gold table/column references used by every addendum |
-| `plans/gold-gap-remediation.md` | (emitted on live-catalog intersection failure) | Lists missing Gold tables/columns — halts downstream orchestrators |
+| `plans/manifests/gold-dependency-manifest.yaml` | (emitted by Planning skill — acceleration mode, or workshop with Gold source) | Gold table/column references used by every addendum |
+| `plans/manifests/source-dependency-manifest.yaml` | (emitted by Planning skill — workshop mode with Silver/Bronze/source CSV) | Source-layer table/column references used by every workshop-draft addendum. Same shape as `gold-dependency-manifest.yaml`; top-level key is `source_dependencies` instead of `gold_dependencies` |
+| `plans/gold-gap-remediation.md` | (emitted on live-catalog intersection failure for Gold sources) | Lists missing Gold tables/columns — halts downstream orchestrators in strict mode |
+| `plans/source-gap-remediation.md` | (emitted on live-catalog intersection failure for non-Gold workshop sources) | Lists missing Silver/Bronze tables/columns — warning only; downstream stages continue with `implementation_readiness: workshop_deployable` (Silver/Bronze) or `workshop_draft` (source CSV) |
 | `plans/deploy-checkpoint.md` | (emitted by Asset Bundles skill) | Concrete resolved job/warehouse/asset names for the current target |
 
 ## Anti-patterns (DO NOT use these filenames)

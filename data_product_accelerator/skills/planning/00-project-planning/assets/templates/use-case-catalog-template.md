@@ -1,16 +1,20 @@
 # {Project Name} — Use Case Catalog
 
 **Planning Mode:** {acceleration / workshop}
+**Planning Source:** `{deployed_gold | gold_design | deployed_silver | deployed_bronze | source_csv}` (set by Phase 0)
+**Implementation Readiness:** `{gold_ready | gold_design_only | workshop_deployable | workshop_draft}`
 **Total Use Cases:** {count}
 **Domains Covered:** {domain_1}, {domain_2}, ...
+
+> **Note on the "Planning Assets" column:** When the planning source is Gold (`deployed_gold` or `gold_design`), list Gold tables (`fact_*`, `dim_*`). When the planning source is Silver or Bronze (workshop deployments), list the actual Silver/Bronze tables — these are the deploy targets in workshop mode. When the planning source is a source CSV, list the schema entities; downstream stages will not deploy until at least one live layer is provisioned. Gold promotion is recommended for production hardening.
 
 ---
 
 ## Use Case Summary
 
-| UC# | Use Case Name | Domain | Gold Tables | Artifact Types | Example Question |
-|-----|--------------|--------|-------------|---------------|-----------------|
-| UC-001 | {Descriptive Name} | {Domain} | `fact_*`, `dim_*` | TVF, MV, Dashboard | "{Natural language question}?" |
+| UC# | Use Case Name | Domain | Planning Assets | Artifact Types | Example Question |
+|-----|--------------|--------|-----------------|---------------|-----------------|
+| UC-001 | {Descriptive Name} | {Domain} | `fact_*`, `dim_*`  *(or `silver_*` / `bronze_*` in workshop drafts)* | TVF, MV, Dashboard | "{Natural language question}?" |
 | UC-002 | {Descriptive Name} | {Domain} | `fact_*`, `dim_*` | TVF, MV, Alert | "{Natural language question}?" |
 | ... | ... | ... | ... | ... | ... |
 
@@ -30,7 +34,7 @@
 4. {Question}? *(optional)*
 5. {Question}? *(optional)*
 
-**Gold Tables:** `{catalog}.{gold_schema}.fact_*`, `{catalog}.{gold_schema}.dim_*`
+**Planning Assets:** `{catalog}.{gold_schema}.fact_*`, `{catalog}.{gold_schema}.dim_*`  *(workshop deployments on Silver/Bronze use `${silver_schema}` / `${bronze_schema}` references directly; `requires_gold_promotion` is advisory)*
 
 **Implementing Artifacts:**
 
@@ -58,7 +62,7 @@
 2. {Question}?
 3. {Question}?
 
-**Gold Tables:** `{tables}`
+**Planning Assets:** `{tables — Gold by default; Silver/Bronze in workshop drafts}`
 
 **Implementing Artifacts:**
 
@@ -93,7 +97,7 @@ Verify every question has at least one implementing artifact, and every artifact
 
 1. No row should be empty — every question needs at least one implementing artifact.
 2. No artifact column should be all-empty — every artifact type listed serves at least one question (otherwise remove the column or the unused artifact).
-3. **No row should have Genie Space as its ONLY coverage.** The Genie Space is an interface layer, not an implementing artifact. Every question must be answerable by at least one TVF, Metric View, or raw Gold table that is included in the Genie Space's asset list. If a question can only be answered by ad-hoc SQL against a raw table, that raw table MUST be listed as a Genie Space asset — and mark the row with `x` in the matching artifact column, not just in the Genie Space column.
+3. **No row should have Genie Space as its ONLY coverage.** The Genie Space is an interface layer, not an implementing artifact. Every question must be answerable by at least one TVF, Metric View, or raw planning-source table that is included in the Genie Space's asset list. If a question can only be answered by ad-hoc SQL against a raw table, that raw table MUST be listed as a Genie Space asset — and mark the row with `x` in the matching artifact column, not just in the Genie Space column. **Production Genie Spaces use Gold tables only.** Workshop-mode Genie Spaces may reference Silver/Bronze directly with a quality advisory; promote to Gold for production hardening.
 
 ---
 

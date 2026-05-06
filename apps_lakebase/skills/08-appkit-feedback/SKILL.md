@@ -14,11 +14,11 @@ compatibility: Requires 07-appkit-chat-history complete (Vote table + traceId co
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.0.1"
   domain: apps
   role: feedback
   standalone: false
-  last_verified: "2026-04-27"
+  last_verified: "2026-04-30"
   volatility: medium
   upstream_sources:
     - name: "databricks-agent-skills/databricks-apps"
@@ -130,11 +130,21 @@ variables:
 
 ### Creating an MLflow Experiment
 
-If you don't have an experiment, create one:
+The feedback experiment MUST be pinned to the same user-and-use-case identity that backs `APP_NAME` so concurrent workshop attendees on a shared workspace never collide on a single experiment, and the MLflow UI never lists a generic `Default` / `Tracing` / `my-app-feedback` entry.
+
+**Naming rule (REQUIRED):** `/Users/<user_email>/mlflow/<APP_NAME>-feedback` — e.g. `/Users/jane.doe@example.com/mlflow/jane-d-stayfinder-feedback`. The leaf carries the same `${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}` shape that derives `APP_NAME` (see `apps_lakebase/Instructions.md`). When running on top of `vibecoding-state`, this value is already pinned at `state://Resources.mlflow_feedback_experiment_path` by [`vibecoding-state.migrate_canonical`](../../../genai-agents/vibecoding-state/SKILL.md#operation-migrate_canonical) — read it from state instead of inventing a new path.
+
+If you don't have an experiment yet, create one:
 
 ```bash
-databricks experiments create --name "/Shared/my-app-feedback" --profile <PROFILE>
+# Replace <user_email> and <APP_NAME> with your actual values
+# (or pull mlflow_feedback_experiment_path directly from .vibecoding-state.md).
+databricks experiments create \
+  --name "/Users/<user_email>/mlflow/<APP_NAME>-feedback" \
+  --profile <PROFILE>
 ```
+
+Forbidden names (HARD STOP if encountered): `/Shared/my-app-feedback`, `/Shared/feedback`, `/Shared/Default`, or any path whose leaf is not `<APP_NAME>-feedback`.
 
 Note the `experiment_id` from the output and set it in your environment.
 
@@ -211,7 +221,11 @@ AppKit.server.extend((app) => {
   // POST /api/feedback — submit or update feedback
   app.post("/api/feedback", async (req, res) => {
     const { chatId, messageId, isUpvoted } = req.body;
-    const userId = req.session!.userId;
+    const forwardedEmail = req.headers["x-forwarded-email"];
+    const userId =
+      typeof forwardedEmail === "string" && forwardedEmail.length > 0
+        ? forwardedEmail
+        : req.session!.userId;
 
     if (!chatId || !messageId || typeof isUpvoted !== "boolean") {
       return res
@@ -355,6 +369,8 @@ full REST API reference and AppKit auth rationale.
 See [references/trace-extraction.md](references/trace-extraction.md) for
 trace ID extraction patterns (already wired into
 [07-appkit-chat-history](../07-appkit-chat-history/SKILL.md) Step 4a).
+
+For 2-Apps Pathway-C, `source_id` must be the originating user's email. The app-to-app bearer identifies the AppKit SP, so do not derive MLflow `AssessmentSource.source_id` from that bearer.
 
 ### User vs. Service Principal Auth for MLflow
 

@@ -5,9 +5,13 @@ description: >-
   with Agent Domain Framework and Agent Layer Architecture. Includes interactive
   Quick Start with key decisions, industry-specific domain patterns, complete
   phase document templates (Use Cases, Agents, Frontend), Genie Space integration
-  patterns, deployment order requirements, and worked examples. Use when planning
-  any Databricks solution post-Gold layer — observability, analytics, agent-based
-  frameworks, or multi-artifact projects.
+  patterns, deployment order requirements, and worked examples. Default
+  acceleration mode plans on top of a completed Gold layer. Workshop mode can
+  also plan from the best available layer (deployed Gold, Gold design YAML,
+  deployed Silver, deployed Bronze, or source schema CSV) and produces a
+  workshop-draft contract for downstream stages. Use when planning any
+  Databricks solution after Gold layer is complete, or in workshop mode after
+  Bronze, Silver, or Gold-design is available.
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"
@@ -27,12 +31,18 @@ metadata:
     - plans/manifests/observability-manifest.yaml
     - plans/manifests/ml-manifest.yaml
     - plans/manifests/genai-agents-manifest.yaml
-    - plans/manifests/gold-dependency-manifest.yaml
-    - plans/gold-gap-remediation.md   # emitted ONLY when live-catalog intersection finds missing tables/columns
+    - plans/manifests/gold-dependency-manifest.yaml          # acceleration mode (Gold source)
+    - plans/manifests/source-dependency-manifest.yaml         # workshop mode (any source layer; superset of gold-dependency-manifest)
+    - plans/gold-gap-remediation.md   # emitted ONLY when live-catalog intersection finds missing tables/columns (acceleration)
+    - plans/source-gap-remediation.md # emitted ONLY in workshop mode when the selected planning source has missing tables/columns
   reads:
+    # Acceleration mode (default) reads Gold design + deployed Gold:
     - gold_layer_design/yaml/
     - gold_layer_design/erd_master.md
     - gold_layer_design/docs/BUSINESS_ONBOARDING_GUIDE.md
+    # Workshop mode may also read these as fallbacks (in priority order):
+    - data_product_accelerator/context/*.csv     # source schema CSV (last-resort planning basis)
+    # Workshop mode also probes the live catalog for deployed Bronze/Silver/Gold schemas as a planning source.
   supported_modes:
     - acceleration     # Full breadth (DEFAULT) — all domains, all artifacts, full rationalization
     - workshop         # Learning & Enablement — minimal representative sampling with hard artifact caps
@@ -46,9 +56,11 @@ metadata:
 
 ## Planning Mode
 
-**Default: Data Product Acceleration** — full breadth, all domains, all artifacts. This is the standard behavior described in this entire skill document below.
+**Default: Data Product Acceleration** — full breadth, all domains, all artifacts, **Gold layer required as planning basis**. This is the standard behavior described in this entire skill document below.
 
-**Workshop mode** is available for Learning & Enablement scenarios with hard artifact caps. It is NEVER activated unless the user includes the **exact phrase** `planning_mode: workshop` in their prompt.
+**Workshop mode** is available for Learning & Enablement scenarios with hard artifact caps **and layer flexibility** — it can plan from the best available source layer (Gold, Gold design YAML, Silver, Bronze, or source CSV). Workshop mode is NEVER activated unless the user includes the **exact phrase** `planning_mode: workshop` in their prompt.
+
+> **Mode vs source layer:** `planning_mode` (acceleration | workshop) controls artifact caps and validation strictness. `planning_source.selected_layer` (gold | gold_design | silver | bronze | source_csv) records which input the plan was derived from and is set automatically by Phase 0 below. Acceleration mode FORCES `selected_layer = gold` (or `gold_design` only if explicitly allowed). Workshop mode picks the best available source via the Phase 0 priority order and stamps it onto every manifest.
 
 ### Mode Detection Rules
 
@@ -69,7 +81,10 @@ metadata:
 
 Comprehensive methodology for creating multi-phase project plans for Databricks data platform solutions. This skill combines interactive project planning with architectural methodology, including templates, worked examples, and quality standards.
 
-**Key Assumption:** Planning starts AFTER Bronze ingestion and Gold layer design are complete. These are prerequisites, not phases.
+**Key Assumption (mode-aware):**
+
+- **Acceleration mode (default):** Planning starts AFTER Bronze ingestion AND Gold layer design are complete. Gold is the required planning basis. These are prerequisites, not phases. Phase 0 will stop with a remediation message if Gold is missing.
+- **Workshop mode (`planning_mode: workshop`):** Planning AND deployment are layer-agnostic. Phase 0 selects the highest-fidelity input present from: deployed Gold, Gold design YAML, deployed Silver, deployed Bronze, or a source schema CSV. The selected layer is stamped onto every manifest as `planning_source.selected_layer`. Workshop manifests built from Silver or Bronze are marked `implementation_readiness: workshop_deployable` — downstream stages (semantic-layer, observability, ml, genai-agents) deploy directly against the selected layer. Workshop manifests built from a source CSV are marked `implementation_readiness: workshop_draft` (planning contract only — no live tables to deploy against). `requires_gold_promotion` is an **advisory** field; it is recommended for production but never blocks deployment.
 
 ## When to Use This Skill
 
@@ -116,19 +131,27 @@ if PLANS_DIR.exists() and any(PLANS_DIR.iterdir()):
 ### Fast Track: Create Your Project Plan
 
 ```bash
-# 1. Verify prerequisites are complete:
-#    - Bronze ingestion ✅
-#    - Silver DLT streaming ✅
-#    - Gold dimensional model ✅
+# 1. Verify prerequisites for your mode:
+#    Acceleration (default):
+#      - Bronze ingestion ✅
+#      - Silver DLT streaming ✅
+#      - Gold dimensional model ✅ (REQUIRED)
+#    Workshop (planning_mode: workshop):
+#      - At least ONE of: deployed Gold, gold_layer_design/yaml/, deployed Silver,
+#        deployed Bronze, or data_product_accelerator/context/*.csv
+#      - Phase 0 picks the highest-fidelity input automatically.
 
 # 2. Run this prompt with your project info:
 "Create a phased project plan for {project_name} with:
-- Gold tables: {n} tables ({d} dimensions + {f} facts)
+- Planning assets: {n} tables (Gold/Silver/Bronze depending on what is available)
 - Use cases: {use_case_1, use_case_2, use_case_3, etc.}
 - Target audience: {executives, analysts, data scientists}
 - Agent domains: {domain1, domain2, domain3, domain4, domain5}"
 
 # 3. Output: Complete plan structure in plans/ folder
+#    - Acceleration emits gold-dependency-manifest.yaml.
+#    - Workshop emits gold-dependency-manifest.yaml OR source-dependency-manifest.yaml
+#      depending on the selected planning source layer.
 ```
 
 ### Key Decisions (Answer These First)
@@ -158,6 +181,133 @@ This orchestrator spans 3 phases. To maintain coherence without context pollutio
 
 ## Step-by-Step Workflow
 
+### Phase 0: Planning Source Discovery (MANDATORY, runs before Phase 1)
+
+This phase decides WHICH layer the plan will be derived from and stamps the answer onto every emitted manifest as `planning_source`. It runs in **both** modes; the only difference is which selections are allowed.
+
+#### Step 0.1 — Inventory available planning inputs
+
+Detect each potential planning source. Record presence/absence in working memory.
+
+```python
+from pathlib import Path
+from databricks.sdk import WorkspaceClient
+
+def detect_planning_sources(catalog: str, user_schema_prefix: str) -> dict:
+    """Return a dict describing every potential planning source that exists.
+
+    Priority order (highest fidelity first):
+      1. deployed_gold     — live tables in <catalog>.<prefix>_gold
+      2. gold_design       — gold_layer_design/yaml/*.yaml authored, deployment may or may not be done
+      3. deployed_silver   — live tables in <catalog>.<prefix>_silver
+      4. deployed_bronze   — live tables in <catalog>.<prefix>_bronze
+      5. source_csv        — data_product_accelerator/context/*.csv (last resort)
+    """
+    w = WorkspaceClient()
+    sources = {}
+    for layer, schema in (
+        ("deployed_gold",   f"{user_schema_prefix}_gold"),
+        ("deployed_silver", f"{user_schema_prefix}_silver"),
+        ("deployed_bronze", f"{user_schema_prefix}_bronze"),
+    ):
+        try:
+            tables = list(w.tables.list(catalog_name=catalog, schema_name=schema))
+            sources[layer] = {"schema": f"{catalog}.{schema}", "table_count": len(tables)} if tables else None
+        except Exception:
+            sources[layer] = None
+    yaml_dir = Path("gold_layer_design/yaml")
+    if yaml_dir.exists() and any(yaml_dir.glob("*.yaml")):
+        sources["gold_design"] = {"path": str(yaml_dir), "yaml_count": len(list(yaml_dir.glob("*.yaml")))}
+    else:
+        sources["gold_design"] = None
+    csvs = list(Path("data_product_accelerator/context").glob("*.csv"))
+    sources["source_csv"] = {"paths": [str(c) for c in csvs]} if csvs else None
+    return sources
+```
+
+#### Step 0.2 — Select the planning source by mode
+
+| Mode | Allowed `selected_layer` values | Selection rule |
+|------|---------------------------------|----------------|
+| `acceleration` (default) | `deployed_gold`, `gold_design` | Pick `deployed_gold` if present; else `gold_design` ONLY when explicitly accepted; else **STOP** with a Gold-required remediation message. |
+| `workshop` | `deployed_gold`, `gold_design`, `deployed_silver`, `deployed_bronze`, `source_csv` | Pick the highest-priority source present. Never silently fall through to a lower layer when a higher one exists. |
+
+**Acceleration STOP message:**
+> Planning in acceleration mode requires the Gold layer. Run the Gold Layer Design and Setup skills first, or re-run with `planning_mode: workshop` to plan from a lower layer.
+
+**Workshop selection log (must be printed):**
+```
+Phase 0 — Planning source selected: <selected_layer>
+  Available: deployed_gold=<bool>, gold_design=<bool>, deployed_silver=<bool>, deployed_bronze=<bool>, source_csv=<bool>
+  Reason: highest-fidelity available input under workshop mode
+```
+
+#### Step 0.3 — Derive readiness markers
+
+Compute the readiness fields that every emitted manifest must include. `requires_gold_promotion` is **advisory only** — it is a hint for production hardening, never a deployment gate.
+
+```python
+def readiness_for(selected_layer: str, mode: str) -> dict:
+    if selected_layer == "deployed_gold":
+        # Production-deployable from Gold.
+        return {"implementation_readiness": "gold_ready",
+                "requires_gold_promotion": False}
+    if selected_layer == "gold_design":
+        # Deployable once the Gold layer is provisioned.
+        return {"implementation_readiness": "gold_design_only",
+                "requires_gold_promotion": False}
+    # Silver, Bronze, source CSV — workshop only.
+    if mode != "workshop":
+        raise SystemExit("Non-Gold planning sources are only allowed in workshop mode.")
+    if selected_layer in {"deployed_silver", "deployed_bronze"}:
+        # Workshop builds the semantic layer directly on top of Silver/Bronze.
+        # Gold promotion is recommended for production but not required to deploy.
+        return {"implementation_readiness": "workshop_deployable",
+                "requires_gold_promotion": False}
+    if selected_layer == "source_csv":
+        # No live tables — planning contract only; downstream stages will not
+        # attempt to deploy until at least one live layer exists.
+        return {"implementation_readiness": "workshop_draft",
+                "requires_gold_promotion": False}
+    raise SystemExit(f"Unknown selected_layer={selected_layer!r}")
+```
+
+**Readiness state semantics:**
+
+| `implementation_readiness` | When | Downstream behavior |
+|---|---|---|
+| `gold_ready` | Acceleration or workshop on `deployed_gold` | Full production deploy |
+| `gold_design_only` | Acceleration or workshop on `gold_design` (Gold YAML, no live tables yet) | Deploy after Gold provisioning; live-catalog checks advisory |
+| `workshop_deployable` | Workshop on `deployed_silver` or `deployed_bronze` | Deploy semantic layer / Genie Spaces directly against the Silver or Bronze schema; Gold promotion is an advisory next step |
+| `workshop_draft` | Workshop on `source_csv` only | Planning contract only; downstream stages stop and ask for at least one live layer |
+
+#### Step 0.4 — Stamp `planning_source` onto every manifest
+
+Every manifest emitted by Phases 1–3 (semantic-layer, observability, ml, genai-agents, gold-dependency, source-dependency) MUST carry a top-level block:
+
+```yaml
+planning_source:
+  selected_layer: deployed_gold | gold_design | deployed_silver | deployed_bronze | source_csv
+  schema: "<catalog>.<schema>"            # e.g. main.acme_gold (omit/null for source_csv)
+  source_yaml_dir: "gold_layer_design/yaml"   # only when selected_layer = gold_design
+  source_csv_paths: ["data_product_accelerator/context/<file>.csv"]  # only for source_csv
+  selected_at: "<ISO-8601 UTC>"
+implementation_readiness: gold_ready | gold_design_only | workshop_deployable | workshop_draft
+requires_gold_promotion: true | false   # advisory only; never a deployment gate
+```
+
+Downstream orchestrators (semantic-layer, observability, ml, genai-agents) read these fields:
+
+- `gold_ready` / `gold_design_only` / `workshop_deployable` — proceed with deployment against the layer the manifest declares (`gold_schema` for Gold sources; `silver_schema` / `bronze_schema` for workshop deployments on Silver/Bronze).
+- `workshop_draft` (only emitted when `selected_layer = source_csv`) — stop before deployment; the plan is a contract only.
+- `requires_gold_promotion` is advisory; it influences messaging, not gating.
+
+#### Step 0.5 — Mode-aware Phase 1 prerequisites table
+
+The `Prerequisites Status` table in Phase 1 must reflect the selected source. Layers above the selected one are still valid; layers below it (or absent) are marked `N/A` or `Planned only`. See the updated `assets/templates/prerequisites-template.md` for the dynamic format.
+
+---
+
 ### Phase 1: Requirements Gathering
 
 #### Project Information
@@ -169,18 +319,21 @@ This orchestrator spans 3 phases. To maintain coherence without context pollutio
 | Primary Use Cases | {use_case_1, use_case_2, use_case_3, etc.} |
 | Target Stakeholders | {executives, analysts, data scientists, operations} |
 
-#### Prerequisites Status
+#### Prerequisites Status (filled by Phase 0)
 
-| Layer | Count | Status |
-|-------|-------|--------|
-| Bronze Tables | {n} | ✅ Complete |
-| Silver Tables | {m} | ✅ Complete |
-| Gold Dimensions | {d} | ✅ Complete |
-| Gold Facts | {f} | ✅ Complete |
+The status of each layer must reflect what Phase 0 detected. Layers above the selected planning source are "✅ Complete"; the selected layer itself is the source the plan was derived from; layers below or absent are `N/A` or `Planned only`. Use the dynamic format from `assets/templates/prerequisites-template.md`.
+
+| Layer | Count | Status (mode-aware) |
+|-------|-------|---------------------|
+| Bronze Tables | {n} | ✅ Complete / N/A / Planned only |
+| Silver Tables | {m} | ✅ Complete / N/A / Planned only |
+| Gold Dimensions | {d} | ✅ Complete / Designed only / N/A |
+| Gold Facts | {f} | ✅ Complete / Designed only / N/A |
+| **Selected planning source** | — | `{planning_source.selected_layer}` (from Phase 0) |
 
 #### Define Agent Domains
 
-Derive domains from your business questions and Gold table groupings (see Artifact Rationalization Framework). Do not force a fixed number — let the data model and use cases determine natural boundaries.
+Derive domains from your business questions and **planning-source table groupings** (see Artifact Rationalization Framework). Use Gold table groupings when `planning_source.selected_layer` is `deployed_gold` or `gold_design`; otherwise group on the selected source-layer tables (Silver / Bronze / source CSV entities). Do not force a fixed number — let the data model and use cases determine natural boundaries.
 
 ##### Required Reads (Before Proceeding)
 
@@ -193,13 +346,13 @@ If a worked example matches your project, treat it as the **primary format refer
 
 **Workshop mode:** `references/workshop-mode-profile.md` should already be loaded when `planning_mode: workshop` was detected — see its **Document Scope** section, since workshop mode changes artifact counts but NOT which documents to produce.
 
-| Domain | Icon | Focus Area | Key Gold Tables | Est. Business Questions |
-|--------|------|------------|-----------------|------------------------|
-| {Domain 1} | {emoji} | {focus} | {tables} | {count} |
-| {Domain 2} | {emoji} | {focus} | {tables} | {count} |
+| Domain | Icon | Focus Area | Key Planning Assets | Est. Business Questions |
+|--------|------|------------|---------------------|------------------------|
+| {Domain 1} | {emoji} | {focus} | {tables from selected layer} | {count} |
+| {Domain 2} | {emoji} | {focus} | {tables from selected layer} | {count} |
 | ... | ... | ... | ... | ... |
 
-**Sizing check:** If a domain has < 3 business questions, consider merging it. If two domains share > 70% of Gold tables, consolidate.
+**Sizing check:** If a domain has < 3 business questions, consider merging it. If two domains share > 70% of their planning assets (Gold/Silver/Bronze tables, depending on `planning_source.selected_layer`), consolidate.
 
 See [Industry Domain Patterns](references/industry-domain-patterns.md) for examples by industry.
 
@@ -228,11 +381,11 @@ List 5-10 key questions per domain that the solution must answer:
 
 #### Use Case Catalog
 
-After defining business questions and selecting addendums, consolidate into a **Use Case Catalog** — one entry per distinct analytical or operational problem the solution will address. Each use case ties business questions to the Gold tables and artifacts that solve them. Use `assets/templates/use-case-catalog-template.md` for the full format.
+After defining business questions and selecting addendums, consolidate into a **Use Case Catalog** — one entry per distinct analytical or operational problem the solution will address. Each use case ties business questions to the **planning assets** (Gold tables in acceleration; selected-layer tables in workshop) and artifacts that solve them. Use `assets/templates/use-case-catalog-template.md` for the full format.
 
-| UC# | Use Case Name | Domain | Gold Tables | Artifact Types | Example Question |
-|-----|--------------|--------|-------------|---------------|-----------------|
-| UC-001 | {Descriptive Name} | {Domain} | `fact_*`, `dim_*` | TVF, MV, Dashboard | "{Natural language question}?" |
+| UC# | Use Case Name | Domain | Planning Assets | Artifact Types | Example Question |
+|-----|--------------|--------|-----------------|---------------|-----------------|
+| UC-001 | {Descriptive Name} | {Domain} | `fact_*`, `dim_*`  *(or `silver_*` / `bronze_*` in workshop drafts)* | TVF, MV, Dashboard | "{Natural language question}?" |
 | UC-002 | ... | ... | ... | ... | ... |
 
 **Use Case Catalog Rules:**
@@ -240,7 +393,7 @@ After defining business questions and selecting addendums, consolidate into a **
 - Every business question from the domain sections above MUST map to at least one use case
 - Every artifact in the addendum summaries MUST trace back to at least one use case question
 - Questions should be phrased as stakeholders would ask them (these become Genie benchmark candidates)
-- Group related questions into a single use case when they share the same Gold tables and grain
+- Group related questions into a single use case when they share the same planning assets (Gold tables in acceleration; selected-layer tables in workshop) and grain
 
 See [Worked Example: Wanderbricks](references/worked-example-wanderbricks.md) for 3 fully worked-out use case cards.
 
@@ -288,15 +441,27 @@ Before proceeding to Phase 3 (Manifests), verify that ALL selected plan document
 
 **If any required document is missing, create it from its template before generating manifests.** Manifests reference these files in `generated_from.plan_addendums` — they must exist on disk. **Workshop mode does not waive this gate**: artifact counts inside each document are capped, but the document set is unchanged.
 
-#### Phase 2 Step 5 — Emit Gold Dependency Manifest (MANDATORY)
+#### Phase 2 Step 5 — Emit Source Dependency Manifest (MANDATORY, layer-aware)
 
-**Before Phase 3 manifest generation, extract every Gold table/column referenced across all plan addendums into a single machine-readable manifest.** This becomes the contract validated against the live catalog in the next step.
+**Before Phase 3 manifest generation, extract every source-layer table/column referenced across all plan addendums into a single machine-readable manifest.** This becomes the contract validated against the live catalog in the next step.
 
-Write `plans/manifests/gold-dependency-manifest.yaml` with the following shape:
+The manifest filename and shape depend on the Phase 0 selected layer:
+
+| `planning_source.selected_layer` | File path | Top-level key |
+|----------------------------------|-----------|---------------|
+| `deployed_gold` or `gold_design` | `plans/manifests/gold-dependency-manifest.yaml` | `gold_dependencies:` |
+| `deployed_silver`, `deployed_bronze`, `source_csv` (workshop) | `plans/manifests/source-dependency-manifest.yaml` | `source_dependencies:` |
+
+Acceleration mode emits ONLY `gold-dependency-manifest.yaml` (existing behavior). Workshop mode emits whichever file matches its selected layer; when the selected layer is Gold, it emits `gold-dependency-manifest.yaml` for backward compatibility. Both shapes share the same `referenced_by` semantics.
 
 ```yaml
-# plans/manifests/gold-dependency-manifest.yaml
-planning_mode: acceleration  # or workshop — mirror the manifest's planning_mode
+# plans/manifests/gold-dependency-manifest.yaml  (acceleration, or workshop with Gold source)
+planning_mode: acceleration  # or workshop — mirror the parent manifest's planning_mode
+planning_source:
+  selected_layer: deployed_gold   # or gold_design
+  schema: "<catalog>.<gold_schema>"
+implementation_readiness: gold_ready  # or gold_design_only
+requires_gold_promotion: false
 generated_from:
   plan_addendums:
     - plans/phase1-use-cases.md
@@ -321,14 +486,49 @@ summary:
   total_referenced_by: 37
 ```
 
+```yaml
+# plans/manifests/source-dependency-manifest.yaml  (workshop only; Bronze/Silver/source CSV)
+planning_mode: workshop
+planning_source:
+  selected_layer: deployed_silver   # or deployed_bronze, source_csv
+  schema: "<catalog>.<silver_schema>"   # null for source_csv
+  source_csv_paths: []                  # populated for source_csv
+implementation_readiness: workshop_deployable   # workshop_draft only when selected_layer=source_csv
+requires_gold_promotion: false                  # advisory only; never gates deployment
+generated_from:
+  plan_addendums:
+    - plans/phase1-use-cases.md
+source_dependencies:
+  - table: silver_bookings
+    columns: [booking_id, property_id, booking_date, gross_amount]
+    referenced_by:
+      - planning/use_case_cards/revenue_overview.md
+summary:
+  total_tables: 4
+  total_columns: 22
+  total_referenced_by: 6
+```
+
 **Rules:**
-- One entry per **distinct** Gold table; union all column references from all plan addendums.
-- `referenced_by` uses relative artifact paths (e.g., `semantic-layer/metric_views/*.yaml`) so downstream fixes can trace artifacts back to the missing column.
-- Emit this manifest even if `planning_mode: workshop` — the workshop cap applies to artifact counts, not to manifest accuracy.
+- One entry per **distinct** source table; union all column references from all plan addendums.
+- `referenced_by` uses relative artifact paths so downstream fixes can trace artifacts back to the missing column.
+- Emit this manifest even when `planning_mode: workshop` — the workshop cap applies to artifact counts, not to manifest accuracy.
+- The shape is identical to Gold's: only the filename, top-level key (`source_dependencies` vs `gold_dependencies`), and `planning_source` block change.
 
-#### Phase 2 Step 6 — Live-Catalog Intersection (STOP Rule, MANDATORY)
+#### Phase 2 Step 6 — Live-Catalog Intersection (STOP / WARN Rule, MANDATORY, mode-aware)
 
-**Immediately after emitting the Gold dependency manifest, query the live catalog and cross-reference every table/column reference.** Downstream stages (semantic-layer, observability) all assume Gold is complete — catching gaps HERE saves 5+ deploy cycles later.
+**Immediately after emitting the dependency manifest, query the live catalog and cross-reference every table/column reference.** Downstream stages all assume the planning source is consistent with the live catalog — catching gaps HERE saves 5+ deploy cycles later.
+
+The validation behavior depends on `planning_mode` and `planning_source.selected_layer`:
+
+| Mode + selected layer | Behavior | Artifacts |
+|------------------------|----------|-----------|
+| `acceleration` + `deployed_gold` | **Fail-loud STOP** if any gap | Emit `plans/gold-gap-remediation.md`; raise |
+| `acceleration` + `gold_design` (only when explicitly accepted) | **Warn** (Gold may not be deployed yet) | Emit `plans/gold-gap-remediation.md`; do NOT raise |
+| `workshop` + `deployed_gold` | **Fail-loud STOP** if any gap (same as acceleration) | Emit `plans/gold-gap-remediation.md`; raise |
+| `workshop` + `gold_design` | **Warn** | Emit `plans/gold-gap-remediation.md`; continue |
+| `workshop` + `deployed_silver` / `deployed_bronze` | **Warn** | Emit `plans/source-gap-remediation.md`; continue |
+| `workshop` + `source_csv` | **Skip live intersection** (no live schema to compare against) | None |
 
 ```python
 import yaml
@@ -337,72 +537,83 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.getOrCreate()
 catalog = "<lakehouse_default_catalog>"
-gold_schema = "<gold_schema>"  # e.g., "{user_schema_prefix}_gold"
 
-manifest = yaml.safe_load(Path("plans/manifests/gold-dependency-manifest.yaml").read_text())
+# Choose which manifest to load based on Phase 0 selection.
+gold_path   = Path("plans/manifests/gold-dependency-manifest.yaml")
+source_path = Path("plans/manifests/source-dependency-manifest.yaml")
+manifest_path = gold_path if gold_path.exists() else source_path
+manifest = yaml.safe_load(manifest_path.read_text())
 
-# Pull every Gold table and column from the live catalog in one shot.
-live_cols = (
-    spark.sql(f"""
-      SELECT table_name, column_name, full_data_type
-      FROM {catalog}.information_schema.columns
-      WHERE table_schema = '{gold_schema}'
-    """).collect()
-)
-live_index = {}
-for row in live_cols:
-    live_index.setdefault(row.table_name, {})[row.column_name] = row.full_data_type
+planning_mode    = manifest.get("planning_mode", "acceleration")
+selected_layer   = manifest.get("planning_source", {}).get("selected_layer", "deployed_gold")
+target_schema    = manifest.get("planning_source", {}).get("schema")  # e.g. "<catalog>.<schema>"
+deps_key         = "gold_dependencies" if "gold_dependencies" in manifest else "source_dependencies"
 
-# Intersect
-missing_tables, missing_columns = [], []
-for dep in manifest["gold_dependencies"]:
-    tbl = dep["table"]
-    if tbl not in live_index:
-        missing_tables.append({
-            "table": tbl,
-            "referenced_by": dep["referenced_by"],
-        })
-        continue
-    for col in dep["columns"]:
-        if col not in live_index[tbl]:
-            missing_columns.append({
-                "table": tbl,
-                "column": col,
-                "referenced_by": dep["referenced_by"],
-            })
+# Workshop + source_csv: nothing to intersect against, skip.
+if selected_layer == "source_csv":
+    print("ℹ Skipping live-catalog intersection — selected_layer=source_csv has no live schema.")
+else:
+    # Pull every table and column from the live target schema in one shot.
+    schema_only = target_schema.split(".")[-1]
+    live_cols = (
+        spark.sql(f"""
+          SELECT table_name, column_name, full_data_type
+          FROM {catalog}.information_schema.columns
+          WHERE table_schema = '{schema_only}'
+        """).collect()
+    )
+    live_index = {}
+    for row in live_cols:
+        live_index.setdefault(row.table_name, {})[row.column_name] = row.full_data_type
 
-if missing_tables or missing_columns:
-    # Emit a remediation doc and STOP — do NOT generate downstream manifests.
-    remediation = Path("plans/gold-gap-remediation.md")
-    remediation.write_text(
-        "# Gold Dependency Gap Remediation\n\n"
-        "The following Gold references in plan addendums do not exist in "
-        f"`{catalog}.{gold_schema}`. Downstream orchestrators (semantic-layer, "
-        "observability, ml, genai-agents) cannot proceed until Gold is fixed.\n\n"
-        "## Missing tables\n\n"
-        + "\n".join(f"- **{m['table']}** — referenced by {m['referenced_by']}"
-                    for m in missing_tables)
-        + "\n\n## Missing columns\n\n"
-        + "\n".join(
-            f"- **{m['table']}.{m['column']}** — referenced by {m['referenced_by']}"
-            for m in missing_columns
+    missing_tables, missing_columns = [], []
+    for dep in manifest[deps_key]:
+        tbl = dep["table"]
+        if tbl not in live_index:
+            missing_tables.append({"table": tbl, "referenced_by": dep["referenced_by"]})
+            continue
+        for col in dep["columns"]:
+            if col not in live_index[tbl]:
+                missing_columns.append({"table": tbl, "column": col, "referenced_by": dep["referenced_by"]})
+
+    if missing_tables or missing_columns:
+        # Pick remediation filename based on dependency kind.
+        remediation_path = Path(
+            "plans/gold-gap-remediation.md" if deps_key == "gold_dependencies"
+            else "plans/source-gap-remediation.md"
         )
-        + "\n\n## Next steps\n\n"
-        "1. Add the missing tables/columns to `gold_layer_design/yaml/` "
-        "(`gold/00-gold-layer-design`).\n"
-        "2. Re-run `gold/01-gold-layer-setup` to deploy the updated Gold layer.\n"
-        "3. Re-run this Planning skill to regenerate manifests.\n"
-    )
-    raise RuntimeError(
-        f"Gold gap detected: {len(missing_tables)} missing tables, "
-        f"{len(missing_columns)} missing columns. See plans/gold-gap-remediation.md. "
-        "STOP — downstream orchestrators cannot proceed."
-    )
+        remediation_path.write_text(
+            f"# {('Gold' if deps_key == 'gold_dependencies' else 'Source')} Dependency Gap Remediation\n\n"
+            f"The following references in plan addendums do not exist in `{target_schema}`.\n\n"
+            "## Missing tables\n\n"
+            + "\n".join(f"- **{m['table']}** — referenced by {m['referenced_by']}" for m in missing_tables)
+            + "\n\n## Missing columns\n\n"
+            + "\n".join(
+                f"- **{m['table']}.{m['column']}** — referenced by {m['referenced_by']}"
+                for m in missing_columns
+            )
+            + "\n\n## Next steps\n\n"
+            "1. Acceleration / Gold source: add tables to `gold_layer_design/yaml/` and re-run "
+            "`gold/01-gold-layer-setup`.\n"
+            "2. Workshop / Silver or Bronze: extend the corresponding setup skill (silver/bronze) "
+            "and re-run.\n"
+            "3. Re-run this Planning skill to regenerate manifests.\n"
+        )
 
-print("✅ Gold dependency manifest intersected cleanly with live catalog.")
+        is_strict = (planning_mode == "acceleration" and selected_layer == "deployed_gold") \
+                 or (planning_mode == "workshop"     and selected_layer == "deployed_gold")
+        msg = (f"{deps_key} gap detected: {len(missing_tables)} missing tables, "
+               f"{len(missing_columns)} missing columns. See {remediation_path}.")
+        if is_strict:
+            raise RuntimeError(msg + " STOP — downstream orchestrators cannot proceed.")
+        else:
+            print(f"⚠ {msg} Continuing under non-strict mode/layer; downstream manifests "
+                  f"will carry implementation_readiness=" + manifest.get("implementation_readiness", ""))
+    else:
+        print(f"✅ {deps_key} intersected cleanly with live catalog `{target_schema}`.")
 ```
 
-**Escape flag:** If the user has an out-of-band reason to bypass the gap (e.g., Gold is intentionally incomplete for a phased rollout), they can pass `planning_allow_gold_gap: true` in their prompt. In that case, still emit `plans/gold-gap-remediation.md` as a warning, but proceed to Phase 3 with a prominent `gold_gap_acknowledged: true` marker in every downstream manifest.
+**Escape flag:** If the user has an out-of-band reason to bypass the gap (e.g., Gold is intentionally incomplete for a phased rollout), they can pass `planning_allow_gold_gap: true` in their prompt. In that case, still emit the remediation file as a warning, but proceed to Phase 3 with a prominent `gold_gap_acknowledged: true` marker in every downstream manifest. This flag does NOT relax mode-specific behavior; non-Gold workshop manifests already carry `implementation_readiness: workshop_deployable` (Silver/Bronze) or `workshop_draft` (source CSV).
 
 ### Phase 3: Manifest Generation (Plan-as-Contract)
 
@@ -495,7 +706,7 @@ Prerequisites (Bronze → Silver → Gold) → Phase 1 (Use Cases) → Phase 2 (
 
 Every artifact (TVF, Metric View, Dashboard, Alert, ML Model, Monitor, Genie Space) must:
 1. Be tagged with its Agent Domain
-2. Use the domain's Gold tables
+2. Use the domain's planning assets (Gold tables in acceleration; selected-layer tables in workshop)
 3. Answer domain-specific questions
 4. Be grouped with related domain artifacts in documentation
 
@@ -504,7 +715,7 @@ Every artifact (TVF, Metric View, Dashboard, Alert, ML Model, Monitor, Genie Spa
 ## {Domain}: get_{metric}_by_{dimension}
 
 **Agent Domain:** {Domain}
-**Gold Tables:** `fact_{entity}`, `dim_{entity}`
+**Planning Assets:** `fact_{entity}`, `dim_{entity}`   # or `silver_{entity}` / `bronze_{entity}` in workshop drafts
 **Business Questions:** "What are the top {metric} by {dimension}?"
 ```
 
@@ -559,12 +770,12 @@ For detailed architecture, design patterns, "Why Genie Spaces" comparison, and t
 - Genie Spaces: **max 25 assets per space**; 10-25 per space is optimal; <10 = merge spaces
 - TVFs: **only** when Metric Views cannot answer the question (requires parameterized multi-table logic)
 - Metric Views: one per distinct analytical grain, not per domain
-- Domains: emerge from business questions (min 3 questions per domain); merge if >70% Gold table overlap
+- Domains: emerge from business questions (min 3 questions per domain); merge if >70% planning-asset overlap
 - Naming: `get_{domain}_{metric}` for TVFs, `{domain}_analytics_metrics` for Metric Views
 
 ## SQL Query Standards
 
-**ALWAYS use Gold layer tables, NEVER system tables directly.** Reference pattern: `${catalog}.${gold_schema}.table_name`
+**ALWAYS use Gold layer tables for production deployable artifacts, NEVER `system.*` tables directly.** Reference pattern: `${catalog}.${gold_schema}.table_name`. In workshop deployments built from Silver or Bronze (`implementation_readiness: workshop_deployable`), SQL **does** reference `${catalog}.${silver_schema}.*` or `${catalog}.${bronze_schema}.*` directly — the workshop semantic layer is built on top of those tables. `requires_gold_promotion` is an advisory flag recommending Gold promotion for production hardening; it does not block workshop deployment.
 
 - Date parameters: `STRING` type (Genie compatible), cast at query time: `CAST(start_date AS DATE)`
 - SCD Type 2 joins: `LEFT JOIN dim_{entity} d ON f.{entity}_id = d.{entity}_id AND d.is_current = TRUE`
@@ -631,11 +842,12 @@ For detailed architecture, design patterns, "Why Genie Spaces" comparison, and t
 - [ ] Has References section
 
 ### Content Quality
-- [ ] All queries use Gold layer tables (not system tables)
+- [ ] All queries reference the planning-source layer (Gold for acceleration; Gold/Silver/Bronze for workshop deployments per `planning_source.selected_layer`); never `system.*` tables directly
 - [ ] All artifacts tagged with Agent Domain
 - [ ] LLM-friendly comments on all artifacts
-- [ ] Examples use `${catalog}.${gold_schema}` variables
+- [ ] Examples use `${catalog}.${gold_schema}` variables for Gold sources, or `${silver_schema}` / `${bronze_schema}` for workshop deployments on those layers
 - [ ] Summary tables are accurate and complete
+- [ ] Every emitted manifest carries `planning_source`, `implementation_readiness`, and `requires_gold_promotion` from Phase 0 (with `requires_gold_promotion` as advisory only)
 
 ### Cross-References
 - [ ] Main phase document links to addendums
@@ -665,7 +877,7 @@ For detailed architecture, design patterns, "Why Genie Spaces" comparison, and t
 - [ ] Genie Space count justified by asset volume (not just domain count)
 - [ ] No TVF duplicates a Metric View query
 - [ ] No domain has < 3 distinct business questions (merge small domains)
-- [ ] Domains with >70% Gold table overlap are consolidated
+- [ ] Domains with >70% planning-asset overlap (Gold/Silver/Bronze, by selected layer) are consolidated
 
 ### Agent Layer Architecture (If Phase 2 Included)
 - [ ] Agent-to-Genie Space mapping documented (1:1 recommended)
@@ -678,7 +890,7 @@ For detailed architecture, design patterns, "Why Genie Spaces" comparison, and t
 ## Key Learnings
 
 1. **Agent Domain framework** provides consistent organization across all artifacts — every artifact gets a domain tag
-2. **Gold layer references only** — never query `system.*` tables directly; use `${catalog}.${gold_schema}.*`
+2. **Planning-source layer references only** — never query `system.*` tables directly. Acceleration uses `${catalog}.${gold_schema}.*`. Workshop deployments use `${gold_schema}` / `${silver_schema}` / `${bronze_schema}` based on `planning_source.selected_layer`
 3. **Cross-addendum updates** — user requirements span multiple addendums; update all affected documents
 4. **LLM-friendly comments** are critical for Genie/AI/BI integration — include example questions
 5. **Agents use Genie Spaces as abstraction** — agents don't write SQL; Genie handles NL-to-SQL translation, optimization, and guardrails
@@ -686,7 +898,7 @@ For detailed architecture, design patterns, "Why Genie Spaces" comparison, and t
 7. **Deploy Genie Spaces before agents** — three-level testing: assets → Genie → Agents
 8. **Genie Space 25-asset hard limit** — plan space count from total asset volume, not domain count; fewer focused spaces > many thin ones
 9. **Rationalize before creating** — every artifact must trace to a business question; TVFs only when Metric Views can't answer
-10. **Domains emerge from data** — business questions and Gold table groupings determine natural domain boundaries
+10. **Domains emerge from data** — business questions and planning-asset groupings (Gold by default; Silver/Bronze in workshop deployments) determine natural domain boundaries
 
 ## References
 
@@ -715,10 +927,12 @@ For detailed architecture, design patterns, "Why Genie Spaces" comparison, and t
 
 ## Pipeline Progression
 
-**Previous stage:** `gold/01-gold-layer-setup` → Gold layer tables and merge scripts should be complete
+**Previous stage (acceleration):** `gold/01-gold-layer-setup` → Gold layer tables and merge scripts should be complete.
+
+**Previous stage (workshop):** ANY of `bronze/00-bronze-layer-setup`, `silver/00-silver-layer-setup`, `gold/00-gold-layer-design`, or `gold/01-gold-layer-setup`. Phase 0 picks the highest-fidelity input automatically.
 
 **Next stage:** After completing the project plan for remaining phases, proceed to:
-- **`semantic-layer/00-semantic-layer-setup`** — Build Metric Views, TVFs, and Genie Spaces on top of Gold
+- **`semantic-layer/00-semantic-layer-setup`** — Build Metric Views, TVFs, and Genie Spaces on top of the planning source. For Gold sources, deployment runs against `gold_schema` (production path). For workshop manifests with `implementation_readiness: workshop_deployable` (Silver/Bronze), deployment runs directly against the selected layer with a quality advisory; Gold promotion is recommended for production. For `implementation_readiness: workshop_draft` (source CSV), the orchestrator stops because there are no live tables to deploy against.
 
 ---
 

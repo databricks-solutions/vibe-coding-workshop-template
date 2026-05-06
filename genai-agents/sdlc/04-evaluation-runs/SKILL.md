@@ -30,6 +30,18 @@ metadata:
       sync_commit: "281d9acd92d936bd5294f78bd7ec68fb12d4a696"
 fields_read:
   - agent.reviewer_role
+  - agent.must_do
+  - agent.must_not_do
+  - docs.agent_tool_plan.selected_tools
+inputs:
+  - name: agent_tool_plan_ref
+    required: false
+    description: >
+      Path to docs/agent_tool_plan.yaml. When set, failure-shape classification
+      scopes primary_shape: tool_call_empty (and the tool_call_empty routing
+      branch) to tools present in selected_tools[] only. Tools that were never
+      wired cannot trigger this branch. The retrieval routing branch only
+      exists when KA or Vector Search appears in selected_tools[].
 ---
 
 # Evaluation runs (MLflow GenAI)
@@ -78,8 +90,12 @@ MLflow passes **one row’s `inputs`** into `predict_fn` (as a dict). The provid
 Your track's `predict_fn(inputs: dict) -> str` works as-is with `run_evaluation.py`:
 
 ```bash
+# --experiment-path MUST be the user-and-use-case-pinned eval experiment, e.g.
+#   /Users/<user_email>/mlflow/<APP_NAME>-eval
+# Read it from .vibecoding-state.md (mlflow_experiment_path with -eval leaf swap)
+# instead of using a literal /Shared/my-agent/traces.
 uv run run_evaluation.py --predict-module predict_fn.py \
-  --experiment-path /Shared/my-agent/traces \
+  --experiment-path /Users/<user_email>/mlflow/<APP_NAME>-eval \
   --dataset-table catalog.schema.benchmarks \
   --thresholds '{"safety/mean": 0.7, "relevance_to_query/mean": 0.7}'
 ```

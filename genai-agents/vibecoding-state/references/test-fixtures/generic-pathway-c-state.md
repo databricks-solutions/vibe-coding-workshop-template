@@ -76,8 +76,8 @@ Legend: `req` = required, `opt` = optional, `—` = skip.
 - **app_url:** `https://sample-retail-app-1234.databricksapps.com`
 - **serving_endpoint_name:** `sample-retail-agent-endpoint`
 - **ai_gateway_endpoint:** `n/a`
-- **mlflow_experiment_path:** `/Users/operator@example.com/mlflow/sample-retail-agent`
-- **mlflow_feedback_experiment_path:** `/Users/operator@example.com/mlflow/sample-retail-agent-feedback`
+- **mlflow_experiment_path:** `/Users/operator@example.com/mlflow/sample-retail-app-agent`  <!-- /Users/<user_email>/mlflow/<APP_NAME>-agent -->
+- **mlflow_feedback_experiment_path:** `/Users/operator@example.com/mlflow/sample-retail-app-feedback`  <!-- /Users/<user_email>/mlflow/<APP_NAME>-feedback -->
 - **lakebase_project:** `sample-retail-lakebase`
 - **lakebase_host:** `instance-sample-retail.database.cloud.databricks.com`
 - **doc_qa_backend:** `n/a`

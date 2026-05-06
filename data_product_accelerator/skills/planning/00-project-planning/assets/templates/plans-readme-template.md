@@ -2,17 +2,22 @@
 
 **Complete phased implementation plan for {Project Description}**
 
+**Planning Mode:** {acceleration | workshop}
+**Selected Planning Source:** `{deployed_gold | gold_design | deployed_silver | deployed_bronze | source_csv}` (set by Phase 0)
+**Implementation Readiness:** `{gold_ready | gold_design_only | workshop_deployable | workshop_draft}`
+**Requires Gold Promotion:** `{true | false}`
+
 ---
 
 ## Plan Index
 
-### Prerequisites (Complete)
+### Prerequisites (mode-aware)
 
 | Layer | Document | Status | Description |
 |-------|----------|--------|-------------|
-| Bronze | [Prerequisites](./prerequisites.md) | ✅ Complete | Raw data ingestion ({n} tables) |
-| Silver | [Prerequisites](./prerequisites.md) | ✅ Complete | DLT streaming with DQ |
-| Gold | [Prerequisites](./prerequisites.md) | ✅ Complete | Dimensional model ({n} tables) |
+| Bronze | [Prerequisites](./prerequisites.md) | {✅ Complete / Planned only / N/A} | Raw data ingestion ({n} tables) |
+| Silver | [Prerequisites](./prerequisites.md) | {✅ Complete / Planned only / N/A} | DLT streaming with DQ |
+| Gold | [Prerequisites](./prerequisites.md) | {✅ Complete / 📐 Designed only / Planned only / N/A} | Dimensional model ({n} tables) |
 
 ### Project Phases
 
@@ -39,21 +44,22 @@
 
 ## Agent Domain Framework
 
-| Domain | Icon | Focus Area | Key Gold Tables |
-|--------|------|------------|-----------------|
-| {Domain 1} | {emoji} | {focus} | {tables} |
+| Domain | Icon | Focus Area | Key Planning Assets |
+|--------|------|------------|---------------------|
+| {Domain 1} | {emoji} | {focus} | {tables from selected planning source} |
 
 ---
 
 ## Project Scope Summary
 
-### Prerequisites (Data Layers)
+### Prerequisites (Data Layers, mode-aware)
 
 | Layer | Schema | Tables | Status |
 |-------|--------|--------|--------|
-| Bronze | `{schema}` | {n} | ✅ Complete |
-| Silver | `{schema}` | {n} | ✅ Complete |
-| Gold | `{schema}` | {n} | ✅ Complete |
+| Bronze | `{schema}` | {n} | {✅ Complete / Planned only / N/A} |
+| Silver | `{schema}` | {n} | {✅ Complete / Planned only / N/A} |
+| Gold | `{schema}` | {n} | {✅ Complete / 📐 Designed only / Planned only / N/A} |
+| **Selected planning source** | — | — | `{planning_source.selected_layer}` |
 
 ### Phase 1 (Use Cases)
 

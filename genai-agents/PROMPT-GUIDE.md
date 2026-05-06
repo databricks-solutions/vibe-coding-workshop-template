@@ -39,6 +39,7 @@ and implements the step for you.
 |---|---|---|---|
 | 0 | Workspace Setup | P0 | ~15 min |
 | 1 | AppKit App + Lakebase Baseline | P1–P5 | ~2 hr |
+| 1b | Agent Design (Track A only) | P5a–P5b | ~45 min |
 | 2 | Foundation (MLflow + Experiment + Tools) | P6–P8 | ~2 hr |
 | 3 | Tool Catalog (KA + Genie + UC functions) | P9–P11 | ~2 hr |
 | 4 | Track A Agent Build (Apps + OBO + memory) | P12–P18 | ~5 hr |
@@ -173,6 +174,32 @@ agent shape you eventually pick — it always comes first.
 > fallback. Load `apps_lakebase/skills/05-appkit-lakebase-wiring/SKILL.md`.
 
 **Expected:** `lakebase_instance`, `lakebase_database` captured; CRUD smoke test passes locally and after redeploy.
+
+---
+
+## Section 1b: Agent Design (Track A only)
+
+These prompts run after the AppKit/Lakebase baseline and before Foundation when
+you are building a Track A agent. They produce planning artifacts in `docs/`,
+not code or Databricks resources. Skip this section for non-agent workshops.
+
+### Prompt P5a — Agent Spec Design
+
+> Generate `docs/agent_spec.yaml` from `docs/design_prd.md`. Use
+> `foundation/00b-agent-spec-and-tool-plan/SKILL.md`. If I ask for MCP web
+> research, use web search and record recommendations with source URLs. Do not
+> create code or resources.
+
+**Expected:** `docs/agent_spec.yaml` exists; agent purpose, personas, capabilities, tool recommendations, MCP research, KA recommendation, and governance rules are populated.
+
+### Prompt P5b — Agent Tool Selection
+
+> Generate `docs/agent_tool_plan.yaml` from `docs/agent_spec.yaml`. If I provide
+> `{agent_sql_catalog}` and `{agent_sql_schema}`, include SQL MCP as a read-only
+> tool over those Unity Catalog tables using warehouse `{warehouse_id}`. Do not
+> create code or resources.
+
+**Expected:** `docs/agent_tool_plan.yaml` exists; every selected tool has a smoke test; SQL MCP carries read-only guardrails; KA is selected or explicitly skipped.
 
 ---
 

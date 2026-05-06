@@ -13,14 +13,14 @@ description: >
 license: Apache-2.0
 compatibility: "Works with any workshop that follows the vibecoding state schema in references/state-template.md. Pathways A, B, C write to apps_lakebase/$APP_NAME/.vibecoding-state.md; Pathway D writes to agents/$AGENT_NAME/.vibecoding-state.md."
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-04-30"
   volatility: low
   upstream_sources: []
   author: "prashanth-subrahmanyam"
-  version: "2.0.0"
+  version: "2.1.0"
   domain: "genai-agents"
   role: "runtime-contract"
-  operations: "bootstrap, resolve_spec, enter, migrate_canonical, exit, retrospective.per_prompt, retrospective.rollup, state_contract_audit, endpoint_guardrail_audit, llm_role_endpoint_probe, audit_debts, skill_helper_resolution"
+  operations: "bootstrap, resolve_spec, hydrate_from_files, enter, migrate_canonical, exit, retrospective.per_prompt, retrospective.rollup, state_contract_audit, endpoint_guardrail_audit, llm_role_endpoint_probe, audit_debts, skill_helper_resolution"
   produces: "live_state_file, bootstrap_preflight, state_file_set, canonical_names, state_overrides, deferred_actions, mlflow_eval_known_quality_issues, gate_load_bearing_checks, productized_debts, preflight_check_registry, evaluation_runs_preflight, system_prompt_review, skill_helper_resolutions, resolved_variant, resolved_resources, resolved_ui, resolved_agent, resolved_governance, per_step_log_section, retrospective_entry"
   consumes: "Workshop Choices (PRD), PRD document at prd_path, Pathway Applicability Matrix, prior prompt gate"
   references:
@@ -129,6 +129,52 @@ All twelve operations take a typed parameter bag. The prompt invokes the operati
 
 **Downstream contract:** Every consuming skill declares which fields it reads via a machine-parseable `fields_read:` YAML list in its frontmatter (see § *Field Consumer Contract* below and [`references/spec-schema.md`](references/spec-schema.md) §"Field Consumer Contract"). Prompts in `Instructions.md` and `WALKTHROUGH.md` reference resolved content by dotted path (e.g. `ui.user_journeys`, `agent.tools`, `governance.scorer_suite.guidelines`) instead of inlining domain-specific content. This is what makes the workshops use-case-agnostic.
 
+### Operation: `hydrate_from_files`
+
+**When:** Called once per workshop, before any prompt that reads `state://AgentSpec`, `state://AppSpec`, or `state://DataSpec`. The Agents Accelerator visible path calls it from prompt `uc_resources_foundation` (input_id 200, order 40), right after `op enter` succeeds and before any UC schema/volume creation.
+
+**Purpose:** The Agents Accelerator design pair (`docs/agent_spec.yaml` from prompt 38, `docs/agent_tool_plan.yaml` from prompt 39) becomes the source of truth for the agent's intent. `hydrate_from_files` lifts those file values into the live state file so every downstream consumer (Track A build prompts, MLflow SDLC suite at prompts 50-56) keeps reading from `state://AgentSpec`, `state://AppSpec`, and `state://Spec Provenance` without an additional visible-path step. This is additive to `resolve_spec`: PRD-only LLM-driven workflows that never produce the `docs/*.yaml` files continue to work unchanged.
+
+**Inputs:**
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| `agent_spec_yaml`      | string | required | Path to the `docs/agent_spec.yaml` produced by prompt 38 (`agent_spec_design`). |
+| `agent_tool_plan_yaml` | string | required | Path to the `docs/agent_tool_plan.yaml` produced by prompt 39 (`agent_tool_selection`). |
+| `ui_design_md`         | string | required | Path to the `docs/ui_design.md` produced by prompt 04 (`cursor_copilot_ui_design`). |
+| `prd_path`             | string | required | Path to `docs/design_prd.md` from prompt 03 (`prd_generation`); used for `source_prd` provenance. |
+| `state_path`           | string | required | Path to the live state file (Pathways A/B/C: `apps_lakebase/$APP_NAME/.vibecoding-state.md`; Pathway D: `agents/$AGENT_NAME/.vibecoding-state.md`). |
+
+**Behavior:**
+
+1. **Read `agent_spec_yaml`.** Copy scalar/list `agent.*` fields directly into the state file's `## Agent` section as a fenced ```yaml``` block: `model`, `capabilities`, `personas`, `system_prompt`, `benchmark_seeds`, `must_do`, `must_not_do`. File values override any prior `resolve_spec` LLM output silently; the file is the source of truth.
+
+   **Tool projection rule (preserves the v2.0 `fields_read: agent.tools` contract without rewriting any consumer).** The Agent Spec produced by step 38 follows the 00b schema (`tool_recommendations`, NOT `agent.tools`). Hydration MUST project tools into `state://AgentSpec.agent.tools[]` using these three sub-rules:
+
+   a. Seed `state://AgentSpec.agent.tools[]` from `docs/agent_spec.yaml.tool_recommendations.managed_databricks[]` plus `tool_recommendations.external[]`. Map each entry to the v2.0 tool discriminated-union shape: populate `kind` (`hosted` | `function` | `mcp`), `name`, `surface`, `io_contract`, `readonly`, plus the kind-specific fields (`hosted_type` + `resource_ref`, or `language`, or `mcp_server_ref`). Carry `selected_by_default` forward to pre-mark entries.
+   b. Overlay `docs/agent_tool_plan.yaml.selected_tools[]` on top. Any Tool Plan entry with the same `name` REPLACES the spec recommendation — binding selection wins over loose recommendation. Tool Plan entries with no matching spec recommendation are appended.
+   c. Tool families absent from BOTH the spec and the Tool Plan are NOT written into `agent.tools[]`. Skipped families are recorded as skipped, not failed (consistent with step 44 semantics).
+
+   The projection is the only legitimate way `state://AgentSpec.agent.tools[]` becomes populated on the Agents Accelerator visible path. Step 38 does NOT and MUST NOT write `agent.tools[]` directly into `docs/agent_spec.yaml`; downstream prompts that still cite `agent.tools[]` (e.g. step 44's prerequisite block before Pass 3.5) MUST be updated to read `tool_recommendations` (loose) plus `selected_tools` (binding) instead.
+2. **Read `agent_tool_plan_yaml`.** Merge `selected_tools[]`, `selected_mcp_servers[]`, `runtime_config.llm`, and `resource_grants` into `## Agent` under new keys `selected_tools`, `selected_mcp_servers`, `runtime_config`, and `resource_grants`. Tools selected by the user in the Tool Plan win over the Agent Spec's recommendations.
+3. **Read `ui_design_md`.** Parse loose markdown headings into `## UI` (`pages[]`, `personas[]`, `user_journeys[]`) on a best-effort basis. If the document is structured differently or only contains free-form prose, write the verbatim markdown into `## UI.raw_markdown` and emit a non-fatal warning so downstream SDLC prompts can still find personas/journeys textually.
+4. **Stamp `## Spec Provenance`.** Compute `prd_sha256` from `prd_path` and write `resolved_at` (current UTC ISO timestamp), `resolver_version: "3.0"` (new tag distinguishing file-based hydration from LLM `resolve_spec`'s `"2.0"`), `schema_version: "2.0"`, `prd_sha256`, and `hydrated_from_files: true`.
+5. **Optional `## Resources` (DataSpec).** If the PRD declares a Lakehouse/Resources section (Bronze tables, Genie Spaces, Vector Search indexes, etc.) and `## Resources` is already populated by an earlier `resolve_spec` run, leave it untouched. Otherwise write `## Resources` as `optional: true` with `tables: []`, `mark_skipped: "no Lakehouse track"`, signalling downstream prompts that `state://DataSpec.*` lookups should fall back gracefully (e.g. KA branch C in prompt 42 reads from `docs/design_prd.md` + `docs/agent_spec.yaml.agent.capabilities` instead of `state://DataSpec.glossary`).
+6. **Idempotency.** Re-running with the same inputs is a no-op: each section is regenerated from the file values, sha256 is stable, and the state file ends in the same byte sequence (modulo the `resolved_at` timestamp, which is allowed to drift). Re-running with newer `docs/*.yaml` files overwrites cleanly.
+
+**Outputs:** `{ hydrated: true, sections_written: ["## Agent", "## UI", "## Resources", "## Spec Provenance"] }`. The Agents Accelerator step 40 records `hydrated_from_files: true` and `resolver_version: "3.0"` in its `op exit` `captured` map.
+
+**Errors:**
+
+- Missing required input file → halt with an explicit pointer to the producing prompt: `agent_spec_yaml` → 38, `agent_tool_plan_yaml` → 39, `ui_design_md` → 04, `prd_path` → 03, `state_path` → bootstrap.
+- `agent_spec.yaml` missing `agent.model` → halt with a pointer to prompt 38's model selection rule (Pass 1 / Pass 2 of the Agents Accelerator cleanup).
+- `agent_tool_plan.yaml.runtime_config.llm.endpoint` equals the literal YAML-path string `docs/agent_spec.yaml.agent.model` → halt with the Pass 2 placeholder rule citation. This is defense-in-depth; prompt 39's generated prompt already forbids this.
+- Any value at a documented Agent Spec / Tool Plan path is still wrapped in `{...}` (e.g. `{agent_sql_catalog}`) → halt with the Pass 2 placeholder-handling rule. The user must rerun prompt 39 with real values.
+
+**Downstream contract:** After `hydrate_from_files` runs, every prompt that consumes `state://AgentSpec.agent.*`, `state://AppSpec.ui.*`, or `state://Spec Provenance.*` sees the file-derived values. `state://DataSpec.*` is `<pending>` or `optional: true` unless the Lakehouse track produced one. SDLC prompts (50-56) MUST handle the optional/pending DataSpec case gracefully — they already do (the Agents Accelerator visible path no longer requires Lakehouse outputs), but the `optional: true` flag makes the contract explicit.
+
+**LLM driver prompt:** See [`references/hydrator-prompt.md`](references/hydrator-prompt.md) for the actual prompt that an LLM-driven implementation runs to execute this operation. That file is to `hydrate_from_files` what [`references/resolver-prompt.md`](references/resolver-prompt.md) is to `resolve_spec`.
+
 ### Operation: `enter`
 
 **When:** At the **top** of every workshop prompt, before any domain skill or command runs.
@@ -200,7 +246,11 @@ Other halt conditions (not numbered above): missing state file, unresolved `<pen
 
 1. Move `example/<use_case_slug>/.vibecoding-state.md` to `apps_lakebase/<app_name>/.vibecoding-state.md` (A/B/C) or `agents/<agent_name>/.vibecoding-state.md` (D).
 2. Update `Global Variables.APP_NAME` (or `AGENT_NAME`).
-3. All subsequent `enter` calls resolve to the canonical path automatically.
+3. **Pin MLflow experiment paths to the user-and-use-case identity.** At the same prompt that first resolves `$APP_NAME` / `$AGENT_NAME`, also resolve any `<pending>` MLflow experiment paths in `Captured Resource IDs` so downstream skills (F2, SDLC 04c, 08-appkit-feedback) consume the value from state instead of constructing their own — generic leaves like `Tracing`, `traces`, or `my-app-feedback` are forbidden:
+   - `mlflow_experiment_path` → `/Users/<user_email>/mlflow/<APP_NAME>-agent` (Pathway C) or `/Users/<user_email>/mlflow/<AGENT_NAME>-agent` (Pathway D). `n/a` for Pathways A and B.
+   - `mlflow_feedback_experiment_path` → `/Users/<user_email>/mlflow/<APP_NAME>-feedback` (Pathway C only). `n/a` for A, B, D.
+   - The leaf MUST carry the same `${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}` shape that backs `APP_NAME` so concurrent workshop attendees on a shared workspace cannot collide on a single MLflow experiment.
+4. All subsequent `enter` calls resolve to the canonical path automatically.
 
 **Outputs:** Path of the canonical state file.
 
@@ -544,6 +594,27 @@ The same matrix is mirrored into the live state file at `bootstrap` so every `en
 | Session rollup file (live, gitignored) | `example/<use_case_slug>/retrospective-rollup.md` |
 
 Live state and retrospective files are gitignored. Only the two files under `references/` are committed.
+
+---
+
+## State File Size Discipline
+
+The live state file is read top-to-bottom by every `enter` call. Without size discipline it grows linearly with prompt count and the per-prompt token cost climbs every step.
+
+**Header / History split.** Every state file MUST contain the literal marker line:
+
+```
+<!-- HISTORY -->
+```
+
+- **Above the marker** (the *header*): everything `enter` may need to decide whether a prompt can run, including `Workshop Choices`, `Global Variables`, `Captured Resource IDs`, the six spec sections (`## Variant`, `## Resources`, `## UI`, `## Agent`, `## Governance`, `## Spec Provenance`), `## State File Set`, `## Canonical Names`, `## Pathway Applicability Matrix`, `## State Overrides`, `## Deferred Actions`, `## MLflow Eval Known Quality Issues`, `## Gate Load Bearing Checks`, `## Preflight Check Registry`, `## Productized Debts`, `## Endpoint Guardrail Audit`, `## Evaluation Runs Preflight`, `## System Prompt Review`, `## Skill Helper Resolutions`, and `## State Contract Audit`. The header is rewritten in place by `exit` / audit operations.
+- **Below the marker** (the *history*): `## Per-Step Log` entries are appended chronologically. **Never re-rewritten**, only appended.
+
+**Default `enter` read.** `enter` reads the entire file end-to-end (the existing contract is preserved). However, when a future lightweight operation is explicitly documented as `header_only`, it may stop reading at the `<!-- HISTORY -->` marker. Do not add a new `enter` parameter in this task unless every prompt invocation is also updated; the first change is the file-layout discipline.
+
+**Soft size budget.** When the file exceeds **800 lines above the marker**, `state_contract_audit` raises a `state_file_header_oversized` warning. The audit emits a remediation hint listing collapsible sections (typically `Endpoint Guardrail Audit` history, resolved deferred actions, audited debts). The warning never blocks; it documents drift so a future audit can refactor.
+
+**No-op when the marker is missing.** Pre-existing state files without the marker are not auto-migrated; `enter` continues to read the whole file. The marker is added to new state files by the template and may be introduced to live files only after confirming the six spec sections are above it. This rule is non-breaking by construction.
 
 ---
 

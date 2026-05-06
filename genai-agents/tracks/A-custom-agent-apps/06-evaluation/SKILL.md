@@ -21,6 +21,17 @@ metadata:
 fields_read:
   - agent.benchmark_seeds.seed_examples
   - governance.verification.smoke_test_cases
+  - docs.agent_tool_plan.selected_tools
+  - docs.agent_tool_plan.verification.tool_smoke_tests
+inputs:
+  - name: agent_tool_plan_ref
+    required: false
+    description: >
+      Path to docs/agent_tool_plan.yaml. When set, the smoke set is the UNION
+      of governance.verification.smoke_test_cases[] (Spec) and
+      verification.tool_smoke_tests[] (Plan, one per selected_tools[] entry).
+      The fail-closed gate's "any tool returns empty output" condition is
+      scoped to selected_tools[] — tools that were never wired cannot trip it.
 ---
 
 # Track A Step 6: Evaluate the Agent
@@ -55,6 +66,8 @@ and human feedback labeling. Think of A6 as "does my agent work?" and S4 as
 ---
 
 ## Step 6a: Run the Built-In Evaluation
+
+Smoke evaluation uses the configured model route from `docs/agent_tool_plan.yaml.runtime_config.llm`. The evaluation runner must not substitute a hardcoded model endpoint. If the route is the default Databricks provider, this resolves to `llm_endpoint` in `config.yml`.
 
 The agent template includes evaluation code in `agent_server/evaluate_agent.py`
 (or `tests/evaluate_agent.py` depending on your template version). Run it:

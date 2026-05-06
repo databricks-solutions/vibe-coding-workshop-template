@@ -28,27 +28,62 @@ The "Extract, Don't Generate" principle applies to the planning-to-implementatio
 | `observability-manifest.yaml` | `monitoring/00-observability-setup` (stage 7) | Monitors, Dashboards, Alerts |
 | `ml-manifest.yaml` | `ml/00-ml-pipeline-setup` (stage 8) | Feature Tables, Models, Experiments |
 | `genai-agents-manifest.yaml` | `genai-agents/00-course-orchestrator` (stage 9) | Agents, Tools, Eval Datasets |
+| `gold-dependency-manifest.yaml` | Planning self-validation + downstream | Gold tables/columns referenced by all addendums (acceleration default; workshop with Gold source) |
+| `source-dependency-manifest.yaml` | Planning self-validation + downstream | Source-layer tables/columns referenced by all addendums (workshop with Silver/Bronze/source CSV) |
+
+## Layer-Aware Manifest Header (MANDATORY in all manifests)
+
+Every manifest emitted by Planning carries a `planning_source` block plus readiness markers, populated by Phase 0:
+
+```yaml
+planning_mode: acceleration | workshop
+planning_source:
+  selected_layer: deployed_gold | gold_design | deployed_silver | deployed_bronze | source_csv
+  schema: "<catalog>.<schema>"           # null when selected_layer = source_csv
+  source_yaml_dir: "gold_layer_design/yaml"          # only when selected_layer = gold_design
+  source_csv_paths: ["data_product_accelerator/context/<file>.csv"]   # only for source_csv
+  selected_at: "<ISO-8601 UTC>"
+implementation_readiness: gold_ready | gold_design_only | workshop_deployable | workshop_draft
+requires_gold_promotion: true | false   # advisory only; never gates deployment
+```
+
+| `selected_layer` | `implementation_readiness` | `requires_gold_promotion` | Downstream behavior |
+|---|---|---|---|
+| `deployed_gold` | `gold_ready` | `false` | Full production deploy path |
+| `gold_design` | `gold_design_only` | `false` | Validate against `gold_layer_design/yaml/`; warn-only on live mismatch; deploy once Gold is provisioned |
+| `deployed_silver` | `workshop_deployable` | `false` (advisory: recommended for production) | Workshop deployment runs directly against `silver_schema`; Genie-quality advisory printed |
+| `deployed_bronze` | `workshop_deployable` | `false` (advisory: recommended for production) | Workshop deployment runs directly against `bronze_schema`; stronger Genie-quality advisory |
+| `source_csv` | `workshop_draft` | `false` (advisory) | Planning contract only; downstream stops because no live tables exist |
+
+### Strict vs Advisory Validation
+
+- **Acceleration + `deployed_gold`** — fail-loud on any live-catalog gap (existing behavior).
+- **Acceleration + `gold_design`** — only allowed if explicitly accepted; emit `gold-gap-remediation.md` as a warning.
+- **Workshop + `deployed_gold`** — fail-loud on any gap (parity with acceleration; Gold is Gold).
+- **Workshop + `deployed_silver` / `deployed_bronze`** — emit `source-gap-remediation.md` as a warning if the live catalog is missing manifest-declared tables. The semantic-layer orchestrator deploys Metric Views, TVFs, and Genie Spaces directly against the selected layer with a quality advisory.
+- **Workshop + `source_csv`** — emit `source-gap-remediation.md` and continue planning, but the semantic-layer orchestrator will stop because there are no live tables to deploy against.
 
 ---
 
 ## Generation Workflow
 
-### Step 1: Review Gold Layer Design
+### Step 1: Review Planning Source (mode-aware)
 
-Before generating manifests, review the Gold layer outputs:
+Phase 0 in the main SKILL.md selects the planning source. Before generating manifests, review the artifacts produced by that source:
 
-```
-gold_layer_design/
-├── yaml/{domain}/*.yaml        # Table schemas (columns, types, PKs, FKs)
-├── erd_master.md                # Entity-Relationship Diagram
-└── docs/BUSINESS_ONBOARDING_GUIDE.md  # Business context
-```
+| Selected layer | Inputs to review |
+|---|---|
+| `deployed_gold` | `gold_layer_design/yaml/`, `gold_layer_design/erd_master.md`, `gold_layer_design/docs/BUSINESS_ONBOARDING_GUIDE.md`, plus the live `<catalog>.<gold_schema>` |
+| `gold_design` | `gold_layer_design/yaml/` and ERD only (Gold not yet deployed) |
+| `deployed_silver` | Live `<catalog>.<silver_schema>` table list and column metadata via `information_schema.columns` |
+| `deployed_bronze` | Live `<catalog>.<bronze_schema>` table list and column metadata |
+| `source_csv` | `data_product_accelerator/context/*.csv` schema definitions |
 
-**Extract from Gold YAML:**
+**Extract from the selected source:**
 - Table names → Determines which monitors, metric views, and features to create
 - Column names → Dimensions, measures, feature columns
 - Primary keys → Feature table PKs, monitor slicing expressions
-- Foreign keys → Join paths for metric views, TVF queries
+- Foreign keys (or inferred FKs in Silver/Bronze) → Join paths for metric views, TVF queries
 - Domain groupings → Agent domains, dashboard organization
 
 ### Step 2: Generate Human-Readable Plan Documents
@@ -82,7 +117,7 @@ plans/manifests/
 ```
 
 **Key principle:** Every artifact in a manifest MUST trace back to:
-1. A Gold layer table (from `gold_layer_design/yaml/`)
+1. A planning-source table (Gold table from `gold_layer_design/yaml/` or live Gold; Silver/Bronze table from the live catalog; or a source CSV entity — matching `planning_source.selected_layer`)
 2. A business question or use case (from the plan addendum)
 
 **Use case cross-referencing:** For each artifact entry in a manifest, include a `use_case_refs` list containing the UC# identifiers from `plans/use-case-catalog.md` that the artifact implements. This creates a reverse link from manifests back to the use case catalog, enabling traceability from implementation contracts all the way to business problems.
@@ -231,16 +266,17 @@ Copy a template, replace placeholders (`{domain}`, `{metric}`, `{entity}`, etc.)
 
 Before handing off manifests to downstream orchestrators:
 
-- [ ] All table references exist in `gold_layer_design/yaml/`
-- [ ] All column references exist in the referenced table's YAML
-- [ ] All metric view sources reference valid fact/dim tables
-- [ ] All TVF `gold_tables_used` reference valid tables
-- [ ] All Genie Space assets reference valid metric views and TVFs from the same manifest
+- [ ] Every manifest carries `planning_mode`, `planning_source`, `implementation_readiness`, `requires_gold_promotion` (populated by Phase 0)
+- [ ] All table references exist in the planning source (`gold_layer_design/yaml/` for Gold sources; live `information_schema.columns` for deployed Silver/Bronze; the source CSV for `source_csv`)
+- [ ] All column references exist in the referenced table within the planning source
+- [ ] All metric view sources reference valid fact/dim tables (Gold sources) or the closest Silver/Bronze equivalent (workshop deployments on `deployed_silver` / `deployed_bronze`)
+- [ ] All TVF `gold_tables_used` (or `source_assets_used` for workshop deployments on Silver/Bronze) reference valid tables
+- [ ] All Genie Space assets reference valid metric views and TVFs from the same manifest. **Production trusted assets are Gold-only**. Workshop Genie Spaces built on Silver/Bronze are deployable but carry a quality caveat: raw layers typically lack curated COMMENTs and dimensional joins, so NL accuracy will be lower than on Gold. Promote to Gold for production.
 - [ ] All monitor `timestamp_column` values exist in the referenced table
 - [ ] All alert queries reference fully qualified table names
 - [ ] All model `feature_table` values are defined in the `feature_tables` section
 - [ ] Summary counts match actual counts in the manifest
 - [ ] Business questions are specific and testable
-- [ ] Domain names are consistent across all 4 manifests
+- [ ] Domain names are consistent across all manifests (semantic, observability, ml, genai-agents, source/gold-dependency)
 - [ ] All artifacts have `use_case_refs` linking back to the use case catalog
 - [ ] Every UC# referenced in manifests exists in `plans/use-case-catalog.md`

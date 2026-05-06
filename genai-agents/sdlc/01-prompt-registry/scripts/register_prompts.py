@@ -25,8 +25,13 @@ Usage:
         --prompt-name syntax_validity \
         --template-file ./prompts/syntax_judge.txt \
         --alias staging \
-        --experiment /Shared/my-agent/prompts \
+        --experiment /Users/<user_email>/mlflow/<APP_NAME>-prompts \
         --commit-message "Stricter scoring rubric v2"
+
+The --experiment path MUST be the user-and-use-case-pinned path
+(e.g. /Users/jane.doe@example.com/mlflow/jane-d-stayfinder-prompts).
+Read it from .vibecoding-state.md (mlflow_experiment_path with the leaf
+swapped from -agent to -prompts) instead of using a literal placeholder.
 """
 from __future__ import annotations
 
@@ -45,7 +50,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DEFAULT_EXPERIMENT = "/Shared/my-agent/prompts"
+DEFAULT_EXPERIMENT: str | None = None
 DEFAULT_ALIAS = "production"
 
 
@@ -89,7 +94,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--experiment",
         default=DEFAULT_EXPERIMENT,
-        help=f"MLflow experiment path (default: {DEFAULT_EXPERIMENT}).",
+        required=DEFAULT_EXPERIMENT is None,
+        help=(
+            "MLflow experiment path. Required — pass the user-and-use-case-pinned "
+            "path /Users/<user_email>/mlflow/<APP_NAME>-prompts "
+            "(e.g. /Users/jane.doe@example.com/mlflow/jane-d-stayfinder-prompts) "
+            "so the prompt registry never lands in a generic /Shared/Tracing-style "
+            "experiment shared across attendees."
+        ),
     )
     parser.add_argument(
         "--commit-message",

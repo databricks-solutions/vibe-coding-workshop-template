@@ -19,8 +19,35 @@
 version: 2
 manifest_type: semantic-layer
 planning_mode: acceleration  # or "workshop" — downstream orchestrators must not expand beyond listed artifacts
+
+# -----------------------------------------------------------------------------
+# Layer-aware planning source (set by Phase 0 of the planning orchestrator)
+# -----------------------------------------------------------------------------
+# - Acceleration always sets selected_layer = deployed_gold (or gold_design if
+#   explicitly accepted).
+# - Workshop may set selected_layer to deployed_gold, gold_design,
+#   deployed_silver, deployed_bronze, or source_csv based on what is available.
+# - Downstream consumers MUST honor implementation_readiness:
+#     gold_ready / gold_design_only / workshop_deployable -> deploy against
+#     the schema declared by planning_source (gold_schema / silver_schema /
+#     bronze_schema). workshop_draft (only when selected_layer = source_csv)
+#     stops before deployment because no live tables exist.
+# - requires_gold_promotion is ADVISORY only; it never gates deployment.
+# -----------------------------------------------------------------------------
+planning_source:
+  selected_layer: deployed_gold      # deployed_gold | gold_design | deployed_silver | deployed_bronze | source_csv
+  schema: "${catalog}.${gold_schema}"   # null when selected_layer = source_csv
+  source_yaml_dir: "gold_layer_design/yaml"      # only when selected_layer = gold_design
+  source_csv_paths: []                            # populated for source_csv only
+  selected_at: "<ISO-8601 UTC>"
+implementation_readiness: gold_ready              # gold_ready | gold_design_only | workshop_deployable | workshop_draft
+requires_gold_promotion: false                    # advisory only; recommended for production hardening
+
 generated_from:
-  gold_yaml_dir: gold_layer_design/yaml/
+  gold_yaml_dir: gold_layer_design/yaml/   # populated when selected_layer is gold-based
+  source_inventory:                         # populated for non-Gold workshop sources
+    schema: ""                              # e.g. "${catalog}.${silver_schema}"
+    tables: []                              # e.g. ["silver_bookings", "silver_properties"]
   plan_addendums:
     - plans/phase1-addendum-1.2-tvfs.md
     - plans/phase1-addendum-1.3-metric-views.md
@@ -31,7 +58,11 @@ generated_from:
 # -----------------------------------------------------------------------------
 catalog: ${catalog}
 gold_schema: ${gold_schema}
-semantic_schema: ${semantic_schema}    # Schema for metric views and TVFs
+semantic_schema: ${semantic_schema}    # Schema for metric views and TVFs (production deploy target)
+# Optional layer-aware fields (used in workshop mode when planning_source != gold):
+silver_schema: ""                       # e.g. ${silver_schema}
+bronze_schema: ""                       # e.g. ${bronze_schema}
+source_schema: ""                       # alias for whichever layer is selected; defaults to gold_schema
 
 # -----------------------------------------------------------------------------
 # Domains — one entry per agent domain
@@ -43,10 +74,20 @@ domains:
   # ---------------------------------------------------------------------------
   {domain_name}:
     description: "{Brief description of domain focus area}"
+    # gold_tables is the canonical list when planning_source = deployed_gold | gold_design.
+    # In workshop_deployable manifests (Silver/Bronze) it is the *target* Gold list
+    # recommended for production promotion; source_assets reflects the actual
+    # planning-source layer (Silver/Bronze) used for workshop deployment.
+    # In workshop_draft manifests (source_csv) it is the *target* Gold list to be
+    # created once a live layer is provisioned.
     gold_tables:
       - fact_{entity}
       - dim_{entity_1}
       - dim_{entity_2}
+    # Populated for workshop runs whose planning_source is Silver/Bronze/source CSV.
+    # Downstream workshop deployments use source_assets as the deploy source against
+    # silver_schema or bronze_schema.
+    source_assets: []   # e.g. [silver_bookings, silver_properties] or [bronze_raw_events]
 
     # -------------------------------------------------------------------------
     # Metric Views for this domain
@@ -55,6 +96,12 @@ domains:
     metric_views:
       - name: "{domain}_analytics_metrics"
         source_table: "fact_{entity}"
+        # Optional per-artifact target schema (default: top-level semantic_schema).
+        # For workshop deployments on Silver/Bronze, target_schema typically equals
+        # ${semantic_schema} or the selected layer's schema; deployment proceeds
+        # immediately with a quality advisory. Production hardening promotes the
+        # MV onto Gold (manifest-driven re-planning).
+        target_schema: "${semantic_schema}"
         description: "Core KPI aggregation for {domain} analytics"
         dimensions:
           - name: "{dimension_1}"
@@ -90,9 +137,13 @@ domains:
           - name: end_date
             type: STRING
             description: "End date (YYYY-MM-DD format)"
+        # gold_tables_used remains the canonical key for Gold-based runs.
+        # source_assets_used is the canonical key for workshop deployments on
+        # Silver/Bronze; downstream TVF generation uses whichever is non-empty.
         gold_tables_used:
           - fact_{entity}
           - dim_{entity_1}
+        source_assets_used: []   # workshop deployments on Silver/Bronze; e.g. [silver_bookings]
         business_questions:
           - "Show {metric} summary for last 2 weeks"
           - "Daily {metric} breakdown for {date_range}"
@@ -114,6 +165,7 @@ domains:
         gold_tables_used:
           - fact_{entity}
           - dim_{entity_1}
+        source_assets_used: []   # workshop deployments on Silver/Bronze
         business_questions:
           - "Which {dimension} are the top contributors?"
           - "Top 5 {dimension} by {metric} this month"
