@@ -4,6 +4,65 @@ Single-file helper library for the V2V Lakehouse Genie Code workflow. V2V genie-
 
 ---
 
+## Section 0 — Cloning the workshop repo (first-time only)
+
+**Skip if `REPO_ROOT` is already defined** (your notebook is inside the cloned repo).
+
+### Path convention
+
+Genie Code Git folders live under your user home as a **modern Git folder**:
+
+```
+/Workspace/Users/<email>/<workshop_folder>/<repo_name>
+```
+
+- `<email>` — auto-detected via `w.current_user.me().user_name`.
+- `<workshop_folder>` — the workshop's scoping folder (set by Section 1 / the calling prompt).
+- `<repo_name>` — last path segment of the Git URL with `.git` stripped.
+
+### Clone via the Workspace UI (recommended)
+
+1. Workspace → your user folder → right-click → **Create → Folder** → `<workshop_folder>`.
+2. Right-click `<workshop_folder>` → **Create → Git Folder**.
+3. Paste the workshop's Git URL → accept the default destination.
+4. Open a notebook inside the cloned folder → proceed to Section 1.
+
+### Clone programmatically (if UI access is blocked)
+
+```python
+from databricks.sdk import WorkspaceClient
+
+REPO_URL = "https://github.com/<org>/<repo>"   # workshop-specific
+WORKSHOP_FOLDER = "<workshop_folder>"          # workshop-specific
+
+w = WorkspaceClient()
+email = w.current_user.me().user_name
+repo_name = REPO_URL.rstrip("/").split("/")[-1].removesuffix(".git")
+
+parent_dir = f"/Workspace/Users/{email}/{WORKSHOP_FOLDER}"
+repo_path = f"{parent_dir}/{repo_name}"
+
+w.workspace.mkdirs(parent_dir)   # mandatory — repos.create() does not create parents
+existing = next(
+    (r for r in w.repos.list(path_prefix=repo_path) if r.path == repo_path),
+    None,
+)
+if existing is None:
+    w.repos.create(url=REPO_URL, provider="gitHub", path=repo_path)
+print(f"REPO_ROOT = {repo_path}")
+```
+
+### Anti-patterns
+
+| Pattern | Failure |
+|---------|---------|
+| `path="/Repos/Users/<email>/<folder>/<repo>"` | `BadRequest: Invalid Git folder (Repo) path specified` — `/Repos/` has no `Users/` segment. |
+| `path="/Repos/<email>/<folder>/<repo>"` | Legacy `/Repos/<email>/...` rejects nested folders; entries must be flat. |
+| `repos.create(...)` without `mkdirs(parent_dir)` first | The Git folder API does not auto-create parent directories. |
+| `! git clone …` or `subprocess.run(["git", "clone", …])` | Forbidden in Genie Code — no shell. See Section 1's forbid-list. |
+
+---
+
 ## Section 1 — Bootstrap (run once per session; re-run after any kernel restart)
 
 **Forbid-list (do not use in Genie Code):** `databricks` CLI / `databricks bundle …`; `subprocess` / `os.system` / `shell=True`; `npm` / `npx` / `node`; `pip` without `%`; `open(local_path)`, `/tmp/...`, paths outside `/Workspace`; `localhost`, `curl`, `psql`; `git clone`. Use the SDK helpers below.
