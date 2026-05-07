@@ -31,6 +31,8 @@ Use this **ordered** path from zero to a ready classroom. Workspace foundation (
 
 ### 0.2 AppKit-MCP branch (Apps Lakebase Genie **with** MCP only)
 
+**Default participant track (2026):** Genie prompts use **Databricks SDK only** — see `apps_lakebase/gc-prompt-conversion/workshop-variables.md` (**no** `mcp-appkit-skill`). Treat **0.2** as **optional** unless you intentionally run the MCP AppKit server for demos.
+
 Skip **0.2** for **DPA-only Genie** (no AppKit MCP).
 
 ```mermaid
@@ -56,7 +58,7 @@ flowchart TD
 
 ### 0.4 Day-of — pick one track (or both in sequence)
 
-**Apps Lakebase Genie (MCP + SDK)** — canonical order: **[`apps_lakebase/prompts/README.md`](apps_lakebase/prompts/README.md)**. Short overview + links: [`apps_lakebase/Instructions.md`](apps_lakebase/Instructions.md).
+**Apps Lakebase Genie (SDK)** — canonical order: **[`apps_lakebase/prompts/README.md`](apps_lakebase/prompts/README.md)**. Short overview + links: [`apps_lakebase/Instructions.md`](apps_lakebase/Instructions.md). Optional MCP add-on: §0.2 + `mcp-setup-gc.md`.
 
 **Data Product Accelerator Genie (SDK)** — no MCP required for the core medallion flow:
 
@@ -234,7 +236,7 @@ All `_gc.md` prompts are new files. The original non-GC prompts (`ui_design.md`,
 | `apps_lakebase/prompts/one-ui-design-local.md` | Scaffold, UI, mock deploy (single Genie prompt) |
 | `apps_lakebase/prompts/setup_lakebase_gc.md` | Lakebase project provisioning + npm dep + app.yaml config |
 | `apps_lakebase/prompts/wire_ui_to_lakebase_gc.md` | Wire React frontend and FastAPI backend to Lakebase |
-| `apps_lakebase/prompts/deploy_and_test_gc.md` | Deploy app via MCP + SDK, validate end-to-end |
+| `apps_lakebase/prompts/deploy_and_test_gc.md` | Deploy app via SDK (`validate_and_deploy`), validate end-to-end |
 | `apps_lakebase/prompts/cleanup-gc.md` | Delete app, Lakebase instance, and workspace files |
 
 ### 3b. apps_lakebase — Modified Skill Files
@@ -242,12 +244,12 @@ All `_gc.md` prompts are new files. The original non-GC prompts (`ui_design.md`,
 | Skill | Key Change for Genie Code |
 |-------|--------------------------|
 | `apps_lakebase/skills/00-appkit-navigator/SKILL.md` | Added Genie Code execution context; no local server, no npm |
-| `apps_lakebase/skills/01-appkit-scaffold/SKILL.md` | Scaffold via `appkit_scaffold_app` MCP tool (Genie path) |
-| `apps_lakebase/skills/02-appkit-build/SKILL.md` | No local dev server; MCP `appkit_validate` for structural checks |
-| `apps_lakebase/skills/03-appkit-deploy/SKILL.md` | Deploy via `appkit_deploy` MCP tool + deploy job as fallback if SP blocked |
-| `apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` | Plugins via `appkit_add_lakebase`, `appkit_add_analytics`, etc. MCP tools |
+| `apps_lakebase/skills/01-appkit-scaffold/SKILL.md` | Scaffold patterns for Genie: `write_file()` + overrides (read skill; no MCP) |
+| `apps_lakebase/skills/02-appkit-build/SKILL.md` | No local dev server; validate by reading files / SDK preflight |
+| `apps_lakebase/skills/03-appkit-deploy/SKILL.md` | Deploy via `validate_and_deploy()` (SDP only; no deploy Jobs) |
+| `apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` | Plugins: merge `package.json` / `app.yaml` via `write_file()` per skill + Lakebase SDK provisioning |
 | `apps_lakebase/skills/05-appkit-lakebase-wiring/SKILL.md` | Lakebase ops via `w.postgres` SDK instead of local `psql` |
-| `apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` | AppKit/Lakebase/MCP error-to-fix lookup table |
+| `apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` | AppKit/Lakebase/SDK error-to-fix lookup table |
 | `apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` | Full 11-tool reference with parameters, return values, and examples |
 
 ### 3c. data_product_accelerator — New Files (Genie Code track)
@@ -338,10 +340,10 @@ After Step B passes, participants run the workshop prompts in sequence.
 |------|-------------|--------------|
 | 0 | `mcp-setup-gc.md` | MCP connectivity + repo access |
 | 1 | `generate_prd_gc.md` | Generate PRD for the booking app |
-| 2 | `one-ui-design-local.md` | Scaffold, UI polish, mock deploy via MCP + SDK |
+| 2 | `one-ui-design-local.md` | Scaffold, UI polish, mock deploy via SDK |
 | 3 | `setup_lakebase_gc.md` | Provision Lakebase, bind to app, add npm dep |
 | 4 | `wire_ui_to_lakebase_gc.md` | Wire frontend + backend to Lakebase |
-| 5 | `deploy_and_test_gc.md` | Deploy via MCP, validate end-to-end |
+| 5 | `deploy_and_test_gc.md` | Deploy via SDK, validate end-to-end |
 
 ### Prompt Sequence — data_product_accelerator Track
 

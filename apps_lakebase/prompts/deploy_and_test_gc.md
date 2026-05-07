@@ -6,52 +6,23 @@ You are Genie Code, an AI assistant on the Databricks workspace. You are deployi
 
 Key requirements:
 
-- **Deploy (primary):** **`deployment, app_url = validate_and_deploy(APP_NAME, APP_BASE)`** from `@apps_lakebase/gc-prompt-conversion/workshop-variables.md` — MCP `appkit_validate` + SDK `create`/`deploy_and_wait` as one contract (**`@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md`**). Do **not** hand-roll a different validate+deploy sequence unless troubleshooting directs it.
-- **Permissions:** If the MCP service principal cannot read the app source tree, fix **folder and app ACLs** for the MCP SP (`CAN_READ` / `CAN_MANAGE`) — see `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md`, `.assistant_instructions.md` Deploy Rules, and `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md`. **No** deploy Jobs.
-- **Validate** (included in `validate_and_deploy`): MCP `appkit_validate` uses `source_code_path`, not `workspace_path`.
+- **Deploy (primary):** **`deployment, app_url = validate_and_deploy(APP_NAME, APP_BASE)`** from `@apps_lakebase/gc-prompt-conversion/workshop-variables.md` — SDK **`sdk_preflight_app_folder`** + `create`/`deploy_and_wait` as one contract (**`@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md`**). Do **not** hand-roll a different validate+deploy sequence unless troubleshooting directs it.
+- **Permissions:** If the **app’s service principal** cannot read the app source tree at build time, fix **folder and app ACLs** (`CAN_READ` on `APP_BASE`, `CAN_MANAGE` on the app as needed) — see `.assistant_instructions.md` Deploy Rules and `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md`. **No** deploy Jobs.
+- **Validate** (included in `validate_and_deploy`): SDK preflight checks required files under `APP_BASE`.
 - Monitor deployment via SDK: `w.apps.get()`, `w.apps.list_deployments()`
 - Fix deployment errors (up to 3 iterations): identify error → fix files → redeploy → re-verify
 - **API testing from notebooks is blocked by the Apps auth proxy** — use SDK status checks and browser verification instead
 - `@databricks/appkit` is a **CLI tool only** — it has no `build` or `start` commands. Use `vite build` and `tsx app.ts` instead
 
-**Environment:** Genie Code on Databricks workspace (serverless). No CLI, no curl, no psql, no localhost. **`validate_and_deploy()`** uses MCP for **`appkit_validate`** and the SDK for **`deploy_and_wait`**. Browser handles UI verification.
+**Environment:** Genie Code on Databricks workspace (serverless). No CLI, no curl, no psql, no localhost. **`validate_and_deploy()`** uses the SDK for preflight, app create/activate, and **`deploy_and_wait`**. Browser handles UI verification.
 
 **Prompt sequence:** `one-ui-design-local.md` → `setup_lakebase_gc.md` → `wire_ui_to_lakebase_gc.md` → **this file** (see `@apps_lakebase/prompts/README.md`).
 
 ---
 
-### Session Recovery: MCP Setup
+### Session Recovery: SDK bootstrap
 
-> **Skip this section** if `mcp_client` and `w` are still in scope from a previous prompt. Run ONLY if your Genie Code session was reset (kernel recycled, new conversation, or `ModuleNotFoundError`). If packages are missing, re-run the MCP setup prompt first to reinstall them.
-
-<!--
-# --- Uncomment this block if session was reset ---
-
-import nest_asyncio
-nest_asyncio.apply()
-
-from databricks.sdk import WorkspaceClient
-from databricks_mcp import DatabricksMCPClient
-
-w = WorkspaceClient()
-client_id = w.dbutils.secrets.get(scope="v2v-gc-agent", key="client_id")
-client_secret = w.dbutils.secrets.get(scope="v2v-gc-agent", key="client_secret")
-host = spark.conf.get("spark.databricks.workspaceUrl")
-
-w_oauth = WorkspaceClient(
-    host=f"https://{host}",
-    client_id=client_id,
-    client_secret=client_secret,
-)
-
-MCP_URL = f"https://mcp-appkit-skill-{host.split('.')[0]}.{host.split('.', 1)[1]}/mcp"
-mcp_client = DatabricksMCPClient(server_url=MCP_URL, workspace_client=w_oauth)
-
-tools = mcp_client.list_tools()
-print(f"MCP OK. {len(tools)} tools available")
-
-# --- End session recovery block ---
--->
+> **Skip** if `w`, `validate_and_deploy`, and `APP_BASE` are still in scope. If the session was reset, re-run **`@apps_lakebase/gc-prompt-conversion/workshop-variables.md`** three-cell bootstrap.
 
 > **Troubleshooting:** See `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` for error resolution.
 
@@ -71,23 +42,18 @@ Deploy the Lakebase-wired web application and verify it starts correctly. This i
 
 ### Step 1: Derive Variables and Read State
 
-Ensure `APP_NAME`, `DB_SCHEMA`, `REPO_ROOT`, `APP_BASE`, `mcp_client`, and `w` are in scope (paste **`@apps_lakebase/gc-prompt-conversion/workshop-variables.md`** Cell 3 if needed). Then read `.vibecoding-state.md` to confirm values and check for deferred TODO items.
+Ensure `APP_NAME`, `DB_SCHEMA`, `REPO_ROOT`, `APP_BASE`, and `w` are in scope (paste **`@apps_lakebase/gc-prompt-conversion/workshop-variables.md`** Cell 3 if needed). Then read `.vibecoding-state.md` to confirm values and check for deferred TODO items.
 
 ---
 
-### Step 2: Validate App Structure (optional preflight)
+### Step 2: Validate app structure (optional preflight)
 
-**Note:** Step 4 **`validate_and_deploy()`** already runs MCP **`appkit_validate`** first. Use this step only if you want an early read of validation output before touching deploy.
+**Note:** Step 4 **`validate_and_deploy()`** already runs **`sdk_preflight_app_folder(APP_BASE)`** first. Use this step only if you want an early read before touching deploy.
 
 ```python
-result = mcp_client.call_tool("appkit_validate", {
-    "app_name": APP_NAME,
-    "source_code_path": APP_BASE,
-})
-print(result)
+bad = sdk_preflight_app_folder(APP_BASE)
+print(bad if bad else "sdk_preflight OK")
 ```
-
-> **If MCP is unavailable:** See `@apps_lakebase/skills/03-appkit-deploy/SKILL.md` (Genie / validation patterns) and `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` — do not reference removed local-only scripts.
 
 Fix any reported errors before proceeding.
 
@@ -148,11 +114,11 @@ print(f"Deployment state: {deployment.status.state.name if deployment.status and
 print(f"App URL: {app_url}")
 ```
 
-> **CRITICAL:** `validate_and_deploy` expects `mcp_client` and `w` in scope — run workshop-variables Cell 3 after pip + restart if needed.
+> **CRITICAL:** `validate_and_deploy` expects `w` and helpers in scope — run `workshop-variables.md` Cell 3 after pip + restart if needed.
 
-> If the MCP SP cannot read the app tree after troubleshooting, **grant** `CAN_READ` on `APP_BASE` and `CAN_MANAGE` on the app and directory for the MCP SP (UUID from `appkit_get_app_status`). Redeploy with **`validate_and_deploy`** only — no Jobs, no `_deploy_app`.
+> If the **app service principal** cannot read `APP_BASE` at build time, **grant** `CAN_READ` on `APP_BASE` and `CAN_MANAGE` on the app (UUID `service_principal_client_id` from `w.apps.get(APP_NAME)`). Redeploy with **`validate_and_deploy`** only — no Jobs, no `_deploy_app`.
 
-> SP permissions (`CAN_MANAGE` on app + directory) were granted in the UI step (`one-ui-design-local.md`). If you get MCP permission errors, re-run those grants.
+> SP permissions were described in `one-ui-design-local.md` / `.assistant_instructions.md`. If deploy fails with source read errors, re-check those grants.
 
 **Timing:** First deploys take 3-5 minutes (platform runs `npm install` + `npm run build`). Redeployments take 1-3 minutes.
 
@@ -279,7 +245,7 @@ else:
 
 If the deploy fails or the app doesn't start, read `@apps_lakebase/skills/03-appkit-deploy/SKILL.md` Step 5 for the full error diagnosis flow.
 
-After fixing, re-validate via MCP `appkit_validate` (`app_name` + `source_code_path`) and redeploy. Common errors:
+After fixing, re-run **`validate_and_deploy(APP_NAME, APP_BASE)`** (or `sdk_preflight_app_folder(APP_BASE)` for a quick check) and redeploy. Common errors:
 
 | Error | Fix |
 |-------|-----|
@@ -318,7 +284,7 @@ Use the Databricks SDK to list apps, find STOPPED ones, and delete one to make r
 
 ### Checklist
 
-- [ ] MCP `appkit_validate` passed (or SDK fallback validation passed)
+- [ ] SDK preflight passed (`sdk_preflight_app_folder` / `validate_and_deploy`)
 - [ ] Pre-deploy config validated (all 4 files checked)
 - [ ] Lakebase instance state is `AVAILABLE`
 - [ ] App resource binding is `postgres` type (NOT `database` type)
@@ -328,6 +294,6 @@ Use the Databricks SDK to list apps, find STOPPED ones, and delete one to make r
 - [ ] Post-deploy Lakebase verification completed (resource type check, instance check, browser instructions)
 - [ ] Browser verification: home page loads, `/api/health` returns `{ "data": [{ "status": "connected" }], "source": "live" }` (or `"source": "mock"` if pool failed)
 - [ ] Error fix table provided for common deployment failures
-- [ ] `.vibecoding-state.md` updated with: app URL, deploy status, deploy method, Lakebase instance state, any errors and fixes
+- [ ] `.vibecoding-state.md` updated with: app URL, deploy status, deploy method (`validate_and_deploy` / SDK), Lakebase instance state, any errors and fixes
 
 **Previous step:** `wire_ui_to_lakebase_gc.md` | **Next step:** None — workshop complete!

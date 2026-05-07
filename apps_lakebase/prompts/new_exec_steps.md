@@ -8,7 +8,7 @@
 
 | Track | Environment | Tools | Pre-reqs |
 |-------|-------------|-------|----------|
-| **Genie Code** | Databricks notebooks (serverless) | MCP AppKit tools, Databricks SDK | No local IDE, CLI, Node.js, or npm needed |
+| **Genie Code** | Databricks notebooks (serverless) | Databricks SDK (`WorkspaceClient`, `write_file`, `validate_and_deploy`) | No local IDE, CLI, Node.js, or npm needed |
 | **CLI** | Local AI-powered IDE (Cursor, Windsurf, VS Code) | Databricks CLI, npm, bash | Local toolchain required |
 
 ---
@@ -27,9 +27,9 @@ Complete these **before** the workshop. Owner: Workspace Admin / Account Admin.
 | 5b | **Enable Lakebase** | 15 min | Workspace Settings > Compute > Lakebase; grant catalog permissions |
 | 6a | **Create service principal** | 10 min | Account Console > Service Principals > Add (note the Application ID = `client_id`) |
 | 6b | **Generate OAuth client secret** | 5 min | SP > Secrets tab > Generate secret (copy immediately — shown only once) |
-| 6c | **Grant SP access** | 10 min | Workspace User role + `Can Use` on `mcp-appkit-skill` app |
-| 6d | **Create secret scope + store credentials** | 10 min | Create `v2v-gc-agent` scope; store `client_id` and `client_secret` via SDK |
-| 6e | **Verify MCP pre-reqs** | 5 min | Run `apps_lakebase/skills/00-appkit-navigator/scripts/validate-prereqs.sh` (or follow `mcp-setup-gc.md`) — expect secret scope `v2v-gc-agent` verified |
+| 6c | **(Optional) MCP app access** | 10 min | Only if running `mcp-appkit-skill`: Workspace User role + `Can Use` on that app — **skip** for SDK-only Genie |
+| 6d | **Create secret scope + store credentials** | 10 min | **Optional** for MCP-only flows; SDK-only Genie uses notebook identity — skip unless you use `mcp-setup-gc.md` |
+| 6e | **Verify Genie bootstrap** | 5 min | Participants run `workshop-variables.md` three-cell bootstrap; confirm `w` + `validate_and_deploy` exist |
 
 ---
 
@@ -53,7 +53,7 @@ Genie Code participants skip items 7–12 entirely.
 | # | Step | Est. Time | Details |
 |---|------|-----------|---------|
 | A | **Log in to workspace** | 2 min | Confirm you can access the Databricks workspace URL |
-| B | **Verify MCP connectivity** | 5 min | Run the setup cells from `apps_lakebase/prompts/mcp-setup-gc.md` Step 6 — install `databricks-mcp`, restart kernel, connect to MCP server, verify 11 tools are listed |
+| B | **Verify SDK bootstrap** | 5 min | Run three cells from `apps_lakebase/gc-prompt-conversion/workshop-variables.md` — `%pip install databricks-sdk`, `restartPython`, paste Cell 3; confirm `w`, `APP_BASE`, `validate_and_deploy` exist |
 
 ---
 
@@ -79,9 +79,9 @@ Each step is a separate Genie Code conversation. Use the `_gc.md` prompt files i
 | | |
 |---|---|
 | **Prompt file** | `apps_lakebase/prompts/one-ui-design-local.md` |
-| **Goal** | Scaffold a blank AppKit project via MCP, build and polish the UI from the PRD with mock data, deploy to Databricks Apps |
+| **Goal** | Scaffold a blank AppKit project via skills + `write_file()`, build and polish the UI from the PRD with mock data, deploy to Databricks Apps |
 | **Skills used** | `01-appkit-scaffold`, `02-appkit-build`, `03-appkit-deploy` |
-| **Key actions** | MCP `appkit_scaffold_app` → implement frontend with static mock data → SDK file writes → deploy via job or MCP `appkit_deploy` |
+| **Key actions** | Read scaffold skill → `write_file()` tree under `APP_BASE` → mock UI → `validate_and_deploy(APP_NAME, APP_BASE)` (SDP only) |
 | **Output** | Running Databricks App at a public HTTPS URL serving mock data; `docs/ui_design.md` |
 | **Checkpoint** | App is `RUNNING`; UI loads in browser; mock data renders on all pages |
 
@@ -209,7 +209,7 @@ Each step is a separate agent conversation in your local IDE. Use the prompt tem
 
 | Step | Prompt File | Description |
 |------|-------------|-------------|
-| Pre-req B | `apps_lakebase/prompts/mcp-setup-gc.md` (Step 6) | Verify MCP connectivity |
+| Pre-req B | `apps_lakebase/gc-prompt-conversion/workshop-variables.md` (Cells 1–3) | Verify SDK bootstrap (`w`, `validate_and_deploy`) — optional MCP: `mcp-setup-gc.md` |
 | 1 | `apps_lakebase/prompts/generate_prd_gc.md` | Generate PRD for StayFindr |
 | 2 | `apps_lakebase/prompts/one-ui-design-local.md` | Scaffold, UI, mock deploy (single prompt) |
 | 3 | `apps_lakebase/prompts/setup_lakebase_gc.md` | Lakebase config (YAML only) |

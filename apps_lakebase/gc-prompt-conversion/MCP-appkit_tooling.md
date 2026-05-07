@@ -1,12 +1,12 @@
 # MCP AppKit Tooling — Complete Tool Reference
 
-> **Prerequisite document for all `_gc.md` prompt files.** Complete the one-time setup in `mcp-setup-gc.md` before using these tools.
+> **Workshop status (2026):** Genie prompts in `apps_lakebase/prompts/` are **SDK-only** — see `workshop-variables.md`, `gc-prompt-header.md`, and `GENIE-CODE-OVERRIDES.md`. **`mcp-appkit-skill` is not required.** This file is retained as an **optional** mapping from old MCP tool names to SDK / skill equivalents for facilitators or custom environments.
 
 ---
 
 ## Overview
 
-The **`mcp-appkit-skill`** Databricks App exposes **11 MCP tools** for scaffolding, deploying, validating, and extending AppKit applications from within Genie Code notebooks. The tools are accessed via the `DatabricksMCPClient` Python library.
+The **`mcp-appkit-skill`** Databricks App (if deployed) exposes **11 MCP tools** for scaffolding, deploying, validating, and extending AppKit applications. The tools are accessed via the `DatabricksMCPClient` Python library. **The standard workshop does not use them.**
 
 **Source project:** `/Users/Jaiwant.jonathan/DBXApps/appkit-mcp-skill` (deployed as `mcp-appkit-skill` in the workspace).
 
@@ -14,14 +14,14 @@ The **`mcp-appkit-skill`** Databricks App exposes **11 MCP tools** for scaffoldi
 
 ## Tool Hierarchy
 
-MCP AppKit tools are the **primary** interface for scaffold, validate, plugins, and Lakebase helpers. The **Databricks SDK** (`WorkspaceClient` `w`) carries **SDP deployment** (`w.apps.*`) and workspace/database operations:
+**Workshop default:** The **Databricks SDK** (`WorkspaceClient` `w`) is the only required interface — `write_file()`, `w.database.*`, `w.postgres.*`, `w.apps.*`, `w.workspace.*`, `w.permissions.*`, and **`validate_and_deploy()`** (SDK preflight + `w.apps.create_and_wait` / `deploy_and_wait`). **No Databricks Jobs** for deploy.
 
-| Tier | Tools | Auth Required | When to Use |
-|------|-------|---------------|-------------|
-| **1. MCP AppKit** (via `DatabricksMCPClient`) | All 11 tools below | OAuth M2M (`v2v-gc-agent` scope) | Scaffold, validate, plugins, Lakebase provisioning, status |
-| **2. Databricks SDK** (`WorkspaceClient` `w`) | `w.apps.*`, `w.database.*`, `w.workspace.*`, `w.permissions.*` | Notebook / Genie runtime auth | **SDP (SDK deployment path):** `validate_and_deploy()` uses `w.apps.create_and_wait` / `w.apps.deploy_and_wait` after MCP `appkit_validate`. **No Databricks Jobs** for deploy. |
+| Tier | Tools | When to Use (optional) |
+|------|-------|-------------------------|
+| **1. MCP AppKit** (via `DatabricksMCPClient`) | All 11 tools below | Custom / facilitator setups only |
+| **2. Databricks SDK** (`WorkspaceClient` `w`) | Same as workshop | **Always** — standard Genie track |
 
-**SDP (SDK deployment path):** The workshop contract is `validate_and_deploy(app_name, app_base)` in `workshop-variables.md`: MCP `appkit_validate`, then **SDK** create/activate/deploy via the session `WorkspaceClient` (`w`). Do not create or run deploy Jobs; do not use `_deploy_app` notebooks.
+**SDP (SDK deployment path):** `validate_and_deploy(app_name, app_base)` in `workshop-variables.md` runs **`sdk_preflight_app_folder`** then **SDK** create/activate/deploy via the session `WorkspaceClient` (`w`). Do not create or run deploy Jobs; do not use `_deploy_app` notebooks.
 
 ---
 
@@ -206,7 +206,7 @@ Deploy a Databricks App from a workspace source path. Creates the app if it does
 | `app_name` | string | Yes | Databricks App name (<=26 chars, lowercase/hyphens) |
 | `source_code_path` | string | Yes | Workspace path with app source, e.g. `/Workspace/Users/me@co.com/my-app` |
 
-> **Note:** This tool runs as the MCP service principal. If validate or deploy fails with folder / `permission_denied`, **grant the MCP SP** `CAN_READ` (validate) and `CAN_MANAGE` (deploy) on the app’s workspace directory and on the app resource — use `service_principal_client_id` from `appkit_get_app_status` (UUID, not numeric id). See Deploy Rules in `.assistant_instructions.md` and `troubleshooting_gc.md`. **Do not** use a Databricks Job or `_deploy_app` for deploy; the supported path is SDP (`validate_and_deploy` + permissions).
+> **Note:** This tool runs as the MCP service principal. **Workshop default:** use `validate_and_deploy()` from `workshop-variables.md` (notebook user + app SP for build) instead of MCP validate. If you still use MCP validate/deploy, grant the **MCP SP** `CAN_READ` / `CAN_MANAGE` as described in `.assistant_instructions.md` (legacy section). **Do not** use deploy Jobs or `_deploy_app`.
 
 ---
 
@@ -411,4 +411,5 @@ The MCP AppKit Skill App enforces **OAuth authentication**:
 | 2026-04 | **Major overhaul:** Replaced tRPC patterns with Express routes (`appkit.server.extend`), fixed Lakebase env (`LAKEBASE_ENDPOINT`/`postgres`), added `.then()` pattern, removed `appkit_add_trpc_route`, updated to correct API patterns |
 | 2026-04 | **Trimmed to 11 tools:** Removed `appkit_add_express_route`, `appkit_add_serving_endpoint`, `appkit_add_vector_search`, `appkit_push_files`, `appkit_get_app_logs` (unused by workshop prompts or redundant). Removed `serving`/`vectorSearch` from PLUGIN_REGISTRY. |
 | 2026-07 | Added tool hierarchy (MCP primary → native fallback → SDK); fixed import to `databricks_mcp`; added fallback notes per tool; restored `nest_asyncio` requirement |
-| 2026-05 | **Jobs removed:** Deploy is SDP-only (`validate_and_deploy` + SDK `w.apps.*` + MCP validate). Dropped `deploy-appkit-app` job and `_deploy_app` notebook; grant MCP SP on workspace path instead. |
+| 2026-05 | **Jobs removed:** Deploy is SDP-only (`validate_and_deploy` + SDK `w.apps.*`). Dropped `deploy-appkit-app` job and `_deploy_app` notebook. |
+| 2026-05 | **MCP optional:** Workshop Genie track is SDK-only (`sdk_preflight` + `validate_and_deploy`); MCP doc retained for reference. |

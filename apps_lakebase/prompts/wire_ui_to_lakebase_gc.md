@@ -21,38 +21,9 @@ Key requirements:
 
 ---
 
-### Session Recovery: MCP Setup
+### Session Recovery: SDK bootstrap
 
-> **Skip this section** if `mcp_client` and `w` are still in scope from a previous prompt. Run ONLY if your Genie Code session was reset (kernel recycled, new conversation, or `ModuleNotFoundError`). If packages are missing, re-run the MCP setup prompt first to reinstall them.
-
-<!--
-# --- Uncomment this block if session was reset ---
-
-import nest_asyncio
-nest_asyncio.apply()
-
-from databricks.sdk import WorkspaceClient
-from databricks_mcp import DatabricksMCPClient
-
-w = WorkspaceClient()
-client_id = w.dbutils.secrets.get(scope="v2v-gc-agent", key="client_id")
-client_secret = w.dbutils.secrets.get(scope="v2v-gc-agent", key="client_secret")
-host = spark.conf.get("spark.databricks.workspaceUrl")
-
-w_oauth = WorkspaceClient(
-    host=f"https://{host}",
-    client_id=client_id,
-    client_secret=client_secret,
-)
-
-MCP_URL = f"https://mcp-appkit-skill-{host.split('.')[0]}.{host.split('.', 1)[1]}/mcp"
-mcp_client = DatabricksMCPClient(server_url=MCP_URL, workspace_client=w_oauth)
-
-tools = mcp_client.list_tools()
-print(f"MCP OK. {len(tools)} tools available")
-
-# --- End session recovery block ---
--->
+> **Skip** if `w`, `APP_BASE`, and `write_file` are still in scope. If the session was reset, re-run **`@apps_lakebase/gc-prompt-conversion/workshop-variables.md`** three-cell bootstrap.
 
 > **Troubleshooting:** See `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` for error resolution.
 

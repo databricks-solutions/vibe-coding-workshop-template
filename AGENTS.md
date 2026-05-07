@@ -19,13 +19,13 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 │
 ├── apps_lakebase/                      <-- Component 1: Databricks AppKit Workshop
 │   ├── Instructions.md                 #   Genie overview + links (prompts/README, gc-prompt-conversion)
-│   └── skills/                         #   6 Genie Code agent skills (SDK/MCP)
-│       ├── 00-appkit-navigator/        #     Entry-point navigator (MCP/SDK)
-│       ├── 01-appkit-scaffold/         #     Scaffold via MCP appkit_scaffold_app
+│   └── skills/                         #   6 Genie Code agent skills (read in Genie; implement with SDK)
+│       ├── 00-appkit-navigator/        #     Entry-point navigator (Genie: SDK)
+│       ├── 01-appkit-scaffold/         #     Scaffold via skills + write_file (Genie)
 │       ├── 02-appkit-build/            #     Build UI, write files via SDK
-│       ├── 03-appkit-deploy/           #     Deploy via job/SDK, browser verify
-│       ├── 04-appkit-plugin-add/       #     Add plugins via MCP + SDK provisioning
-│       └── 05-appkit-lakebase-wiring/  #     Wire Lakebase (server.extend + ctx.lakebase)
+│       ├── 03-appkit-deploy/           #     Deploy via SDK (Genie: validate_and_deploy), browser verify
+│       ├── 04-appkit-plugin-add/       #     Add plugins via SDK + write_file (Genie)
+│       └── 05-appkit-lakebase-wiring/  #     Wire Lakebase (appkit.server.extend + appkit.lakebase.query)
 │
 ├── agentic-framework/                  <-- Component 2: Multi-Agent Build Framework
 │   ├── agents/                         #   Agent prompts (PRD analyzer, skill scaffolder, etc.)
@@ -80,7 +80,7 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 
 ### Databricks AppKit Workshop — `apps_lakebase/`
 
-The app is **scaffolded at runtime** — via `databricks apps init` (CLI) or MCP `appkit_scaffold_app` (Genie Code). **Skills** live under `apps_lakebase/skills/` (same folder names `00-appkit-navigator/` through `05-appkit-lakebase-wiring/`). **Genie Code** uses MCP + SDK per `apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md` and `apps_lakebase/prompts/`. **Local IDE + CLI** uses the same `SKILL.md` files and runs `databricks` CLI, `npm`, and bash **on your machine** per each skill (no separate `orig_prompts/` tree in this repo).
+The app is **scaffolded at runtime** — via `databricks apps init` (CLI) or **`write_file()`** from skills + `GENIE-CODE-OVERRIDES.md` (Genie Code). **Skills** live under `apps_lakebase/skills/` (same folder names `00-appkit-navigator/` through `05-appkit-lakebase-wiring/`). **Genie Code** uses the **Databricks SDK** per `apps_lakebase/gc-prompt-conversion/workshop-variables.md`, `GENIE-CODE-OVERRIDES.md`, and `apps_lakebase/prompts/`. **Local IDE + CLI** uses the same `SKILL.md` files and runs `databricks` CLI, `npm`, and bash **on your machine** per each skill (no separate `orig_prompts/` tree in this repo).
 
 #### Genie Code Skills (Databricks Notebooks)
 

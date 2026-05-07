@@ -1,6 +1,6 @@
 # Workshop Variables — apps_lakebase Standard Setup
 
-**Read this BEFORE following any prompt in `apps_lakebase/prompts/`.** This file defines the standard variables, file-writing helper, and four AppKit-aware SDK helpers that every Genie Code prompt depends on.
+**Read this BEFORE following any prompt in `apps_lakebase/prompts/`.** This file defines the standard variables, `write_file()`, and three AppKit-aware SDK helpers every Genie Code prompt depends on. **There is no `mcp-appkit-skill` dependency** — scaffold comes from reading `apps_lakebase/skills/*/SKILL.md` + `write_file()`, Lakebase from `w.database` / `w.postgres` / `w.apps` per the prompts and `GENIE-CODE-OVERRIDES.md`.
 
 > **Companion:** Read `@apps_lakebase/gc-prompt-conversion/gc-prompt-header.md` first for environment constraints and error-handling protocol.
 
@@ -12,11 +12,11 @@ Every prompt must run these three cells (in separate cells) before doing anythin
 
 ```python
 # Cell 1 — install packages (own cell, run first)
-%pip install databricks-mcp --upgrade databricks-sdk -q
+%pip install databricks-sdk --upgrade -q
 ```
 
 ```python
-# Cell 2 — restart the kernel (required: databricks-mcp pulls a newer pydantic/typing_extensions)
+# Cell 2 — restart the kernel (recommended after SDK upgrade)
 dbutils.library.restartPython()
 ```
 
@@ -26,6 +26,7 @@ dbutils.library.restartPython()
 
 import base64
 import time
+
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ImportFormat
 from databricks.sdk.service.apps import App, AppDeployment
@@ -40,6 +41,7 @@ DB_SCHEMA = APP_NAME.replace("-", "_")
 REPO_ROOT = f"/Workspace/Users/{email}/v2v-in-geniecode/vibe-coding-workshop-template"
 APP_BASE = f"{REPO_ROOT}/apps_lakebase/{APP_NAME}"
 
+
 def write_file(path, content):
     """Write a plain text file (TypeScript, JSON, YAML, markdown) to the workspace.
     Creates parent dirs automatically. Encodes content to base64 for the SDK."""
@@ -53,66 +55,24 @@ def write_file(path, content):
     )
     print(f"\u2713 Wrote {path.split('/')[-1]}")
 
-def setup_mcp_client(secret_scope="v2v-gc-agent",
-                     client_id_key="client_id",
-                     client_secret_key="client_secret",
-                     mcp_app_slug="mcp-appkit-skill"):
-    """One-shot MCP + WorkspaceClient bootstrap.
 
-    Pulls v2v-gc-agent OAuth secrets, derives MCP_URL from the workspace host,
-    instantiates DatabricksMCPClient with M2M auth, asserts the 11 core
-    AppKit tools exist. Returns (w, mcp_client).
+def sdk_preflight_app_folder(app_base):
+    """Lightweight file checks (replaces MCP appkit_validate). Returns list of error strings."""
+    errs = []
+    required = [
+        f"{app_base}/app.yaml",
+        f"{app_base}/package.json",
+        f"{app_base}/app.ts",
+        f"{app_base}/client/index.html",
+        f"{app_base}/server/server.ts",
+    ]
+    for p in required:
+        try:
+            w.workspace.get_status(p)
+        except Exception as e:
+            errs.append(f"missing or unreadable: {p} ({e})")
+    return errs
 
-    Replaces the 30-50 line Session Recovery block currently duplicated
-    across `setup_lakebase_gc.md`, `wire_ui_to_lakebase_gc.md`,
-    `deploy_and_test_gc.md`, and `one-ui-design-local.md`.
-
-    PREREQUISITE: cells 1 (pip install) and 2 (restartPython) above MUST
-    have run first. This helper does NOT install packages or restart the
-    kernel.
-
-    Args:
-        secret_scope: Databricks secret scope holding the OAuth client_id/secret
-                      (default: "v2v-gc-agent" — set up by the workshop admin).
-        client_id_key: secret key for the OAuth client_id.
-        client_secret_key: secret key for the OAuth client_secret.
-        mcp_app_slug: slug of the MCP AppKit Skill App (default: "mcp-appkit-skill").
-
-    Returns:
-        (w, mcp_client) — both ready to use.
-    """
-    import nest_asyncio
-    from databricks.sdk import WorkspaceClient as _WC
-    from databricks_mcp import DatabricksMCPClient
-
-    nest_asyncio.apply()
-
-    w_local = _WC()
-    cid = w_local.dbutils.secrets.get(scope=secret_scope, key=client_id_key)
-    csecret = w_local.dbutils.secrets.get(scope=secret_scope, key=client_secret_key)
-    host = spark.conf.get("spark.databricks.workspaceUrl")
-
-    w_oauth = _WC(
-        host=f"https://{host}",
-        client_id=cid,
-        client_secret=csecret,
-    )
-
-    app_obj = w_local.apps.get(name=mcp_app_slug)
-    mcp_url = f"{app_obj.url.rstrip('/')}/mcp"
-    mcp_client = DatabricksMCPClient(server_url=mcp_url, workspace_client=w_oauth)
-
-    tools = mcp_client.list_tools()
-    tool_names = [t.name for t in tools]
-    print(f"MCP OK. {len(tools)} tools: {tool_names}")
-
-    core = ["appkit_scaffold_app", "appkit_deploy", "appkit_validate", "appkit_add_lakebase", "appkit_list_apps"]
-    missing = [t for t in core if t not in tool_names]
-    if missing:
-        raise RuntimeError(f"MCP missing core tools: {missing}. Run mcp-setup-gc.md.")
-    print("All core tools verified. Ready to go!")
-
-    return w_local, mcp_client
 
 def ensure_app_active(app_name, max_wait_minutes=10):
     """Start the app if STOPPED, poll compute_status until ACTIVE.
@@ -144,34 +104,34 @@ def ensure_app_active(app_name, max_wait_minutes=10):
             w.apps.start(app_name)
     return compute
 
+
 def validate_and_deploy(app_name, app_base, description="StayFindr -- AppKit booking app"):
-    """End-to-end deploy contract for AppKit apps.
+    """End-to-end deploy contract for AppKit apps (SDK only — no MCP).
 
     Steps:
-      1. mcp_client.call_tool('appkit_validate', ...) and print result
+      1. sdk_preflight_app_folder(app_base) — required paths exist
       2. w.apps.get(app_name) or w.apps.create_and_wait(...) if missing
       3. ensure_app_active(app_name)
       4. w.apps.deploy_and_wait(app_name=..., app_deployment=AppDeployment(source_code_path=app_base))
       5. Return (deployment, app_url)
 
-    Collapses the 35-50 line Validate+Create+Activate+Deploy block in
+    Collapses the validate+create+activate+deploy block in
     `one-ui-design-local.md` and `deploy_and_test_gc.md` into a single call.
 
-    REQUIRES: `mcp_client` in scope (call setup_mcp_client() first).
+    REQUIRES: `w` in scope (paste Cell 3 after pip + restart).
     """
-    print(f"Validating {app_name} via MCP appkit_validate...")
-    result = mcp_client.call_tool("appkit_validate", {
-        "app_name": app_name,
-        "source_code_path": app_base,
-    })
-    print(result.content[0].text if hasattr(result, "content") else result)
+    print(f"Preflight {app_name} (SDK file checks)...")
+    bad = sdk_preflight_app_folder(app_base)
+    if bad:
+        raise RuntimeError("sdk_preflight failed:\n  " + "\n  ".join(bad))
+    print("Preflight OK")
 
     try:
         app = w.apps.get(app_name)
         print(f"App exists: {app_name}")
     except Exception:
         print(f"Creating app {app_name}...")
-        app = w.apps.create_and_wait(
+        w.apps.create_and_wait(
             app=App(name=app_name, description=description, default_source_code_path=app_base)
         )
         print(f"\u2713 App created")
@@ -188,6 +148,7 @@ def validate_and_deploy(app_name, app_base, description="StayFindr -- AppKit boo
     print(f"\u2713 Deploy: {deployment.deployment_id} -- {state}")
     print(f"  URL: {app_url}")
     return deployment, app_url
+
 
 def verify_postgres_resource(app_name):
     """Print pass/fail for postgres-type resource binding.
@@ -214,6 +175,7 @@ def verify_postgres_resource(app_name):
         print("  \u2717 No postgres resource found -- app will crash with ConfigurationError. Run setup_lakebase_gc.md Step 2.")
     return has_postgres
 
+
 print(f"APP_NAME:  {APP_NAME}")
 print(f"DB_SCHEMA: {DB_SCHEMA}")
 print(f"REPO_ROOT: {REPO_ROOT}")
@@ -227,9 +189,9 @@ print(f"APP_BASE:  {APP_BASE}")
 | Helper | Purpose | Replaces |
 |--------|---------|----------|
 | `write_file(path, content)` | Write workspace file (.ts, .json, .yaml, .md) | `databricks workspace import` / `echo > file` |
-| `setup_mcp_client()` | Bootstrap M2M MCP + WorkspaceClient, verify 11 core tools | ~30-50 line Session Recovery block (5x duplicate) |
+| `sdk_preflight_app_folder(app_base)` | Verify required app files exist before deploy | MCP `appkit_validate` |
 | `ensure_app_active(app_name)` | Start app if STOPPED, poll compute until ACTIVE (uses `.state.name`) | ~12 line activate block (3x duplicate) |
-| `validate_and_deploy(app_name, app_base)` | MCP `appkit_validate` + create-if-missing + ensure-ACTIVE + `deploy_and_wait` + URL print | ~35-50 line deploy block (3x duplicate, 13 `deploy_and_wait` callsites) |
+| `validate_and_deploy(app_name, app_base)` | SDK preflight + create-if-missing + ensure-ACTIVE + `deploy_and_wait` + URL print | MCP validate + SDK deploy |
 | `verify_postgres_resource(app_name)` | Check resource binding is `postgres`-type (not `database`) | ~10-15 line verification block (3x duplicate) |
 
 ---

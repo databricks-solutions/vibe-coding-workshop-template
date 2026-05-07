@@ -1,6 +1,6 @@
 # Genie Code prompts (`apps_lakebase/prompts/`)
 
-Workshop prompts for **Genie Code** (Databricks notebooks + MCP AppKit + SDK). **Local IDE + CLI:** follow [`apps_lakebase/skills/`](../skills/) (same lifecycle; run shell/CLI on your machine per each `SKILL.md`).
+Workshop prompts for **Genie Code** (Databricks notebooks + **Databricks SDK** only — no `mcp-appkit-skill`). **Local IDE + CLI:** follow [`apps_lakebase/skills/`](../skills/) (same lifecycle; run shell/CLI on your machine per each `SKILL.md`).
 
 **`REPO_ROOT` / `APP_BASE` / facilitator paths:** Maintain these **only** in [`../gc-prompt-conversion/workshop-variables.md`](../gc-prompt-conversion/workshop-variables.md) (Cell 3 derivation). Do not duplicate or drift copies in other files.
 
@@ -10,15 +10,15 @@ In Genie Code, use **`@`** paths from the repo root so files resolve reliably:
 
 | Doc | Purpose |
 |-----|---------|
-| `@apps_lakebase/gc-prompt-conversion/gc-prompt-header.md` | Environment forbid-list, MCP contract |
-| `@apps_lakebase/gc-prompt-conversion/workshop-variables.md` | `%pip` / restart / `APP_NAME` / `setup_mcp_client()` / `validate_and_deploy()` |
-| `@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md` | CLI → SDK/MCP when skills mention bash/CLI |
+| `@apps_lakebase/gc-prompt-conversion/gc-prompt-header.md` | Environment forbid-list, SDK deploy contract |
+| `@apps_lakebase/gc-prompt-conversion/workshop-variables.md` | `%pip` / restart / `APP_NAME` / `write_file` / `validate_and_deploy()` |
+| `@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md` | CLI → SDK when skills mention bash/CLI |
 | `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` | Error catalog |
-| `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` | MCP tool parameters (reference) |
+| `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` | Optional legacy MCP tool reference (not required) |
 
 ## Recommended workshop order (Genie)
 
-Run **once** before the main track if MCP is not bootstrapped: `@apps_lakebase/prompts/mcp-setup-gc.md`.
+Optional facilitator doc (MCP AppKit skill, **not** required for the standard track): `@apps_lakebase/prompts/mcp-setup-gc.md`.
 
 Then, in order:
 

@@ -1,6 +1,8 @@
 # MCP Setup — Genie Code Workshop
 
-> **Skill cross-reference:** For the full tool reference (all 11 tool signatures, parameters, return values, and examples), see `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md`.
+> **Standard workshop:** Genie prompts use **SDK only** (`workshop-variables.md` — no `databricks-mcp`). This page is **optional** for facilitators who still deploy **`mcp-appkit-skill`** for experimentation.
+
+> **Skill cross-reference:** For MCP tool signatures, see `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md`.
 
 ---
 
@@ -153,7 +155,7 @@ All core tools verified. Ready to go!
 | `ImportError: cannot import name 'Sentinel'` | Outdated `typing_extensions` | Run `dbutils.library.restartPython()` (see 1a above) |
 | `appkit_validate` says `app.yaml not found` but files exist | MCP SP lacks `CAN_READ` on repo folder | Run Step 2 below to grant SP read access |
 
-> **Fallback:** If MCP setup fails entirely, the workshop can still proceed using native MCP tools (`generate_appkit_scaffold`, `deploy_appkit_app`) and SDK. Steps 3-4 (Lakebase) are SDK-only regardless.
+> **Fallback:** If MCP setup fails entirely, the standard workshop still proceeds with **SDK only** (`workshop-variables.md`, `write_file`, `validate_and_deploy`). This MCP doc is optional.
 
 ---
 

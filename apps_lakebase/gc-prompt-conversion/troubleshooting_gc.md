@@ -19,14 +19,13 @@ These rules apply to EVERY step. Follow them proactively — do not wait for err
 | Use `w.workspace.export()` to read files | NOT `export_()` (no trailing underscore) |
 | Unicode in JSX files | When writing `.tsx` files via Python SDK, use actual Unicode characters (e.g., `·`, `★`, `✓`, `🏠`), NOT escape sequences like `\u00B7`, `\u2605`, `\u{1F3E0}`. Python string literals with `\u` are interpreted by Python, not passed through to TypeScript. |
 
-### MCP Client
+### Workshop bootstrap (SDK)
 
 | Rule | Detail |
 |------|--------|
-| Constructor signature | `DatabricksMCPClient(server_url: str, workspace_client: Optional[WorkspaceClient])` — nothing else. Do NOT pass `oauth_client_id`, `oauth_client_secret`, or `oauth_scope`. |
-| Separate WorkspaceClient | Create a dedicated `WorkspaceClient` with M2M credentials (`client_id`, `client_secret`) and pass it as `workspace_client`. |
-| Session recovery | If `mcp_client` is undefined, run the Session Recovery block in the current prompt. |
-| Bootstrap after re-init | Genie **re-initializing** clients or a **new kernel** wipes Python state. Re-run the **three-cell** sequence from `workshop-variables.md` (pip → `restartPython` → Cell 3 with `setup_mcp_client()`) before importing `databricks_mcp`. |
+| Single setup source | Paste **Cell 1–3** from `workshop-variables.md` — defines `w`, `APP_*`, `write_file`, `sdk_preflight_app_folder`, `validate_and_deploy`, `ensure_app_active`, `verify_postgres_resource`. |
+| Session recovery | If `w` or helpers are undefined after a Genie re-init / new kernel, re-run **Cell 1** `%pip install databricks-sdk`, **Cell 2** `restartPython()`, **Cell 3** full block from `workshop-variables.md`. |
+| No MCP in workshop path | Do not import `databricks_mcp` or call `appkit_*` tools for the standard Genie track. |
 
 ### APP_NAME Derivation
 
@@ -40,10 +39,11 @@ These rules apply to EVERY step. Follow them proactively — do not wait for err
 
 | Rule | Detail |
 |------|--------|
-| Primary path (Genie) | After MCP SP grants: use `validate_and_deploy(APP_NAME, APP_BASE)` from `workshop-variables.md` — MCP `appkit_validate` + SDK `create_and_wait` / `ensure_app_active` / `deploy_and_wait`. |
-| `permission_denied` / validate cannot list files | Grant the **MCP service principal** `CAN_READ` on the app’s workspace folder (`APP_BASE`) and `CAN_MANAGE` on the app and directory as needed. Use the UUID `service_principal_client_id` from `appkit_get_app_status` (not the numeric id). See `.assistant_instructions.md` Deploy Rules and `MCP-appkit_tooling.md` (SDP path — **no** deploy Jobs). |
-| Fallback — MCP `appkit_deploy` | Only when SDK path is blocked and job is unavailable; requires same SP grants as validate. |
-| Parameter case sensitivity | Deploy job params must be uppercase: `"APP_NAME"` and `"APP_BASE"`. Wrong case = `InvalidParameterValue`. |
+| Primary path (Genie) | Use `validate_and_deploy(APP_NAME, APP_BASE)` from `workshop-variables.md` — SDK `sdk_preflight_app_folder` + `create_and_wait` / `ensure_app_active` / `deploy_and_wait`. |
+| Scaffold + bulk writes | Use `write_file()` per skills + `GENIE-CODE-OVERRIDES.md`; optional `FILES` / JSON paste pattern in `mcp-off-paste-genie-bootstrap.md`. |
+| `permission_denied` / build cannot read source | Grant the **app’s service principal** `CAN_READ` on `APP_BASE` (and `CAN_MANAGE` on the app as required). Use `w.apps.get(APP_NAME)` → `service_principal_client_id` (UUID). See `.assistant_instructions.md` Deploy Rules (**no** deploy Jobs). |
+| Legacy MCP-only issues | If you still run `mcp-appkit-skill`, see `MCP-appkit_tooling.md` — not required for this workshop. |
+| Parameter case sensitivity | Legacy deploy-job params (if ever used) must be uppercase: `"APP_NAME"` and `"APP_BASE"`. Wrong case = `InvalidParameterValue`. |
 | `AppDeployment` wrapper | `source_code_path` must be inside `AppDeployment(source_code_path=...)`, NOT as a direct kwarg to `deploy_and_wait()`. |
 | Polling state comparison | Use `.state.name` (returns `"ACTIVE"`) not `str(state)` (returns `"ComputeState.ACTIVE"`). The latter breaks equality checks and causes infinite polling. |
 | Deploy job INTERNAL_ERROR | The job can fail but still trigger the deployment. Always poll `w.apps.list_deployments()` to check actual deployment status regardless of job exit code. |
@@ -69,14 +69,15 @@ These rules apply to EVERY step. Follow them proactively — do not wait for err
 - [ ] `client/index.html` exists with `<div id="root">`
 - [ ] `vite.config.ts` has `root: "client"` and `outDir: "dist"` (NOT `"../dist"` — `outDir: "dist"` with `root: "client"` outputs to `client/dist/` where AppKit looks for static files)
 - [ ] No `databricks.yml` in the app directory
-- [ ] MCP SP has `CAN_MANAGE` on app and workspace directory
+- [ ] App service principal has `CAN_READ` on `APP_BASE` and `CAN_MANAGE` on the app (and directory grants as needed per `.assistant_instructions.md`)
 
 ### Error Table
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `ModuleNotFoundError: No module named 'databricks_mcp'` | Package not installed for this kernel, or `setup_mcp_client()` ran **before** pip + restart after a Genie re-init / new session | Run **Cell 1** alone: `%pip install databricks-mcp --upgrade databricks-sdk -q`. Then **Cell 2**: `dbutils.library.restartPython()`. Then **Cell 3**: paste the full block from `gc-prompt-conversion/workshop-variables.md` (defines helpers) and `w, mcp_client = setup_mcp_client()`. **Genie re-init = new Python** — always repeat cells 1–2–3. See also `MCP-appkit_tooling.md` troubleshooting table. |
-| `TypeError: DatabricksMCPClient.__init__() got an unexpected keyword argument 'oauth_client_id'` | Wrong constructor args | Use `DatabricksMCPClient(server_url=MCP_URL, workspace_client=w_oauth)` only. See Global Directives → MCP Client. |
+| `ModuleNotFoundError: No module named 'databricks_sdk'` | SDK not installed or wrong kernel | Run **Cell 1**: `%pip install databricks-sdk --upgrade -q`. Then **Cell 2**: `dbutils.library.restartPython()`. Then **Cell 3**: paste the full block from `gc-prompt-conversion/workshop-variables.md`. |
+| `ModuleNotFoundError: No module named 'databricks_mcp'` | Old prompt or notebook still importing MCP | Workshop path is SDK-only — remove `databricks_mcp` imports; use `workshop-variables.md` Cell 1–3 only. |
+| `TypeError: DatabricksMCPClient.__init__() ...` | Legacy MCP bootstrap | Not used in this workshop — use `WorkspaceClient()` from Cell 3. |
 | `The parent folder (...) does not exist` / "parse scaffold files failed" | Missing directory | Call `w.workspace.mkdirs(APP_BASE)` before writing any files. |
 | `Error building app` (after deploy) | `typegen` failure blocking `vite build` | Change build script to `"(npm run typegen || true) && vite build"`. |
 | `Error building app` — `Could not resolve entry module "index.html"` | Missing HTML entry point | Create `client/index.html`. Verify `vite.config.ts` has `root: "client"`. |
@@ -137,7 +138,7 @@ These rules apply to EVERY step. Follow them proactively — do not wait for err
 | `project already exists` during deploy | Lakebase project from a prior run | Either delete the project first (`w.database.delete_database_instance(name=APP_NAME)`) or skip project creation and proceed to resource binding. |
 | `LAKEBASE_ENDPOINT is not set` / `PGHOST is not set` at runtime | Missing resource binding or wrong `valueFrom` | Verify `app.yaml` has `valueFrom: postgres` and the app has a `postgres`-type resource bound. |
 | `ConfigurationError: Missing required resources: postgres:Postgres [lakebase]` | Resource bound as `database` type | Rebind using `AppResourcePostgres` with `branch` and `database` params (not `AppResourceDatabase`). |
-| MCP `appkit_add_lakebase` returns wrong env var name | MCP boilerplate outdated | Ignore MCP suggestion. Always use `LAKEBASE_ENDPOINT` with `valueFrom: postgres`, NOT `DATABRICKS_LAKEBASE_DB` with `valueFrom: database`. |
+| Stale Lakebase env var in snippets | Copy-paste from old examples | Always use `LAKEBASE_ENDPOINT` with `valueFrom: postgres`, NOT `DATABRICKS_LAKEBASE_DB` with `valueFrom: database`. |
 
 ---
 
@@ -179,7 +180,7 @@ These rules apply to EVERY step. Follow them proactively — do not wait for err
 
 ### Pre-Deploy Checklist
 
-- [ ] MCP `appkit_validate` passed (or manual checks confirmed)
+- [ ] `sdk_preflight_app_folder(APP_BASE)` empty (or `validate_and_deploy` preflight succeeded)
 - [ ] Lakebase instance state is `AVAILABLE`
 - [ ] Resource binding is `postgres` type (not `database` type)
 - [ ] `app.ts`: **`await createApp({ plugins: [lakebase(), server()], async onPluginsReady(appkit) { await registerRoutes(appkit) } })`** (lakebase first; **`await` required**)

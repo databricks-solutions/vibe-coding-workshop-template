@@ -6,8 +6,8 @@ You are Genie Code, an AI assistant on the Databricks workspace. You are adding 
 
 Key requirements:
 
-- Create a Lakebase database instance via the **Databricks SDK** (`w.database` API)
-- Use the MCP `appkit_add_lakebase` tool for boilerplate file snippets (this tool does NOT create Lakebase projects — you must create the project/database first via SDK)
+- Create a Lakebase database instance via the **Databricks SDK** (`w.database` / `w.postgres` APIs)
+- Apply Lakebase **boilerplate** from `@apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` Steps 2b–2c via `write_file()` (MCP not used — snippets come from the skill + `GENIE-CODE-OVERRIDES.md`)
 - Grant the app's service principal `DATABRICKS_SUPERUSER` access
 - Bind the database as a `postgres`-type resource on the app via `w.apps.update()` (AppKit requires `AppResourcePostgres`, not `AppResourceDatabase`)
 - Discover the database path via `w.postgres.list_databases()` for the resource binding
@@ -16,44 +16,15 @@ Key requirements:
 - Do NOT deploy in this step — deployment happens in `deploy_and_test_gc.md`
 - Do NOT add `lakebase()` to `app.ts` — that happens in `wire_ui_to_lakebase_gc.md`
 
-**Environment:** Genie Code on Databricks workspace (serverless). No CLI, no npm, no Node.js. MCP tools provide boilerplate snippets. Databricks SDK handles Lakebase provisioning and file operations.
+**Environment:** Genie Code on Databricks workspace (serverless). No CLI, no npm, no Node.js. Databricks SDK handles Lakebase provisioning, permissions, resource binding, and all file writes (`write_file`).
 
 **Prompt sequence:** `one-ui-design-local.md` → **this file** → `wire_ui_to_lakebase_gc.md` → `deploy_and_test_gc.md` (see `@apps_lakebase/prompts/README.md`).
 
 ---
 
-### Session Recovery: MCP Setup
+### Session Recovery: SDK bootstrap
 
-> **Skip this section** if `mcp_client` and `w` are still in scope from a previous prompt. Run ONLY if your Genie Code session was reset (kernel recycled, new conversation, or `ModuleNotFoundError`). If packages are missing, re-run the MCP setup prompt first to reinstall them.
-
-<!--
-# --- Uncomment this block if session was reset ---
-
-import nest_asyncio
-nest_asyncio.apply()
-
-from databricks.sdk import WorkspaceClient
-from databricks_mcp import DatabricksMCPClient
-
-w = WorkspaceClient()
-client_id = w.dbutils.secrets.get(scope="v2v-gc-agent", key="client_id")
-client_secret = w.dbutils.secrets.get(scope="v2v-gc-agent", key="client_secret")
-host = spark.conf.get("spark.databricks.workspaceUrl")
-
-w_oauth = WorkspaceClient(
-    host=f"https://{host}",
-    client_id=client_id,
-    client_secret=client_secret,
-)
-
-MCP_URL = f"https://mcp-appkit-skill-{host.split('.')[0]}.{host.split('.', 1)[1]}/mcp"
-mcp_client = DatabricksMCPClient(server_url=MCP_URL, workspace_client=w_oauth)
-
-tools = mcp_client.list_tools()
-print(f"MCP OK. {len(tools)} tools available")
-
-# --- End session recovery block ---
--->
+> **Skip** if `w`, `APP_BASE`, and `write_file` are still in scope. If the session was reset, re-run **`@apps_lakebase/gc-prompt-conversion/workshop-variables.md`** three-cell bootstrap (**Cell 1** `%pip install databricks-sdk`, **Cell 2** `restartPython`, **Cell 3** full paste).
 
 > **Troubleshooting:** See `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` for error resolution.
 
@@ -113,22 +84,14 @@ Read `@apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` and follow **Steps 3a
 
 ---
 
-### Step 3: Get MCP Boilerplate
+### Step 3: Lakebase boilerplate (SDK + skill)
 
-Call the MCP `appkit_add_lakebase` tool to get file snippets:
+Read `@apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` **Steps 2b–2c** and `@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md` (**`app.yaml` — Lakebase env section**, **`package.json`**).
 
-```python
-result = mcp_client.call_tool("appkit_add_lakebase", {
-    "app_name": APP_NAME,
-    "lakebase_instance_name": APP_NAME,
-})
-```
+- Merge **`LAKEBASE_ENDPOINT`** with **`valueFrom: postgres`** and **`DB_SCHEMA`** into `app.yaml` via `write_file()`.
+- Ensure **`@databricks/lakebase`** is listed in `package.json` **`dependencies`** via `write_file()`.
 
-> **Important:** `appkit_add_lakebase` does NOT create Lakebase projects or databases. It only returns file snippets (app.yaml patches, server.ts boilerplate, dependencies) that wire an **already-existing** Lakebase project into your AppKit app. Step 2 above handles project creation via the SDK.
-
-> **Fallback:** If the MCP client is unavailable, apply the patterns from `@apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` Steps 2b–2c directly.
-
-Review the returned snippets. Apply the `package.json` and `app.yaml` changes. Do NOT apply `server.ts` changes yet — those happen in `wire_ui_to_lakebase_gc.md`.
+> **Important:** Step 2 above creates the Lakebase project/database and binds the **`postgres`** resource. This step only updates **config files** — do **not** change `server/server.ts` yet (that is `wire_ui_to_lakebase_gc.md`).
 
 ---
 

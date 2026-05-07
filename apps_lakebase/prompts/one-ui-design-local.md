@@ -6,13 +6,13 @@ Read **`@apps_lakebase/gc-prompt-conversion/gc-prompt-header.md`** first (enviro
 
 Two phases in one run: **A)** scaffold + mock-data UI + `docs/ui_design.md` + deploy · **B)** audit vs PRD, polish interactions/components, redeploy + `.vibecoding-state.md`.
 
-**Refs:** `@appkit-apps` · `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` · `@apps_lakebase/gc-prompt-conversion/workshop-variables.md` · `@apps_lakebase/skills/01-appkit-scaffold/SKILL.md` · `@apps_lakebase/skills/03-appkit-deploy/SKILL.md`
+**Refs:** `@appkit-apps` · `@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md` · `@apps_lakebase/gc-prompt-conversion/workshop-variables.md` · `@apps_lakebase/skills/01-appkit-scaffold/SKILL.md` · `@apps_lakebase/skills/03-appkit-deploy/SKILL.md`
 
 **Hard rules**
 
-- Genie/session: MCP + SDK write files — **no** local CLI, npm, node, localhost, npx, curl in the notebook workflow  
+- Genie/session: **Databricks SDK** + `write_file()` — **no** local CLI, npm, node, localhost, npx, curl in the notebook workflow  
 - **`@databricks/appkit`** has **no** `appkit build` / `appkit start`; platform runs `npm install` + build at deploy time  
-- **Pre-Lakebase:** `createApp({ plugins: [server()] })` **or** `registerRoutes` + `onPluginsReady` if you add `/api/*` — **never** `lakebase()` until Wire Lakebase  
+- **Pre-Lakebase:** `await createApp({ plugins: [server()] })` **or** `registerRoutes` + `onPluginsReady` if you add `/api/*` — **never** `lakebase()` until Wire Lakebase  
 - **Phase B:** do not change `app.ts` / `server/server.ts` except to fix validate/deploy failures; enhance client code in place  
 - **App name:** ≤26 chars, `[a-z0-9-]+`
 
@@ -22,15 +22,11 @@ Two phases in one run: **A)** scaffold + mock-data UI + `docs/ui_design.md` + de
 
 ## Three-cell bootstrap (before Phase A — every kernel / Genie re-init)
 
-Follow **`@apps_lakebase/gc-prompt-conversion/workshop-variables.md` § Three-Cell Bootstrap** exactly: **Cell 1** `%pip install databricks-mcp --upgrade databricks-sdk -q` · **Cell 2** `dbutils.library.restartPython()` · **Cell 3** paste the full variable + helper block, then:
+Follow **`@apps_lakebase/gc-prompt-conversion/workshop-variables.md` § Three-Cell Bootstrap** exactly: **Cell 1** `%pip install databricks-sdk --upgrade -q` · **Cell 2** `dbutils.library.restartPython()` · **Cell 3** paste the **full** variable + helper block (defines `w`, `APP_*`, `write_file`, `sdk_preflight_app_folder`, `ensure_app_active`, `validate_and_deploy`, `verify_postgres_resource`).
 
-`w, mcp_client = setup_mcp_client()`
+> **Genie re-initializing clients** often starts **fresh Python**. If helpers are missing, re-run cells **1–2–3** in order.
 
-> **Genie re-initializing clients** or granting MCP SP permissions often starts **fresh Python**. If you see `ModuleNotFoundError: No module named 'databricks_mcp'`, you skipped pip/restart or ran `setup_mcp_client()` before Cell 3 after a re-init — **re-run cells 1–2–3** in order. See troubleshooting → `databricks_mcp`.
-
-> **Critical:** `DatabricksMCPClient` takes **only** `server_url` and `workspace_client` — not `oauth_client_id` / `oauth_client_secret` / `oauth_scope`. For a paste-ready alternate block, use **`mcp-setup-gc.md`** in this folder.
-
-**Deploy contract:** Use **`deployment, app_url = validate_and_deploy(APP_NAME, APP_BASE)`** after permissions (do not hand-roll validate + create + deploy). If the MCP SP cannot read the app tree, fix **ACLs** on `APP_BASE` and the app (see `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` and `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md`). **SDP only** — no deploy Jobs.
+**Deploy contract:** Use **`deployment, app_url = validate_and_deploy(APP_NAME, APP_BASE)`** after permissions. Grant the **app’s service principal** **`CAN_READ`** on `APP_BASE` and **`CAN_MANAGE`** on the app (and directory grants as needed) so the platform build can read sources — see `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` and `.assistant_instructions.md`. **SDP only** — no deploy Jobs.
 
 ---
 
@@ -47,14 +43,14 @@ Optional: read **`{APP_BASE}/.vibecoding-state.md`** before Phase B if present.
 # Phase A — Build (mock), design doc, first deploy
 
 1. Read **`{REPO_ROOT}/docs/design_prd.md`**.  
-2. **Scaffold:** `01-appkit-scaffold` Steps 1–3 — MCP `appkit_scaffold_app` (`app_name` + description from PRD: pages, react-router v7, **8–10 US listing** mocks), `mkdirs` + SDK import. Scaffold output for `package.json` / `app.yaml` is often wrong → **Steps 2 & 4** of same skill (`tsx`/`vite` in **dependencies**, `vite` root/outDir, `index.html`, `tsconfig`, pre-Lakebase `app.ts`).  
+2. **Scaffold:** `01-appkit-scaffold` Steps 1–3 — implement the AppKit tree with **`write_file()`** under `APP_BASE` per the skill and **`GENIE-CODE-OVERRIDES.md`** Section 2 / Section 6 (`mkdirs` first). Do **not** call MCP `appkit_scaffold_app`. Scaffold output for `package.json` / `app.yaml` is often wrong → **Steps 2 & 4** of same skill (`tsx`/`vite` in **dependencies**, `vite` root/outDir, `index.html`, `tsconfig`, pre-Lakebase `app.ts`).  
 3. **UI (first pass):** `client/src` with router root + `App` layout; pages `HomePage`, `SearchResultsPage`, `ListingDetailPage`, `BookingPage`, `BookingConfirmationPage`, `AgentSearchPage`; stub or real versions of shared pieces under `components/`; **`client/src/data/mockData.ts`** for all mocks.  
 
    **Must-haves for later polish:** SearchBar dates — check-in `min` = today, check-out ≥ check-in + 1, auto-bump checkout when needed; **`data-testid`** on interactive controls; **`BookingPage`** — name + email required, blur validation, button copy explains state (no silent disable). UX: warm palette, responsive, empty/loading/error on data-driven views.
 
 4. Write **`{REPO_ROOT}/docs/ui_design.md`**: screens, nav (Home→Search→Detail→Booking→Confirm; Home→Agent), palette/typography, which components consume which mocks.  
-5. **Permissions (before first deploy):** per `03-appkit-deploy` / overrides — grant MCP SP **CAN_MANAGE** on the **app** and on the app’s **workspace directory** (`CAN_READ` minimum for validate if you see `permission_denied` in `appkit_validate` output).  
-6. **Validate + deploy:** `deployment, app_url = validate_and_deploy(APP_NAME, APP_BASE)` (includes MCP `appkit_validate`, create-if-missing, `ensure_app_active`, SDK `deploy_and_wait` with **`AppDeployment(source_code_path=APP_BASE)`**).  
+5. **Permissions (before first deploy):** per `03-appkit-deploy` / overrides — grant the **app service principal** **`CAN_MANAGE`** on the **app** and **`CAN_READ`** (minimum) on **`APP_BASE`** so deploy-time build succeeds.  
+6. **Validate + deploy:** `deployment, app_url = validate_and_deploy(APP_NAME, APP_BASE)` (SDK preflight, create-if-missing, `ensure_app_active`, `deploy_and_wait` with **`AppDeployment(source_code_path=APP_BASE)`**).  
 7. **Verify:** confirm deployment terminal state from the return value; **`compute_status.state.name`** is `"ACTIVE"` inside the helper path — smoke the printed **URL** in the browser (not `curl` from the notebook).
 
 ---
@@ -66,13 +62,13 @@ Optional: read **`{APP_BASE}/.vibecoding-state.md`** before Phase B if present.
 3. **Batch 2 — search:** Home uses shared SearchBar + URL params. Results: read params, sidebar + map stub + **`ListingCard`** + pagination (~8/page); **`type=natural`** → trivial keyword parse → editable chips. **`AgentSearchPage`:** one clarifying question before listings; short rationale per suggestion; multi-turn OK.  
 4. **Batch 3 — booking path:** ListingDetail / Booking / Confirmation consume URL dates & guests; dynamic nights and totals. **Booking lookup** (Home or **`/booking-lookup`**): mock `localStorage` or in-memory map by reference.  
 5. **Permissions (if needed) + `validate_and_deploy(APP_NAME, APP_BASE)` + browser pass** as in Phase A.  
-6. **Write `.vibecoding-state.md`:** phase `one-ui-design-local.md` complete, batches done, leftovers, deploy method/status (note `validate_and_deploy` vs job fallback if used).
+6. **Write `.vibecoding-state.md`:** phase `one-ui-design-local.md` complete, batches done, leftovers, deploy status (`validate_and_deploy` / SDK preflight).
 
 ---
 
 ## Done when
 
-- **A:** Scaffold fixed per skill · six pages · mocks · `ui_design.md` · MCP SP grants · `validate_and_deploy` → ACTIVE · smoke OK  
+- **A:** Scaffold fixed per skill · six pages · mocks · `ui_design.md` · SP grants · `validate_and_deploy` → ACTIVE · smoke OK  
 - **B:** Gap list addressed · eight shared components in use · search modes + NL chips + agent UX · full param flow · booking lookup · redeploy verified · state file updated  
 
 **Next:** `setup_lakebase_gc.md`
