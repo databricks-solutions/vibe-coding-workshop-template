@@ -150,12 +150,8 @@ When running in **Databricks Genie Code** (notebook-based agent), these constrai
 - **No `databricks bundle` commands.** Bundles are deployed via a deploy job or by the admin. Use SDK `w.jobs.run_now_and_wait()` to run already-deployed jobs.
 - **Auth is automatic.** `WorkspaceClient()` auto-detects notebook credentials.
 - **No localhost.** Testing happens via deployed endpoints only.
-- **For Apps / Lakebase operations:** Use MCP AppKit tools where available:
-  - `appkit_get_app_status` — check app status and deployments
-  - `appkit_list_apps` — list all workspace apps
-  - `appkit_deploy` — deploy an app
-  - `appkit_provision_lakebase` — provision a Lakebase instance for an app
-  - `appkit_manage_app_resources` — bind Lakebase or other resources to an app
+- **Databricks Apps / AppKit + Lakebase (UI track)** are **not** owned by this accelerator’s Genie prompts. Use **`apps_lakebase/prompts/`** and **`apps_lakebase/gc-prompt-conversion/workshop-variables.md`** — `WorkspaceClient` (`w.apps.*`), **`validate_and_deploy()`**, Lakebase via **`w.database` / `w.postgres`**, and **`write_file()`** (SDK-only; no `mcp-appkit-skill`).
+- **“MCP” in docs/skills** can mean different things: (1) optional **AppKit MCP server** — not used in the standard Genie workshop path; (2) **Genie HTTP MCP** for agents (e.g. `/api/2.0/mcp/genie/...`) — GenAI skills only; (3) **IDE assistant tools** (e.g. run file on cluster) — Cursor/local, not Genie notebook APIs.
 
 Skills marked with `variant: genie-code` in their frontmatter have been adapted with SDK equivalents for all CLI commands.
 

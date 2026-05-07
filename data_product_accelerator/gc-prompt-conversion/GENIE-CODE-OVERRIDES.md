@@ -2,6 +2,16 @@
 
 > **Read this file FIRST before following any skill in `data_product_accelerator/skills/`.** The skills folder contains CLI-based patterns written for the Cursor/local development track. This file maps every CLI operation to its Genie Code equivalent using the Databricks Python SDK.
 
+## Terminology: MCP
+
+**Genie prompts under `data_product_accelerator/prompts/` do not use `mcp-appkit-skill`, `DatabricksMCPClient`, or `databricks-mcp`.** They use **`WorkspaceClient`** (`w.jobs`, `w.pipelines`, `w.workspace`, `w.statement_execution`, …) and the helpers in **`workshop-variables.md`**.
+
+| Where you see “MCP” | What it means | Genie action |
+|---------------------|----------------|---------------|
+| **`mcp-appkit-skill` / `appkit_*` tools** | Optional AppKit helper server | **Out of scope here.** For Apps + Lakebase UI, use **`apps_lakebase/prompts/`** and **`apps_lakebase/gc-prompt-conversion/workshop-variables.md`** (`validate_and_deploy`, `w.apps`, Lakebase SDK). |
+| **Genie HTTP MCP** (e.g. `/api/2.0/mcp/genie/{space_id}`) | Databricks Genie / agent tool protocol | Only in **GenAI agent** skills — follow those skills’ REST/SDK patterns; not used for medallion DPA cells. |
+| **“MCP tool” in a skill** (e.g. run file on cluster) | IDE / assistant integration (Cursor, etc.) | **Not available in Genie.** Use inline Python + SDK equivalents from this file. |
+
 ---
 
 ## Section 1: Environment Constraints

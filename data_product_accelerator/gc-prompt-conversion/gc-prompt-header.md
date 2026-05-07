@@ -2,6 +2,8 @@
 
 **Read this BEFORE following any prompt in `data_product_accelerator/prompts/`.** It consolidates the standard environment, error-handling, and skill-reference rules that apply to every Genie Code prompt in this workshop.
 
+**Cross-component:** Databricks **Apps / AppKit + Lakebase** (UI app) live under **`apps_lakebase/prompts/`** — SDK-only Genie path; see **`apps_lakebase/gc-prompt-conversion/gc-prompt-header.md`** and **`apps_lakebase/gc-prompt-conversion/workshop-variables.md`**. This header governs **data product** prompts only.
+
 ---
 
 ## CLI Overrides

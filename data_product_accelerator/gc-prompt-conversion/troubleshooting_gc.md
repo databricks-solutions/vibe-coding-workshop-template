@@ -40,6 +40,12 @@ Rules that apply to EVERY step. Follow proactively — do not wait for errors.
 | Max length | 26 chars, lowercase letters/numbers/hyphens only. No underscores. |
 | DB_SCHEMA | `APP_NAME.replace("-", "_")` (e.g. `jaiwant_j_booking_app`) |
 
+### Cross-component — Apps / AppKit (not DPA)
+
+| Topic | Where to go |
+|-------|-------------|
+| Databricks Apps deploy, AppKit project tree, Lakebase **UI** app, `validate_and_deploy` | **`apps_lakebase/prompts/`** and **`apps_lakebase/gc-prompt-conversion/`** (SDK-only — `w.apps`, `validate_and_deploy`, Lakebase SDK). This file does **not** cover **`mcp-appkit-skill`** or AppKit MCP tools — use the Apps workshop troubleshooting: **`apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md`**. |
+
 ---
 
 ## Step: Extract from Tables (`extract_from_tables_gc.md`)
