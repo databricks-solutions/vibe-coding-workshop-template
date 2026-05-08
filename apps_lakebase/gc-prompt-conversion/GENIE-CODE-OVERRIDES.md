@@ -2,6 +2,14 @@
 
 > **Read this file FIRST before following any skill in `apps_lakebase/skills/`.** The skills folder contains CLI-based patterns written for the Cursor/local development track. This file maps every CLI operation to its Genie Code equivalent using the **Databricks Python SDK** (`WorkspaceClient`) and `write_file()` from `@apps_lakebase/gc-prompt-conversion/workshop-variables.md`. **No MCP AppKit server is required.**
 
+## MCP AppKit Skill — forbidden unless the human opted in
+
+**Standard Genie workshop:** Treat **`mcp-appkit-skill`**, **`DatabricksMCPClient`**, **`databricks-mcp`**, **`mcp_client.call_tool(...)`**, and every **`appkit_*` MCP tool** as **out of scope**. Do **not** import, install (`%pip install databricks-mcp`), connect, list tools, or call them.
+
+**Use only:** `WorkspaceClient()` from Cell 3, `write_file()`, `sdk_preflight_app_folder`, `validate_and_deploy`, `w.database` / `w.postgres` / `w.apps` per tables below.
+
+**Facilitators only:** `MCP-appkit_tooling.md` and `prompts/mcp-setup-gc.md` exist for a **legacy optional track**. If the user's message does **not** explicitly ask for MCP, ignore those documents entirely.
+
 ---
 
 ## Section 1: Environment Constraints
@@ -19,6 +27,7 @@ Genie Code runs inside Databricks serverless notebooks. The following are **not 
 | `curl $APP_URL/api/...` | Apps auth proxy blocks programmatic requests from notebooks |
 | `databricks.yml` / `databricks bundle deploy` | No Asset Bundle workflow; deploy via SDK `validate_and_deploy()` |
 | `git clone`, `git`, filesystem paths | No local filesystem |
+| MCP AppKit Skill (`DatabricksMCPClient`, `databricks-mcp`, MCP `call_tool`, any workspace `appkit_*` MCP tool) | Standard track uses SDK only (`validate_and_deploy`, `write_file`). Ignore facilitator MCP docs unless the human opted in |
 
 ---
 
@@ -51,7 +60,7 @@ When any skill says to run a CLI command, use this table instead:
 
 | CLI Command | Genie Code Override |
 |-------------|---------------------|
-| `npx @databricks/appkit scaffold <name>` | Implement from `apps_lakebase/skills/01-appkit-scaffold/SKILL.md` Steps 1–4 using `write_file()` under `APP_BASE`, or paste a `FILES` dict / JSON bundle per `mcp-off-paste-genie-bootstrap.md`. |
+| `npx @databricks/appkit scaffold <name>` | Implement from `apps_lakebase/skills/01-appkit-scaffold/SKILL.md` Steps 1–4 using `write_file()` under `APP_BASE`, or paste a `FILES` dict / JSON bundle per [`mcp-off-paste-genie-bootstrap.md`](mcp-off-paste-genie-bootstrap.md) (**SDK-only bulk paste helper** — historical filename; **not** the MCP server). |
 | `npx @databricks/appkit docs "<query>"` | Read the reference files in `apps_lakebase/skills/<skill>/references/` |
 | `bash apps_lakebase/skills/00-appkit-navigator/scripts/validate-prereqs.sh` | Skip in Genie, or run `sdk_preflight_app_folder(APP_BASE)` after scaffold (from `workshop-variables.md` Cell 3) |
 
@@ -61,7 +70,7 @@ When any skill says to run a CLI command, use this table instead:
 2. `w.workspace.mkdirs(APP_BASE)`.
 3. For each required file (`package.json`, `app.yaml`, `app.ts`, `vite.config.ts`, `client/index.html`, `server/server.ts`, …), **`write_file(f"{APP_BASE}/<path>", contents)`** following Section 6 patterns in this file.
 
-**Optional — bulk paste:** If you have JSON `{"files":[{"path":"...","contents":"..."}]}` (e.g. exported from another environment), parse with `json.loads` and loop `write_file` as in `@apps_lakebase/gc-prompt-conversion/mcp-off-paste-genie-bootstrap.md`.
+**Optional — bulk paste:** If you have JSON `{"files":[{"path":"...","contents":"..."}]}`, parse with `json.loads` and loop `write_file` as in `@apps_lakebase/gc-prompt-conversion/mcp-off-paste-genie-bootstrap.md` (**SDK paste pattern only** — never substitute MCP `call_tool`).
 
 ### npm / Node.js
 
@@ -405,5 +414,5 @@ When a skill says `npx @databricks/appkit docs "<query>"`, read the correspondin
 | `03-appkit-deploy` | `apps_lakebase/skills/03-appkit-deploy/references/app-management.md` |
 | `04-appkit-plugin-add` | `apps_lakebase/skills/04-appkit-plugin-add/references/plugin-lakebase.md`, `plugin-analytics.md`, `plugin-genie.md`, `plugin-files.md` |
 | `05-appkit-lakebase-wiring` | `apps_lakebase/skills/05-appkit-lakebase-wiring/references/database-design-guide.md`, `frontend-patterns.md`, `multi-table-example.md` |
-| Optional MCP → SDK mapping (legacy) | `apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` |
+| Facilitator-only legacy MCP reference (**do not use in standard Genie**) | `apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` |
 | Troubleshooting | `apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` |

@@ -57,7 +57,7 @@ def write_file(path, content):
 
 
 def sdk_preflight_app_folder(app_base):
-    """Lightweight file checks (replaces MCP appkit_validate). Returns list of error strings."""
+    """Lightweight required-file checks before deploy. Returns list of error strings."""
     errs = []
     required = [
         f"{app_base}/app.yaml",
@@ -106,7 +106,7 @@ def ensure_app_active(app_name, max_wait_minutes=10):
 
 
 def validate_and_deploy(app_name, app_base, description="StayFindr -- AppKit booking app"):
-    """End-to-end deploy contract for AppKit apps (SDK only — no MCP).
+    """End-to-end deploy contract for AppKit apps via Workspace Apps API (SDK).
 
     Steps:
       1. sdk_preflight_app_folder(app_base) — required paths exist
@@ -186,13 +186,13 @@ print(f"APP_BASE:  {APP_BASE}")
 
 ## Helper Quick Reference
 
-| Helper | Purpose | Replaces |
-|--------|---------|----------|
-| `write_file(path, content)` | Write workspace file (.ts, .json, .yaml, .md) | `databricks workspace import` / `echo > file` |
-| `sdk_preflight_app_folder(app_base)` | Verify required app files exist before deploy | MCP `appkit_validate` |
-| `ensure_app_active(app_name)` | Start app if STOPPED, poll compute until ACTIVE (uses `.state.name`) | ~12 line activate block (3x duplicate) |
-| `validate_and_deploy(app_name, app_base)` | SDK preflight + create-if-missing + ensure-ACTIVE + `deploy_and_wait` + URL print | MCP validate + SDK deploy |
-| `verify_postgres_resource(app_name)` | Check resource binding is `postgres`-type (not `database`) | ~10-15 line verification block (3x duplicate) |
+| Helper | Purpose | Notes |
+|--------|---------|-------|
+| `write_file(path, content)` | Write workspace file (.ts, .json, .yaml, .md) | Replaces shell `echo`/`import`; use for all scaffolding |
+| `sdk_preflight_app_folder(app_base)` | Verify required app files exist before deploy | Same intent as manual `app.yaml` / tree validation |
+| `ensure_app_active(app_name)` | Start app if STOPPED, poll compute until ACTIVE (uses `.state.name`) | Collapses duplicated activate+polling snippets |
+| `validate_and_deploy(app_name, app_base)` | Preflight + create-if-missing + ensure ACTIVE + `deploy_and_wait` + URL | **Only** supported deploy path in Genie prompts |
+| `verify_postgres_resource(app_name)` | Check resource binding is `postgres`-type (not `database`) | Collapses duplicated resource-inspection snippets |
 
 ---
 

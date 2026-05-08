@@ -11,6 +11,7 @@ Two phases in one run: **A)** scaffold + mock-data UI + `docs/ui_design.md` + de
 **Hard rules**
 
 - Genie/session: **Databricks SDK** + `write_file()` — **no** local CLI, npm, node, localhost, npx, curl in the notebook workflow  
+- **No MCP AppKit path:** Do **not** use `DatabricksMCPClient`, `databricks-mcp`, `mcp_client.call_tool`, or MCP `appkit_*` tools — standard track only (`GENIE-CODE-OVERRIDES.md`, `validate_and_deploy`). Do **not** open `mcp-setup-gc.md` / `MCP-appkit_tooling.md` unless the human explicitly asked for MCP.
 - **`@databricks/appkit`** has **no** `appkit build` / `appkit start`; platform runs `npm install` + build at deploy time  
 - **Pre-Lakebase:** `await createApp({ plugins: [server()] })` **or** `registerRoutes` + `onPluginsReady` if you add `/api/*` — **never** `lakebase()` until Wire Lakebase  
 - **Phase B:** do not change `app.ts` / `server/server.ts` except to fix validate/deploy failures; enhance client code in place  

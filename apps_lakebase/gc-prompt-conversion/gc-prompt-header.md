@@ -21,9 +21,10 @@ If the error is not in the troubleshooting catalog, capture the full error text 
 ## Skills Required (read these BEFORE starting any prompt)
 
 - `@apps_lakebase/gc-prompt-conversion/workshop-variables.md` — standard variable setup (`APP_NAME`, `DB_SCHEMA`, `REPO_ROOT`, `APP_BASE`), `write_file()`, `sdk_preflight_app_folder`, `ensure_app_active`, **`validate_and_deploy()`** (SDK preflight + deploy), `verify_postgres_resource`
-- `@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md` — CLI → SDK when skills mention bash/CLI
+- `@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md` — CLI → SDK when skills mention bash/CLI (**includes explicit MCP forbid-list**)
 - `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` — error catalog
-- `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` — **optional** historical mapping from old MCP tool names to SDK/skill equivalents (workshop does not require `mcp-appkit-skill`)
+
+**Do not** load facilitator MCP docs as part of standard prep: `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` and `@apps_lakebase/prompts/mcp-setup-gc.md` — those teach `DatabricksMCPClient` / `appkit_*` tools and cause models to regress into MCP. Only open them if the **human** explicitly opted into the legacy MCP AppKit Skill track.
 
 ---
 
@@ -75,6 +76,6 @@ Every prompt that touches the app's source files or deploys follows this contrac
 
 5. **Wrap `source_code_path` in `AppDeployment(...)`** — `deploy_and_wait()` rejects `source_code_path` as a top-level kwarg.
 
-**Permissions:** The **Databricks App’s service principal** must be able to read `APP_BASE` at build time. Grant **`CAN_READ`** (and typically **`CAN_MANAGE`** on the app) per `.assistant_instructions.md` Deploy Rules — same as when MCP validated on behalf of a different identity; here preflight runs as the notebook user, but the **build** still uses the app SP.
+**Permissions:** The **Databricks App’s service principal** must be able to read `APP_BASE` at build time. Grant **`CAN_READ`** on the workspace folder that contains `APP_BASE` (and typically **`CAN_MANAGE`** on the app) per `.assistant_instructions.md` Deploy Rules. Preflight runs as the notebook user; the **platform build** still executes as the **app SP**.
 
 See `@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md` Section 6 ("AppKit Verified Patterns") for the canonical `app.ts`, `app.yaml`, `package.json`, and resource-binding snippets. After **Wire Lakebase**, `app.ts` must use **`await createApp`** with `[lakebase(), server()]` and `onPluginsReady` — bare `createApp(...)` causes missing `/api/*` routes and a stuck **Mock Data** indicator; map layout guidance is in the same file under **Map / location UI**.

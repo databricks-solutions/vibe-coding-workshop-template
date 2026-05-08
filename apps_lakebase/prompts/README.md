@@ -12,15 +12,14 @@ In Genie Code, use **`@`** paths from the repo root so files resolve reliably:
 |-----|---------|
 | `@apps_lakebase/gc-prompt-conversion/gc-prompt-header.md` | Environment forbid-list, SDK deploy contract |
 | `@apps_lakebase/gc-prompt-conversion/workshop-variables.md` | `%pip` / restart / `APP_NAME` / `write_file` / `validate_and_deploy()` |
-| `@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md` | CLI → SDK when skills mention bash/CLI |
+| `@apps_lakebase/gc-prompt-conversion/GENIE-CODE-OVERRIDES.md` | CLI → SDK; **explicit MCP forbid-list** for Genie |
 | `@apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` | Error catalog |
-| `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` | Optional legacy MCP tool reference (not required) |
+
+**Genie agents:** Do **not** open `MCP-appkit_tooling.md` or `mcp-setup-gc.md` as part of setup — both teach MCP `DatabricksMCPClient` / `appkit_*` tools and derail SDK-only flows. Humans use those only when running the legacy facilitator MCP track.
 
 ## Recommended workshop order (Genie)
 
-Optional facilitator doc (MCP AppKit skill, **not** required for the standard track): `@apps_lakebase/prompts/mcp-setup-gc.md`.
-
-Then, in order:
+Start here (standard track uses **Databricks SDK only** — no MCP install):
 
 1. `@apps_lakebase/prompts/generate_prd_gc.md`
 2. `@apps_lakebase/prompts/one-ui-design-local.md` — single prompt for scaffold + UI + mock deploy
@@ -42,7 +41,7 @@ Then, in order:
 
 | File | Note |
 |------|------|
-| `mcp-setup-gc.md` | Admin/participant MCP bootstrap cells |
+| `mcp-setup-gc.md` | **Facilitator / legacy MCP only** — not part of Genie `@` preamble |
 | `cleanup-gc.md`, `new_exec_steps.md` | Facilitator / operational |
 | `design_prd.md`, `ui_design.md` | Samples / scaffolding (not substitutes for `docs/` in repo root) |
 

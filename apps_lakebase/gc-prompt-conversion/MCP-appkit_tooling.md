@@ -1,5 +1,9 @@
 # MCP AppKit Tooling — Complete Tool Reference
 
+> **AGENTS / GENIE — HARD STOP:** **Do not** import `databricks_mcp`, construct `DatabricksMCPClient`, or call `appkit_*` MCP tools while executing standard workshop prompts. This file is **facilitator reference only**. Production behavior for notebooks is **`workshop-variables.md` Cell 3 helpers** (`write_file`, `validate_and_deploy`) per **`GENIE-CODE-OVERRIDES.md`** (§ *MCP AppKit Skill — forbidden*).
+
+---
+
 > **Workshop status (2026):** Genie prompts in `apps_lakebase/prompts/` are **SDK-only** — see `workshop-variables.md`, `gc-prompt-header.md`, and `GENIE-CODE-OVERRIDES.md`. **`mcp-appkit-skill` is not required.** This file is retained as an **optional** mapping from old MCP tool names to SDK / skill equivalents for facilitators or custom environments.
 
 ---
@@ -18,8 +22,8 @@ The **`mcp-appkit-skill`** Databricks App (if deployed) exposes **11 MCP tools**
 
 | Tier | Tools | When to Use (optional) |
 |------|-------|-------------------------|
-| **1. MCP AppKit** (via `DatabricksMCPClient`) | All 11 tools below | Custom / facilitator setups only |
-| **2. Databricks SDK** (`WorkspaceClient` `w`) | Same as workshop | **Always** — standard Genie track |
+| **1. MCP AppKit** (via `DatabricksMCPClient`) | All 11 tools below | **Inactive** unless facilitator explicitly opted in |
+| **2. Databricks SDK** (`WorkspaceClient` `w`) | `write_file`, `validate_and_deploy`, UC / Apps APIs | **Default** — all standard Genie prompts |
 
 **SDP (SDK deployment path):** `validate_and_deploy(app_name, app_base)` in `workshop-variables.md` runs **`sdk_preflight_app_folder`** then **SDK** create/activate/deploy via the session `WorkspaceClient` (`w`). Do not create or run deploy Jobs; do not use `_deploy_app` notebooks.
 
@@ -410,6 +414,6 @@ The MCP AppKit Skill App enforces **OAuth authentication**:
 | 2026-04 | Documented all 11 tools; corrected tool names to `appkit_scaffold_app`/`appkit_deploy` |
 | 2026-04 | **Major overhaul:** Replaced tRPC patterns with Express routes (`appkit.server.extend`), fixed Lakebase env (`LAKEBASE_ENDPOINT`/`postgres`), added `.then()` pattern, removed `appkit_add_trpc_route`, updated to correct API patterns |
 | 2026-04 | **Trimmed to 11 tools:** Removed `appkit_add_express_route`, `appkit_add_serving_endpoint`, `appkit_add_vector_search`, `appkit_push_files`, `appkit_get_app_logs` (unused by workshop prompts or redundant). Removed `serving`/`vectorSearch` from PLUGIN_REGISTRY. |
-| 2026-07 | Added tool hierarchy (MCP primary → native fallback → SDK); fixed import to `databricks_mcp`; added fallback notes per tool; restored `nest_asyncio` requirement |
+| 2026-07 | Added tool hierarchy (**SDK default** → optional facilitator MCP tier); fixed import to `databricks_mcp`; added fallback notes per tool; restored `nest_asyncio` requirement |
 | 2026-05 | **Jobs removed:** Deploy is SDP-only (`validate_and_deploy` + SDK `w.apps.*`). Dropped `deploy-appkit-app` job and `_deploy_app` notebook. |
 | 2026-05 | **MCP optional:** Workshop Genie track is SDK-only (`sdk_preflight` + `validate_and_deploy`); MCP doc retained for reference. |
