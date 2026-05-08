@@ -26,11 +26,7 @@ mv ISSUE*.md issue*.md docs/troubleshooting/ 2>/dev/null
 # Move summaries
 mv *SUMMARY*.md docs/reference/ 2>/dev/null
 
-# Convert to kebab-case
-cd docs
-find . -name "*.md" | while read f; do
-    new=$(echo "$f" | sed 's/\([A-Z]\)/-\L\1/g' | sed 's/^-//' | tr '_' '-' | tr -s '-')
-    [ "$f" != "$new" ] && mv "$f" "$new" 2>/dev/null
-done
+# Note: bulk "kebab-case" renames were removed — the prior sed pipeline was not portable
+# (GNU vs BSD sed) and could corrupt paths like appendices/A-code-examples.md.
 
 echo "✅ Documentation organized into docs/ subdirectories"
