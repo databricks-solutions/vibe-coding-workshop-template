@@ -1,6 +1,6 @@
 # Genie Code — Paste scaffold (supplement)
 
-**Canonical bootstrap:** Paste **Cell 1–3** from [`workshop-variables.md`](workshop-variables.md). That defines `w`, `APP_*`, `write_file`, `sdk_preflight_app_folder`, `ensure_app_active`, **`validate_and_deploy()`** (SDK preflight + `create_and_wait` + `deploy_and_wait`), and `verify_postgres_resource`. **This file does not replace `workshop-variables.md`** — it only documents the **paste-a-tree** pattern when you are not using MCP (the whole workshop is now SDK-only).
+**Canonical bootstrap:** Paste **Cell 1–3** from [`workshop-variables.md`](workshop-variables.md). That defines `w`, `APP_*`, `write_file`, `sdk_preflight_app_folder`, `ensure_app_active`, **`validate_and_deploy()`** (SDK preflight + `create_and_wait` + `deploy_and_wait`), and `verify_postgres_resource`. **This file does not replace `workshop-variables.md`** — it only documents the **paste-a-tree** pattern for bulk `write_file` loops.
 
 ---
 
