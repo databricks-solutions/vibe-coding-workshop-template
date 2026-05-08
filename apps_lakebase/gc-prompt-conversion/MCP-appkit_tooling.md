@@ -1,10 +1,6 @@
 # MCP AppKit Tooling — Complete Tool Reference
 
-> **AGENTS / GENIE — HARD STOP:** **Do not** import `databricks_mcp`, construct `DatabricksMCPClient`, or call `appkit_*` MCP tools while executing standard workshop prompts. This file is **facilitator reference only**. Production behavior for notebooks is **`workshop-variables.md` Cell 3 helpers** (`write_file`, `validate_and_deploy`) per **`GENIE-CODE-OVERRIDES.md`** (§ *MCP AppKit Skill — forbidden*).
-
----
-
-> **Workshop status (2026):** Genie prompts in `apps_lakebase/prompts/` are **SDK-only** — see `workshop-variables.md`, `gc-prompt-header.md`, and `GENIE-CODE-OVERRIDES.md`. **`mcp-appkit-skill` is not required.** This file is retained as an **optional** mapping from old MCP tool names to SDK / skill equivalents for facilitators or custom environments.
+> **Facilitator / optional app only.** Default Genie workshop: **`workshop-variables.md`** + **`GENIE-CODE-OVERRIDES.md`** — do not use this doc unless you intentionally operate the MCP helper app described below.
 
 ---
 

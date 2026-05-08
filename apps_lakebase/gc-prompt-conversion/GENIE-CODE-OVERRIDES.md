@@ -1,14 +1,6 @@
 # Genie Code Overrides — apps_lakebase
 
-> **Read this file FIRST before following any skill in `apps_lakebase/skills/`.** The skills folder contains CLI-based patterns written for the Cursor/local development track. This file maps every CLI operation to its Genie Code equivalent using the **Databricks Python SDK** (`WorkspaceClient`) and `write_file()` from `@apps_lakebase/gc-prompt-conversion/workshop-variables.md`. **No MCP AppKit server is required.**
-
-## MCP AppKit Skill — forbidden unless the human opted in
-
-**Standard Genie workshop:** Treat **`mcp-appkit-skill`**, **`DatabricksMCPClient`**, **`databricks-mcp`**, **`mcp_client.call_tool(...)`**, and every **`appkit_*` MCP tool** as **out of scope**. Do **not** import, install (`%pip install databricks-mcp`), connect, list tools, or call them.
-
-**Use only:** `WorkspaceClient()` from Cell 3, `write_file()`, `sdk_preflight_app_folder`, `validate_and_deploy`, `w.database` / `w.postgres` / `w.apps` per tables below.
-
-**Facilitators only:** `MCP-appkit_tooling.md` and `prompts/mcp-setup-gc.md` exist for a **legacy optional track**. If the user's message does **not** explicitly ask for MCP, ignore those documents entirely.
+> **Read this FIRST when a skill under `apps_lakebase/skills/` mentions CLI, npm, shell, or localhost.** Map those steps to the **Databricks Python SDK** (`WorkspaceClient`) and **`write_file()`** from **`workshop-variables.md` Cell 3**. This workshop track does **not** use external AppKit MCP servers or `databricks-mcp` / `DatabricksMCPClient` / `appkit_*` MCP tools — only `w.*` APIs and `validate_and_deploy()`.
 
 ---
 
@@ -27,7 +19,6 @@ Genie Code runs inside Databricks serverless notebooks. The following are **not 
 | `curl $APP_URL/api/...` | Apps auth proxy blocks programmatic requests from notebooks |
 | `databricks.yml` / `databricks bundle deploy` | No Asset Bundle workflow; deploy via SDK `validate_and_deploy()` |
 | `git clone`, `git`, filesystem paths | No local filesystem |
-| MCP AppKit Skill (`DatabricksMCPClient`, `databricks-mcp`, MCP `call_tool`, any workspace `appkit_*` MCP tool) | Standard track uses SDK only (`validate_and_deploy`, `write_file`). Ignore facilitator MCP docs unless the human opted in |
 
 ---
 
@@ -60,7 +51,7 @@ When any skill says to run a CLI command, use this table instead:
 
 | CLI Command | Genie Code Override |
 |-------------|---------------------|
-| `npx @databricks/appkit scaffold <name>` | Implement from `apps_lakebase/skills/01-appkit-scaffold/SKILL.md` Steps 1–4 using `write_file()` under `APP_BASE`, or paste a `FILES` dict / JSON bundle per [`mcp-off-paste-genie-bootstrap.md`](mcp-off-paste-genie-bootstrap.md) (**SDK-only bulk paste helper** — historical filename; **not** the MCP server). |
+| `npx @databricks/appkit scaffold <name>` | `01-appkit-scaffold/SKILL.md` + `write_file()` under `APP_BASE`; optional bulk JSON → `write_file` loop per [`mcp-off-paste-genie-bootstrap.md`](mcp-off-paste-genie-bootstrap.md) |
 | `npx @databricks/appkit docs "<query>"` | Read the reference files in `apps_lakebase/skills/<skill>/references/` |
 | `bash apps_lakebase/skills/00-appkit-navigator/scripts/validate-prereqs.sh` | Skip in Genie, or run `sdk_preflight_app_folder(APP_BASE)` after scaffold (from `workshop-variables.md` Cell 3) |
 
@@ -70,7 +61,7 @@ When any skill says to run a CLI command, use this table instead:
 2. `w.workspace.mkdirs(APP_BASE)`.
 3. For each required file (`package.json`, `app.yaml`, `app.ts`, `vite.config.ts`, `client/index.html`, `server/server.ts`, …), **`write_file(f"{APP_BASE}/<path>", contents)`** following Section 6 patterns in this file.
 
-**Optional — bulk paste:** If you have JSON `{"files":[{"path":"...","contents":"..."}]}`, parse with `json.loads` and loop `write_file` as in `@apps_lakebase/gc-prompt-conversion/mcp-off-paste-genie-bootstrap.md` (**SDK paste pattern only** — never substitute MCP `call_tool`).
+**Optional — bulk paste:** JSON `{"files":[...]}` → `json.loads` + loop `write_file` (see `mcp-off-paste-genie-bootstrap.md`).
 
 ### npm / Node.js
 
@@ -101,7 +92,7 @@ When any skill says to run a CLI command, use this table instead:
 | `ls /path/to/dir` | `[obj.path for obj in w.workspace.list(path=WS_PATH)]` |
 | `curl` for local testing | Test in the browser after deploying. Apps auth proxy blocks notebook requests. |
 
-### Validate app config (replaces `appkit validate`)
+### Validate app config (SDK preflight)
 
 After Cell 3 from `workshop-variables.md` is loaded:
 
@@ -114,79 +105,20 @@ Full pre-deploy contract: **`validate_and_deploy(APP_NAME, APP_BASE)`** (include
 
 ---
 
-## Section 3: Variable Setup (Python, not bash)
+## Section 3: Skill → Genie (summary)
 
-Replace all bash variable derivation (`databricks current-user me`, `jq`, string manipulation) with this Python block:
-
-```python
-import base64
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ImportFormat
-
-w = WorkspaceClient()
-
-email = spark.sql("SELECT current_user()").collect()[0][0]
-prefix = email.split("@")[0].replace(".", "-")
-parts = prefix.split("-")
-APP_NAME = f"{parts[0]}-{parts[-1][0]}-booking-app"[:26]
-DB_SCHEMA = APP_NAME.replace("-", "_")
-REPO_ROOT = f"/Workspace/Users/{email}/v2v-in-geniecode/vibe-coding-workshop-template"
-APP_BASE = f"{REPO_ROOT}/apps_lakebase/{APP_NAME}"
-
-def write_file(path, content):
-    """Write a plain text file (TypeScript, JSON, YAML, markdown) to the workspace."""
-    parent = "/".join(path.split("/")[:-1])
-    w.workspace.mkdirs(parent)
-    w.workspace.import_(
-        path=path,
-        content=base64.b64encode(content.encode()).decode(),
-        format=ImportFormat.AUTO,
-        overwrite=True,
-    )
-    print(f"✓ Wrote {path.split('/')[-1]}")
-
-print(f"APP_NAME:  {APP_NAME}")
-print(f"DB_SCHEMA: {DB_SCHEMA}")
-print(f"REPO_ROOT: {REPO_ROOT}")
-print(f"APP_BASE:  {APP_BASE}")
-```
+| Skill folder | If the skill says | In Genie |
+|--------------|-------------------|----------|
+| `00-appkit-navigator` | `validate-prereqs.sh`, `npx … docs` | `sdk_preflight_app_folder`; read `skills/*/references/` |
+| `01-appkit-scaffold` | `npx scaffold`, shell checks | `write_file` + `01-appkit-scaffold/SKILL.md`; skip `npm install` |
+| `02-appkit-build` | `npm run dev`, typecheck | Skip; review files; deploy to browser-test |
+| `03-appkit-deploy` | `databricks apps …`, `curl` | **`validate_and_deploy(APP_NAME, APP_BASE)`** only (see below) |
+| `04-appkit-plugin-add` | `npm install @databricks/…` | Edit `package.json` / `app.yaml` with `write_file`; Lakebase APIs: `setup_lakebase_gc.md` |
+| `05-appkit-lakebase-wiring` | local `curl` / build | `write_file`; browser test; patterns in **Section 6** |
 
 ---
 
-## Section 4: Skill-Specific Overrides
-
-### `00-appkit-navigator/SKILL.md`
-
-| Skill instruction | Genie Code action |
-|---|---|
-| Run `validate-prereqs.sh` | `sdk_preflight_app_folder(APP_BASE)` after scaffold (Cell 3 from `workshop-variables.md`) |
-| `npx @databricks/appkit docs "<query>"` | Read reference files in `apps_lakebase/skills/` |
-| Route to "lakebase CLI" operations | Use `w.postgres.*` SDK methods instead |
-
-### `01-appkit-scaffold/SKILL.md`
-
-| Skill instruction | Genie Code action |
-|---|---|
-| `databricks --version` / CLI version check | Skip — no CLI |
-| `node --version` / Node.js check | Skip — no Node.js |
-| `databricks auth profiles` / profile selection | Skip — notebook auto-authenticates |
-| `git clone` Agent Skills repo | Skip — skills are already in `apps_lakebase/skills/` |
-| `npx @databricks/appkit scaffold` | Use SDK scaffold pattern in Section 2 (`write_file` + skill `01-appkit-scaffold`). |
-| `npm install` after scaffold | Skip — platform runs `npm install` at deploy time |
-| `grep "name:" app.yaml` config verification | Read via `w.workspace.export()` and check Python string |
-| Any bash/shell command | STOP — use SDK equivalent from this file |
-
-### `02-appkit-build/SKILL.md`
-
-| Skill instruction | Genie Code action |
-|---|---|
-| `npm run typegen` | Skip entirely — type generation runs at deploy time |
-| `npx tsc --noEmit` | Skip — validate TypeScript correctness by reviewing file content |
-| `npm run dev` / `localhost:8000` | Skip — test after deploy in browser |
-| `npx @databricks/appkit docs "<query>"` | Read `apps_lakebase/skills/02-appkit-build/references/` |
-| Write/edit TypeScript files | `write_file(APP_BASE + "/path/to/file.ts", content)` |
-
-### `03-appkit-deploy/SKILL.md`
+## Section 4: Deploy (`03-appkit-deploy` detail)
 
 Deploy is wrapped in a single helper: **`validate_and_deploy()`** from `@apps_lakebase/gc-prompt-conversion/workshop-variables.md` — **SDK preflight** (`sdk_preflight_app_folder`) plus **SDK** create / activate / deploy.
 
@@ -218,35 +150,7 @@ The helper:
 | `npm run build` pre-flight | Skip — `sdk_preflight` + deploy catch missing files; platform builds at deploy time |
 | `curl $APP_URL/api/...` | Test in browser only — auth proxy blocks notebook requests |
 
-### `04-appkit-plugin-add/SKILL.md`
-
-| Skill instruction | Genie Code action |
-|---|---|
-| `npx @databricks/appkit docs` | Read `apps_lakebase/skills/04-appkit-plugin-add/references/` |
-| `npm install @databricks/lakebase` | Edit `package.json` / `app.yaml` via `write_file()` per `04-appkit-plugin-add` references and `setup_lakebase_gc.md` |
-| `npm install @databricks/analytics` | Edit `package.json` `dependencies` section via `write_file()` |
-| Any `npm install <package>` | Edit `package.json` directly — platform installs dependencies at deploy time |
-
-#### Lakebase Infrastructure Provisioning
-
-This workshop uses **Lakebase Autoscaling** (`w.postgres.*` API). The full provisioning code with all correct API calls is in `setup_lakebase_gc.md` Step 2 — follow that prompt directly.
-
-Key API rules:
-- `w.postgres.get_project(name="projects/{APP_NAME}")` — full path as `name`, NOT `project_id=APP_NAME`
-- `w.postgres.create_project(..., project_id=APP_NAME)` — `project_id` is only valid on `create_project`
-- The production branch endpoint (`primary`, NOT `ep-primary`) and `databricks_postgres` database are auto-created with the project
-- `DB_SCHEMA` is a schema within `databricks_postgres`, NOT a separate Postgres database
-- Resource binding always uses `AppResourcePostgres` (NOT `AppResourceDatabase`)
-
-### `05-appkit-lakebase-wiring/SKILL.md`
-
-| Skill instruction | Genie Code action |
-|---|---|
-| `npm run build` validation | Skip — validate by reading `server.ts` file content |
-| `npm run dev` | Skip — test after first deploy in browser |
-| `npx @databricks/appkit docs "lakebase"` | Read `apps_lakebase/skills/05-appkit-lakebase-wiring/references/` |
-| Write `server.ts`, `app.ts`, hook files | `write_file(APP_BASE + "/path/to/file.ts", content)` |
-| Local `curl` API testing | Test after deploy in browser |
+**Lakebase (`04` / setup prompt):** Follow `setup_lakebase_gc.md` for `w.postgres.*` / `w.database.*`. Bind **`AppResourcePostgres`** (`valueFrom: postgres` in `app.yaml`), never `AppResourceDatabase`.
 
 **`app.ts` vs skill text:** The skill file may show `createApp({...})` without `await` or older `server({ autoStart: false })` snippets. **For Genie Code, always follow Section 6 below** — **`await createApp`** with `plugins: [lakebase(), server()]` and `onPluginsReady` (no `autoStart`, no `.then()`). This avoids `/api/*` 404s and a stuck **Mock Data** indicator after deploy.
 
@@ -414,5 +318,4 @@ When a skill says `npx @databricks/appkit docs "<query>"`, read the correspondin
 | `03-appkit-deploy` | `apps_lakebase/skills/03-appkit-deploy/references/app-management.md` |
 | `04-appkit-plugin-add` | `apps_lakebase/skills/04-appkit-plugin-add/references/plugin-lakebase.md`, `plugin-analytics.md`, `plugin-genie.md`, `plugin-files.md` |
 | `05-appkit-lakebase-wiring` | `apps_lakebase/skills/05-appkit-lakebase-wiring/references/database-design-guide.md`, `frontend-patterns.md`, `multi-table-example.md` |
-| Facilitator-only legacy MCP reference (**do not use in standard Genie**) | `apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md` |
 | Troubleshooting | `apps_lakebase/gc-prompt-conversion/troubleshooting_gc.md` |

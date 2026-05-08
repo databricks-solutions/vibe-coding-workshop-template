@@ -1,12 +1,8 @@
-# MCP Setup — Genie Code Workshop
+# MCP Setup — optional facilitator track
 
-> **GENIE CODE / AGENTS — STOP:** This document teaches **`DatabricksMCPClient`** and **`appkit_*` MCP tools**. **Do not** follow it for the normal workshop sequence. Standard prompts use **`workshop-variables.md`** + **`validate_and_deploy()`** only. Open this file **only** when a **human** explicitly asked for the optional **`mcp-appkit-skill`** track.
+> **Not** part of the default Genie prompt path (`workshop-variables.md` + `validate_and_deploy`). For workspace admins running an optional MCP AppKit helper app.
 
----
-
-> **Standard workshop:** Genie prompts use **SDK only** (`workshop-variables.md` — no `databricks-mcp`). This page is **optional** for facilitators who still deploy **`mcp-appkit-skill`** for experimentation.
-
-> **Skill cross-reference:** For MCP tool signatures, see `@apps_lakebase/gc-prompt-conversion/MCP-appkit_tooling.md`.
+**MCP tool reference:** [`../gc-prompt-conversion/MCP-appkit_tooling.md`](../gc-prompt-conversion/MCP-appkit_tooling.md).
 
 ---
 

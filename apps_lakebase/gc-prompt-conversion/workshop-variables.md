@@ -1,6 +1,6 @@
 # Workshop Variables — apps_lakebase Standard Setup
 
-**Read this BEFORE following any prompt in `apps_lakebase/prompts/`.** This file defines the standard variables, `write_file()`, and three AppKit-aware SDK helpers every Genie Code prompt depends on. **There is no `mcp-appkit-skill` dependency** — scaffold comes from reading `apps_lakebase/skills/*/SKILL.md` + `write_file()`, Lakebase from `w.database` / `w.postgres` / `w.apps` per the prompts and `GENIE-CODE-OVERRIDES.md`.
+**Read this BEFORE following any prompt in `apps_lakebase/prompts/`.** Defines `APP_*`, `REPO_ROOT`, `APP_BASE`, `write_file()`, and **`validate_and_deploy()`** (SDK preflight + Apps deploy). Scaffold from `apps_lakebase/skills/*/SKILL.md` + `write_file()`; Lakebase from `w.postgres` / `w.database` / `w.apps` per each `*_gc.md` prompt and **`GENIE-CODE-OVERRIDES.md`**.
 
 > **Companion:** Read `@apps_lakebase/gc-prompt-conversion/gc-prompt-header.md` first for environment constraints and error-handling protocol.
 

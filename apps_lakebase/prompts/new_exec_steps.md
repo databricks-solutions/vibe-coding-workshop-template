@@ -27,7 +27,7 @@ Complete these **before** the workshop. Owner: Workspace Admin / Account Admin.
 | 5b | **Enable Lakebase** | 15 min | Workspace Settings > Compute > Lakebase; grant catalog permissions |
 | 6a | **Create service principal** | 10 min | Account Console > Service Principals > Add (note the Application ID = `client_id`) |
 | 6b | **Generate OAuth client secret** | 5 min | SP > Secrets tab > Generate secret (copy immediately — shown only once) |
-| 6c | **(Optional) MCP app access** | 10 min | Only if running `mcp-appkit-skill`: Workspace User role + `Can Use` on that app — **skip** for SDK-only Genie |
+| 6c | **(Optional) MCP app access** | 10 min | **Skip** for default Genie (SDK-only); only if your org runs an optional MCP helper app |
 | 6d | **Create secret scope + store credentials** | 10 min | **Optional** for MCP-only flows; SDK-only Genie uses notebook identity — skip unless you use `mcp-setup-gc.md` |
 | 6e | **Verify Genie bootstrap** | 5 min | Participants run `workshop-variables.md` three-cell bootstrap; confirm `w` + `validate_and_deploy` exist |
 

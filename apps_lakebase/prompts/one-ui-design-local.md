@@ -11,7 +11,6 @@ Two phases in one run: **A)** scaffold + mock-data UI + `docs/ui_design.md` + de
 **Hard rules**
 
 - Genie/session: **Databricks SDK** + `write_file()` — **no** local CLI, npm, node, localhost, npx, curl in the notebook workflow  
-- **No MCP AppKit path:** Do **not** use `DatabricksMCPClient`, `databricks-mcp`, `mcp_client.call_tool`, or MCP `appkit_*` tools — standard track only (`GENIE-CODE-OVERRIDES.md`, `validate_and_deploy`). Do **not** open `mcp-setup-gc.md` / `MCP-appkit_tooling.md` unless the human explicitly asked for MCP.
 - **`@databricks/appkit`** has **no** `appkit build` / `appkit start`; platform runs `npm install` + build at deploy time  
 - **Pre-Lakebase:** `await createApp({ plugins: [server()] })` **or** `registerRoutes` + `onPluginsReady` if you add `/api/*` — **never** `lakebase()` until Wire Lakebase  
 - **Phase B:** do not change `app.ts` / `server/server.ts` except to fix validate/deploy failures; enhance client code in place  
@@ -44,7 +43,7 @@ Optional: read **`{APP_BASE}/.vibecoding-state.md`** before Phase B if present.
 # Phase A — Build (mock), design doc, first deploy
 
 1. Read **`{REPO_ROOT}/docs/design_prd.md`**.  
-2. **Scaffold:** `01-appkit-scaffold` Steps 1–3 — implement the AppKit tree with **`write_file()`** under `APP_BASE` per the skill and **`GENIE-CODE-OVERRIDES.md`** Section 2 / Section 6 (`mkdirs` first). Do **not** call MCP `appkit_scaffold_app`. Scaffold output for `package.json` / `app.yaml` is often wrong → **Steps 2 & 4** of same skill (`tsx`/`vite` in **dependencies**, `vite` root/outDir, `index.html`, `tsconfig`, pre-Lakebase `app.ts`).  
+2. **Scaffold:** `01-appkit-scaffold` Steps 1–3 — implement the AppKit tree with **`write_file()`** under `APP_BASE` per the skill and **`GENIE-CODE-OVERRIDES.md`** Section 2 / Section 6 (`mkdirs` first). Scaffold output for `package.json` / `app.yaml` is often wrong → **Steps 2 & 4** of same skill (`tsx`/`vite` in **dependencies**, `vite` root/outDir, `index.html`, `tsconfig`, pre-Lakebase `app.ts`).  
 3. **UI (first pass):** `client/src` with router root + `App` layout; pages `HomePage`, `SearchResultsPage`, `ListingDetailPage`, `BookingPage`, `BookingConfirmationPage`, `AgentSearchPage`; stub or real versions of shared pieces under `components/`; **`client/src/data/mockData.ts`** for all mocks.  
 
    **Must-haves for later polish:** SearchBar dates — check-in `min` = today, check-out ≥ check-in + 1, auto-bump checkout when needed; **`data-testid`** on interactive controls; **`BookingPage`** — name + email required, blur validation, button copy explains state (no silent disable). UX: warm palette, responsive, empty/loading/error on data-driven views.

@@ -25,7 +25,6 @@ These rules apply to EVERY step. Follow them proactively — do not wait for err
 |------|--------|
 | Single setup source | Paste **Cell 1–3** from `workshop-variables.md` — defines `w`, `APP_*`, `write_file`, `sdk_preflight_app_folder`, `validate_and_deploy`, `ensure_app_active`, `verify_postgres_resource`. |
 | Session recovery | If `w` or helpers are undefined after a Genie re-init / new kernel, re-run **Cell 1** `%pip install databricks-sdk`, **Cell 2** `restartPython()`, **Cell 3** full block from `workshop-variables.md`. |
-| No MCP in workshop path | Do not import `databricks_mcp` or call `appkit_*` tools for the standard Genie track. |
 
 ### APP_NAME Derivation
 
@@ -42,11 +41,8 @@ These rules apply to EVERY step. Follow them proactively — do not wait for err
 | Primary path (Genie) | Use `validate_and_deploy(APP_NAME, APP_BASE)` from `workshop-variables.md` — SDK `sdk_preflight_app_folder` + `create_and_wait` / `ensure_app_active` / `deploy_and_wait`. |
 | Scaffold + bulk writes | Use `write_file()` per skills + `GENIE-CODE-OVERRIDES.md`; optional `FILES` / JSON paste pattern in `mcp-off-paste-genie-bootstrap.md`. |
 | `permission_denied` / build cannot read source | Grant the **app’s service principal** `CAN_READ` on `APP_BASE` (and `CAN_MANAGE` on the app as required). Use `w.apps.get(APP_NAME)` → `service_principal_client_id` (UUID). See `.assistant_instructions.md` Deploy Rules (**no** deploy Jobs). |
-| Legacy MCP-only issues | If you still run `mcp-appkit-skill`, see `MCP-appkit_tooling.md` — not required for this workshop. |
-| Parameter case sensitivity | Legacy deploy-job params (if ever used) must be uppercase: `"APP_NAME"` and `"APP_BASE"`. Wrong case = `InvalidParameterValue`. |
 | `AppDeployment` wrapper | `source_code_path` must be inside `AppDeployment(source_code_path=...)`, NOT as a direct kwarg to `deploy_and_wait()`. |
 | Polling state comparison | Use `.state.name` (returns `"ACTIVE"`) not `str(state)` (returns `"ComputeState.ACTIVE"`). The latter breaks equality checks and causes infinite polling. |
-| Deploy job INTERNAL_ERROR | The job can fail but still trigger the deployment. Always poll `w.apps.list_deployments()` to check actual deployment status regardless of job exit code. |
 
 ### API Testing
 
@@ -76,8 +72,7 @@ These rules apply to EVERY step. Follow them proactively — do not wait for err
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `ModuleNotFoundError: No module named 'databricks_sdk'` | SDK not installed or wrong kernel | Run **Cell 1**: `%pip install databricks-sdk --upgrade -q`. Then **Cell 2**: `dbutils.library.restartPython()`. Then **Cell 3**: paste the full block from `gc-prompt-conversion/workshop-variables.md`. |
-| `ModuleNotFoundError: No module named 'databricks_mcp'` | Old prompt or notebook still importing MCP | Workshop path is SDK-only — remove `databricks_mcp` imports; use `workshop-variables.md` Cell 1–3 only. |
-| `TypeError: DatabricksMCPClient.__init__() ...` | Legacy MCP bootstrap | Not used in this workshop — use `WorkspaceClient()` from Cell 3. |
+| `ModuleNotFoundError: No module named 'databricks_mcp'` / `DatabricksMCPClient` errors | Notebook importing optional MCP client | Remove those imports; use **`workshop-variables.md` Cell 1–3** only (`WorkspaceClient`, `validate_and_deploy`). |
 | `The parent folder (...) does not exist` / "parse scaffold files failed" | Missing directory | Call `w.workspace.mkdirs(APP_BASE)` before writing any files. |
 | `Error building app` (after deploy) | `typegen` failure blocking `vite build` | Change build script to `"(npm run typegen || true) && vite build"`. |
 | `Error building app` — `Could not resolve entry module "index.html"` | Missing HTML entry point | Create `client/index.html`. Verify `vite.config.ts` has `root: "client"`. |

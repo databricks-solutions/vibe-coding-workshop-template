@@ -1,22 +1,18 @@
 # AppKit + Lakebase workshop (Genie Code overview)
 
-This document is **orientation only** for **Databricks Genie Code**. It does **not** replace executable prompts or skills under [`skills/`](skills/).
-
-**First read:** [`gc-prompt-conversion/GENIE-CODE-OVERRIDES.md`](gc-prompt-conversion/GENIE-CODE-OVERRIDES.md) — maps CLI / `npm` / localhost patterns in skills to **Databricks SDK** patterns that work in notebooks.
+Orientation for **Genie Code** — runnable steps are in [`prompts/`](prompts/) (`*_gc.md`); skills under [`skills/`](skills/) are the **CLI/local** reference.
 
 ## Run the workshop (Genie)
 
-1. **Workspace prep:** [PRE-REQUISITES.md](../PRE-REQUISITES.md) (foundation).
-2. **Prompt order and `@` links:** [`prompts/README.md`](prompts/README.md) — canonical sequence (recommended UI: `one-ui-design-local.md`).
-3. **Variables + helpers** (`APP_NAME`, `REPO_ROOT`, `validate_and_deploy`, etc.): [`gc-prompt-conversion/workshop-variables.md`](gc-prompt-conversion/workshop-variables.md).
-4. **CLI → notebook mapping:** [`gc-prompt-conversion/GENIE-CODE-OVERRIDES.md`](gc-prompt-conversion/GENIE-CODE-OVERRIDES.md) — standard track is SDK-only (**MCP out of scope**).
-5. **Errors:** [`gc-prompt-conversion/troubleshooting_gc.md`](gc-prompt-conversion/troubleshooting_gc.md).
+1. [PRE-REQUISITES.md](../PRE-REQUISITES.md) — workspace / UC / compute.
+2. [`prompts/README.md`](prompts/README.md) — prompt order (start with `generate_prd_gc.md` → `one-ui-design-local.md` → …).
+3. [`gc-prompt-conversion/workshop-variables.md`](gc-prompt-conversion/workshop-variables.md) — Cell 1–3 (`w`, `write_file`, **`validate_and_deploy`**).
+4. [`gc-prompt-conversion/GENIE-CODE-OVERRIDES.md`](gc-prompt-conversion/GENIE-CODE-OVERRIDES.md) — when a skill mentions CLI/npm/shell.
+5. [`gc-prompt-conversion/troubleshooting_gc.md`](gc-prompt-conversion/troubleshooting_gc.md) — on any error.
 
-**Legacy facilitator-only (do not prepend to Genie context):** [pre-req-mcp-setup.md](../pre-req-mcp-setup.md), [`prompts/mcp-setup-gc.md`](prompts/mcp-setup-gc.md), [`gc-prompt-conversion/MCP-appkit_tooling.md`](gc-prompt-conversion/MCP-appkit_tooling.md).
+**Lifecycle:** PRD → scaffold/UI + mock deploy → Lakebase setup → wire backend → deploy + E2E.
 
-**Lifecycle (summary):** PRD → scaffold/UI + mock deploy → Setup Lakebase → Wire Lakebase → Deploy + E2E. **Executable** steps live only in [`prompts/`](prompts/) (`*_gc.md`).
-
-**Optional:** `apps_lakebase/<APP_NAME>/.vibecoding-state.md` — append `APP_NAME`, URLs, and fixes between prompts if your team uses it.
+**Optional:** `apps_lakebase/<APP_NAME>/.vibecoding-state.md` between steps if your team uses it.
 
 ## CLI / local IDE (not Genie)
 
