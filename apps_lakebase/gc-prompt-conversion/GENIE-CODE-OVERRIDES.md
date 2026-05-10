@@ -1,6 +1,6 @@
 # Genie Code Overrides — apps_lakebase
 
-> **Read this FIRST when a skill under `apps_lakebase/skills/` mentions CLI, npm, shell, or localhost.** Map those steps to the **Databricks Python SDK** (`WorkspaceClient`) and **`write_file()`** from **`workshop-variables.md` Cell 3**. This workshop track does **not** use external AppKit MCP servers or `databricks-mcp` / `DatabricksMCPClient` / `appkit_*` MCP tools — only `w.*` APIs and `validate_and_deploy()`.
+> **Read this FIRST when a skill under `apps_lakebase/skills/` mentions CLI, npm, shell, or localhost.** Map those steps to the **Databricks Python SDK** (`WorkspaceClient`) and **`write_file()`** from **`workshop-variables.md` Cell 3**. This workshop track does **not** use external AppKit MCP servers or `databricks-mcp` / `DatabricksMCPClient` / any **`appkit_*`** invocation — including **host or IDE MCP tools** (e.g. `appkit_get_app_status`, `appkit_scaffold_app`). Use only `w.*` APIs and **`validate_and_deploy()`** for deploy and app status.
 
 ---
 
@@ -152,11 +152,18 @@ The helper:
 
 **Lakebase (`04` / setup prompt):** Follow `setup_lakebase_gc.md` for `w.postgres.*` / `w.database.*`. Bind **`AppResourcePostgres`** (`valueFrom: postgres` in `app.yaml`), never `AppResourceDatabase`.
 
-**`app.ts` vs skill text:** The skill file may show `createApp({...})` without `await` or older `server({ autoStart: false })` snippets. **For Genie Code, always follow Section 6 below** — **`await createApp`** with `plugins: [lakebase(), server()]` and `onPluginsReady` (no `autoStart`, no `.then()`). This avoids `/api/*` 404s and a stuck **Mock Data** indicator after deploy.
+**`app.ts` vs skill text (read the active prompt first):** Skills may show `createApp` without `await`, older `server({ autoStart: false })`, or **`lakebase()`** from CLI `apps init --features lakebase`. **Do not copy Lakebase snippets into the wrong phase.**
 
-**CRITICAL — Client Page Migration (mandatory, do not skip):**
+| Active prompt | Which Section 6 `app.ts` / YAML / resources to use |
+|----------------|---------------------------------------------------|
+| **`one-ui-design-local.md`** (mock first deploy) | **Only** **`app.ts` — Without Lakebase`**. **No** `lakebase()` import. **No** `app.yaml` **`LAKEBASE_*`** env vars, **no** `valueFrom: postgres`, **no** `resources` / postgres binding. Use **`mockData.ts`** + optional **`/api/*`** stubs in `server/server.ts`. |
+| **`setup_lakebase_gc.md`** | Provision DB, bind **`AppResourcePostgres`**, add npm dep, set **`app.yaml`** env per that prompt — **still** do **not** add **`lakebase()`** to `app.ts` until **`wire_ui_to_lakebase_gc.md`**. |
+| **`wire_ui_to_lakebase_gc.md`** | **Then** apply **`app.ts` — With Lakebase`**, `onPluginsReady`, and the **Client page migration** + **`ConnectionStatus`** below. |
+| **`deploy_and_test_gc.md`** | Deploy / verify after wiring. |
 
-After writing `server.ts`, these three client pages still import from `../data/mockData` and MUST be rewritten. Leaving them unchanged means the UI shows static hardcoded data even though Lakebase is connected and queries run successfully.
+**CRITICAL — Client page migration + `ConnectionStatus` (Lakebase live only — `wire_ui_to_lakebase_gc.md`):**
+
+Do **not** apply this block during **`one-ui-design-local.md`**. After Lakebase is wired and **`lakebase()`** is registered, these pages should move off static `mockData` imports where the PRD expects live API data:
 
 | Page | Required change |
 |------|----------------|
@@ -166,7 +173,7 @@ After writing `server.ts`, these three client pages still import from `../data/m
 
 After migrating each page, **read it back** and verify the `mockData` import is gone.
 
-**`ConnectionStatus` placement:** Import `ConnectionStatus` in `App.tsx` and render `<ConnectionStatus context="StayFindr" />` in the navbar alongside the nav links. This shows the live/mock/error indicator to users.
+**`ConnectionStatus` placement (same phase):** Import `ConnectionStatus` in `App.tsx` and render `<ConnectionStatus context="StayFindr" />` in the navbar alongside the nav links.
 
 ---
 
@@ -197,7 +204,7 @@ dbutils.library.restartPython()
 
 ## Section 6: AppKit Verified Patterns (Ground Truth)
 
-These are the correct file contents. The skills may show slightly different versions — use these.
+These are the correct file contents. The skills may show slightly different versions — use the **subsection that matches the active prompt** in the table above (mock-first vs Lakebase). **Never** combine **`lakebase()`** in `app.ts` with **empty** `app.resources` / missing **`AppResourcePostgres`** — that causes **ConfigurationError** at startup.
 
 ### `app.ts` — With Lakebase
 
@@ -225,17 +232,42 @@ await createApp({
 
 ### `app.ts` — Without Lakebase
 
+Use **`onPluginsReady`** whenever **`server/server.ts`** defines **`registerRoutes(appkit)`** (mock `/api/*` stubs for `one-ui-design-local.md`). If the scaffold has **no** custom routes, the minimal two-line body is still valid.
+
 ```typescript
 import { createApp, server } from "@databricks/appkit";
+import { registerRoutes } from "./server/server.js";
 
 await createApp({
   plugins: [server()],
+  async onPluginsReady(appkit) {
+    await registerRoutes(appkit);
+  },
 });
 ```
 
 > **Critical:** Use `await createApp(...)` — NOT `export default createApp(...)`. The `export default` form is a Promise that tsx never awaits, so the server never starts. Use a **single import** from `"@databricks/appkit"` — do NOT split as `import createApp from "@databricks/appkit"` + `import { server } from "@databricks/appkit/server"`. The subpath `@databricks/appkit/server` does not exist and causes an immediate crash (`ERR_MODULE_NOT_FOUND`).
 
-### `app.yaml` — Lakebase env section
+### `server/server.ts` — Mock API stubs (pre-Lakebase)
+
+Do **not** read a standalone Express app from **`appkit.server.express`** (that field is not the AppKit contract and is often **`undefined`**, which crashes with **`Cannot read properties of undefined (reading 'get')`**). Register routes only via **`appkit.server.extend`**:
+
+```typescript
+export async function registerRoutes(appkit: any) {
+  appkit.server.extend((app) => {
+    app.get("/api/health", (_req, res) => {
+      res.json({ status: "ok", source: "mock", timestamp: new Date().toISOString() });
+    });
+    // ...other app.get / app.post routes
+  });
+}
+```
+
+Leave the **`app`** parameter in **`extend((app) => …)`** untyped at the callback (see **`05-appkit-lakebase-wiring`** — avoid `: Express` on that parameter for AppKit’s linter/types).
+
+### `app.yaml` — Lakebase env section (**not** for `one-ui-design-local.md`)
+
+Use **only** after **`setup_lakebase_gc.md`** has bound a postgres resource (and **`wire_ui_to_lakebase_gc.md`** when that prompt tells you to add these keys). **Do not** add this block for the mock-only first deploy — **`lakebase()`** + **`LAKEBASE_ENDPOINT`** / **`valueFrom: postgres`** with **no** resource causes **ConfigurationError**.
 
 ```yaml
 env:
@@ -286,7 +318,7 @@ export default defineConfig({
 
 The `|| true` prevents typegen failures from blocking the vite build.
 
-### Resource Binding (Lakebase)
+### Resource Binding (Lakebase) (**`setup_lakebase_gc.md`** / **`wire_ui_to_lakebase_gc.md`** — not `one-ui-design-local.md`)
 
 ```python
 from databricks.sdk.service.apps import (

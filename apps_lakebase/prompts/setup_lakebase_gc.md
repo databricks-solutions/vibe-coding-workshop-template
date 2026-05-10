@@ -10,7 +10,7 @@ Key requirements:
 - Apply Lakebase **boilerplate** from `@apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` Steps 2b–2c via `write_file()` (MCP not used — snippets come from the skill + `GENIE-CODE-OVERRIDES.md`)
 - Grant the app's service principal `DATABRICKS_SUPERUSER` access
 - Bind the database as a `postgres`-type resource on the app via `w.apps.update()` (AppKit requires `AppResourcePostgres`, not `AppResourceDatabase`)
-- Discover the database path via `w.postgres.list_databases()` for the resource binding
+- Discover the database path via **`w.postgres.list_databases(parent=branch_path)`** (Postgres API — not `w.database.list_databases`) for the resource binding
 - Add `@databricks/lakebase` to `package.json` dependencies (do NOT register the plugin in `app.ts` yet)
 - Configure `app.yaml` with `LAKEBASE_ENDPOINT` (`valueFrom: postgres`) and `DB_SCHEMA` environment variables
 - Do NOT deploy in this step — deployment happens in `deploy_and_test_gc.md`
@@ -71,16 +71,118 @@ Also set up the `write_file` helper using the Databricks SDK (same as prior step
 
 ---
 
-### Step 2: Provision Lakebase Infrastructure
+### Step 2: Provision Lakebase Infrastructure (SDK — copy these cells)
 
-Read `@apps_lakebase/skills/04-appkit-plugin-add/SKILL.md` and follow **Steps 3a–3d** to provision the Lakebase infrastructure via SDK:
+> **Why this section exists:** `04-appkit-plugin-add/SKILL.md` documents **CLI / bundle** Lakebase flows (`databricks postgres …`, `databricks.yml`). It does **not** define Genie “Steps 3a–3d”. Without the cells below, Genie often pastes **obsolete** `w.database.create_database_instance(name=...)` and **hangs or errors**. Use **exactly** this sequence.
 
-- **Step 3a** — Create the Lakebase instance (check if it already exists first). Store `read_write_dns` as `LAKEBASE_HOST`.
-- **Step 3b** — Create the database catalog with `create_database_if_not_exists=True`. Use `DB_SCHEMA` as the `database_name`.
-- **Step 3c** — Grant the app's service principal `DATABRICKS_SUPERUSER` using the proper enum types.
-- **Step 3d** — Discover the database path via `w.postgres.list_databases()`, then bind as a `postgres`-type resource named `"postgres"` on the app with `CAN_CONNECT_AND_CREATE` permission.
+**Order:** ensure instance **AVAILABLE** → grant app SP **DATABRICKS_SUPERUSER** → discover default DB path on `production` branch → **merge** `postgres` resource on the app.
 
-> **Order matters:** Create instance → Create database → Grant SP role → Bind resource.
+#### Step 2a — Database instance (Lakebase project / instance = `APP_NAME`)
+
+Current SDK: `create_database_instance` takes a **`DatabaseInstance`** object (not `name=`). `get_database_instance` raises **`NotFound`** when the instance does not exist yet — that is **expected** on first run.
+
+```python
+from databricks.sdk.errors import NotFound
+from databricks.sdk.service.database import DatabaseInstance
+
+try:
+    instance = w.database.get_database_instance(name=APP_NAME)
+    print("Instance exists; state=", getattr(instance.state, "name", instance.state))
+except NotFound:
+    print("Creating database instance (long-running)...")
+    instance = w.database.create_database_instance_and_wait(DatabaseInstance(name=APP_NAME))
+
+# Wait until DNS is present (some regions fill read_write_dns after state AVAILABLE)
+instance = w.database.get_database_instance(name=APP_NAME)
+LAKEBASE_HOST = instance.read_write_dns or ""
+print("read_write_dns:", LAKEBASE_HOST or "(empty until ready — re-get after ~1 min if needed)")
+```
+
+If `create_database_instance_and_wait` is missing, upgrade the SDK (`%pip install --upgrade databricks-sdk -q` + `restartPython`) and use `waiter = w.database.create_database_instance(DatabaseInstance(name=APP_NAME)); waiter.result()` per current docs.
+
+#### Step 2b — Branch path and default database id
+
+Use **`w.postgres.list_databases`** only — do **not** call **`w.postgres.create_database`** here (Genie often hits **`spec.role` empty**; default DB already exists). **`DB_SCHEMA`** is the Postgres schema name for later DDL; the binding path is **`dbs[0].name`** (`projects/.../databases/db-...`). Extended rationale and errors: **`troubleshooting_gc.md`** → *Setup Lakebase — extended notes*.
+
+```python
+branch_path = f"projects/{APP_NAME}/branches/production"
+dbs = list(w.postgres.list_databases(parent=branch_path))
+if not dbs:
+    raise RuntimeError(
+        "No databases on branch yet. Re-run this cell after instance is AVAILABLE, "
+        "or wait ~30–60s for platform provisioning."
+    )
+db_path = dbs[0].name
+print("branch_path:", branch_path)
+print("database path for binding:", db_path)
+```
+
+#### Step 2c — Grant app service principal `DATABRICKS_SUPERUSER`
+
+Use **`w.database.create_database_instance_role`** only — not **`w.postgres.create_role`** (wrong **`parent`** paths / incomplete **`Role`** spec). Retry **`DatabaseInstanceRole.name`**: numeric **`str(service_principal_id)`** first, then **`service_principal_client_id`**. Escape hatch and **`Identity not found`**: **`troubleshooting_gc.md`** → *Setup Lakebase — extended notes*.
+
+```python
+from databricks.sdk.service.database import (
+    DatabaseInstanceRole,
+    DatabaseInstanceRoleIdentityType,
+    DatabaseInstanceRoleMembershipRole,
+)
+
+app0 = w.apps.get(name=APP_NAME)
+sp_id = app0.service_principal_id
+if sp_id is None:
+    raise RuntimeError("App has no service_principal_id — create/wait for app first.")
+
+def _grant(name: str) -> None:
+    w.database.create_database_instance_role(
+        APP_NAME,
+        DatabaseInstanceRole(
+            name=name,
+            identity_type=DatabaseInstanceRoleIdentityType.SERVICE_PRINCIPAL,
+            membership_role=DatabaseInstanceRoleMembershipRole.DATABRICKS_SUPERUSER,
+        ),
+    )
+
+try:
+    _grant(str(sp_id))
+    print("Granted DATABRICKS_SUPERUSER (role name = numeric service_principal_id)")
+except Exception as e1:
+    cid = app0.service_principal_client_id
+    if not cid:
+        raise
+    print("Retrying grant with service_principal_client_id (UUID) as role name:", e1)
+    _grant(cid)
+    print("Granted DATABRICKS_SUPERUSER (role name = service_principal_client_id UUID)")
+```
+
+#### Step 2d — Bind `postgres` resource on the app (merge existing resources)
+
+Merge via **`app.as_dict()`** → dict **`resources`** (string **`permission`**: `"CAN_CONNECT_AND_CREATE"`) → **`App.from_dict(d)`** → **`w.apps.update`** — preserves other app fields and avoids **`permission` `.value`** errors. Details: **`troubleshooting_gc.md`** Step 2 error table.
+
+```python
+from databricks.sdk.service.apps import App
+
+app1 = w.apps.get(name=APP_NAME)
+d = app1.as_dict()
+res = [x for x in (d.get("resources") or []) if x.get("name") != "postgres"]
+res.append(
+    {
+        "name": "postgres",
+        "postgres": {
+            "branch": branch_path,
+            "database": db_path,
+            "permission": "CAN_CONNECT_AND_CREATE",
+        },
+    }
+)
+d["resources"] = res
+w.apps.update(name=APP_NAME, app=App.from_dict(d))
+print("Bound app.resources postgres → branch + database path")
+```
+
+#### Optional: UC `DatabaseCatalog` (skip unless your workspace requires it)
+
+Some orgs require a Unity Catalog **`DatabaseCatalog`** linked to the instance. If **`list_databases`** already returns a default DB, you usually **skip** this. If platform docs require it, use `w.database.create_database_catalog(DatabaseCatalog(...))` with UC-legal **`name`**, `database_instance_name=APP_NAME`, and the target **`database_name`** — see SDK dataclass `DatabaseCatalog`. If the API returns “unimplemented” or you are unsure, **skip** and continue with the default `db_path` from Step 2b.
 
 ---
 
@@ -114,7 +216,7 @@ If `app.yaml` already has other entries, merge — do not overwrite.
 1. **Read `package.json`** — confirm `@databricks/lakebase` is in `dependencies`
 2. **Read `app.yaml`** — confirm `LAKEBASE_ENDPOINT` with `valueFrom: postgres` and `DB_SCHEMA` are set
 3. **Read `app.ts`** — confirm it is **unchanged** (still uses `createApp({ plugins: [server()] })`)
-4. **Check instance status** — `w.database.get_database_instance(name=APP_NAME)` state is `AVAILABLE`
+4. **Check instance status** — `w.database.get_database_instance(name=APP_NAME)`; `state.name == "AVAILABLE"` (or print `state` if older SDK shape)
 5. **Check resource binding** — `w.apps.get(name=APP_NAME)` resources includes a `postgres`-type resource:
 
 ```python
@@ -124,7 +226,7 @@ for r in (app.resources or []):
     if pg:
         print(f"  ✓ Resource '{r.name}' → branch={pg.branch}, db={pg.database}")
     else:
-        print(f"  ⚠ Resource '{r.name}' is NOT postgres type — AppKit will crash. Re-run Step 3d.")
+        print(f"  ⚠ Resource '{r.name}' is NOT postgres type — AppKit will crash. Re-run Step 2d.")
 ```
 
 ---
@@ -132,7 +234,7 @@ for r in (app.resources or []):
 ### Checklist
 
 - [ ] Lakebase instance created — state `AVAILABLE`
-- [ ] Database created — name is `{DB_SCHEMA}`
+- [ ] Default DB path discovered via **`list_databases`** (full path like `.../databases/db-...`; **`DB_SCHEMA`** is only the Postgres schema name for DDL later — not the same string)
 - [ ] App SP granted `DATABRICKS_SUPERUSER`
 - [ ] App resource bound — `postgres`-type resource named `postgres` visible (NOT `database` type)
 - [ ] `@databricks/lakebase` added to `package.json` `dependencies`

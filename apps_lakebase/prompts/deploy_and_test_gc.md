@@ -175,10 +175,10 @@ if logs and hasattr(logs, 'log_lines'):
 Print the app URL and instruct the user to verify in browser:
 
 1. Home page loads with the React UI (not an error page or JSON)
-2. Navigation links work (Search, Agent pages)
+2. Navigation links work (**Search**, **Agent**, and **Bookings** or equivalent if the PRD includes that journey — not only Search/Agent)
 3. Click into a listing to verify detail page renders
-4. Data source indicator shows "Live Data" if Lakebase is connected
-5. Navigate to `{app_url}/api/health` — expected: `{ "data": [{ "status": "connected" }], "source": "live" }`
+4. On **each** data-driven page, confirm **`ConnectionStatus`** shows **Live Data** (or **Mock Data** only if Lakebase is intentionally unavailable) — proves **`wire_ui_to_lakebase_gc.md`** Step 3b shipped
+5. Navigate to **`{app_url}/api/health`** (canonical path — not `/api/health/lakebase`) — expected: `{ "data": [{ "status": "connected" }], "source": "live" }`
 
 ---
 
@@ -226,7 +226,7 @@ else:
 ║  1. Home page loads with React UI (not error/JSON)          ║
 ║  2. Navigation links work (Search, Agent pages)             ║
 ║  3. Click a listing → detail page renders                   ║
-║  4. Go to {{app_url}}/api/health                              ║
+║  4. Go to {{app_url}}/api/health (not /api/health/lakebase)   ║
 ║     Expected: {{"data":[{{"status":"connected"}}],"source":"live"}} ║
 ║  5. Go to {{app_url}}/api/listings                            ║
 ║     Expected: {{"data":[...],"source":"live"}}                ║

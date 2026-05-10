@@ -4,6 +4,8 @@
 
 **Standard `@` refs (each prompt links these):** `gc-prompt-header.md` · `workshop-variables.md` · `GENIE-CODE-OVERRIDES.md` · `troubleshooting_gc.md`
 
+**Not** part of this stack: `@appkit-apps`, `@mcp-appkit-tooling`, `MCP-appkit_tooling.md`, or any **`appkit_*`** MCP tool (e.g. `appkit_get_app_status`) — use **`apps_lakebase/skills/*/SKILL.md`** + SDK only.
+
 ## Order
 
 1. `generate_prd_gc.md`
@@ -20,6 +22,8 @@
 | Wire UI | `wire_ui_to_lakebase_gc.md` |
 | Deploy + test | `deploy_and_test_gc.md` |
 
-**Other:** `mcp-setup-gc.md`, `new_exec_steps.md`, `design_prd.md`, `ui_design.md` — samples or ops; not part of the default `@` stack.
+**Other:** `mcp-setup-gc.md`, `new_exec_steps.md`, `design_prd.md`, `ui_design.md`, **`original-ui-one-design.md`** (archived **CLI** “UI + deploy” prompts + workshop placeholders — **not** for Genie) — samples or ops; not part of the default `@` stack.
+
+**Cursor / CLI / bundle (reference only, not Genie):** **`original-setup-lakebase.md`**, **`original-wire-ui-to-lakebase.md`**, **`original-deploy-and-test.md`** — same workshop story as **`setup_lakebase_gc` → `wire_ui_to_lakebase_gc` → `deploy_and_test_gc`** but with npm, `databricks.yml`, and CLI. See **`gc-prompt-header.md`** for SDK vs bundle equivalence.
 
 **Local IDE:** [`../skills/`](../skills/) + repo [QUICKSTART.md](../../QUICKSTART.md) Path A.

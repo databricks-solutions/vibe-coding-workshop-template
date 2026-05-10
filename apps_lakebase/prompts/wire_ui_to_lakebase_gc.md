@@ -13,7 +13,7 @@ Key requirements:
 - Follow the **resolved AppKit** pattern: `appkit.server.extend((app) => { ... })` inside `export async function registerRoutes(appkit)` — access SQL via `appkit.lakebase.query()` (not `ctx.lakebase.getPool()` on the `server` import)
 - Use `DB_SCHEMA` (from `.vibecoding-state.md`) in all DDL, queries, and grants
 - Do NOT deploy in this step — deployment happens in `deploy_and_test_gc.md`
-- There is no `npm run build` or `npm run dev` — validation is through file content review only
+- There is no `npm run build` or `npm run dev` in the notebook — validation is through file content review only. **Compile gate:** the first successful **`deploy_and_test_gc.md`** deploy runs platform `npm install` + build; treat that as the TypeScript gate. A facilitator may optionally run **`npm run build`** locally to catch errors earlier.
 
 **Environment:** Genie Code on Databricks workspace (serverless). No CLI, no npm, no Node.js, no TypeScript compiler. Use file tools for code editing and `executeCode` for Python.
 
@@ -63,7 +63,7 @@ After wiring Lakebase, the app uses `onPluginsReady` to register routes before t
 import { createApp, server, lakebase } from "@databricks/appkit";
 import { registerRoutes } from "./server/server.js";
 
-createApp({
+await createApp({
   plugins: [lakebase(), server()],
   async onPluginsReady(appkit) {
     await registerRoutes(appkit);
@@ -98,28 +98,33 @@ All routes go inside a single `appkit.server.extend((app) => { ... })` callback 
 | `/api/bookings` | POST | Create booking (insert into bookings table) |
 | `/api/bookings/:id` | GET | Booking details with listing info via JOIN |
 
+> **Canonical workshop health URL:** implement **`GET /api/health`** only (returns `{ data: [{ status: "connected" }], source: "live" | "mock" }` per table above). Do **not** register **`/api/health/lakebase`** — some external CLI samples use that path; **`deploy_and_test_gc.md`** and **`troubleshooting_gc.md`** assume **`/api/health`**.
+
 ---
 
 ### Verification
 
 Since there is no `npm run build` in Genie Code, verify by:
 
-1. **Read `app.ts`** — confirm `createApp({ plugins: [lakebase(), server()], async onPluginsReady(appkit) { await registerRoutes(appkit); } })` (lakebase before server, no top-level `await`)
+1. **Read `app.ts`** — confirm **`await createApp({ plugins: [lakebase(), server()], async onPluginsReady(appkit) { await registerRoutes(appkit); } })`** (lakebase before server; **`await` on `createApp` required**)
 2. **Read `server/server.ts`** — confirm `export async function registerRoutes(appkit)` with a single `appkit.server.extend((app) => { ... })`, idempotent DDL, count-check seed, all routes return `{ data, source }` (health uses wrapped `data` array — see table), `DB_SCHEMA` from `process.env.DB_SCHEMA`
 3. **Read `server/mock-data.ts`** — confirm camelCase fallback data arrays exist
-4. **Cross-check** — API route paths match URLs that client pages will call
-5. **List all files** — confirm expected files exist
+4. **Cross-check** — API route paths match URLs that client pages will call; nav includes **Bookings** (or equivalent) if the PRD describes that journey
+5. **Read `client/src/` pages** — every data-fetching page imports **`ConnectionStatus`** and passes **`source`** from **`useLakebaseData`** (see **`05-appkit-lakebase-wiring/references/frontend-patterns.md`** Step 3b)
+6. **List all files** — confirm expected files exist
 
 ---
 
 ### Checklist
 
-- [ ] `app.ts` uses `createApp({ plugins: [lakebase(), server()], async onPluginsReady(appkit) { await registerRoutes(appkit); } })` — lakebase before server, no `autoStart`, no `.then()`, no `appkit.server.start()`, no top-level `await`
+- [ ] `app.ts` uses **`await createApp({ plugins: [lakebase(), server()], async onPluginsReady(appkit) { await registerRoutes(appkit); } })`** — lakebase before server, no `autoStart`, no `.then()`, no `appkit.server.start()`
 - [ ] `server/server.ts` exports `registerRoutes` with a single `appkit.server.extend((app) => {...})` call (not `server.extend` on the plugin import)
 - [ ] DDL creates schema and all tables with `IF NOT EXISTS` (idempotent)
 - [ ] Seed data uses count-check pattern (not `ON CONFLICT`)
 - [ ] All API routes return `{ data, source }` with mock fallback
-- [ ] `/api/health` endpoint exists and checks Lakebase connectivity
+- [ ] **`GET /api/health`** exists (canonical path — not `/api/health/lakebase`) and checks Lakebase connectivity with wrapped `{ data, source }`
+- [ ] **`ConnectionStatus`** at top of **every** page that calls **`useLakebaseData`**; hook **`source`** passed through
+- [ ] **Navigation** includes PRD journeys (e.g. **Bookings** list/detail or entry point) wired to real **`/api/*`** routes
 - [ ] `server/mock-data.ts` created with camelCase fallback data
 - [ ] `DB_SCHEMA` used via `process.env.DB_SCHEMA` in all SQL (never hardcoded)
 - [ ] All files verified via spot-checks
