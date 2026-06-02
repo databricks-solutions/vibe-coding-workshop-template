@@ -1,6 +1,11 @@
 ---
 name: genie-space-export-import-api
 description: Comprehensive patterns for Databricks Genie Space Export/Import API - JSON schema, serialization format, and programmatic deployment. Use when programmatically creating, exporting, or importing Genie Spaces via REST API, troubleshooting API deployment errors, or implementing CI/CD for Genie Spaces. Includes complete GenieSpaceExport schema, API endpoints (List, Get, Create, Update, Delete), JSON format requirements, ID generation, variable substitution, inventory-driven generation patterns, and production deployment checklists.
+clients: [ide_cli, genie_code]
+bundle_resource: genie
+deploy_verb: bundle_deploy
+deploy_note: "RULE_8 tiers: T1 native `genie_spaces` bundle entry (preferred; verify CLI support via `bundle validate`) -> T2 provisioning notebook job (active fallback) -> T3 `createAsset` escape hatch (Genie-Code-only, last resort, non-version-controlled). Space name + table_identifiers carry the per-user prefix. semantic_warehouse_id is baked at deploy time, never a runtime --var."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0"

@@ -1,6 +1,11 @@
 ---
 name: databricks-table-valued-functions
 description: End-to-end guide for planning, creating, deploying, and validating Table-Valued Functions (TVFs) in Databricks optimized for Genie Space natural language queries. Use when creating TVFs for Genie Spaces, planning TVF requirements from business questions, troubleshooting TVF compilation errors, or ensuring Genie compatibility. Includes requirements gathering templates, schema validation patterns, SQL requirements (STRING parameters, parameter ordering, LIMIT workarounds), v3.0 bullet-point comment format, null safety, SCD2 handling, cartesian product prevention, 5 complete domain-adaptable examples, Asset Bundle deployment patterns, and post-deployment validation queries.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "TVFs are created by a notebook_task in the semantic-layer job; deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code). TVF params are STRING for Genie compatibility."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"

@@ -1,6 +1,11 @@
 ---
 name: metric-views-patterns
 description: Standard patterns for creating Databricks Metric Views with semantic metadata for Genie and AI/BI. Use when creating metric views, troubleshooting metric view creation errors, validating schema references before deployment, implementing joins (including snowflake schema patterns), or optimizing metric views for Genie natural language queries.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Metric Views are created by a notebook_task in the semantic-layer job; deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"

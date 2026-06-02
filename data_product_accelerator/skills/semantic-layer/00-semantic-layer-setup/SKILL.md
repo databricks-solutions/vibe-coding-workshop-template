@@ -11,6 +11,11 @@ description: >
   Use when building the semantic layer end-to-end, creating Metric Views and TVFs for Genie,
   or setting up Genie Spaces. For Genie optimization, use genie-optimization-orchestrator directly.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Combined semantic_layer_job (Metric Views -> TVFs -> Genie) deployed via `bundle deploy --target dev` from the bundle-folder page; Genie Spaces follow the RULE_8 tier model (see 04-genie-space-export-import-api). On Genie Code the deploy verb runs through runDatabricksCli."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

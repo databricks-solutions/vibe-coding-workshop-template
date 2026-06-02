@@ -1,6 +1,11 @@
 ---
 name: genie-space-patterns
 description: Patterns for setting up Databricks Genie Spaces with comprehensive agent instructions, data assets, SQL expressions, and benchmark questions. Use when creating Genie Spaces, configuring agent behavior, selecting data assets, defining SQL expressions (measures, filters, dimensions), or validating benchmark questions. Includes mandatory 8-section deliverable structure, General Instructions (≤20 lines), data asset organization (Metric Views → TVFs → Tables), SQL expressions (sql_snippets) for structured KPI/filter/dimension definitions, benchmark questions with exact SQL, Serverless warehouse mandate, table/column comment requirements for Genie SQL quality, pre-creation table inspection, Conversation API programmatic validation, follow-up vs new conversation patterns, deployment checklists, post-deployment configuration audit for drift detection, cross-consumer design considerations (Genie + dashboards), and benchmark regression testing patterns.
+clients: [ide_cli, genie_code]
+bundle_resource: genie
+deploy_verb: bundle_deploy
+deploy_note: "Design/config skill; the Genie Space JSON is deployed via 04-genie-space-export-import-api using the RULE_8 tier model. Serverless SQL Warehouse is mandatory; space title + table identifiers carry the per-user prefix."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.6"
