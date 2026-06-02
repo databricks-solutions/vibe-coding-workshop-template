@@ -6,7 +6,14 @@
 # This script is a convenience fallback when the repo cannot be reached
 # directly from an IDE-native command.
 #
-# Strategy:
+# CLIENT NOTE — IDE/CLI ONLY. This script assumes a local Databricks CLI
+# (`databricks --version`) and the `aitools install` verb, both of which are
+# HARD-BLOCKED on Genie Code. On Genie Code the Databricks skills are already
+# loaded in-session, so this script is not used; the per-user whole-repo
+# git-clone kickstart into `/Users/<email>/.assistant/skills/` is the Genie Code
+# path and is wired in the repo root AGENTS.md (coordinated in Milestone 06).
+#
+# Strategy (IDE/CLI):
 #   1. Always clone into .agents/skills/ (agentskills.io standard, works in all IDEs)
 #   2. Optionally run IDE-native install for deeper integration
 set -euo pipefail

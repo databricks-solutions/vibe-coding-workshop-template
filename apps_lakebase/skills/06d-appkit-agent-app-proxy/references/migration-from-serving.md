@@ -2,6 +2,8 @@
 
 Use this reference when an AppKit app was originally wired against a **Model Serving endpoint** ([`06-appkit-serving-wiring`](../../06-appkit-serving-wiring/SKILL.md)) and the underlying agent has been (or is being) redeployed as a **Databricks App** per [migrate-agent-to-apps](https://docs.databricks.com/aws/en/generative-ai/agent-framework/migrate-agent-to-apps).
 
+> **Client routing:** commands below are for the **IDE/CLI** path. On **Genie Code**: run `databricks …` via `runDatabricksCli` and **omit `--profile`**; a targetless `bundle validate`/`bundle deploy` needs `--target dev`; skip local `npm run build` (server-side build on deploy). See the routing table in [`../SKILL.md`](../SKILL.md) and `skills/genie-code-environment`.
+
 **Symptoms that signal a needed migration:**
 
 - `/api/serving/invoke` or `/api/serving/stream` returns `404: Cannot find serving endpoint` after the agent was redeployed.

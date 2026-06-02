@@ -2,6 +2,8 @@
 
 How user identity flows in AppKit chat applications — all AppKit-native, no Vercel AI SDK.
 
+> **Client note (IDE & Genie Code).** All identity/auth handling here is **server-side code** — OBO header parsing, `.asUser(req)`, and `config.authenticate()` resolve at runtime on the deployed app and behave identically on both clients. There are no client-specific commands in this reference; the local-dev fallback identity (`DEV_USER_EMAIL`) only applies when running outside the Databricks Apps platform.
+
 ## User Identity in Databricks Apps
 
 Databricks Apps use On-Behalf-Of (OBO) authentication. When a user accesses the app

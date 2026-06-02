@@ -4,6 +4,8 @@ Two of the highest-cost failure classes during AppKit deployment are caused by *
 
 > **Read this when:** preparing to deploy, hitting `ENOTEMPTY` / `Exit handler never called` during platform `npm install`, or when `permission denied for schema` starts appearing after recreating the app.
 
+> **Client note — Genie Code:** Rule 1 (lockfile regeneration) is an **IDE/CLI-only** hazard — Genie Code has no local `npm`, so it never regenerates the lockfile and avoids this class entirely (the build runs server-side). Rule 2 (app-recreation → new SP → Lakebase ownership) applies on **both** clients: avoid deleting/recreating the app regardless of how you deploy.
+
 ---
 
 ## Rule 1 — Never regenerate `package-lock.json` locally

@@ -11,13 +11,24 @@ description: >
 license: Apache-2.0
 compatibility: Requires Databricks CLI >= 0.295.0 and Node.js v22+
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(git:*) Bash(node:*) Read
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  Scaffolding does not deploy — it delegates deploy to `03-appkit-deploy` (the `apps_deploy` contract).
+  `apps init` is **pre-approved** on Genie Code via `runDatabricksCli` and completes without local npm
+  (deps install **server-side** on deploy); pass `--output-dir` so the project lands in your repo/home, not
+  `/Workspace/<name>`. The `aitools install` + `apps manifest` verbs are **hard-blocked** on Genie Code —
+  use the `git clone` skills-install path and blank-scaffold plugin discovery instead. `npx @databricks/appkit
+  docs` is IDE-only (npx absent on Genie Code → WebFetch the docs site). Omit `--profile` on Genie Code.
+coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.1.0"
   domain: apps
   role: scaffold
   standalone: true
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources: []  # Project-specific scaffold workflow; see See Also for canonical upstream.
 ---
@@ -33,6 +44,23 @@ Create and configure Databricks AppKit projects — blank or with plugins — us
 - Setting up a full-stack TypeScript app that deploys to Databricks Apps
 
 **Not for adding plugins to an existing app.** Use the `04-appkit-plugin-add` skill for that.
+
+### Working in Genie Code (client routing)
+
+Scaffolding works on both clients; the per-step notes below carry the details. This table is the index so the skill stands alone even if you jump straight to a step:
+
+| IDE/CLI (as written) | Genie Code substitution | Step |
+|----------------------|--------------------------|------|
+| `databricks aitools install` / `aitools tools` | **hard-blocked** via `runDatabricksCli` — skills are loaded in-session, so the install/gate is a no-op; if you need the files materialized, use the `git clone` install path | 1, 2 |
+| `databricks apps manifest` | **hard-blocked** — discover plugins by blank-scaffolding first and reading `appkit.plugins.json`, or WebFetch the AppKit docs | 2 |
+| `databricks apps init …` | **pre-approved** via `runDatabricksCli`; **add `--output-dir`** (`.` or an explicit home path) so it doesn't land at `/Workspace/<name>`; `⚠ npm not found` is expected (deps install server-side on deploy) | 2 |
+| `databricks warehouses list` / `aitools tools get-default-warehouse` | `aitools` blocked → use `databricks warehouses list --output json` via `runDatabricksCli` | 2 |
+| `npm install` / `npm run dev` (local dev server) | no local Node toolchain — skip; verify on the **deployed** app (`03-appkit-deploy`) | 3 |
+| `npx @databricks/appkit docs …` | npx absent (P9) — WebFetch https://databricks.github.io/appkit/ | docs |
+| `--profile <PROFILE>` on any `databricks …` | **omit** — Genie Code injects the workspace + OAuth | all |
+| `databricks apps deploy` | not run from this skill — see the `03-appkit-deploy` deploy-routing contract | next |
+
+Scaffold **into your repo clone** (e.g. `/Users/<your-email>/.assistant/skills/vibe-coding-workshop` on Genie Code), never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ## Prerequisites
 
@@ -315,6 +343,8 @@ npx @databricks/appkit docs --full       # full index with all API entries
 | Validate | `databricks apps validate` |
 | Deploy | `databricks apps deploy --profile <P>` |
 | Browse AppKit docs | `npx @databricks/appkit docs` |
+
+> **Client note — Genie Code:** in this table, **omit `--profile`** and run `databricks …` via `runDatabricksCli`; **add `--output-dir`** to `apps init`; replace `npx @databricks/appkit docs` with a WebFetch of the docs site; and use the `git clone` row (not `aitools`) to install skills. See the "Working in Genie Code" routing table above.
 
 ---
 

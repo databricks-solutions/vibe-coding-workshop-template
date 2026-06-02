@@ -13,13 +13,25 @@ description: >
 license: Apache-2.0
 compatibility: Requires 05-appkit-lakebase-wiring and 06-appkit-serving-wiring complete, Node.js v22+, Databricks CLI >= 0.295.0
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  Chat-history persistence is source editing (server.ts DDL/routes, sidebar, hooks) — client-agnostic.
+  The `chat` schema/table DDL runs **server-side on app startup** under the SP (RULE_10 Deploy-First) on both
+  clients — never run it locally. IDE: `npm run build`/`npm test` gates, `databricks bundle validate
+  --profile $PROFILE`, then `databricks apps deploy --profile $PROFILE`. Genie Code: local `npm` gates are an
+  IDE convenience (server-side build on deploy); run `bundle validate` via `runDatabricksCli` (omit
+  `--profile`; `--target dev` if targetless blocked); deploy per `03-appkit-deploy`. `apps validate` is
+  hard-blocked and (per Step 9) unsafe for Lakebase apps — skip on both clients. Verify via browser + logs.
+coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.1.0"
+  version: "1.2.0"
   domain: apps
   role: chat-history
   standalone: false
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources:
     - name: "databricks-agent-skills/databricks-lakebase"
@@ -74,6 +86,22 @@ npx @databricks/appkit docs "lakebase"
 npx @databricks/appkit docs "serving"
 ```
 
+### Working in Genie Code (client routing)
+
+Everything in this skill is **source editing + server-side code** (DDL, proxy route, sidebar, hooks) — written the same way on both clients. The DDL runs server-side on startup (Step 1) and is already client-agnostic. Only local gates and the deployed-app checks differ:
+
+| IDE/CLI (as written) | Genie Code substitution |
+|----------------------|--------------------------|
+| `npm run build` / `npm test` gates (Steps 1–8) | **IDE-only** convenience — no local Node toolchain. Skip; the platform builds **server-side** on deploy, and the retry tests run in CI or post-clone where npm exists. Errors surface in `databricks apps logs <name>` |
+| `npm run dev` | not available — verify on the deployed app |
+| `npx @databricks/appkit docs …` | npx absent (P9) — WebFetch https://databricks.github.io/appkit/docs/plugins/ |
+| `databricks bundle validate --profile $PROFILE` (Step 9) | run via `runDatabricksCli` (omit `--profile`; `--target dev` if a targetless validate is guardrail-blocked) — this is the canonical gate on both clients |
+| `databricks apps validate` (Step 9) | hard-blocked **and** unsafe for Lakebase apps (boots locally) — skip on both clients, rely on `bundle validate` + server-side build logs |
+| local `curl http://localhost:8000/api/…` gates (Steps 3, 7) | no local dev server — exercise the routes on the **deployed** app via browser, or the OAuth-session `requests.Session()` test in `03-appkit-deploy` |
+| `databricks apps deploy …` | see the `03-appkit-deploy` deploy-routing contract (`runDatabricksCli`, else SDK `w.apps.deploy(... SNAPSHOT)`) |
+
+Paths are relative to `apps_lakebase/$APP_NAME` — under your `.assistant/skills` repo clone on Genie Code, never `/tmp`. See `skills/genie-code-environment` for the full manifest.
+
 ---
 
 ## Architecture
@@ -103,6 +131,8 @@ This pattern extends the `server.extend()` streaming proxy already documented in
 ## Step 1: Create the Chat Schema
 
 Add idempotent DDL after `createApp()` in `server/server.ts`. The `chat` schema is deliberately isolated from application data schemas so it doesn't collide with other tables.
+
+> **RULE_10 — this DDL is intentionally in-app, not a bundle resource or a `psql` script.** `initChatSchema()` runs **server-side on every app startup** via `AppKit.lakebase.query()`, so the app's Service Principal owns the schema, tables, and indexes (the same Deploy-First Pattern as `05-appkit-lakebase-wiring` Step 1d). This is **client-agnostic** — it executes identically whether the app was deployed from an IDE or Genie Code, and there is **no client-side `psql`/DDL step**. Do not move it into `databricks.yml` or a setup script: idempotent `CREATE … IF NOT EXISTS` on startup is the correct, SP-owning pattern.
 
 ```typescript
 async function initChatSchema() {
@@ -1145,6 +1175,8 @@ databricks bundle validate --profile $PROFILE
 # bundle config and `databricks apps deploy` will surface app.yaml errors at deploy time.
 databricks apps validate --profile $PROFILE
 ```
+
+> **Client note — Genie Code:** run `bundle validate` via `runDatabricksCli` (omit `--profile`; add `--target dev` if a targetless validate is guardrail-blocked). **Skip `apps validate` entirely** — it is hard-blocked on Genie Code *and* unsafe for Lakebase apps (boots locally against `initChatSchema()`); rely on `bundle validate` + the server-side build logs after deploy.
 
 > **Treat `bundle validate` warnings as errors.** This is a load-bearing rule from the rollup ("`databricks bundle validate` warnings can be load-bearing errors", Skill 06d). Common warning-as-error cases for this skill: `unknown field: endpoint_name` on a `serving_endpoint` (rename to `name:`), `valueFrom: postgres` with no `postgres_*` resource declared, missing `permission` field on a declared resource. See [03-appkit-deploy SKILL.md](../03-appkit-deploy/SKILL.md) "Common Errors" for the canonical fix table.
 

@@ -10,13 +10,24 @@ description: >
 license: Apache-2.0
 compatibility: Requires a built AppKit project with Node.js v22+ and Databricks CLI >= 0.295.0
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  IDE: `databricks apps deploy --profile $PROFILE` (local Node build + bundle sync + start).
+  Genie Code: run `databricks apps deploy` via `runDatabricksCli` where the project page
+  allows it (omit `--profile` — pre-authenticated), else fall back to the SDK
+  `w.apps.deploy(<name>, AppDeployment(source_code_path=…, mode=AppDeploymentMode.SNAPSHOT))`
+  via `executeCode`. The frontend build runs **server-side** in the container, so no local
+  `npm install` / `npm run build` is required on Genie Code (Gap 4 resolved).
+coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.1.0"
+  version: "1.2.0"
   domain: apps
   role: deploy
   standalone: true
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources: []  # Deployment workflow / fix-loop is project-specific; canonical upstream in See Also.
 ---
@@ -43,9 +54,22 @@ Before deploying, ensure:
 - `$APP_NAME` and `$PROFILE` are set by the calling prompt. **If a `.vibecoding-state.md` exists from a prior phase**, use the `APP_NAME`, `PROFILE`, and workspace URL values from it directly — do not re-derive them with `databricks current-user me` or `databricks auth profiles`.
 - The app directory contains `app.yaml` and `databricks.yml`
 - If deploying to a **different workspace** than where the app was scaffolded: update the `host` in `databricks.yml`, update `sql_warehouse_id` for the new workspace, and remove stale bundle state with `rm -rf $APP_NAME/.databricks`
-- If no CLI profile exists for the target workspace, create one with `databricks auth login --host <workspace-url>` (NOT `databricks configure`, which requires interactive token input and fails in automated/agent contexts)
-- All commands in this skill assume the working directory is `apps_lakebase/`. Paths like `$APP_NAME/app.yaml` are relative to `apps_lakebase/`, not the repo root.
+- If no CLI profile exists for the target workspace, create one with `databricks auth login --host <workspace-url>` (NOT `databricks configure`, which requires interactive token input and fails in automated/agent contexts). **IDE/CLI only** — on Genie Code the runtime is already authenticated to its host workspace; skip profile creation and drop `--profile` from every command (see the routing note below).
+- All commands in this skill assume the working directory is `apps_lakebase/`. Paths like `$APP_NAME/app.yaml` are relative to `apps_lakebase/`, not the repo root. On Genie Code, this is `<repo-clone-root>/apps_lakebase/` under your `.assistant/skills/` clone — `cd` there first; never operate from `/tmp`.
 - **Do NOT run `rm -f package-lock.json && npm install` locally before deploying.** The platform's `npm install` depends on lockfile stability; regenerating the lockfile locally causes `ENOTEMPTY` / `Exit handler never called` failures during platform install. See [references/lockfile-and-recreation.md](references/lockfile-and-recreation.md) for the full rule, scenario table, and recovery ladder — plus the Lakebase ownership consequences of app recreation.
+
+### Working in Genie Code (deploy routing)
+
+This skill is written for the **IDE/CLI path** — the commands below are correct as-is when you have a local terminal, Node.js, and a CLI profile. If you are running in **Genie Code** (no local toolchain, pre-authenticated to one workspace), apply these four substitutions to every step and you do not need to re-read this note per command:
+
+| IDE/CLI (as written) | Genie Code substitution |
+|----------------------|--------------------------|
+| `databricks <cmd> … --profile $PROFILE` | run `databricks <cmd> …` via `runDatabricksCli`, **omit `--profile`** (ambient auth) |
+| `databricks apps deploy …` (when the project page blocks it) | SDK fallback via `executeCode`: `w.apps.deploy(<name>, AppDeployment(source_code_path=<workspace path>, mode=AppDeploymentMode.SNAPSHOT))` |
+| `npm run build` / `npm run dev` (local) | **skip** — the frontend build runs server-side in the container during deploy; assert on `databricks apps logs <name>` instead |
+| `databricks bundle deploy` (targetless) | add `--target dev` (a targetless bundle deploy is guardrail-blocked on Genie Code) |
+
+Everything else (config validation, log streaming, the fix loop, error table) is identical across clients. Inline `> **Client note — Genie Code:**` callouts below flag the few steps where the behavior — not just the syntax — differs. See `skills/genie-code-environment` for the full behavioral manifest.
 
 ---
 
@@ -258,6 +282,8 @@ npm run build
 
 This must complete without errors. A successful build produces the output referenced by `app.yaml`'s command (typically `build/index.mjs` or `dist/server.js`).
 
+> **Client note — Genie Code:** this local pre-build is an **IDE/CLI convenience**, not a hard gate — there is no local Node toolchain on Genie Code. **Skip Step 2 entirely** and deploy directly (Step 3); the platform runs the same `npm install` + `npm run build` **server-side** during the deploy pipeline. TypeScript/compile errors surface in `databricks apps logs <name>` after deploy — treat those logs as the authoritative build signal and feed them into the Step 5 fix loop. (Build-runs-server-side was verified end-to-end — see the Platform Build Pipeline note above.)
+
 Verify the build output exists before deploying:
 
 ```bash
@@ -299,6 +325,8 @@ databricks apps deploy --profile $PROFILE
 ```
 
 This is equivalent to running `npm run build` + `databricks bundle deploy` + `databricks apps start` in sequence.
+
+> **Client note — Genie Code:** run `databricks apps deploy` (no `--profile`) through `runDatabricksCli` from the `$APP_NAME` directory. If the project page blocks `apps deploy`, use the SDK fallback via `executeCode` — `w.apps.deploy(<name>, AppDeployment(source_code_path=<workspace path>, mode=AppDeploymentMode.SNAPSHOT))` — which triggers the same server-side build (no pre-synced `dist/` needed). Then poll `w.apps.get(<name>)` / `databricks apps logs <name>` for the `Building app…` → `ACTIVE` transition.
 
 For faster iteration after the first deploy, skip the build step:
 

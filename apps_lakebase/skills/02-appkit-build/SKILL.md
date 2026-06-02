@@ -12,13 +12,26 @@ description: >
   "static data", "two-phase data".
 license: Apache-2.0
 compatibility: Requires an existing AppKit project scaffolded via 01-appkit-scaffold skill, Node.js v22+, Databricks CLI >= 0.295.0
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  Building features is **source editing** (`.sql` queries, `server/server.ts`, `client/src/**`) — fully
+  client-agnostic; the same files are written on both clients. Deploy is delegated to `03-appkit-deploy`.
+  The local toolchain steps are an **IDE convenience**: `npm run typegen`, `npm run dev`, `npx tsc --noEmit`,
+  `npm run build`, and the `http://localhost:8000` checks have **no Genie Code equivalent** (no local Node) —
+  on Genie Code typegen/tsc/build run **server-side on deploy**; write UI against the SQL schema + the
+  appkit-ui docs and verify on the deployed app. `npx @databricks/appkit docs` is IDE-only (WebFetch on
+  Genie Code). `databricks apps validate` is skipped on Genie Code (hard-blocked) — rely on `bundle validate`
+  + server-side build logs.
+coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.1.0"
   domain: apps
   role: build
   standalone: false
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources: []  # Project-specific PRD-to-UI workflow; see See Also for canonical upstream.
 ---
@@ -40,6 +53,21 @@ Implement full-stack UI and backend features on an already-scaffolded AppKit pro
 ---
 
 ## Before You Begin
+
+### Working in Genie Code (client routing)
+
+This skill is **source editing** — designing SQL queries, writing `server/server.ts`, and building React under `client/src/`. All of that is **identical on both clients**; only the local-toolchain gates differ:
+
+| IDE/CLI (as written) | Genie Code substitution |
+|----------------------|--------------------------|
+| `npm run typegen` (generates `client/src/appKitTypes.d.ts`) | no local Node — typegen runs **server-side on deploy**. Write UI against the `.sql` `-- @param` annotations + the appkit-ui docs; the generated types land at deploy/build time |
+| `npm run dev` / `http://localhost:8000` checks (Step 6) | no local dev server — verify UI/queries on the **deployed** app (browser, or the OAuth-session test in `03-appkit-deploy`) |
+| `npx tsc --noEmit` (Step 4b) / `npm run build` | IDE-only gates — the platform type-checks + builds **server-side** on deploy; TS errors surface in `databricks apps logs <name>` |
+| `npx @databricks/appkit docs …` | npx absent (P9) — WebFetch https://databricks.github.io/appkit/ |
+| `ls node_modules/@databricks/appkit-ui/…` | no local `node_modules` — consult the appkit-ui docs (WebFetch) instead |
+| `databricks apps validate --profile $PROFILE` (checklist) | hard-blocked on Genie Code — skip; rely on `bundle validate` (`runDatabricksCli`, omit `--profile`) + server-side build logs per `03-appkit-deploy` / `07-appkit-chat-history` Step 9 |
+
+Edit files **in your repo clone** — paths are relative to `apps_lakebase/$APP_NAME` (on Genie Code, under `/Users/<your-email>/.assistant/skills/vibe-coding-workshop`), never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 **Optional upstream checks** (skip if latency-constrained or the `last_verified` date above is < 30 days old):
 

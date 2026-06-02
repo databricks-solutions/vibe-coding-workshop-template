@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Tests AppKit Serving plugin endpoints and validates response shape.
 #
+# SCOPE: IDE/local-dev convenience (NON-CANONICAL). Defaults to a local dev server
+#   at http://localhost:8000 and uses raw-Bearer curl, neither of which works on Genie
+#   Code (no local dev server; the Apps OAuth gate rejects raw Bearer). The canonical
+#   cross-client verification is the deployed-app path: browser chat test +
+#   `databricks apps logs <name>`, or the 3-hop OAuth `requests.Session()` test in
+#   03-appkit-deploy. `bash -n` syntax-checks fine offline.
+#
 # Usage: bash scripts/test-serving-endpoint.sh [OPTIONS]
 #
 # Output: JSON array to stdout, diagnostics to stderr.

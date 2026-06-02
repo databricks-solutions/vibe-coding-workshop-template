@@ -15,13 +15,23 @@ description: >
   skill for that.
 license: Apache-2.0
 compatibility: Requires an existing AppKit project with Node.js v22+ and Databricks CLI >= 0.295.0
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  Plugin registration is pure source editing (server.ts / app.yaml / databricks.yml) — client-agnostic.
+  IDE: `npm install <plugin>` then `databricks apps deploy --profile $PROFILE`. Genie Code: add the
+  plugin package to `package.json` (no local `npm install` — the platform installs it server-side on
+  deploy) and deploy via `runDatabricksCli` (omit `--profile`) or the SDK fallback in `03-appkit-deploy`.
+  `npx @databricks/appkit docs` is IDE-only (npx absent on Genie Code) — WebFetch the AppKit docs site instead.
+coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.1.0"
   domain: apps
   role: plugin-integration
   standalone: true
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources:
     - name: "databricks-agent-skills/databricks-apps"
@@ -57,6 +67,21 @@ AppKit may have plugins beyond those listed here. Always check the upstream docs
 - **Full plugin list:** `npx @databricks/appkit docs "plugins"`
 
 The bundled reference files below cover commonly used plugins as a fallback when the live docs cannot be reached. If the user requests a plugin not listed here, consult the upstream docs directly.
+
+### Working in Genie Code (client routing)
+
+This skill is written for the **IDE/CLI** path. Plugin registration itself — editing `server/server.ts`, `app.yaml`, and `databricks.yml` — is **identical on both clients**. Only the toolchain commands differ; apply these substitutions and you do not need to re-check per command:
+
+| IDE/CLI (as written) | Genie Code substitution |
+|----------------------|--------------------------|
+| `npm install <plugin>` / `npm install @databricks/appkit@latest` | add the package to `package.json` `dependencies`; the platform runs `npm install` **server-side** on deploy (no local npm on Genie Code) |
+| `node -e "require('@databricks/appkit')…"` / `find node_modules …` (export check) | **IDE-only** — no local `node_modules`; confirm the export from the AppKit docs and let the server-side build + `databricks apps logs <name>` surface a bad import |
+| `npx @databricks/appkit docs "<topic>"` | npx is absent (P9) — `WebFetch` https://databricks.github.io/appkit/docs/plugins/ instead |
+| `databricks apps validate --profile $PROFILE` | hard-blocked — skip; rely on server-side build logs (see `03-appkit-deploy`) |
+| `databricks <cmd> … --profile $PROFILE` | run via `runDatabricksCli`, **omit `--profile`** (pre-authenticated) |
+| `databricks apps deploy …` | see the `03-appkit-deploy` deploy-routing contract (`runDatabricksCli`, else SDK `w.apps.deploy(... SNAPSHOT)`) |
+
+Paths in this skill are relative to `apps_lakebase/$APP_NAME` — on Genie Code that is under your `.assistant/skills` repo clone, never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ---
 
@@ -99,6 +124,8 @@ find node_modules/@databricks/appkit -name "*.d.ts" | xargs grep -l "<ExportName
 ```
 
 > **Anti-pattern — "Import it and see if it compiles."** The server bundler (tsdown) skips type checking and will silently bundle a broken import. The error surfaces only when the client build runs tsc or the server crashes at runtime — usually after a 2-3 minute deploy round-trip. Always run the `node -e` check above before writing the import.
+
+> **Client note — Genie Code:** the `node -e` / `find node_modules` checks are **IDE-only** (no local `node_modules`). Instead, confirm the export name against the AppKit plugin docs (WebFetch https://databricks.github.io/appkit/docs/plugins/), then deploy and treat the **server-side build logs** (`databricks apps logs <name>`) as the authoritative signal — a nonexistent import fails the platform build there with the same error.
 
 ---
 

@@ -3,6 +3,8 @@
 > **Upstream (always check for latest):** https://databricks.github.io/appkit/docs/development/llm-guide
 >
 > Run `npx @databricks/appkit docs "llm guide"` for the live version. This file is a fallback.
+>
+> **Client note (IDE & Genie Code).** These are **code-authoring rules** — they apply identically on both clients. On Genie Code `npx` is absent: WebFetch the upstream link above instead of the `npx … docs` command, and note that any `databricks apps validate` mention is IDE-only (skipped on Genie Code; rely on `bundle validate` + server-side build logs).
 
 ---
 

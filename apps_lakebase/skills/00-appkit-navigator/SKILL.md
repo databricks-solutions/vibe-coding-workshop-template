@@ -11,13 +11,19 @@ description: >
   "wire agent", "serving plugin", "agent app proxy", "chat history",
   "feedback".
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+coverage: full
+# Contract/index layer only (M5 5e, body sweep). The navigator's client-awareness body layer
+# (client_context detection, skills/genie-code-environment pointer, npx/$PROFILE IDE-gating,
+# Development-Lifecycle deploy/test client-annotation) is added in Milestone 06 (criterion 3 / step 4)
+# to keep this Tier-1-thin routing skill from being double-touched.
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.1.0"
   domain: meta
   role: navigator
   standalone: true
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: low
   upstream_sources: []  # Routing skill; canonical Apps guidance lives in databricks-agent-skills (see See Also).
 ---

@@ -6,6 +6,8 @@
 > - https://databricks.github.io/appkit/docs/configuration
 > - `databricks apps deploy --help`
 
+> **Client routing:** commands below are written for the **IDE/CLI** path with `--profile $PROFILE`. On **Genie Code**, run each `databricks …` command via `runDatabricksCli` and **omit `--profile`** (pre-authenticated); a targetless `databricks bundle deploy` needs `--target dev`. See the deploy-routing table in [`../SKILL.md`](../SKILL.md) and the behavioral manifest in `skills/genie-code-environment`.
+
 ## app.yaml Configuration
 
 The `app.yaml` file configures the app's runtime environment in Databricks Apps.

@@ -12,13 +12,24 @@ description: >
 license: Apache-2.0
 compatibility: Requires Lakebase plugin registered via 04-appkit-plugin-add, Node.js v22+, Databricks CLI >= 0.295.0
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  Wiring is source editing (server.ts DDL/routes, hooks) — client-agnostic. DDL runs **server-side** on
+  first deploy under the app's Service Principal (Deploy-First Pattern), so the SP owns the schema/tables on
+  both clients — never run DDL locally. IDE: `npm run build` gates locally, then `databricks apps deploy
+  --profile $PROFILE`. Genie Code: local `npm run build` gates are an IDE convenience (no local npm) — skip
+  them and let the platform build server-side; deploy via `runDatabricksCli` (omit `--profile`) or the SDK
+  fallback in `03-appkit-deploy`. Verify via browser `ConnectionStatus` / `apps logs` or the OAuth-session test.
+coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.1.0"
   domain: apps
   role: lakebase-wiring
   standalone: false
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources:
     - name: "databricks-agent-skills/databricks-lakebase"
@@ -71,6 +82,20 @@ npx @databricks/appkit docs "lakebase"
 ```
 
 > **Build system note:** AppKit uses `tsdown` with `unbundle: true` for server compilation. Each `.ts` file in `server/` gets its own `.js` output, and relative imports between them are preserved. You can safely split `server/server.ts` into multiple files (e.g., `server/mock-data.ts`, `server/mappers.ts`) — they will resolve correctly at runtime. The entry point remains `server/server.ts`.
+
+### Working in Genie Code (client routing)
+
+All the **code** in this skill — DDL, routes, hooks, mappers — is written into the project the same way on both clients. The DDL is intentionally executed **server-side on first deploy** (the "Deploy-First Pattern" in Step 1d), so it is already client-agnostic. Only the **local build/test gates** differ:
+
+| IDE/CLI (as written) | Genie Code substitution |
+|----------------------|--------------------------|
+| `npm run build` gates (Steps 2g, 3c2, 4a, 4b) — "**You MUST run `npm run build`**" | **IDE-only** convenience — there is no local Node toolchain on Genie Code. Skip them; the platform runs the same build **server-side** on deploy, and TypeScript/import errors surface in `databricks apps logs <name>`. Wire the code, then deploy and read the logs. |
+| `npm run dev` | not available on Genie Code (and blocked pre-deploy anyway — `lakebase()` needs platform-injected env) — verify on the deployed app instead |
+| `npx @databricks/appkit docs "lakebase"` | npx absent (P9) — WebFetch https://databricks.github.io/appkit/docs/plugins/lakebase |
+| `databricks … --profile $PROFILE` | run via `runDatabricksCli`, **omit `--profile`** (pre-authenticated) |
+| local `curl … -H "Authorization: Bearer …"` health test | browser `ConnectionStatus` + `apps logs`, **or** the 3-hop OAuth `requests.Session()` test (see Quick Reference note and `03-appkit-deploy`) |
+
+Paths are relative to `apps_lakebase/$APP_NAME` — on Genie Code that lives under your `.assistant/skills` repo clone, never `/tmp`. The `apps validate` skip and the health-test routing are already flagged inline at Steps 4a2 and Quick Reference. See `skills/genie-code-environment` for the full manifest.
 
 ---
 
