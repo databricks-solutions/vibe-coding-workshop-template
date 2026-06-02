@@ -4,7 +4,7 @@ description: End-to-end orchestrator for creating Silver layer pipelines using S
 clients: [ide_cli, genie_code]
 bundle_resource: pipelines
 deploy_verb: bundle_deploy
-deploy_note: "Silver SDP/DLT pipeline + DQ-rules setup job deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code). The DQ-rules job runs before the pipeline; DLT updates use full_refresh=True; no DEFAULT clauses in serverless table DDL."
+deploy_note: "Silver SDP/DLT pipeline + DQ-rules setup job deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code). The DQ-rules job runs before the pipeline; DLT updates use full_refresh=True; no DEFAULT clauses in serverless table DDL. On Genie Code, write generated pipeline/DQ scripts under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`, e.g. `src/`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
 coverage: full
 metadata:
   author: prashanth subrahmanyam

@@ -11,6 +11,11 @@ description: >
   Use when setting up observability end-to-end, creating Lakehouse Monitors, enabling anomaly
   detection, building dashboards, or configuring SQL alerts.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: monitors
+deploy_verb: bundle_deploy
+deploy_note: "Orchestrates Lakehouse monitors + anomaly detection + AI/BI dashboards + SQL-alert jobs, all deployed via `bundle deploy --target dev` (runDatabricksCli on Genie Code). On Genie Code, write generated monitor/alert configs and dashboard JSON under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

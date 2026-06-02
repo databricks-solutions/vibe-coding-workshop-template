@@ -14,7 +14,7 @@ license: Apache-2.0
 clients: [ide_cli, genie_code]
 bundle_resource: jobs
 deploy_verb: bundle_deploy
-deploy_note: "Combined semantic_layer_job (Metric Views -> TVFs -> Genie) deployed via `bundle deploy --target dev` from the bundle-folder page; Genie Spaces follow the RULE_8 tier model (see 04-genie-space-export-import-api). On Genie Code the deploy verb runs through runDatabricksCli."
+deploy_note: "Combined semantic_layer_job (Metric Views -> TVFs -> Genie) deployed via `bundle deploy --target dev` from the bundle-folder page; Genie Spaces follow the RULE_8 tier model (see 04-genie-space-export-import-api). On Genie Code the deploy verb runs through runDatabricksCli. Write generated metric-view YAML / TVF SQL under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
 coverage: full
 metadata:
   author: prashanth subrahmanyam

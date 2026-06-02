@@ -1,6 +1,11 @@
 ---
 name: lakehouse-monitoring-comprehensive
 description: Comprehensive guide for Databricks Lakehouse Monitoring (Data Profiling) with quick-start workflow (2 hours), fill-in-the-blank requirements template, concrete fact/dimension monitor examples, and complete deployment patterns. Uses the new Data Quality API (`databricks.sdk.service.dataquality`). Use when setting up Lakehouse Monitoring for Gold layer tables, creating custom business metrics, designing monitoring strategy, querying monitoring tables for dashboards, or troubleshooting monitor initialization failures. Includes setup patterns with graceful degradation, custom metric syntax (AGGREGATE, DERIVED, DRIFT), table-level business KPIs with `input_columns=[":table"]`, query patterns for dashboards, async operations handling, monitor cleanup, Genie documentation integration, and production deployment workflow.
+clients: [ide_cli, genie_code]
+bundle_resource: monitors
+deploy_verb: bundle_deploy
+deploy_note: "Lakehouse monitors (Data Quality API) on Gold tables, deployed via `bundle deploy --target dev` (runDatabricksCli on Genie Code); monitors target the per-user prefixed schema."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0"

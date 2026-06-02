@@ -5,7 +5,7 @@ license: Apache-2.0
 clients: [ide_cli, genie_code]
 bundle_resource: jobs
 deploy_verb: bundle_deploy
-deploy_note: "Gold tables + Silver-to-Gold MERGE jobs + FK constraints deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code). Strip DEFAULT clauses from DDL (SCD2 cols set in INSERT/MERGE); printSchema() before MERGE."
+deploy_note: "Gold tables + Silver-to-Gold MERGE jobs + FK constraints deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code). Strip DEFAULT clauses from DDL (SCD2 cols set in INSERT/MERGE); printSchema() before MERGE. On Genie Code, write generated table/merge scripts under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`, e.g. `src/`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
 coverage: full
 metadata:
   author: prashanth subrahmanyam

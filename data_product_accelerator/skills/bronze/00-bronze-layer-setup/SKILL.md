@@ -4,7 +4,7 @@ description: End-to-end Bronze layer creation for testing and demos. Creates tab
 clients: [ide_cli, genie_code]
 bundle_resource: jobs
 deploy_verb: bundle_deploy
-deploy_note: "Bronze schema/tables + Faker data load deploy as a bundle job via `bundle deploy --target dev` (runDatabricksCli on Genie Code). Job notebooks start with %pip install databricks-sdk + restartPython; use TBLPROPERTIES 'layer'='bronze', never the reserved 'table_type'."
+deploy_note: "Bronze schema/tables + Faker data load deploy as a bundle job via `bundle deploy --target dev` (runDatabricksCli on Genie Code). Job notebooks start with %pip install databricks-sdk + restartPython; use TBLPROPERTIES 'layer'='bronze', never the reserved 'table_type'. On Genie Code, write generated setup/seed scripts under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`, e.g. `src/`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
 coverage: full
 metadata:
   author: prashanth subrahmanyam
