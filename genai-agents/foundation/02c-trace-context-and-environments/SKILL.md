@@ -9,6 +9,11 @@ description: >
   metadata, and how this composes with `client_request_id` and `gen_ai.*`.
   Foundation Step 2c. Sibling to F2 (Python tracing) and F2b (TS tracing).
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Trace-context metadata configuration (user/session/environment/version) — no deployed resource; identical on both clients. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: medium

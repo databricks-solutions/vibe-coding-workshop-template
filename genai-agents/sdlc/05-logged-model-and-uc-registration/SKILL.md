@@ -8,6 +8,11 @@ description: >
   linking, metric-based promotion gating, or rollback. SDLC Step 5.
 license: Apache-2.0
 compatibility: "Requires Databricks workspace with MLflow 3.10+ and Unity Catalog. Scripts use uv."
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Agent logged to MLflow and registered in UC (with champion alias) via the MLflow SDK; the UC model lands under the per-user prefixed catalog/schema. No bundle resource. Identical on both clients; on Genie Code run any CLI step through runDatabricksCli. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

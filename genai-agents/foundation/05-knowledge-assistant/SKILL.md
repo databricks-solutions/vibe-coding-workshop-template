@@ -9,6 +9,11 @@ description: >
   knowledge_assistant tool. Track-neutral foundation skill. Optional but
   recommended whenever document Q&A is part of the agent.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Agent Bricks Knowledge Assistant created/synced via the Databricks SDK/REST; readiness polled identically on both clients. No bundle resource; on Genie Code run any CLI step through runDatabricksCli. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

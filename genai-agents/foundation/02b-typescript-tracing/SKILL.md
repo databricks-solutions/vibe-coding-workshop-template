@@ -9,6 +9,11 @@ description: >
   Sibling to the Python tracing skill (Foundation Step 2). Consumes the MLflow
   environment from Step 1.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Node/TypeScript tracing via the `mlflow-tracing`/`mlflow-openai` npm packages — no deployed resource; identical on both clients. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

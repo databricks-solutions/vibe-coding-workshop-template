@@ -6,6 +6,11 @@ description: >
   Authorization (OBO), auth passthrough for Model Serving, and MCP server
   authentication. Track A Step 4.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Agent permissions / OBO / resource grants — config + grants, no bundle resource. Same model on both clients; on Genie Code run grant CLI steps through runDatabricksCli (pre-authenticated). See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

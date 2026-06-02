@@ -9,6 +9,11 @@ description: >
   human labels to calibrate automated scorers. SDLC Step 4.
 license: Apache-2.0
 compatibility: "Requires Databricks workspace with MLflow 3.10+ and Unity Catalog. Scripts use uv."
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "`mlflow.genai.evaluate()` runs via the MLflow SDK on serverless workspace compute; no bundle resource. Identical on both clients; on Genie Code execute on serverless and run any CLI step through runDatabricksCli. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

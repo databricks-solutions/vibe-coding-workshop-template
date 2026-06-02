@@ -8,6 +8,11 @@ description: >
   the resolved spec to discover which volumes a use case needs and creates them
   alongside the canonical agent + ops UC schemas.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: schemas
+deploy_verb: bundle_deploy
+deploy_note: "Provisions UC schemas + managed volumes idempotently under the per-user prefixed schema (`{user_schema_prefix}`); created via SDK/DDL identically on both clients. On Genie Code run CLI steps through runDatabricksCli (pre-authenticated) and execute on serverless; see `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: medium

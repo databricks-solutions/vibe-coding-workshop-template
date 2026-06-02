@@ -5,6 +5,11 @@ description: >
   tools, DatabricksMCPClient connections, and MCPServerSse for MCP servers.
   Track A Step 3. Builds on shared concepts from F3 (Tools and Data Access).
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Tool + MCP wiring (local function tools, DatabricksMCPClient, MCPServerSse) — code, no bundle resource. Resolves identically on both clients; on Genie Code use its built-in tool surface for ad-hoc calls and runDatabricksCli for grants. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

@@ -11,6 +11,11 @@ description: >
   trace tables but adds a provider-level audit trail.
 license: Apache-2.0
 compatibility: "Requires Databricks AI Gateway (public preview in most AWS/Azure regions as of 2026-04). Requires workspace Unity Catalog and SQL Warehouse for inference tables."
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "AI Gateway endpoint + inference/usage tables created via the Databricks SDK/REST (or CLI through runDatabricksCli on Genie Code); inference tables land in the per-user prefixed schema. Not modeled as a DAB resource kind in this workshop. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

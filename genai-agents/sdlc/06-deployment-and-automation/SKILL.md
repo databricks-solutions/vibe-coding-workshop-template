@@ -9,6 +9,11 @@ description: >
   linking. SDLC Step 6.
 license: Apache-2.0
 compatibility: "Requires Databricks workspace with MLflow 3.10+ and Unity Catalog. Scripts use uv."
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: "The production deploy skill — bundle resources via the `bundle deploy --target dev` spine plus the App deploy step. On Genie Code run every deploy CLI through runDatabricksCli (pre-authenticated); on IDE via the local CLI. CI/CD automation is the same bundle/spine on both clients. See `skills/genie-code-environment` for the deploy verbs."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

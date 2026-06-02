@@ -6,6 +6,11 @@ description: >
   spans, tags, connection pooling, and Unity Catalog OTEL storage for SQL-queryable
   trace retention. Foundation Step 2. Consumes MLflow environment from Step 1.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Experiment + tracing + UC OTEL trace storage configured via the MLflow SDK; OTEL trace tables land in the per-user prefixed schema. No bundle resource. Identical on both clients; on Genie Code use its serverless runtime + runDatabricksCli for any CLI step. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

@@ -6,6 +6,11 @@ description: >
   verify the built-in chat UI. Track A Step 1. Produces a running local agent
   project ready for customization.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: "Clone the agent template and run it. The local dev server (quickstart) is the IDE/local branch; on Genie Code there is no local dev server — deploy to the Databricks Apps runtime and test the deployed app (run the deploy CLI through runDatabricksCli, pre-authenticated). On Genie Code clone the template under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path — relative paths resolve against the page CWD (see `skills/genie-code-environment` §8)."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: medium

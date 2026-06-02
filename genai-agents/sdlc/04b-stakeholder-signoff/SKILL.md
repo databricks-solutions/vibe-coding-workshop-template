@@ -10,6 +10,11 @@ description: >
   of Step 4 eval — this is the gate layered on top of it.
 license: Apache-2.0
 compatibility: "Works with any Databricks workspace. Uses MLflow Evaluation UI and (optionally) Review App labeling sessions."
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Stakeholder sign-off is a review process (MLflow Evaluation UI / Review App) — no deployed resource and no client-specific mechanics. Identical on both clients. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: medium

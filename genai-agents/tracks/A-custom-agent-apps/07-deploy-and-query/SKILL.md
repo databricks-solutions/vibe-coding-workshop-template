@@ -7,6 +7,11 @@ description: >
   workflow. Track A Step 7. Consumes evaluation results from Step 6.
   Produces a running deployed agent on Databricks Apps.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: "The Track A deploy step — create/sync/deploy the agent to the Databricks Apps runtime, then query the endpoint via OAuth. On Genie Code run the create/sync/deploy CLI through runDatabricksCli (pre-authenticated); on IDE via the local CLI. The deployed app + endpoint carry the per-user prefix. See `skills/genie-code-environment` for the resolved deploy verbs."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

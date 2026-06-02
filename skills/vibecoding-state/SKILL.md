@@ -12,6 +12,11 @@ description: >
   BEFORE acting on any workshop prompt.
 license: Apache-2.0
 compatibility: "Works with any workshop that follows the vibecoding state schema in references/state-template.md. Pathways A, B, C write to apps_lakebase/$APP_NAME/.vibecoding-state.md; Pathway D writes to agents/$AGENT_NAME/.vibecoding-state.md."
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Runtime state/gating/retrospective contract — not a deployable skill; no bundle resource and no deploy verb. It is the resolver: at `enter` it resolves the active client and writes the `client_context` capability triple (`cli_channel`, `bundle_deploy.verb`, `page_context_required`, `state_file_root`) that every downstream prompt and skill consumes, so it is client-agnostic by construction. On Genie Code the state file lives under the cloned repo root (`state_file_root` = `{REPO_ROOT}`). See `skills/genie-code-environment` for the resolved per-client deploy verbs."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: low

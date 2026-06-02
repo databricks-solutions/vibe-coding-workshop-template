@@ -11,6 +11,11 @@ description: >
   Triggers on "simple agent", "scaffold agent", "MCP agent", "quick agent",
   "create agent", "tool calling agent", "Genie agent", "basic agent".
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Scaffolds a minimal MCP tool-calling agent and deploys it to Model Serving via a deploy job. On Genie Code run the job submit/deploy through runDatabricksCli (pre-authenticated — no `--profile`); on IDE via the local CLI with a profile. On Genie Code write the scaffolded agent source under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path — relative paths resolve against the page CWD (see `skills/genie-code-environment` §8)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.3.0"

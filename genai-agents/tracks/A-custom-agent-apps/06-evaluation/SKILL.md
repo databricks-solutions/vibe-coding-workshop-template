@@ -7,6 +7,11 @@ description: >
   eval datasets. Track A Step 6. Consumes a working agent with tools from
   Steps 1-5. Produces evaluation results and confidence to deploy.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Agent evaluation (agent-evaluate, built-in judges) runs via the MLflow SDK on serverless workspace compute; no bundle resource. Identical on both clients. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

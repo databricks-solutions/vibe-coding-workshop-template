@@ -12,6 +12,11 @@ description: >
   are tool/retrieval problems rather than instruction problems.
 license: Apache-2.0
 compatibility: "Requires Databricks workspace with MLflow >= 3.11 and Unity Catalog Prompt Registry. Preview feature — confirm region availability."
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "`optimize_prompts()` / `GepaPromptOptimizer` run via the MLflow SDK on serverless workspace compute; optimized prompts re-registered in the UC Prompt Registry. No bundle resource. Identical on both clients; on Genie Code execute on serverless. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

@@ -7,6 +7,11 @@ description: >
   tasks to the correct specialized skill. Uses tiered loading and keyword
   routing so agents read only the skills needed for the current task.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Course navigator/router — selects which genai-agents skills to load; no deployed resource and no deploy verb. Client-agnostic routing. The client-awareness layer (RULE_0 `client_context` detection + `skills/genie-code-environment` pointer) is added in Milestone 06 per the navigator plan; this sweep adds only the capability block."
+coverage: full
 metadata:
   author: "prashanth-subrahmanyam"
   version: "5.0.0"
