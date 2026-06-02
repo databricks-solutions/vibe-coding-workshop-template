@@ -2,6 +2,11 @@
 name: gold-layer-design
 description: End-to-end orchestrator for designing complete Gold layer schemas with ERDs, YAML files, lineage tracking, and comprehensive business documentation. Guides users through dimensional modeling, ERD creation (master/domain/summary based on table count), YAML schema generation, column-level lineage documentation, business onboarding guide creation, source table mapping, and design validation. Orchestrates design-workers (05-erd-diagrams, 06-table-documentation, 01-grain-definition, 07-design-validation, 02-dimension-patterns, 03-fact-table-patterns, 04-conformed-dimensions). Use when designing a Gold layer from scratch, creating dimensional models, documenting business processes, or preparing for Gold layer implementation.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "Design-only: produces ERDs/YAML schemas/lineage/docs consumed by gold-layer-setup; no deployed resource of its own. Downstream artifacts deploy via `bundle deploy --target dev`."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "3.0.0"

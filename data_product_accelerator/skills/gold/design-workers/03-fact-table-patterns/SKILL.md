@@ -2,6 +2,11 @@
 name: 03-fact-table-patterns
 description: Advanced fact table design patterns for Gold layer modeling. Covers measure additivity classification (additive, semi-additive, non-additive), factless fact tables, accumulating snapshot facts, consolidated fact tables, header/line fact patterns, late-arriving facts and dimensions, and NULL handling in measures. Use when designing fact tables beyond basic transaction/aggregate patterns, classifying measure types, or handling complex fact scenarios. Triggers on "fact pattern", "factless", "accumulating snapshot", "measure additivity", "semi-additive", "late arriving", "consolidated fact".
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "Design-phase pattern; output feeds the Gold design/setup artifacts deployed downstream via `bundle deploy --target dev`. No standalone resource."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

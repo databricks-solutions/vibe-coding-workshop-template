@@ -1,6 +1,11 @@
 ---
 name: silver-layer-setup
 description: End-to-end orchestrator for creating Silver layer pipelines using Spark Declarative Pipelines (SDP, formerly DLT) with Delta table-based data quality rules, quarantine patterns, and monitoring views. Orchestrates mandatory dependencies on common skills (databricks-table-properties, databricks-python-imports, databricks-asset-bundles, schema-management-patterns, unity-catalog-constraints, databricks-expert-agent) and Silver-domain skills (dlt-expectations-patterns, dqx-patterns). Use when creating a Silver layer from scratch, setting up Bronze-to-Silver pipelines, or implementing Silver SDP/DLT with streaming ingestion and runtime-updateable DQ rules.
+clients: [ide_cli, genie_code]
+bundle_resource: pipelines
+deploy_verb: bundle_deploy
+deploy_note: "Silver SDP/DLT pipeline + DQ-rules setup job deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code). The DQ-rules job runs before the pipeline; DLT updates use full_refresh=True; no DEFAULT clauses in serverless table DDL."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"

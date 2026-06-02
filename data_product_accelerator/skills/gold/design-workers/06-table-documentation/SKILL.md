@@ -1,6 +1,11 @@
 ---
 name: 06-table-documentation
 description: Comprehensive documentation standards for Gold layer tables including naming conventions, column descriptions, and metadata requirements. Use when creating Gold layer tables, columns, or writing documentation to ensure dual-purpose descriptions that serve both business users and technical users (including LLMs like Genie). Includes YAML schema consultation patterns, surrogate key patterns, SCD Type 2 documentation, and implementation guidance for Silver table naming conventions.
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "Design-phase pattern; output feeds the Gold design/setup artifacts deployed downstream via `bundle deploy --target dev`. No standalone resource."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0"

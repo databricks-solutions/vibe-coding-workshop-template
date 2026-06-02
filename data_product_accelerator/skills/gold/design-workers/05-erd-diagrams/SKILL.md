@@ -1,6 +1,11 @@
 ---
 name: 05-erd-diagrams
 description: Patterns for creating clean, professional Mermaid ERD diagrams for data modeling documentation. Use when documenting Gold layer data models, creating master ERDs for complete models, domain-specific ERDs for focused views, or summary ERDs for large models (20+ tables). Includes organization strategies, syntax standards, relationship patterns, and cross-domain reference patterns.
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "Design-phase pattern; output feeds the Gold design/setup artifacts deployed downstream via `bundle deploy --target dev`. No standalone resource."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0"

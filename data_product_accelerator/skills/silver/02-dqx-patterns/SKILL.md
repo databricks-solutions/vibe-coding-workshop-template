@@ -2,6 +2,11 @@
 name: dqx-patterns
 description: Databricks DQX framework patterns for advanced data quality validation with detailed failure insights and flexible quarantine strategies. Use when implementing Silver/Gold layer validation, needing richer diagnostics than DLT expectations, or requiring pre-merge validation with detailed failure tracking. Supports YAML configuration, Delta table storage, and serverless compute compatibility.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "DQX validation runs as a serverless job/pipeline step; deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"

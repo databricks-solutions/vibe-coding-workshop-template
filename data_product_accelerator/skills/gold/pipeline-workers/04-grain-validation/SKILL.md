@@ -2,6 +2,11 @@
 name: 04-grain-validation
 description: Pre-merge grain validation patterns for Gold layer fact tables. Use when creating fact table merge scripts to validate that DataFrame grain matches DDL PRIMARY KEY, prevent transaction vs aggregated confusion, and catch grain mismatches before MERGE. Includes grain inference functions, pre-merge validation, validation SQL, and common grain mismatch errors.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Pattern consumed by the Gold merge jobs (notebook_task); deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

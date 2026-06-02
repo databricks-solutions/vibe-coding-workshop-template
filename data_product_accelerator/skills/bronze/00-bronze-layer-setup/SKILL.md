@@ -1,6 +1,11 @@
 ---
 name: bronze-layer-setup
 description: End-to-end Bronze layer creation for testing and demos. Creates table DDLs, generates fake data with Faker, copies from existing sources, and configures Asset Bundle jobs. Covers Unity Catalog compliance, Change Data Feed, automatic liquid clustering, and governance metadata. Use when setting up Bronze layer tables, creating test/demo data, rapid prototyping Medallion Architecture, or bootstrapping a new Databricks project. For Faker-specific patterns (corruption rates, function signatures, provider examples), load the faker-data-generation skill.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Bronze schema/tables + Faker data load deploy as a bundle job via `bundle deploy --target dev` (runDatabricksCli on Genie Code). Job notebooks start with %pip install databricks-sdk + restartPython; use TBLPROPERTIES 'layer'='bronze', never the reserved 'table_type'."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"

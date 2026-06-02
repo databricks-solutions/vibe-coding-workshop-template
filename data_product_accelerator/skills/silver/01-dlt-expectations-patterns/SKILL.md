@@ -1,6 +1,11 @@
 ---
 name: dlt-expectations-patterns
 description: Spark Declarative Pipeline (SDP, formerly DLT) expectations patterns for data quality with Unity Catalog Delta table storage. Use when implementing Silver layer SDP/DLT pipelines, creating portable data quality rules, or needing runtime-updateable expectations without code deployment. Supports severity-based filtering (critical vs warning) and quarantine patterns. Uses `import dlt` (legacy API) because `@dlt.expect_all_or_drop()` decorators are not yet available in the modern `dp` API (`from pyspark import pipelines as dp`).
+clients: [ide_cli, genie_code]
+bundle_resource: pipelines
+deploy_verb: bundle_deploy
+deploy_note: "DLT expectations run inside the Silver pipeline; deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0"

@@ -1,6 +1,11 @@
 ---
 name: 01-yaml-table-setup
 description: Patterns for creating Gold layer tables dynamically from YAML schema definitions at runtime. Use when managing 10+ Gold layer tables across multiple domains, when schema evolves frequently, or when you want to avoid embedded SQL DDL strings in Python. Includes YAML schema structure, setup script implementation, Asset Bundle configuration, and workflow patterns for schema changes.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Pattern consumed by the Gold table-setup/merge jobs (notebook_task); deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0"

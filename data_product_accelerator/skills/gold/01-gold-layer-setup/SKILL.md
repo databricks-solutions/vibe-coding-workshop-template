@@ -2,6 +2,11 @@
 name: gold-layer-setup
 description: End-to-end orchestrator for implementing Gold layer tables, merge scripts, FK constraints, and Asset Bundle jobs from YAML schema definitions. Guides users through Silver contract validation, YAML-driven table creation, Silver-to-Gold MERGE operations (SCD Type 1/2 dimensions, aggregated/transaction facts, accumulating snapshots, factless facts, periodic snapshots, junk dimensions), foreign key constraint application, Asset Bundle job configuration, and post-deployment validation. Orchestrates pipeline-workers (01-yaml-table-setup, 02-merge-patterns, 03-deduplication, 04-grain-validation, 05-schema-validation) and common skills (databricks-asset-bundles, databricks-table-properties, databricks-python-imports, schema-management-patterns, unity-catalog-constraints, databricks-expert-agent). Use when implementing Gold layer from YAML designs, creating table setup scripts, writing merge scripts, deploying Gold layer jobs, or troubleshooting Gold layer implementation errors.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Gold tables + Silver-to-Gold MERGE jobs + FK constraints deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code). Strip DEFAULT clauses from DDL (SCD2 cols set in INSERT/MERGE); printSchema() before MERGE."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0.0"
