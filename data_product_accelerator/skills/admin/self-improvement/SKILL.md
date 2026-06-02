@@ -2,6 +2,11 @@
 name: self-improvement
 description: Enables agent self-reflection and learning from mistakes through systematic skill updates. Prioritizes updating existing skills over creating new ones - always searches existing skills first, creates new skills only when justified. Includes upstream source sync workflow for tracking and updating skills from databricks-solutions/ai-dev-kit. Use after encountering errors, completing complex tasks, or when asked to reflect, learn, or document a mistake. Triggers on "learn from this", "don't repeat", "remember this pattern", "what went wrong", "update skills", "capture this learning", "document mistake", "prevent this error", "AI-Dev-Kit updated", "upstream changed", "sync with ai-dev-kit".
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Self-reflection meta-skill — updates/creates `SKILL.md` files in the repo skill tree; no deployed resource and no deploy verb. Client-agnostic. On Genie Code, the repo skill tree lives under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`); write skill edits there, not a bare relative path — relative paths resolve against the page CWD (see `skills/genie-code-environment` §8)."
+coverage: full
 metadata:
   version: "1.4.0"
   author: prashanth subrahmanyam

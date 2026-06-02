@@ -12,6 +12,11 @@ description: >
   "skill audit", "update check", "Databricks released", "new MLflow version", "upstream
   sync", "ai-dev-kit lineage", "databricks-agent-skills lineage".
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Read/report meta-skill — audits skill currency and reports drift; no deployed resource and no deploy verb. Client-agnostic. On Genie Code it audits the skill tree under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`); fetching upstream docs uses the Genie Code web tools (see `skills/genie-code-environment`)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "3.0.0"

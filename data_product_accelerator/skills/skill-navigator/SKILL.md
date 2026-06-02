@@ -1,6 +1,11 @@
 ---
 name: skill-navigator
 description: Intelligent skill navigation system with tiered loading and orchestrator-first routing for context-efficient agent operation. Routes tasks to the correct domain skill based on keyword detection with orchestrator priority. Each skill uses progressive disclosure with references/, scripts/, and assets/ directories. Use this skill as the entry point for any Databricks-related task to determine which specialized skills to load.
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Routing/navigator meta-skill — selects which domain skills to load; no deployed resource and no deploy verb. Client-agnostic routing. The client-awareness layer (RULE_0 `client_context` detection + `skills/genie-code-environment` pointer) is added in Milestone 06 per the navigator plan; this sweep only adds the capability block."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "3.0"

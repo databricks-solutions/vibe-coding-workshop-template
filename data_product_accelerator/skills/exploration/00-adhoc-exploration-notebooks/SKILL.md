@@ -1,6 +1,11 @@
 ---
 name: adhoc-exploration-notebooks
 description: Create dual-format ad-hoc exploration notebooks for Databricks workspace (.py) and local Jupyter (.ipynb) with Databricks Connect. Use when building data exploration tools, debugging data quality issues, or creating interactive analysis notebooks. Supports widget fallback patterns, helper functions for table discovery, and proper Spark session initialization for both environments.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "The local-Jupyter path (Databricks Connect + profile-based CLI auth) is the IDE/local branch only. On Genie Code there is no local toolchain: explore directly in the workspace on serverless compute (pre-authenticated — no profile setup, no local Connect session), and deploy the exploration job via `bundle deploy --target dev` + `bundle run` through runDatabricksCli (see `skills/genie-code-environment`). On Genie Code, write generated notebooks under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path — relative paths resolve against the page CWD (§8)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"

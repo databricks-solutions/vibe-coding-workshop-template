@@ -10,6 +10,11 @@ description: >
   with requirements gathering, quality checklists, and worked examples. Use when creating any .md file,
   organizing existing documentation, maintaining project structure, or creating comprehensive framework
   documentation sets.
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Documentation authoring/organization meta-skill — produces `.md` docs; no deployed resource and no deploy verb. Client-agnostic. On Genie Code, write generated docs under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path — relative paths resolve against the page CWD (see `skills/genie-code-environment` §8)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0.0"
