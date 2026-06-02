@@ -48,7 +48,8 @@ SKIP_SUBSTR = (
     os.sep + "__pycache__" + os.sep,
     os.sep + ".cursor" + os.sep,
     os.sep + "plans" + os.sep,
-    os.path.join("retrospectives", "genie-code-refactor-handoff.md"),
+    "retrospectives" + os.sep,   # entire retrospectives/ tree is non-source (handoff, field guide, plans)
+    "presentations" + os.sep,    # slide deck is non-source
     os.path.join("scripts", "audit_genie_compat.py"),
     # Generated baseline artifacts (avoid self-flagging on re-runs at gates).
     "skill_manifest.txt",
