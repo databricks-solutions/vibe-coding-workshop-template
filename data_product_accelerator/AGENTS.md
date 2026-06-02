@@ -15,7 +15,7 @@ This module (`data_product_accelerator/`) contains the framework — skills, doc
 repo-root/                           <-- workspace root / agent CWD
 ├── data_product_accelerator/        <-- framework (skills, docs, context)
 │   ├── AGENTS.md
-│   ├── skills/                      <-- 77 agent skills (read-only)
+│   ├── skills/                      <-- 44 agent skills (read-only)
 │   ├── context/                     <-- customer schema CSV (input)
 │   └── docs/                        <-- framework documentation
 │
@@ -126,7 +126,7 @@ For full agent behavior, read: `skills/databricks-expert-agent/SKILL.md`
 
 ## Skills Location
 
-All 55 Agent Skills are in `data_product_accelerator/skills/` using the open [SKILL.md format](https://agentskills.io). Each skill directory contains:
+All 44 Agent Skills are in `data_product_accelerator/skills/` using the open [SKILL.md format](https://agentskills.io). Each skill directory contains:
 
 ```
 skill-name/
@@ -159,7 +159,7 @@ This framework is built on the open [Agent Skills (SKILL.md)](https://agentskill
 | **Genie Code** (in-workspace) | Recurses into this repo cloned under `/Users/<you>/.assistant/skills/` | Reference files by path; load `skills/genie-code-environment` first |
 | **Other** | Point the agent to this file manually | Paste file contents or path |
 
-> **Genie Code:** runs inside the Databricks workspace (pre-authenticated, serverless). First-run kickstart — clone the **whole** repo into `/Users/<your-username>/.assistant/skills/` so Genie Code recurses and auto-discovers every skill, then load `skills/genie-code-environment` (behavior manifest) and let `skills/vibecoding-state` detect `client_context`. The clone command + the full skill-root list live in the **[repo-root AGENTS.md](../AGENTS.md)** ("Genie Code" section) and [PRE-REQUISITES.md](../PRE-REQUISITES.md).
+> **Genie Code:** runs inside the Databricks workspace (pre-authenticated, serverless). First-run kickstart — clone the **whole** repo into `/Users/<your-username>/.assistant/skills/vibe-coding-workshop`, then **start a NEW Agent-mode chat thread** (hard-refresh if skills don't appear) so Genie Code recurses and auto-discovers every skill. Then load `skills/genie-code-environment` (behavior manifest) and let `skills/vibecoding-state` detect `client_context`. The clone command + the full skill-root list live in the **[repo-root AGENTS.md](../AGENTS.md)** ("Genie Code" section) and [PRE-REQUISITES.md](../PRE-REQUISITES.md). Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 ### Prompting Pattern (all IDEs)
 

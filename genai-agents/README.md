@@ -66,6 +66,8 @@ flowchart TD
     style CAP stroke-dasharray: 5 5
 ```
 
+> **Diagram note:** Tracks **B** (hosted-tools: B0–B3) and **C** (serving wrap: C1–C2) and the **Capstone** are **alternate methods** — their skill mirrors were removed in the 2026-04-27 consolidation. For those patterns use the upstream [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills). The canonical path is **Track A** (blue).
+
 ## Canonical track
 
 The workshop's canonical agent build is **Track A: Custom Agent on
@@ -147,6 +149,11 @@ patterns, see [`databricks/databricks-agent-skills`](https://github.com/databric
 (`databricks-agent-bricks`, `databricks-genie`).
 
 ## Quick Start
+
+**Pick your client path first:**
+
+- **IDE/CLI (Cursor, Claude Code, VS Code, Codex):** authenticate the Databricks CLI (see [PRE-REQUISITES.md](../PRE-REQUISITES.md)), then start at step 1 below.
+- **Genie Code (in-workspace):** pre-authenticated and serverless — first **Set Up Project**: clone the whole repo into `/Users/<your-username>/.assistant/skills/vibe-coding-workshop`, then **start a NEW Agent-mode chat thread** (hard-refresh if skills don't appear) so the skills load, and load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context`. Then start at step 1. Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 1. Start with the [GenAI Skill Navigator](./00-course-orchestrator/SKILL.md)
 2. Complete Foundation Steps F0-F5 as routed by the navigator

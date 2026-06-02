@@ -37,9 +37,18 @@ Complete the pre-requisites checklist before beginning: [PRE-REQUISITES.md](../P
 Key requirements:
 - Databricks workspace with Apps and Lakebase enabled
 - AI-powered IDE (Cursor recommended) with Claude Sonnet 4.5+
-- Databricks CLI installed and authenticated
+- Databricks CLI installed and authenticated — **IDE/CLI client only**; Genie Code is pre-authenticated (see the Genie Code block below)
 - Node.js v22+ installed
 - A PRD document at `docs/design_prd.md` describing the application to build
+
+> **Genie Code (in-workspace) — Set Up Project first.** Genie Code discovers skills by recursing into a repo cloned in your per-user skills folder, and it runs pre-authenticated and serverless (skip the CLI auth requirement above). Clone the **whole** workshop repo once, then start a fresh thread so the skills load:
+>
+> ```bash
+> git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git \
+>   /Users/<your-username>/.assistant/skills/vibe-coding-workshop
+> ```
+>
+> After cloning, **start a NEW Agent-mode chat thread** (hard-refresh the page if skills don't appear), then load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context` and gates each step. The local dev server / E2E-test steps in this guide are IDE/CLI-only — on Genie Code, verify against the deployed app instead. Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 ---
 

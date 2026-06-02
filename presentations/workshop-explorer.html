@@ -442,7 +442,7 @@ body.light .tour-card.active{box-shadow:0 4px 16px rgba(226,55,29,.15);}
   <canvas id="starfield"></canvas>
   <div class="galaxy-content">
     <div class="stats-bar">
-      <div class="stat"><div class="stat-num">65</div><div class="stat-label">Agent Skills</div></div>
+      <div class="stat"><div class="stat-num">54</div><div class="stat-label">Agent Skills</div></div>
       <div class="stat"><div class="stat-num">9</div><div class="stat-label">Pipeline Stages</div></div>
       <div class="stat"><div class="stat-num">5</div><div class="stat-label">App Phases</div></div>
       <div class="stat"><div class="stat-num">14</div><div class="stat-label">Platform Modules</div></div>
@@ -810,10 +810,10 @@ const TOURS = {
     tree: buildDPATree(),
     steps: [
       {expand:['ta-root'],activate:['ta-n-root'],narration:'The IDE auto-loads <span class="hl">AGENTS.md</span> — the universal entry point for any AI coding assistant.',tier:[1,'Tier 1: Entry'],
-       designRationale:'A single entry file means <em>any IDE</em> (Cursor, Claude Code, Copilot, Windsurf) discovers the framework automatically. No special configuration, no plugin install — just open the repo and the AI knows where to start. This is the "zero-friction onboarding" principle.',
+       designRationale:'A single entry file means <em>any IDE</em> (Cursor, Claude Code, Copilot, Windsurf) discovers the framework automatically. No special configuration, no plugin install — just open the repo and the AI knows where to start. This is the "zero-friction onboarding" principle. <strong>Genie Code (in-workspace):</strong> clone the whole repo into <code>/Users/&lt;you&gt;/.assistant/skills/vibe-coding-workshop</code>, then start a NEW Agent-mode chat thread so Genie Code recurses the clone and auto-loads every SKILL.md (it is pre-authenticated and serverless).',
        inputOutput:{inputs:['repo root'],outputs:['AGENTS.md','skill-navigator']}},
       {expand:['ta-nav'],activate:['ta-n-nav'],narration:'The <span class="hl">Skill Navigator</span> matches keywords to find the right orchestrator or worker skill.',tier:[1,'Tier 1: Routing'],
-       designRationale:'Keyword-based routing keeps the AI\'s context window <em>small and focused</em>. Instead of loading all 77 accelerator skills, the navigator matches your request to 1-2 relevant skills (~4-8K tokens). This is the "progressive disclosure" pattern — load only what you need, when you need it.',
+       designRationale:'Keyword-based routing keeps the AI\'s context window <em>small and focused</em>. Instead of loading all 44 accelerator skills, the navigator matches your request to 1-2 relevant skills (~4-8K tokens). This is the "progressive disclosure" pattern — load only what you need, when you need it.',
        inputOutput:{inputs:['user prompt','keywords'],outputs:['matched skill path']}},
       {expand:['ta-common'],activate:['ta-n-common'],narration:'Two <span class="hl-g">always-on common skills</span> are loaded first: expert-agent and naming-standards.',tier:[1,'Tier 1: Core'],
        skillIds:['common-expert','common-naming'],
@@ -883,7 +883,7 @@ const TOURS = {
        skillIds:['genai-00'],
        designRationale:'The current GenAI tree is organized by course modules rather than the older eight-worker setup. Foundation skills establish UC, MLflow, tracing, tools, and AI Gateway. Track A builds the custom Agent App. The AppKit skills add the 2-Apps UI proxy, chat history, and feedback. SDLC skills handle prompt registry, evaluation, deployment, monitoring, and iteration.',
        inputOutput:{inputs:['agent spec','tools','data assets'],outputs:['working Agent App','AppKit integration','eval scores','versioned prompts','production monitors']}},
-      {narration:'<strong>Full pipeline traversal complete!</strong> From schema CSV to production GenAI agents in 9 stages with 77 accelerator skills.',tier:[1,'Complete'],
+      {narration:'<strong>Full pipeline traversal complete!</strong> From schema CSV to production GenAI agents in 9 stages with 44 accelerator skills.',tier:[1,'Complete'],
        summary:true},
     ]
   },
@@ -1078,6 +1078,7 @@ npm install @databricks/lakebase
 # 4. Validate the app before wiring server.ts
 databricks apps validate --profile $PROFILE</pre>
 <p>Phase 3 is configuration-only: it prepares bundle-managed Lakebase resources and leaves <code>server/server.ts</code> unchanged. The actual <code>lakebase()</code> registration, DDL, API routes, and frontend hooks happen in Phase 4.</p>
+<p><strong>Genie Code (in-workspace):</strong> pre-authenticated and serverless — drop the <code>--profile $PROFILE</code> flag (no CLI profile). Do the one-time <strong>Set Up Project</strong> first: clone the repo into <code>/Users/&lt;you&gt;/.assistant/skills/vibe-coding-workshop</code> and start a NEW Agent-mode chat thread. The local dev-server / E2E-test steps are IDE/CLI-only; on Genie Code, verify against the deployed app.</p>
 <h5>When to Use Lakebase vs. SQL Warehouse</h5><table><tr><th>Pattern</th><th>Use Lakebase</th><th>Use SQL Warehouse</th></tr><tr><td>User writes data</td><td>✅ CRUD operations</td><td>❌ Read-only</td></tr><tr><td>Session/app state</td><td>✅ Transactional</td><td>❌</td></tr><tr><td>Aggregation dashboards</td><td>❌ Not optimized</td><td>✅ Columnar scans</td></tr><tr><td>Ad-hoc analytics</td><td>❌</td><td>✅ Photon engine</td></tr><tr><td>Sub-10ms latency</td><td>✅ PostgreSQL</td><td>❌ 100ms+ cold</td></tr></table>
 <h5>PostgreSQL Type Conventions</h5><table><tr><th>Use Case</th><th>Type</th><th>Never Use</th></tr><tr><td>Auto-increment ID</td><td><code>bigint generated always as identity</code></td><td>serial (deprecated)</td></tr><tr><td>Text fields</td><td><code>text</code></td><td>varchar(n) — arbitrary limits</td></tr><tr><td>Money/prices</td><td><code>numeric(10,2)</code></td><td>float — rounding errors</td></tr><tr><td>Timestamps</td><td><code>timestamptz</code></td><td>timestamp — loses timezone</td></tr><tr><td>Booleans</td><td><code>boolean</code></td><td>int — confusing semantics</td></tr></table>
 <h5>DDL Best Practice</h5><pre>CREATE TABLE IF NOT EXISTS bookings (
@@ -1178,7 +1179,7 @@ DATABRICKS_VOLUME_UPLOADS=/Volumes/catalog/schema/uploads
    content:`<h5>What are Agent Skills?</h5><p>Agent Skills are structured Markdown files (<code>SKILL.md</code>) that teach AI coding assistants <em>how</em> to perform complex multi-step tasks. Instead of the AI guessing, the skill provides the exact steps, code patterns, and guardrails.</p>
 <h5>Orchestrator / Worker Pattern</h5>
 <div class="ac-diagram"><span class="hl">AGENTS.md (entry)</span> → <span class="hl-p">skill-navigator (router)</span><br>&nbsp;&nbsp;&nbsp;&nbsp;↓ routes by keyword<br><span class="hl-g">Orchestrator SKILL.md</span> (decides which workers to call)<br>&nbsp;&nbsp;&nbsp;&nbsp;↓ delegates<br><span class="hl-o">Worker SKILL.md</span> (focused, single-purpose task)</div>
-<p>This pattern limits context window usage. Instead of loading all 77 accelerator skills, the navigator loads only the relevant orchestrator (~4K tokens), which loads only the needed workers (~2K each).</p>
+<p>This pattern limits context window usage. Instead of loading all 44 accelerator skills, the navigator loads only the relevant orchestrator (~4K tokens), which loads only the needed workers (~2K each).</p>
 <h5>Progressive Disclosure</h5><table><tr><th>Tier</th><th>Loaded When</th><th>Token Cost</th><th>Example</th></tr><tr><td>Tier 1: Entry</td><td>Always (auto-loaded)</td><td>~2K</td><td>AGENTS.md</td></tr><tr><td>Tier 2: Router</td><td>Keyword match</td><td>~4K</td><td>skill-navigator</td></tr><tr><td>Tier 3: Orchestrator</td><td>Router delegates</td><td>~4K</td><td>gold-layer-design</td></tr><tr><td>Tier 4: Worker</td><td>Orchestrator calls</td><td>~2K each</td><td>grain-definition</td></tr></table>
 <h5>Skill File Structure</h5><pre># SKILL.md
 ## Metadata (name, version, triggers)
@@ -1187,7 +1188,8 @@ DATABRICKS_VOLUME_UPLOADS=/Volumes/catalog/schema/uploads
 ## Steps (numbered, explicit)
 ## Output Contract (what it produces)
 ## References (linked files for deep detail)</pre>
-<h5>Why This Matters for Workshops</h5><p>Workshop attendees don't need to learn 77 accelerator skills or 10 AppKit skills. They type one natural language prompt, the AI reads AGENTS.md, routes to the right skill, and executes. The skill ensures consistency, correctness, and best practices automatically.</p>
+<h5>Why This Matters for Workshops</h5><p>Workshop attendees don't need to learn 44 accelerator skills or 10 AppKit skills. They type one natural language prompt, the AI reads AGENTS.md, routes to the right skill, and executes. The skill ensures consistency, correctness, and best practices automatically.</p>
+<h5>How Different Clients Discover Skills</h5><p>IDE/CLI clients (Cursor, Claude Code, Copilot, Windsurf, Codex) auto-load <code>AGENTS.md</code> from the repo root. <strong>Genie Code</strong> runs inside the Databricks workspace and discovers skills by recursing into a repo cloned in your per-user skills folder — clone once with <code>git clone … /Users/&lt;you&gt;/.assistant/skills/vibe-coding-workshop</code>, then <strong>start a NEW Agent-mode chat thread</strong> so it auto-loads every <code>SKILL.md</code>. Four root <code>skills/</code> steer behavior across clients: <code>vibecoding-state</code> (detects the client and gates each prompt) and <code>genie-code-environment</code> (the in-workspace behavior manifest).</p>
 <div class="ac-diagram"><span class="hl">Human prompt</span> → <span class="hl-p">AI reads AGENTS.md</span> → <span class="hl-o">routes to skill</span> → <span class="hl-g">executes steps</span> → <span class="hl">production code</span></div>`,
    quiz:[{q:'Why use orchestrator/worker instead of one big skill?',opts:['It looks more organized','Limits context window token usage','The AI requires it'],answer:1},{q:'What is Tier 1 in progressive disclosure?',opts:['The main orchestrator','AGENTS.md (auto-loaded entry point)','The worker skills'],answer:1},{q:'What file format are Agent Skills written in?',opts:['JSON','YAML','Markdown (SKILL.md)'],answer:2}]},
 

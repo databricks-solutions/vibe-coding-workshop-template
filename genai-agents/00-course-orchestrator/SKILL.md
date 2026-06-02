@@ -94,6 +94,11 @@ and CLI/profile authentication do not apply there (see PRE-REQUISITES §11 for t
 IDE/CLI auth path). Routed prompts open with a client-specific RULE_0 preamble;
 follow it as written.
 
+**Genie Code first-run.** Clone the whole repo into
+`/Users/<your-username>/.assistant/skills/vibe-coding-workshop`, then **start a NEW
+Agent-mode chat thread** so the skills load. Full block: [repo-root AGENTS.md](../../AGENTS.md)
+("Genie Code" section) / [PRE-REQUISITES.md](../../PRE-REQUISITES.md).
+
 Live state files are gitignored. Templates live in:
 
 | Template | Purpose |
