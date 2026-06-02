@@ -17,14 +17,15 @@
     "apps_lakebase::SCRIPT_DEPLOY": 5,
     "apps_lakebase::SETUP_SCRIPT": 10,
     "apps_lakebase::SHELL_DATABRICKS": 309,
-    "data_product_accelerator::APP_DEPLOY": 31,
-    "data_product_accelerator::GENIE_RESOURCE": 10,
-    "data_product_accelerator::INSESSION_CREATE": 137,
-    "data_product_accelerator::LOCAL_AUTH": 14,
-    "data_product_accelerator::LOCAL_PATH": 108,
-    "data_product_accelerator::LOCAL_SPARK": 5,
+    "data_product_accelerator::APP_DEPLOY": 53,
+    "data_product_accelerator::GENIE_RESOURCE": 15,
+    "data_product_accelerator::INSESSION_CREATE": 140,
+    "data_product_accelerator::LOCAL_AUTH": 15,
+    "data_product_accelerator::LOCAL_PATH": 109,
+    "data_product_accelerator::LOCAL_SPARK": 7,
+    "data_product_accelerator::PY_BUNDLE_CONFIG": 1,
     "data_product_accelerator::SETUP_SCRIPT": 1,
-    "data_product_accelerator::SHELL_DATABRICKS": 197,
+    "data_product_accelerator::SHELL_DATABRICKS": 198,
     "genai-agents::APP_DEPLOY": 148,
     "genai-agents::GENIE_RESOURCE": 9,
     "genai-agents::INSESSION_CREATE": 21,
@@ -38,16 +39,17 @@
     "skills::SHELL_DATABRICKS": 6
   },
   "by_class": {
-    "APP_DEPLOY": 1534,
+    "APP_DEPLOY": 1556,
     "CLIENT_NAV": 22,
-    "GENIE_RESOURCE": 37,
-    "INSESSION_CREATE": 261,
-    "LOCAL_AUTH": 75,
-    "LOCAL_PATH": 326,
-    "LOCAL_SPARK": 7,
+    "GENIE_RESOURCE": 42,
+    "INSESSION_CREATE": 264,
+    "LOCAL_AUTH": 76,
+    "LOCAL_PATH": 327,
+    "LOCAL_SPARK": 9,
+    "PY_BUNDLE_CONFIG": 1,
     "SCRIPT_DEPLOY": 5,
     "SETUP_SCRIPT": 14,
-    "SHELL_DATABRICKS": 604
+    "SHELL_DATABRICKS": 605
   },
-  "total": 2885
+  "total": 2921
 }

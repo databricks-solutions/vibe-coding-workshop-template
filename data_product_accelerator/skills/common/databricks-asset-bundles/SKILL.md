@@ -7,8 +7,13 @@ metadata:
   domain: infrastructure
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-  last_verified: "2026-04-16"
+  last_verified: "2026-06-02"
   volatility: medium
+  clients: [ide_cli, genie_code]   # one deploy contract, both clients; Genie detail via genie-code-environment
+  deploy_verb: "bundle deploy --target dev"
+  deploy_note: "the canonical deploy spine — IDE local CLI ≡ Genie Code runDatabricksCli; App via apps deploy"
+  bundle_resource: "jobs, pipelines, dashboards, alerts, apps, volumes, schemas, postgres_*; genie_spaces Tier-1 pending CLI support"
+  coverage: all_stages
   upstream_sources:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
@@ -43,6 +48,79 @@ Databricks Asset Bundles provide infrastructure-as-code for deploying Databricks
 - Troubleshooting deployment errors or configuration issues
 - Converting notebooks to use proper parameter passing patterns
 - Validating bundle configurations before deployment
+
+## The Deploy Contract (canonical — every other skill references this)
+
+The Asset Bundle is the **one and only build artifact** for the data-product spine. Every artifact —
+jobs, pipelines, schemas, volumes, Genie Spaces, the App's data resources — comes into existence exactly
+one way: **defined as a resource in `databricks.yml`, brought to life by deploying the bundle.** Both
+clients (IDE+CLI and Genie Code) author the *same* bundle and deploy it *identically*. Other skills link
+here for deploy mechanics rather than restating them.
+
+**Deploy verb (both clients):**
+
+```bash
+databricks bundle deploy --target dev
+```
+
+| Client | How `databricks bundle deploy --target dev` runs |
+|---|---|
+| **IDE (Cursor)** | the local `databricks` CLI, from the bundle's working directory |
+| **Genie Code** | the **`runDatabricksCli`** tool — never a bare-shell `databricks` call |
+
+- **`--target dev` (or another non-prod target) is mandatory.** A *targetless* `bundle deploy` is rejected
+  by a content safety guardrail ("could affect staging/production"). [TESTED P5]
+- **All bundle resources are YAML-defined** (`databricks.yml` + `resources/*.yml`) — the single
+  representation. Do **not** use the Python `databricks_bundles` flavor. (RULE_5)
+- **`dev` → `prod` is the CI promotion lane:** `bundle deploy --target prod` runs in **CI only**;
+  in-session deploys stay non-prod.
+
+> **Per-user prefix is an invariant (no regression).** In shared workshop catalogs the bundle's
+> `catalog`/`schema` variables resolve to a **per-user prefix** (schema `{user_schema_prefix}`,
+> Lakebase/app `{user_app_name}`). Every resource name — and every **Genie Space title** — carries that
+> prefix so participants stay isolated inside one catalog. The deploy path changes only *how* an artifact
+> is created (always `bundle deploy`), **never what it is named**.
+
+### Working in Genie Code (reference → `genie-code-environment`)
+
+The deploy verb is identical on Genie Code; these are the environmental facts that differ (the full
+behavioral catalog lives in the **`genie-code-environment`** skill — load it on demand, don't restate it):
+
+- **CWD is pinned to the current page's bundle root** — be **on the page of the bundle you are deploying**.
+  There is no `cd` and no `--bundle-root` flag; you can only validate/deploy the bundle tied to the current
+  page. [TESTED P2]
+- **Edit the *existing* on-page `databricks.yml`.** Files newly created via `createAsset`/the workspace API
+  do **not** reach the CLI's FUSE mount in the same session, so "create a new bundle, then validate it"
+  fails — edit the bundle already on the page. [TESTED P3]
+- **`bundle validate` / `bundle summary` / `--help` are pre-approved** from any bundle-context page — use
+  them as safe pre-flight; `bundle deploy --target dev` then runs against the on-page bundle. [TESTED P4/P6]
+
+The **App** is the one deliberate exception to bundle-deploy: it ships via `apps deploy` (IDE local CLI;
+Genie Code SDK `w.apps.deploy(<name>, AppDeployment(source_code_path=…, mode=SNAPSHOT))` — see
+`genie-code-environment` and the AppKit skills). Note the Genie SDK (`WorkspaceClient`) is the most capable
+path for individual API operations but has **no `bundle deploy` equivalent** (it is a composite
+client-side op) — so `bundle deploy` always runs through `runDatabricksCli`, never the SDK.
+
+### No in-session artifact creation (RULE_10)
+
+The single creation event is **deploy**. SDK `w.*.create()`, hand-run SQL DDL, and `createAsset` are
+**read-only authoring support** only (inspect schemas, confirm column names/types, check lineage, sample
+rows) — never the channel that brings a deliverable into existence. A `CREATE …` that is the *body of a
+bundle-authored DLT/SQL resource* runs **during** `bundle deploy` and **stays** — that is not in-session
+creation. The **sole carve-out** is a Genie Space via `createAsset` (RULE_8 **Tier 3**), Genie-Code-only
+and last-resort (see [Genie Spaces — three deploy tiers](#genie-spaces--three-deploy-tiers-rule_8)).
+
+### Verifying a deploy (client-agnostic)
+
+After `bundle deploy` + `bundle run`, verify the produced UC state — but verify it **deterministically**:
+
+- **Never iterate a raw `SHOW TABLES` for object counts.** Staging `src_*` views and helper objects are not
+  real deliverables and inflate/skew the count. Assert against an **explicit allowlist** of the
+  fully-qualified objects the bundle was supposed to create (under the **prefixed** schema).
+- **Failed-task diagnostics read the task-level `run_id`** (`run_details.tasks[i].run_id`), not the parent
+  run — a parent `get_run_output` returns `{}`. Pull the failing task's own run id, then its output/logs.
+
+(Bucket-B lesson **B10**, lifted here as cross-client guidance.)
 
 ## Critical Rules (Quick Reference)
 
@@ -277,6 +355,78 @@ resources:
 - **Example:** `master_setup_orchestrator`, `master_refresh_orchestrator`
 
 **Key Principle:** No notebook duplication. Each notebook appears in exactly ONE atomic job.
+
+## Genie Spaces — three deploy tiers (RULE_8)
+
+Genie Spaces are the one resource where the canonical "everything is a bundle resource" ideal is not yet
+fully reachable, so the spine defines **three tiers, preferred first, with a GO/NO-GO that selects the
+active one.** In **every** tier the Space **title carries the per-user prefix** (decision #7) and
+`table_identifiers` are **fully-qualified under the prefixed schema**. Record the chosen tier in
+`deploy_note` (`tier_1_native` once it lands, else `tier_2_provisioning_job`, or `tier_3_createasset`).
+
+### Tier 1 — native `genie_spaces` bundle resource (preferred target; enable when the GO/NO-GO passes)
+
+This is the intended end state — a first-class bundle resource deployed declaratively like any job or
+pipeline. **DABs support is landing ~this month.** As of the last GO/NO-GO (P7, 2026-06-01) `bundle
+validate` does **not** yet accept `genie_spaces` (it is absent from the supported resource list and warns
+"unknown field"), so the block is kept **commented and ready-to-enable** in `bundle-template.yaml` behind a
+`# enable when bundle validate accepts genie_spaces` marker. Flipping to Tier 1 is then a **one-line
+change, not a rewrite**: uncomment the block, re-run the GO/NO-GO, set `deploy_note: tier_1_native`.
+
+```yaml
+# resources:                       # enable when bundle validate accepts genie_spaces (re-run GO/NO-GO)
+#   genie_spaces:
+#     revenue_analytics:
+#       title: "[${var.user_prefix}] Revenue Analytics"   # prefixed (decision #7)
+#       warehouse_id: ${var.warehouse_id}
+#       table_identifiers:
+#         - ${var.catalog}.${var.gold_schema}.fact_revenue # fully-qualified under the prefixed schema
+```
+
+### Tier 2 — Genie-artifact + provisioning job (active fallback, bundle-deployed; both clients)
+
+Until Tier 1 lands, the cross-client canonical path is a **JSON artifact provisioned by a bundle-run
+job** — so creation still happens *during* `bundle deploy` and RULE_10 holds (it is **not** in-session
+creation). Recipe:
+
+1. **Author `src/genie_spaces/<prefixed-name>.json`** — `title` (prefixed per decision #7), `description`,
+   `table_identifiers` (fully-qualified under the **prefixed** schema), `warehouse_id`.
+2. **Author `src/deploy_genie_spaces.py`** — a `notebook_task` notebook that reads `dbutils.widgets`
+   (`target_catalog`, `warehouse_id`), enumerates the JSON dir, and is **idempotent**: `w.genie.list_spaces()`
+   (access the response's **`.spaces`** attribute — it is *not* directly iterable) → match by **title** →
+   **create if absent**, else skip/update. There is **no SDK `create_space`**; create via the REST contract
+   **`POST /api/2.0/genie/spaces`** with **`title` + `warehouse_id` required** (omitting either →
+   `400 INVALID_PARAMETER_VALUE`). Honor the Genie correctness invariants from the semantic-layer skill:
+   every `sql:`/`expected_sql` field is a `List[str]` (bare string → silent corruption, **B1**); data
+   assets **sorted** (tables by `table_name`, TVFs by `function_name`) for deterministic IDs with
+   `uuid.uuid4().hex` (**B2**); a **Serverless** SQL Warehouse is required (classic →
+   `FATAL: External authorization failed`, **B3**). See `semantic-layer/04-genie-space-export-import-api`
+   for the `serialized_space` invariants.
+3. **Add a bundle job task** `deploy_genie_spaces` with `depends_on` the main pipeline and base parameters
+   `{target_catalog: ${var.catalog}, warehouse_id: ${var.warehouse_id}}`.
+
+The IDE client always uses Tier 2 (it has no Tier-3 equivalent).
+
+### Tier 3 — `createAsset` (Genie-Code-only, last-resort; confirmed working P8)
+
+A direct native-tool call that creates a live Space immediately and returns an ID:
+
+```text
+createAsset({ assetType: "genie",
+              name: "<prefixed name>",
+              tableIdentifiers: ["<prefixed.schema.table>", ...] })
+```
+
+This is the **one sanctioned exception** to the authoring discipline (user-approved). It is permitted
+**only** inside a Genie Code session **and only** when neither bundle tier is viable (e.g. no bundle
+context). It creates workspace state the bundle does not own, so it is **non-version-controlled and never
+the default**; the IDE client has no Tier-3 equivalent. Keep **Tier 2 as the canonical, cross-client
+route**. [TESTED P8]
+
+### App-context variant
+
+For the AppKit **App** context, a Genie Space may be declarable as an **`app.yaml` resource** (P7 docs) —
+an alternative to a standalone bundle resource. Explored in the AppKit skills (Milestone 05).
 
 ## Upstream Updates (February 2026)
 

@@ -7,8 +7,12 @@ metadata:
   domain: infrastructure
   role: shared
   used_by_stages: [1, 2, 3, 4]
-  last_verified: "2026-04-16"
+  last_verified: "2026-06-02"
   volatility: medium
+  clients: [ide_cli, genie_code]   # deploy via databricks-asset-bundles (the spine); Genie detail via genie-code-environment
+  deploy_verb: "bundle deploy --target dev"
+  deploy_note: "TBLPROPERTIES/CREATE TABLE are deploy-time bundle-resource bodies (RULE_10: run during bundle deploy, retained)"
+  coverage: all_stages
   upstream_sources:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"

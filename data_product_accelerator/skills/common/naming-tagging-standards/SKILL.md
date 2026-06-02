@@ -7,6 +7,10 @@ metadata:
   domain: common
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  clients: [ide_cli, genie_code]   # naming/tagging is client-agnostic intent; deploy via databricks-asset-bundles (the spine)
+  deploy_verb: "bundle deploy --target dev"
+  deploy_note: "naming/COMMENT/tag standards — authored as intent; applied via deploy-time bundle resources (RULE_10)"
+  coverage: all_stages
   called_by:
     - gold/00-gold-layer-design
     - bronze/00-bronze-layer-setup
