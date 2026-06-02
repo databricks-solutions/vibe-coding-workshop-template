@@ -53,8 +53,7 @@ compare_tables(catalog, "silver_schema", "silver_transactions",
 # 1. Install requirements
 pip install -r requirements.txt
 
-# 2. Configure Databricks Connect
-databricks configure --profile my_profile
+# 2. Configure Databricks Connect — authenticate per PRE-REQUISITES §11 (IDE/CLI only; Genie Code skips this path — see callout below)
 
 # 3. Launch Jupyter and open adhoc_exploration.ipynb
 jupyter lab

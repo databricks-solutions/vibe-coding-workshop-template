@@ -427,7 +427,7 @@ Optional: manual approval step between promote and deploy for regulated environm
 
 | Issue | Fix |
 |-------|-----|
-| Bundle auth error | `databricks auth login` / token validity for target host |
+| Bundle auth error | IDE/CLI: re-auth per PRE-REQUISITES §11; Genie Code: pre-authenticated — verify the target host/`--target` instead |
 | App errors at runtime | `databricks apps logs <app-name>` |
 | Permission denied on UC / warehouse / endpoint | SP grants + `databricks permissions` / SQL `GRANT` |
 | Chat/UI unreachable | Confirm app running: `databricks apps get <app-name>` |

@@ -182,7 +182,22 @@ The workshop leverages advanced AI models for code generation. You need access t
 
 ---
 
+### Choose your client path (before §9–§11)
+
+The workshop runs from one of **two clients**. Steps **9–11 below are the local-machine setup for the IDE/CLI client only.** Pick your path:
+
+| Client | What to do | Auth | Local install |
+|---|---|---|---|
+| **AI IDE + Databricks CLI** (laptop) | Complete **§9, §10, §11** below. | You authenticate locally (PAT / `databricks auth login`) — §11. | Databricks CLI + Node.js v22+ + Git. |
+| **Genie Code** (in-workspace) | **Skip §9–§11.** | **Pre-authenticated** to its host workspace — no PAT, no `databricks configure`, no token. | **None** — runs inside Databricks on **serverless** compute. |
+
+> **Genie Code participants:** there is nothing to install or authenticate locally. Instead, before you begin: (1) confirm you can open the workshop project in Genie Code; (2) confirm your **per-user prefixed** target catalog/schema and app name so your artifacts stay isolated in the shared catalog (this is the workshop's isolation contract); (3) know that deploys run from the project's bundle-folder page (`bundle deploy --target dev`) and the App's frontend is **built server-side** (no local Node step). For exactly how Genie Code behaves — pre-auth, serverless, page-context CLI, file placement — see the `skills/genie-code-environment` manifest (load it once at the start of your session). Everything else in this guide (Admin §1–§5, IDE §6–§8) applies to both clients.
+
+---
+
 ### 9. Install the Databricks CLI
+
+> **IDE/CLI client only** — Genie Code has the CLI built in (pre-authenticated). Skip to the checklist.
 
 The Databricks CLI is required for authentication and deploying Asset Bundles.
 
@@ -219,6 +234,8 @@ You should see output like `Databricks CLI v0.x.x`. Any recent version is accept
 
 ### 10. Install Node.js v22+ and Git
 
+> **IDE/CLI client only** — Genie Code builds the App frontend **server-side** and clones the repo in-workspace, so no local Node.js is needed there.
+
 The AppKit workshop (Path A) requires **Node.js v22+** for scaffolding and running Databricks Apps locally. **Git** is required for cloning the template and installing agent skills.
 
 #### Node.js
@@ -244,6 +261,8 @@ git --version
 ---
 
 ### 11. Authenticate to the Workspace and Validate Connectivity
+
+> **IDE/CLI client only.** This is the single home for local authentication. **Genie Code is already authenticated** to its host workspace (it runs inside Databricks) — Genie Code participants skip this section entirely; there is no PAT, `databricks configure`, or token to set up.
 
 Once the CLI is installed, configure it to connect to your workshop workspace.
 
@@ -320,14 +339,20 @@ Use this checklist to confirm everything is ready:
 
 ### Participant Checklist
 
-- [ ] AI-powered IDE installed and licensed
-- [ ] Claude Sonnet 4.5 (or higher) model accessible in IDE
+**All clients:**
+
+- [ ] AI-powered IDE (or Genie Code) accessible with Claude Sonnet 4.5 (or higher)
+- [ ] Workshop App URL loads successfully in browser
+
+**IDE/CLI client only (§9–§11):**
+
 - [ ] Databricks CLI installed (`databricks --version` works)
 - [ ] Node.js v22+ installed (`node --version` returns v22+) — required for Path A (AppKit)
 - [ ] Git installed (`git --version` works)
 - [ ] CLI authenticated (`databricks auth env --profile DEFAULT` returns valid credentials)
 - [ ] Workspace accessible (`databricks workspace list / --profile DEFAULT` returns results)
-- [ ] Workshop App URL loads successfully in browser
+
+**Genie Code client only:** no local install/auth — confirm you can open the project in Genie Code and that your per-user prefixed catalog/schema + app name are set.
 
 ---
 

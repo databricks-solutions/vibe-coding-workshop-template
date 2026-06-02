@@ -8,7 +8,7 @@ This guide walks you through building a complete Databricks data platform from z
 
 - [ ] Databricks workspace with Unity Catalog enabled
 - [ ] Cursor IDE installed with Agent mode enabled
-- [ ] Databricks CLI v0.200+ installed and configured (`databricks auth login`)
+- [ ] Databricks CLI authenticated — **IDE/CLI client only** (see PRE-REQUISITES §11); Genie Code is pre-authenticated
 - [ ] Repository cloned locally
 - [ ] Customer schema CSV placed in `context/` directory
 

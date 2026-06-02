@@ -99,12 +99,9 @@ PROFILE=$(databricks auth profiles --output json 2>/dev/null \
   | jq -r --arg host "$TARGET_HOST" \
     '[.profiles[] | select(.host == $host)] | .[0].name // empty')
 
-if [ -z "$PROFILE" ]; then
-  databricks auth login --host "$TARGET_HOST"
-  PROFILE=$(databricks auth profiles --output json 2>/dev/null \
-    | jq -r --arg host "$TARGET_HOST" \
-      '[.profiles[] | select(.host == $host)] | .[0].name // empty')
-fi
+# If $PROFILE is empty, no CLI profile exists for this host yet:
+#   IDE/CLI client → create one following PRE-REQUISITES §11, then re-run the discovery above.
+#   Genie Code    → not applicable; skip this whole block (pre-authenticated, no profiles — omit --profile everywhere).
 ```
 
 ---

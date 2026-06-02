@@ -71,8 +71,7 @@ python3 -c "import sys; assert sys.version_info >= (3,11)" && echo "Python: OK"
 node --version  # Should be v20+
 ```
 
-All four must pass. If `databricks auth token` fails, run `databricks configure`
-first and set up a profile for your workspace.
+All four must pass. If `databricks auth token` fails: **IDE/CLI** — set up a profile per PRE-REQUISITES §11; **Genie Code** — not applicable (pre-authenticated; `uv`/`node` checks also differ — see `skills/genie-code-environment`).
 
 ---
 

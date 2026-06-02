@@ -13,7 +13,7 @@ This guide walks you through building a complete Databricks data platform — fr
 - AI coding assistant with file reference support (Cursor, Claude Code, Windsurf, Copilot, Codex, etc.)
 - A Databricks workspace with Unity Catalog
 - A schema CSV exported from the customer's source system
-- Databricks CLI v0.200+ installed and authenticated (`databricks auth login`)
+- Databricks CLI v0.200+ installed and authenticated — **IDE/CLI client only** (see PRE-REQUISITES §11); Genie Code is pre-authenticated
 
 > **File references:** The prompts below use `@` to reference files (supported by Cursor, Windsurf, and others). If your IDE doesn't support `@`, ask the agent to "read the file at [path]" instead.
 
@@ -209,7 +209,7 @@ This will involve the following steps:
 - **Apply fixes and redeploy** — fix source files, redeploy, and re-run (max 3 iterations per job before escalation)
 ```
 
-> **Prerequisite:** Ensure Databricks CLI is installed and authenticated (`databricks auth login`).
+> **Prerequisite:** Databricks CLI installed and authenticated — IDE/CLI only (see PRE-REQUISITES §11); Genie Code is pre-authenticated.
 
 ---
 
@@ -312,7 +312,7 @@ This will involve the following steps:
 - **Apply fixes and redeploy** — fix source files, redeploy, and re-run (max 3 iterations before escalation)
 ```
 
-> **Prerequisite:** Ensure Databricks CLI is installed and authenticated (`databricks auth login`).
+> **Prerequisite:** Databricks CLI installed and authenticated — IDE/CLI only (see PRE-REQUISITES §11); Genie Code is pre-authenticated.
 
 ---
 
@@ -366,7 +366,7 @@ This will involve the following steps:
 - **Apply fixes and redeploy** — fix source files, redeploy, and re-run (max 3 iterations before escalation)
 ```
 
-> **Prerequisite:** Ensure Databricks CLI is installed and authenticated (`databricks auth login`).
+> **Prerequisite:** Databricks CLI installed and authenticated — IDE/CLI only (see PRE-REQUISITES §11); Genie Code is pre-authenticated.
 
 ---
 

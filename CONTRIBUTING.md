@@ -21,7 +21,7 @@ For questions about this repository or to request access:
    ./scripts/setup.sh
    ```
 
-3. Configure authentication:
+3. Configure authentication (contributor local-dev / IDE-CLI only — Genie Code is pre-authenticated):
    ```bash
    export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
    export DATABRICKS_TOKEN="your-token"

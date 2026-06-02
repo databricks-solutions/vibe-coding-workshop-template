@@ -8,7 +8,7 @@ when the chat UI or `/invocations` endpoint does not behave as expected.
 | Issue | Fix |
 |-------|-----|
 | `uv: command not found` | Install uv: `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| `databricks auth token` fails | Run `databricks configure` to set up authentication |
+| `databricks auth token` fails | IDE/CLI: set up auth per PRE-REQUISITES §11. Genie Code: pre-authenticated — not applicable |
 | Port 8000 already in use | Kill the existing process: `lsof -ti:8000 \| xargs kill` |
 | `ModuleNotFoundError` on start | Run `uv run quickstart` to install dependencies |
 | Chat UI shows "connection refused" | Ensure the server is running on `0.0.0.0:8000`, not only bound to `127.0.0.1:8000` if you changed defaults |

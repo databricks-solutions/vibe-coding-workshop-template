@@ -147,8 +147,7 @@ All file paths below are relative to `apps_lakebase/$APP_NAME/` unless explicitl
 #### Step 1.1: Authenticate and Set Up Variables
 
 ```bash
-# Authenticate to Databricks
-databricks auth login --host {workspace_url}
+# Authenticate to Databricks — IDE/CLI only (see PRE-REQUISITES §11); Genie Code is pre-authenticated, skip this line
 
 # Derive app name from your username + use case
 USER_JSON=$(databricks current-user me --output json)
@@ -495,8 +494,8 @@ PROFILE=$(databricks auth profiles --output json 2>/dev/null \
     '[.profiles[] | select(.host == $host)] | .[0].name // empty')
 
 if [ -z "$PROFILE" ]; then
-  echo "No profile found for $TARGET_HOST — creating one..."
-  databricks auth login --host "$TARGET_HOST"
+  # IDE/CLI: create a profile per PRE-REQUISITES §11; Genie Code: skip — pre-authenticated, no profiles (omit --profile).
+  echo "No profile found for $TARGET_HOST — IDE/CLI only: see PRE-REQUISITES §11."
   PROFILE=$(databricks auth profiles --output json 2>/dev/null \
     | jq -r --arg host "$TARGET_HOST" \
       '[.profiles[] | select(.host == $host)] | .[0].name // empty')
@@ -1234,8 +1233,8 @@ PROFILE=$(databricks auth profiles --output json 2>/dev/null \
     '[.profiles[] | select(.host == $host)] | .[0].name // empty')
 
 if [ -z "$PROFILE" ]; then
-  echo "No profile found for $TARGET_HOST — creating one..."
-  databricks auth login --host "$TARGET_HOST"
+  # IDE/CLI: create a profile per PRE-REQUISITES §11; Genie Code: skip — pre-authenticated, no profiles (omit --profile).
+  echo "No profile found for $TARGET_HOST — IDE/CLI only: see PRE-REQUISITES §11."
   PROFILE=$(databricks auth profiles --output json 2>/dev/null \
     | jq -r --arg host "$TARGET_HOST" \
       '[.profiles[] | select(.host == $host)] | .[0].name // empty')

@@ -180,8 +180,7 @@ are **not supported**.
 Generate an OAuth token:
 
 ```bash
-# Authenticate (one-time per session)
-databricks auth login --host https://<workspace>.cloud.databricks.com
+# Authenticate once — IDE/CLI only (see PRE-REQUISITES §11). Genie Code: pre-authenticated, run via runDatabricksCli.
 
 # Get a fresh token
 databricks auth token --host https://<workspace>.cloud.databricks.com

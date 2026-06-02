@@ -327,26 +327,10 @@ See the `03-appkit-deploy` skill for the full deployment workflow.
 
 ## Authentication
 
-Configure a Databricks CLI profile to authenticate:
+Authentication is a **client-specific, one-time setup** — the full guide lives in **[PRE-REQUISITES.md §11](PRE-REQUISITES.md)** (the single home for local auth):
 
-```bash
-databricks auth login --host https://your-workspace.cloud.databricks.com
-```
-
-Verify it works:
-
-```bash
-databricks current-user me
-```
-
-To use a named profile (useful when working with multiple workspaces):
-
-```bash
-databricks auth login --host https://your-workspace.cloud.databricks.com --profile myprofile
-databricks current-user me --profile myprofile
-```
-
-All skills and CLI commands accept a `--profile` flag to target a specific workspace.
+- **IDE/CLI client:** authenticate the Databricks CLI locally (PRE-REQUISITES §11). Verify with `databricks current-user me`; all skills and CLI commands accept a `--profile` flag to target a specific workspace (use `--profile myprofile` when juggling multiple workspaces).
+- **Genie Code client:** already authenticated to its host workspace — nothing to configure, and omit `--profile` from every command.
 
 ---
 
@@ -395,8 +379,10 @@ databricks auth profiles      # List configured profiles
 
 ### Authentication failed
 
+Re-run the IDE/CLI auth from **[PRE-REQUISITES.md §11](PRE-REQUISITES.md)** (does not apply to Genie Code — it is pre-authenticated). Then re-verify:
+
 ```bash
-databricks auth login --host https://your-workspace.cloud.databricks.com
+databricks current-user me
 ```
 
 ### Port 8000 in use

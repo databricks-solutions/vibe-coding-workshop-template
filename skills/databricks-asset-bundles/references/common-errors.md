@@ -441,8 +441,7 @@ Error: Invalid access token. [ReqId: ...] (403)
 
 ✅ **SOLUTION:**
 ```bash
-# Re-authenticate with specific profile
-databricks auth login --host <workspace-url> --profile <profile-name>
+# Re-authenticate — IDE/CLI only (see PRE-REQUISITES §11). Genie Code: pre-authenticated; re-check the page / --target instead.
 
 # Verify authentication
 databricks auth profiles
@@ -754,7 +753,7 @@ When creating Asset Bundle configurations:
 
 ### Pre-Deployment Validation
 - [ ] Run pre-deployment validation script (catches 80% of errors)
-- [ ] Authenticate with named profile (`databricks auth login --profile <name>`)
+- [ ] Authenticated to the target workspace (IDE/CLI: PRE-REQUISITES §11; Genie Code: pre-authenticated)
 - [ ] Run `databricks bundle validate` successfully
 - [ ] Test in dev environment before promoting to prod
 

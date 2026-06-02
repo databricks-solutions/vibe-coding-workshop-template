@@ -21,15 +21,11 @@ Grounded in:
 | `nvm` / Node 20 | Chat UI frontend build | [nvm installation](https://github.com/nvm-sh/nvm) |
 | Databricks CLI | Auth, sync, bundle commands | [CLI installation](https://docs.databricks.com/aws/en/dev-tools/cli/install) |
 
-### 1.2 Databricks CLI Authentication
+### 1.2 Databricks CLI Authentication (IDE/local-dev only)
 
-Configure a profile before running any local commands:
+Configure a profile per **PRE-REQUISITES §11** before running local commands. **Genie Code:** pre-authenticated — skip profile setup; this entire local-dev loop is IDE-only. Verify:
 
 ```bash
-# Interactive login (opens browser for OAuth)
-databricks auth login --host https://your-workspace.cloud.databricks.com
-
-# Verify
 databricks auth token
 databricks current-user me
 ```
