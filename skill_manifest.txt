@@ -15,9 +15,7 @@ data_product_accelerator/skills/admin/self-improvement/SKILL.md
 data_product_accelerator/skills/admin/skill-freshness-audit/SKILL.md
 data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md
 data_product_accelerator/skills/bronze/01-faker-data-generation/SKILL.md
-data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md
 data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md
-data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md
 data_product_accelerator/skills/common/databricks-python-imports/SKILL.md
 data_product_accelerator/skills/common/databricks-table-properties/SKILL.md
 data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md
@@ -83,4 +81,7 @@ genai-agents/tracks/A-custom-agent-apps/05-lakebase-memory/SKILL.md
 genai-agents/tracks/A-custom-agent-apps/06-evaluation/SKILL.md
 genai-agents/tracks/A-custom-agent-apps/07-deploy-and-query/SKILL.md
 genai-agents/tracks/A-custom-agent-apps/08-debugging/SKILL.md
+skills/databricks-asset-bundles/SKILL.md
+skills/databricks-expert-agent/SKILL.md
+skills/genie-code-environment/SKILL.md
 skills/vibecoding-state/SKILL.md

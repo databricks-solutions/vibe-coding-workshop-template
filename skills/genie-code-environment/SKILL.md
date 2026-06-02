@@ -30,6 +30,13 @@ every other gap). This skill is that durable manifest. `skills/vibecoding-state`
 is active and writes the capability block; this skill explains **how the Genie Code client behaves** —
 detection vs. explanation, no duplication. If `client_context == ide_cli`, you do not need this skill.
 
+> **Record the load (G3 manifest-load gate).** The moment you have read this manifest in the current
+> thread, set `environment_capabilities.genie_code_manifest_loaded: true` in the live state file. This skill
+> is the **owner** of the `genie_code_manifest_loaded` preflight check (`skills/vibecoding-state`
+> § *Preflight Check Registry*): on Genie Code, the first deploy / client-divergent prompt's `enter`
+> **halts** until this flag is `true`, so the deploy machinery (allow-list tiers, CWD pin, FUSE gap, App
+> scaffold/deploy, OAuth-session verify) is in context before you act. The check is **inert on `ide_cli`**.
+
 ## The one operating rule (read this first)
 
 > **Match the surface to the task. If a path is blocked, try the next of the three execution paths. Never

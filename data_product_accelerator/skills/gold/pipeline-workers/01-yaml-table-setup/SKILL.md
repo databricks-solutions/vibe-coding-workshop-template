@@ -449,7 +449,7 @@ See `assets/templates/gold-table-template.yaml` for the complete template.
 
 ## Related Patterns
 
-- **Databricks Asset Bundles** - See `common/databricks-asset-bundles` skill
+- **Databricks Asset Bundles** - See `skills/databricks-asset-bundles` skill
 - **Unity Catalog Constraints** - See `common/unity-catalog-constraints` skill
 - **Gold Layer Documentation** - See `gold/design-workers/06-table-documentation` skill
 

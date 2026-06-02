@@ -12,7 +12,7 @@ These skills live in `data_product_accelerator/skills/common/` and are indexed i
 
 | Field | Value |
 |-------|-------|
-| **Path** | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` |
+| **Path** | `skills/databricks-expert-agent/SKILL.md` |
 | **Read When** | Every task (core agent behavior) |
 | **Key Pattern** | "Extract, Don't Generate" — script names from source files |
 
@@ -33,7 +33,7 @@ The "Extract, Don't Generate" principle is the most critical pattern: never hard
 
 | Field | Value |
 |-------|-------|
-| **Path** | `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` |
+| **Path** | `skills/databricks-asset-bundles/SKILL.md` |
 | **Read When** | Creating jobs, pipelines, dashboards, alerts |
 | **Key Patterns** | `notebook_task` (not `python_task`), `base_parameters` (not `parameters`), serverless environments |
 

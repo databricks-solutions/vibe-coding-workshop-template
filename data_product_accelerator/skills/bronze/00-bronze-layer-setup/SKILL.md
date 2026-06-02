@@ -310,12 +310,12 @@ TBLPROPERTIES (
 
 | Step | Read Skill (MANDATORY) | What It Provides |
 |------|------------------------|------------------|
-| All steps | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Core extraction principle: extract names from source, never hardcode |
+| All steps | `skills/databricks-expert-agent/SKILL.md` | Core extraction principle: extract names from source, never hardcode |
 | Step 1, Step 3 | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | Table naming prefixes (`bronze_`), schema COMMENTs, PII governed tags, workflow tags |
 | Step 3 (DDLs) | `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` | Bronze TBLPROPERTIES, `CLUSTER BY AUTO`, governance metadata |
 | Step 3 (DDLs) | `data_product_accelerator/skills/common/schema-management-patterns/SKILL.md` | `CREATE SCHEMA IF NOT EXISTS`, Predictive Optimization |
 | Step 4 (Data) | `data_product_accelerator/skills/bronze/01-faker-data-generation/SKILL.md` | Faker corruption patterns, function signatures, provider examples |
-| Step 5 (Jobs) | `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` | Serverless job YAML, Environments V4, `notebook_task`, `base_parameters` |
+| Step 5 (Jobs) | `skills/databricks-asset-bundles/SKILL.md` | Serverless job YAML, Environments V4, `notebook_task`, `base_parameters` |
 | Step 5 (Jobs) | `data_product_accelerator/skills/common/databricks-python-imports/SKILL.md` | Pure Python import patterns for notebook code sharing |
 | Step 6 (if user-triggered) | `data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs fail |
 

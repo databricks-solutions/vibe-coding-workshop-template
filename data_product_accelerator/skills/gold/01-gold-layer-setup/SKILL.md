@@ -361,7 +361,7 @@ See `scripts/merge_gold_tables_template.py` for starter template.
 
 **MANDATORY: Read this skill using the Read tool BEFORE creating job YAML files:**
 
-1. `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` — Job YAML patterns, serverless config, `notebook_task` vs `python_task`, `base_parameters`, sync
+1. `skills/databricks-asset-bundles/SKILL.md` — Job YAML patterns, serverless config, `notebook_task` vs `python_task`, `base_parameters`, sync
 
 **Activities:**
 1. Add YAML sync to `databricks.yml` — `gold_layer_design/yaml/**/*.yaml`

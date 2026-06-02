@@ -98,7 +98,7 @@ Use this skill when:
 | Monitoring / system table queries | **MUST READ** `monitoring/01-lakehouse-monitoring-comprehensive/SKILL.md` | Dashboard includes monitoring widgets |
 
 **Always load these common skills first (per AGENTS.md):**
-- `common/databricks-expert-agent/SKILL.md` — "Extract Don't Generate" principle, core SA behavior
+- `skills/databricks-expert-agent/SKILL.md` — "Extract Don't Generate" principle, core SA behavior
 - `common/naming-tagging-standards/SKILL.md` — naming conventions for dashboards and datasets
 
 > **Plan addendum filename:** Dashboards are always planned in `plans/phase1-addendum-1.5-aibi-dashboards.md`. See [`planning/00-project-planning/assets/addendum-numbering.md`](../../planning/00-project-planning/assets/addendum-numbering.md) for the canonical numbering table. The legacy name `phase1-addendum-1.1-dashboards.md` is forbidden — if you see it anywhere, replace it with `1.5-aibi-dashboards.md`.

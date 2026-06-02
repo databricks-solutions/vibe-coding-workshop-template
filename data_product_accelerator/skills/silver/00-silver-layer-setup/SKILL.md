@@ -64,7 +64,7 @@ End-to-end workflow for creating production-grade Silver layer pipelines using S
 | Creating a Silver layer from scratch? | **Use this skill** - it orchestrates everything |
 | Only need DLT expectations patterns? | Read `silver/01-dlt-expectations-patterns/SKILL.md` directly |
 | Need advanced DQX validation? | Read `silver/02-dqx-patterns/SKILL.md` directly |
-| Need Asset Bundle configuration? | Read `common/databricks-asset-bundles/SKILL.md` directly |
+| Need Asset Bundle configuration? | Read `skills/databricks-asset-bundles/SKILL.md` directly |
 | Need table properties reference? | Read `common/databricks-table-properties/SKILL.md` directly |
 | Need pure Python import patterns? | Read `common/databricks-python-imports/SKILL.md` directly |
 
@@ -76,13 +76,13 @@ End-to-end workflow for creating production-grade Silver layer pipelines using S
 
 | Phase | MUST Read Skill (use Read tool on SKILL.md) | What It Provides |
 |-------|---------------------------------------------|------------------|
-| All phases | `common/databricks-expert-agent` | Core extraction principle: extract names from source, never hardcode |
+| All phases | `skills/databricks-expert-agent` | Core extraction principle: extract names from source, never hardcode |
 | Schema setup | `common/schema-management-patterns` | CREATE SCHEMA DDL with governance metadata |
 | DQ rules table | `common/databricks-table-properties` | TBLPROPERTIES for the dq_rules metadata table |
 | DQ rules table | `common/unity-catalog-constraints` | PRIMARY KEY constraint syntax |
 | Rules loader | `common/databricks-python-imports` | Pure Python module patterns (NO notebook header) |
 | DLT notebooks | `common/databricks-table-properties` | Silver-layer TBLPROPERTIES (CDF, row tracking, auto-optimize) |
-| Pipeline config | `common/databricks-asset-bundles` | DLT pipeline YAML, job YAML, serverless config, multi-user `user_prefix` pattern |
+| Pipeline config | `skills/databricks-asset-bundles` | DLT pipeline YAML, job YAML, serverless config, multi-user `user_prefix` pattern |
 | Pipeline config | `common/naming-tagging-standards` | Enterprise naming, COMMENTs, tags, PII classifications for every DDL and resource |
 | Deployment (if user-triggered) | `common/databricks-autonomous-operations` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs/pipelines fail |
 
@@ -245,7 +245,7 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
 ### Phase 1: Requirements & Schema Setup (30 min)
 
 **Pre-Condition - MUST read these skills first:**
-1. Read `common/databricks-expert-agent/SKILL.md` - Apply extraction principle throughout
+1. Read `skills/databricks-expert-agent/SKILL.md` - Apply extraction principle throughout
 2. Read `common/schema-management-patterns/SKILL.md` - Use for Silver schema DDL
 
 **Steps:**
@@ -339,7 +339,7 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
 ### Phase 6: Pipeline & Job Configuration (15 min)
 
 **Pre-Condition - MUST read these skills first:**
-1. Read `common/databricks-asset-bundles/SKILL.md` - DLT pipeline YAML, job YAML patterns
+1. Read `skills/databricks-asset-bundles/SKILL.md` - DLT pipeline YAML, job YAML patterns
 
 **Steps:**
 1. Create `resources/silver_dlt_pipeline.yml` using patterns from `databricks-asset-bundles`
@@ -347,7 +347,7 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
 3. Set DLT Direct Publishing Mode: `catalog` + `schema` fields (NOT `target`)
 4. Pass configuration: `catalog`, `bronze_schema`, `silver_schema`
 5. Set: `serverless: true`, `edition: ADVANCED`, `photon: true`
-6. **Multi-user safety:** In shared workspaces, include `${var.user_prefix}` in every pipeline/job `name:` field. See `common/databricks-asset-bundles` → "Shared Workspace Naming" section for the exact pattern. Without it, the second user to deploy hits a `pipeline name is already used` error — and `--force` does NOT fix it (see `common/databricks-asset-bundles/references/common-errors.md` Error 17).
+6. **Multi-user safety:** In shared workspaces, include `${var.user_prefix}` in every pipeline/job `name:` field. See `skills/databricks-asset-bundles` → "Shared Workspace Naming" section for the exact pattern. Without it, the second user to deploy hits a `pipeline name is already used` error — and `--force` does NOT fix it (see `skills/databricks-asset-bundles/references/common-errors.md` Error 17).
 
 **See:** `references/pipeline-configuration.md` for Silver-specific examples
 
@@ -581,10 +581,10 @@ Before considering the Silver layer complete, verify each item and confirm its s
 | `dlt-expectations-patterns` | **Mandatory** - DQ rules, loader, decorators | `silver/01-dlt-expectations-patterns/SKILL.md` |
 | `dqx-patterns` | **Optional** - Advanced validation | `silver/02-dqx-patterns/SKILL.md` |
 | `anomaly-detection` | **Mandatory** - Schema freshness/completeness monitoring | `monitoring/04-anomaly-detection/SKILL.md` |
-| `databricks-expert-agent` | **Mandatory** - Extraction principle | `common/databricks-expert-agent/SKILL.md` |
+| `databricks-expert-agent` | **Mandatory** - Extraction principle | `skills/databricks-expert-agent/SKILL.md` |
 | `databricks-table-properties` | **Mandatory** - Silver TBLPROPERTIES | `common/databricks-table-properties/SKILL.md` |
 | `databricks-python-imports` | **Mandatory** - Pure Python loader | `common/databricks-python-imports/SKILL.md` |
-| `databricks-asset-bundles` | **Mandatory** - Pipeline/job YAML | `common/databricks-asset-bundles/SKILL.md` |
+| `databricks-asset-bundles` | **Mandatory** - Pipeline/job YAML | `skills/databricks-asset-bundles/SKILL.md` |
 | `schema-management-patterns` | **Mandatory** - Schema DDL | `common/schema-management-patterns/SKILL.md` |
 | `unity-catalog-constraints` | **Mandatory** - PK constraint | `common/unity-catalog-constraints/SKILL.md` |
 

@@ -408,7 +408,7 @@ Generating docs/ml-framework-design/ with:
 
 | Skill | Relationship |
 |-------|-------------|
-| `common/databricks-expert-agent` | Extract-don't-generate principle applies to doc content too |
+| `skills/databricks-expert-agent` | Extract-don't-generate principle applies to doc content too |
 | `admin/self-improvement` | Documents learnings and patterns — this skill enforces WHERE |
 | `planning/project-plan-methodology` | Plans produce docs — this skill enforces structure |
 | All domain skills | Technical content goes in `docs/` using this skill's structure |

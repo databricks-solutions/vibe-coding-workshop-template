@@ -60,6 +60,8 @@ databricks configure --profile my_profile
 jupyter lab
 ```
 
+> **Genie Code:** there is no local toolchain — skip the Jupyter / Databricks Connect path and explore directly in the workspace on serverless compute (pre-authenticated). Write generated notebooks under the cloned repo root (`{REPO_ROOT}`), never `/tmp`. See `skills/genie-code-environment` §8–§9.
+
 **Key Differences:**
 - **Databricks (.py):** Uses magic commands (`%pip`, `%sql`), `dbutils.widgets.text()` for params
 - **Local (.ipynb):** Pure Python, direct variable assignment, requires Databricks Connect
@@ -300,7 +302,7 @@ pip install -r requirements.txt
 - [Databricks SDK for Python](https://databricks-sdk-py.readthedocs.io/)
 
 ### Related Patterns
-- [Databricks Asset Bundles](../common/databricks-asset-bundles/SKILL.md) — Deployment patterns
+- [Databricks Asset Bundles](skills/databricks-asset-bundles/SKILL.md) — Deployment patterns
 - [Python File Imports](../common/databricks-python-imports/SKILL.md) — Sharing code between notebooks
 - [DLT Expectations](../silver/dlt-expectations-patterns/SKILL.md) — DQ rules and validation
 - [Metric Views](../semantic-layer/metric-views-patterns/SKILL.md) — Metric View testing patterns

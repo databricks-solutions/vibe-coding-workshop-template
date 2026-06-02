@@ -270,7 +270,7 @@ databricks bundle validate -t <target>   # Pre-flight — catches ~80% of errors
 databricks bundle deploy -t <target>     # Deploy all resources
 ```
 
-**If validate fails:** Read the error, fix the YAML (see Section 6 + `common/databricks-asset-bundles` skill), re-validate.
+**If validate fails:** Read the error, fix the YAML (see Section 6 + `skills/databricks-asset-bundles` skill), re-validate.
 **If deploy fails:** Common causes: auth expired (403), path resolution errors, invalid task types. See Section 6.
 **`--force` clarification:** `--force` handles **Terraform state drift** only (e.g., resource deleted outside bundle). It does NOT fix API name-uniqueness conflicts. For "pipeline name already used" or "resource already exists": list and delete the conflicting resource, then redeploy without `--force`.
 
@@ -353,7 +353,7 @@ Match the error against **Section 6** (decision tree) and `references/error-solu
 
 1. **Read** the source file(s) identified from the stack trace or error message
 2. **Apply fix** using editor tools (StrReplace, Write)
-3. If YAML/config issue → fix the DAB YAML (consult `common/databricks-asset-bundles` skill)
+3. If YAML/config issue → fix the DAB YAML (consult `skills/databricks-asset-bundles` skill)
 4. If dependency issue → deploy upstream assets first (see Section 6 ordering)
 5. **Same-class fix rule:** Before redeploying, grep ALL files from the same generation batch for the same error pattern. If the bug was in one notebook, check sibling notebooks for identical issues. Fix all instances in one pass.
 
@@ -527,7 +527,7 @@ Post-Troubleshooting Self-Improvement:
 **Skill priority for updates** (search in this order):
 1. `references/error-solution-matrix.md` — error-to-fix mapping
 2. `common/databricks-autonomous-operations` — troubleshooting decision tree
-3. `common/databricks-asset-bundles` — if deployment-related
+3. `skills/databricks-asset-bundles` — if deployment-related
 4. Domain-specific skill (e.g., `gold/pipeline-workers/02-merge-patterns` for MERGE errors)
 5. New skill — only if all above are irrelevant (see `admin/self-improvement` justification checklist)
 

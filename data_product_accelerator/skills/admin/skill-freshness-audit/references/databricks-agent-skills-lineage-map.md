@@ -65,7 +65,7 @@ These skills have a structured `upstream_sources` entry pointing at `databricks/
 | `apps_lakebase/skills/06d-appkit-agent-app-proxy` | `databricks-model-serving`, `databricks-apps` | extended | [Serving](https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills/databricks-model-serving/SKILL.md), [Apps](https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills/databricks-apps/SKILL.md) |
 | `apps_lakebase/skills/07-appkit-chat-history` | `databricks-lakebase`, `databricks-apps` | extended | [Lakebase](https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills/databricks-lakebase/SKILL.md), [Apps](https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills/databricks-apps/SKILL.md) |
 | `apps_lakebase/skills/08-appkit-feedback` | `databricks-apps` | extended | [Fetch](https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills/databricks-apps/SKILL.md) |
-| `data_product_accelerator/skills/common/databricks-asset-bundles` | `databricks-dabs` | extended | [Fetch](https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills/databricks-dabs/SKILL.md) |
+| `skills/databricks-asset-bundles` | `databricks-dabs` | extended | [Fetch](https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills/databricks-dabs/SKILL.md) |
 
 ---
 

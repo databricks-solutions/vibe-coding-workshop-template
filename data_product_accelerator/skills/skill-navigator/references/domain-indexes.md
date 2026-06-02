@@ -231,8 +231,8 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 
 | Skill | Path | ~Tokens | Used By Stages |
 |---|---|---|---|
-| `databricks-expert-agent` | `common/databricks-expert-agent/SKILL.md` | ~1.2K | 1-9 (all) |
-| `databricks-asset-bundles` | `common/databricks-asset-bundles/SKILL.md` | ~1.2K | 1-9 |
+| `databricks-expert-agent` | `skills/databricks-expert-agent/SKILL.md` | ~1.2K | 1-9 (all) |
+| `databricks-asset-bundles` | `skills/databricks-asset-bundles/SKILL.md` | ~1.2K | 1-9 |
 | `databricks-autonomous-operations` | `common/databricks-autonomous-operations/SKILL.md` | ~2.0K | 1-9 (troubleshooting) |
 | `naming-tagging-standards` | `common/naming-tagging-standards/SKILL.md` | ~1.5K | 1-9 (all) |
 | `databricks-python-imports` | `common/databricks-python-imports/SKILL.md` | ~1.9K | 1-9 |

@@ -34,7 +34,7 @@ These skills have content that directly draws from or extends AI-Dev-Kit. Upstre
 | `monitoring/02-databricks-aibi-dashboards` | `databricks-skills/databricks-aibi-dashboards/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-aibi-dashboards/SKILL.md) |
 | `silver/00-silver-layer-setup` | `databricks-skills/databricks-spark-declarative-pipelines/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-spark-declarative-pipelines/SKILL.md) |
 | `silver/01-dlt-expectations-patterns` | `databricks-skills/databricks-spark-declarative-pipelines/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-spark-declarative-pipelines/SKILL.md) |
-| `common/databricks-asset-bundles` | `databricks-skills/databricks-asset-bundles/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-asset-bundles/SKILL.md) |
+| `skills/databricks-asset-bundles` | `databricks-skills/databricks-asset-bundles/SKILL.md` | extended | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-asset-bundles/SKILL.md) |
 | `common/databricks-autonomous-operations` | `databricks-skills/databricks-python-sdk/SKILL.md`, `databricks-skills/databricks-jobs/SKILL.md` | extended | [SDK](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-python-sdk/SKILL.md), [Jobs](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-jobs/SKILL.md) |
 | `common/unity-catalog-constraints` | `databricks-skills/databricks-unity-catalog/SKILL.md` | derived | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-unity-catalog/SKILL.md) |
 | `common/schema-management-patterns` | `databricks-skills/databricks-unity-catalog/SKILL.md` | derived | [Fetch](https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/databricks-unity-catalog/SKILL.md) |
@@ -132,7 +132,7 @@ These skills are internal methodology, conventions, or stable patterns with no e
 | `monitoring/03-sql-alerting-patterns` | Internal alerting patterns |
 | `silver/02-dqx-patterns` | DQX library (databrickslabs, not ai-dev-kit) |
 | `bronze/00-bronze-layer-setup` | Internal setup patterns |
-| `common/databricks-expert-agent` | Philosophy/principles (not API-dependent) |
+| `skills/databricks-expert-agent` | Philosophy/principles (not API-dependent) |
 | `common/naming-tagging-standards` | Internal naming convention |
 
 ---

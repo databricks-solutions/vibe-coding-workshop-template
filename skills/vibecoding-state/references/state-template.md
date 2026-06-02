@@ -77,6 +77,7 @@ environment_capabilities:
   app_deploy:    { verb: "apps deploy", gated: true }
   destructive_ops: confirm_required
   state_file_root: <local repo path | git-folder workspace path>
+  genie_code_manifest_loaded: <n/a | false | true>   # G3 — seeded by bootstrap step 0: `n/a` on ide_cli (check is inert), `false` on genie_code. On genie_code the owning skill `skills/genie-code-environment` MUST flip this to `true` once it is read in the current thread; the first deploy/divergent prompt's `enter` halts while it is `false`/`<pending>`.
   # detected_via: <runDatabricksCli | genie_serverless_marker | no_managed_cli_channel>
 ```
 
@@ -292,7 +293,7 @@ bootstrap_preflight:
   workspace_url_was_placeholder: <pending>
   workspace_profile: <pending>
   workspace_host_auth_status: <pending>          # authenticated | unauthenticated | wrong_host
-  databricks_cli_version: <pending>
+  databricks_cli_version: <pending>             # ide_cli: `databricks --version`; genie_code: "unknown_on_genie_code" (--version hard-blocked, Gap-1 → version gate skipped, bundle-validate probe instead)
   databricks_cli_min_version: "0.295.0"
   apps_quota:
     current_count: <pending>
@@ -560,10 +561,11 @@ Canonical map of every named preflight check the workshop knows about. Each
 entry maps a check name to its `owner` (the skill or prompt that owns the
 check) and `blocks_prompt_roles[]` (the prompt roles whose `enter` MUST halt
 while the check has not been recorded as passing). Bootstrap pre-populates
-the nine seeds below; workshops MAY append additional checks but MUST NOT
+the canonical seeds below; workshops MAY append additional checks but MUST NOT
 remove the seeds. See `spec-schema.md` § *Preflight Check Registry* for the
-state-field mapping table, the synchronous reflection-LM probe rule, and the
-normative `enter` / `state_contract_audit` consumption rules.
+state-field mapping table, the synchronous reflection-LM probe rule, the
+client-conditional `genie_code_manifest_loaded` rule, and the normative
+`enter` / `state_contract_audit` consumption rules.
 -->
 
 ```yaml
@@ -598,6 +600,9 @@ preflight_check_registry:
   system_prompt_review_complete:
     owner: first_scored_eval
     blocks_prompt_roles: [first_scored_eval]
+  genie_code_manifest_loaded:                    # G3 — client-conditional (inert on ide_cli)
+    owner: skills/genie-code-environment
+    blocks_prompt_roles: [deploy_app, appkit_agent_proxy]
 ```
 
 ---

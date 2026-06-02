@@ -244,7 +244,7 @@ Before authoring `col IN (...)` rules, extract the actual values from Bronze rat
 SELECT DISTINCT col_name FROM {catalog}.{bronze_schema}.{bronze_table} WHERE col_name IS NOT NULL;
 ```
 
-CSV column comments describe *intent*; production data may include extra values, typos, or legacy states. This follows the "Extract, Don't Generate" principle from `common/databricks-expert-agent` — applied to constraint value literals, not just names.
+CSV column comments describe *intent*; production data may include extra values, typos, or legacy states. This follows the "Extract, Don't Generate" principle from `skills/databricks-expert-agent` — applied to constraint value literals, not just names.
 
 ### Pattern 1: Create DQ Rules Delta Table
 

@@ -310,7 +310,7 @@ That means it must be a concrete 16+ character hex warehouse id at the moment `d
 | `${warehouse_id}` (shell-style placeholder) | ❌ Same failure mode. |
 | Empty string / missing field | ❌ API rejects with `INVALID_PARAMETER_VALUE`. |
 
-**Rule:** Resolve `warehouse_id` at `databricks bundle deploy` time (deploy-time baking — see `common/databricks-asset-bundles/SKILL.md` §Pitfall: `--var` at run time does NOT override deploy-time-baked values) and pass the resolved value into the notebook task via `base_parameters.warehouse_id`. The `deploy_space` helper in `assets/templates/deploy_genie_spaces.py` stamps this value into `serialized_space.config.semantic_warehouse_id` automatically, so you only need to ensure the value reaching the notebook widget is concrete.
+**Rule:** Resolve `warehouse_id` at `databricks bundle deploy` time (deploy-time baking — see `skills/databricks-asset-bundles/SKILL.md` §Pitfall: `--var` at run time does NOT override deploy-time-baked values) and pass the resolved value into the notebook task via `base_parameters.warehouse_id`. The `deploy_space` helper in `assets/templates/deploy_genie_spaces.py` stamps this value into `serialized_space.config.semantic_warehouse_id` automatically, so you only need to ensure the value reaching the notebook widget is concrete.
 
 **Validation:** `_assert_sql_arrays` enforces a hex-only `semantic_warehouse_id` on every POST/PATCH. If you see `config.semantic_warehouse_id must be a concrete deploy-time warehouse id` in a pre-flight error, the root cause is always that `warehouse_id` reached the notebook as a template placeholder — fix it in the bundle YAML, not in the Genie config.
 

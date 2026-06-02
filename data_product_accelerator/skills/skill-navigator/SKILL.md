@@ -233,7 +233,7 @@ domain-folder/
 | "dashboard", "AI/BI" | Monitor | `monitoring/02-databricks-aibi-dashboards` |
 | "alert", "SQL alert" | Monitor | `monitoring/03-sql-alerting-patterns` |
 | "anomaly detection", "freshness", "completeness", "stale tables", "unhealthy tables" | Monitor | `monitoring/04-anomaly-detection` |
-| "deploy", "Asset Bundle" | Infra | `common/databricks-asset-bundles` |
+| "deploy", "Asset Bundle" | Infra | `skills/databricks-asset-bundles` |
 | "schema", "CREATE SCHEMA" | Infra | `common/schema-management-patterns` |
 | "table properties" | Infra | `common/databricks-table-properties` |
 | "constraints", "PK/FK" | Infra | `common/unity-catalog-constraints` |

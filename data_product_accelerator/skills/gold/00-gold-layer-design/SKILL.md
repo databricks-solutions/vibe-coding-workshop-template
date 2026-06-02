@@ -154,7 +154,7 @@ This orchestrator spans 9 phases over 4-8 hours. To maintain coherence without c
 
 | Phase | Worker/reference skills to read at the start of this phase |
 |---|---|
-| 0 | `common/databricks-expert-agent`, `common/naming-tagging-standards`, `design-workers/00-schema-intake` |
+| 0 | `skills/databricks-expert-agent`, `common/naming-tagging-standards`, `design-workers/00-schema-intake` |
 | 1 | `design-workers/01-business-onboarding` |
 | 2 | `design-workers/02-dimension-patterns`, `design-workers/03-fact-patterns`, `references/dimensional-modeling-guide.md` |
 | 3 | `design-workers/04-erd-patterns`, `references/erd-organization-strategy.md` |
@@ -174,7 +174,7 @@ This orchestrator spans 9 phases over 4-8 hours. To maintain coherence without c
 
 Before parsing the schema, read these two common skills. They set enterprise-wide constraints that every downstream phase depends on. Skipping them is the most common root cause of format divergence across YAML files.
 
-1. `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` — Retain: "Extract, Don't Generate" (all table/column names come from the YAML or source schema, never from memory), `CLUSTER BY AUTO`, CDF + Row Tracking, comments + tags on every object.
+1. `skills/databricks-expert-agent/SKILL.md` — Retain: "Extract, Don't Generate" (all table/column names come from the YAML or source schema, never from memory), `CLUSTER BY AUTO`, CDF + Row Tracking, comments + tags on every object.
 2. `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` — Retain: snake_case everywhere, `dim_`/`fact_`/`bridge_` prefixes, dual-purpose description pattern `<Definition>. Business: <context>. Technical: <details>.` (the angle brackets are placeholders — do NOT write literal `<` or `[` characters into descriptions), mandatory tags (`layer`, `domain`, `PII`).
 
 These rules are the authoritative source whenever a domain-specific skill below paraphrases them.

@@ -50,7 +50,7 @@ These skills reference APIs that evolve incrementally. Core patterns are stable 
 | `dlt-expectations-patterns` | silver | `silver/01-dlt-expectations-patterns` | DLT expectations API incrementally updated |
 | `dqx-patterns` | silver | `silver/02-dqx-patterns` | DQX library versioned, periodic releases |
 | `silver-layer-setup` | silver | `silver/00-silver-layer-setup` | Orchestrator — DLT/LDP API evolving |
-| `databricks-asset-bundles` | common | `common/databricks-asset-bundles` | DAB schema adds new resource types |
+| `databricks-asset-bundles` | common | `skills/databricks-asset-bundles` | DAB schema adds new resource types |
 | `databricks-autonomous-operations` | common | `common/databricks-autonomous-operations` | SDK version, new API endpoints |
 | `unity-catalog-constraints` | common | `common/unity-catalog-constraints` | Constraint syntax occasionally enhanced |
 | `schema-management-patterns` | common | `common/schema-management-patterns` | Predictive optimization settings evolve |
@@ -83,7 +83,7 @@ These skills contain patterns and conventions that rarely change. Audit semi-ann
 | `05-erd-diagrams` | gold | `gold/design-workers/05-erd-diagrams` | Mermaid syntax very stable |
 | `project-planning` | planning | `planning/00-project-planning` | Planning methodology is internal |
 | `adhoc-exploration-notebooks` | exploration | `exploration/00-adhoc-exploration-notebooks` | Notebook patterns stable |
-| `databricks-expert-agent` | common | `common/databricks-expert-agent` | Core philosophy, not API-dependent |
+| `databricks-expert-agent` | common | `skills/databricks-expert-agent` | Core philosophy, not API-dependent |
 | `naming-tagging-standards` | common | `common/naming-tagging-standards` | Naming conventions rarely change |
 | `create-agent-skill` | admin | `admin/create-agent-skill` | AgentSkills.io spec stable |
 | `self-improvement` | admin | `admin/self-improvement` | Internal workflow |

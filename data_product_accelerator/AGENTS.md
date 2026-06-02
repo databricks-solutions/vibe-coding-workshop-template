@@ -63,7 +63,7 @@ data_product_accelerator/context/*.csv → Gold Design (1) → Bronze (2) → Si
 |----------|-----------------|
 | "job failed", "troubleshoot", "deploy failed", "self-heal" | `data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md` |
 | "naming", "COMMENT", "tag", "PII", "snake_case", "budget policy" | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` |
-| "Asset Bundle", "DAB", "deploy", "job YAML" | `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` |
+| "Asset Bundle", "DAB", "deploy", "job YAML" | `skills/databricks-asset-bundles/SKILL.md` |
 | "import", "sys.path", "restartPython", "notebook module" | `data_product_accelerator/skills/common/databricks-python-imports/SKILL.md` |
 | "TBLPROPERTIES", "CDF", "auto-optimize", "table properties" | `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` |
 | "CREATE SCHEMA", "schema setup", "predictive optimization" | `data_product_accelerator/skills/common/schema-management-patterns/SKILL.md` |
@@ -95,8 +95,8 @@ These 8 shared skills apply across all pipeline stages. **Read the full SKILL.md
 
 | Skill | Path | Read When |
 |-------|------|-----------|
-| **databricks-expert-agent** | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Every task (core SA agent behavior, "Extract Don't Generate" principle) |
-| **databricks-asset-bundles** | `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` | Creating jobs, pipelines, dashboards, alerts |
+| **databricks-expert-agent** | `skills/databricks-expert-agent/SKILL.md` | Every task (core SA agent behavior, "Extract Don't Generate" principle) |
+| **databricks-asset-bundles** | `skills/databricks-asset-bundles/SKILL.md` | Creating jobs, pipelines, dashboards, alerts |
 | **databricks-autonomous-operations** | `data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md` | Deploy/poll/diagnose/fix loop when jobs fail |
 | **naming-tagging-standards** | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | Creating ANY DDL, COMMENTs, tags, workflows |
 | **databricks-python-imports** | `data_product_accelerator/skills/common/databricks-python-imports/SKILL.md` | Sharing code between notebooks; sys.path setup |
@@ -120,7 +120,7 @@ Customer schema CSVs go in `data_product_accelerator/context/` directory (e.g., 
 
 You are a **Senior Databricks Solutions Architect Agent**. Your mission is to design, implement, and review production-grade Databricks Lakehouse solutions using the Agent Skills in this repository.
 
-For full agent behavior, read: `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md`
+For full agent behavior, read: `skills/databricks-expert-agent/SKILL.md`
 
 ## Skills Location
 

@@ -104,9 +104,9 @@ End-to-end workflow for building the Databricks semantic layer — Metric Views,
 
 | Phase | MUST Read Skill (use Read tool on SKILL.md) | What It Provides |
 |-------|---------------------------------------------|------------------|
-| All phases | `common/databricks-expert-agent` | Core extraction principle: extract names from source, never hardcode |
+| All phases | `skills/databricks-expert-agent` | Core extraction principle: extract names from source, never hardcode |
 | Metric Views | `common/databricks-python-imports` | Pure Python module patterns for helpers |
-| Deployment | `common/databricks-asset-bundles` | Job YAML, deployment patterns |
+| Deployment | `skills/databricks-asset-bundles` | Job YAML, deployment patterns |
 | All phases | `common/naming-tagging-standards` | Dual-purpose COMMENTs, v3.0 TVF comments, enterprise naming |
 | Troubleshooting | `common/databricks-autonomous-operations` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs fail |
 
@@ -158,7 +158,7 @@ This orchestrator spans 7 phases (0–6). To maintain coherence without context 
 - **Phase 1:** Read `01-metric-views-patterns/SKILL.md` → work → persist notes → **discard skill from working memory**
 - **Phase 2:** Read `02-databricks-table-valued-functions/SKILL.md` → work → persist notes → **discard**
 - **Phase 3:** Read `03-genie-space-patterns/SKILL.md` + `04-genie-space-export-import-api/SKILL.md` → work → persist notes → **discard**
-- **Phase 4-6:** Read `common/databricks-asset-bundles/SKILL.md` → work → done
+- **Phase 4-6:** Read `skills/databricks-asset-bundles/SKILL.md` → work → done
 
 Each worker skill ends with a "**Notes to Carry Forward**" section that tells you exactly what to persist for downstream phases. Use those notes — not the full skill content — as your handoff.
 
@@ -369,7 +369,7 @@ print("✅ Phase 0.5 pre-flight passed — safe to proceed to Phase 1.")
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Extract-don't-generate principle |
+| 1 | `skills/databricks-expert-agent/SKILL.md` | Extract-don't-generate principle |
 | 2 | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | CM-02 dual-purpose COMMENT format for Metric Views |
 | 3 | `data_product_accelerator/skills/common/databricks-python-imports/SKILL.md` | sys.path setup for creation script in Asset Bundle |
 | 4 | `data_product_accelerator/skills/semantic-layer/01-metric-views-patterns/SKILL.md` | YAML syntax, validation, joins, composability, format types |
@@ -403,7 +403,7 @@ Bulk creation without checkpoints causes cascading failures. A 2-minute pause ca
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Extract TVF names/columns from `gold_inventory` |
+| 1 | `skills/databricks-expert-agent/SKILL.md` | Extract TVF names/columns from `gold_inventory` |
 | 2 | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | CM-04 v3.0 structured TVF COMMENTs |
 | 3 | `data_product_accelerator/skills/semantic-layer/02-databricks-table-valued-functions/SKILL.md` | STRING params, null safety, Genie compat, notebook_task deployment |
 
@@ -434,7 +434,7 @@ Bulk creation without checkpoints causes cascading failures. A 2-minute pause ca
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Extract asset references from `gold_inventory` |
+| 1 | `skills/databricks-expert-agent/SKILL.md` | Extract asset references from `gold_inventory` |
 | 2 | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | Table/column COMMENTs required by Genie |
 | 3 | `data_product_accelerator/skills/semantic-layer/03-genie-space-patterns/SKILL.md` | 8-section deliverable, agent instructions, SQL expressions, benchmark questions |
 | 4 | `data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/SKILL.md` | JSON schema, array sorting, ID generation, idempotent deployment |
@@ -468,7 +468,7 @@ Bulk creation without checkpoints causes cascading failures. A 2-minute pause ca
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` | Job YAML patterns, serverless config, `notebook_task` vs `sql_task`, `base_parameters` |
+| 1 | `skills/databricks-asset-bundles/SKILL.md` | Job YAML patterns, serverless config, `notebook_task` vs `sql_task`, `base_parameters` |
 
 **Activities:**
 1. Copy `semantic-layer-job-template.yml` from `data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/assets/templates/` to `resources/semantic/semantic_layer_job.yml` — customize paths and variables
@@ -620,8 +620,8 @@ Databricks enforces the `depends_on` chain: Metric Views are created first, then
 | `genie-space-patterns` | **Mandatory** — Genie Space setup | `semantic-layer/03-genie-space-patterns/SKILL.md` |
 | `genie-space-export-import-api` | **Mandatory** — JSON config + API deployment | `semantic-layer/04-genie-space-export-import-api/SKILL.md` |
 | `genie-optimization-orchestrator` | **External** — Run separately after deployment | `semantic-layer/05-genie-optimization-orchestrator/SKILL.md` |
-| `databricks-expert-agent` | **Mandatory** — Extraction principle | `common/databricks-expert-agent/SKILL.md` |
-| `databricks-asset-bundles` | **Mandatory** — Deployment | `common/databricks-asset-bundles/SKILL.md` |
+| `databricks-expert-agent` | **Mandatory** — Extraction principle | `skills/databricks-expert-agent/SKILL.md` |
+| `databricks-asset-bundles` | **Mandatory** — Deployment | `skills/databricks-asset-bundles/SKILL.md` |
 | `databricks-python-imports` | **Mandatory** — Python patterns | `common/databricks-python-imports/SKILL.md` |
 | `naming-tagging-standards` | **Mandatory** — COMMENTs, naming, tags | `common/naming-tagging-standards/SKILL.md` |
 | `databricks-autonomous-operations` | **Mandatory** — Deploy/diagnose/fix loop | `common/databricks-autonomous-operations/SKILL.md` |
