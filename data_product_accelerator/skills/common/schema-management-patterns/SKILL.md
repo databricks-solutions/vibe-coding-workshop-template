@@ -31,6 +31,15 @@ metadata:
 
 Schemas are now created programmatically in setup scripts using `CREATE SCHEMA IF NOT EXISTS` statements. This provides more flexibility and control over schema creation and properties.
 
+> **Spine reconciliation (M2 closeout — accepted residual).** Keeping schema creation programmatic is an
+> **intentional project choice** and does **not** break the bundle-first authoring discipline: these
+> idempotent statements run **during** `bundle deploy` (inside a deploy-time setup task), so the single
+> creation event is still the deploy (decision #1 / RULE_10 holds), and they resolve the
+> **per-user-prefixed** `schema` variable the bundle passes in (decision #7). The declarative
+> schema-resource alternative is deliberately not used here. For the canonical deploy mechanics see the
+> `databricks-asset-bundles` spine. The `INSESSION_CREATE` audit flags in this file are therefore
+> **legitimate deploy-time bodies**, recorded as accepted residual.
+
 ## Current Pattern: Programmatic Schema Creation
 
 ### Setup Scripts Pattern

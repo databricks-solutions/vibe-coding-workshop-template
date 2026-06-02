@@ -7,7 +7,7 @@ metadata:
   domain: common
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-  last_verified: "2026-04-16"
+  last_verified: "2026-06-02"   # M2 closeout re-verify: principles skill; 1 INSESSION_CREATE = legit DDL example
   volatility: low
   clients: [ide_cli, genie_code]   # client-agnostic; Genie-Code behavior via genie-code-environment
   deploy_verb: "bundle deploy --target dev"   # mechanics owned by databricks-asset-bundles (the spine)

@@ -21,7 +21,7 @@ metadata:
     - monitoring/00-observability-setup
     - ml/00-ml-pipeline-setup
     - genai-agents/00-course-orchestrator
-  last_verified: "2026-04-16"
+  last_verified: "2026-06-02"   # M2 closeout re-verify: capability block compliant, no SKILL.md-body flags
   volatility: low
   upstream_sources: []  # Internal naming convention
 ---
