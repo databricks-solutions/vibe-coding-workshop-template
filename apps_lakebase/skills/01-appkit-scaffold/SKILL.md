@@ -178,22 +178,21 @@ For blank scaffolds (no `--features`), this step is optional.
 
 Reference: [Upstream SKILL.md — App Manifest and Scaffolding](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/SKILL.md)
 
-> **CRITICAL — always pass `--output-dir`.** Without it, `databricks apps init` writes the project to the
-> **workspace/CWD root** (e.g. `/Workspace/<APP_NAME>`), NOT your repo/working directory — the CLI's working
-> directory does **not** control where the scaffold lands. Always target the workshop repo (IDE) or your
-> workspace home (Genie Code):
-> - **IDE:** `--output-dir apps_lakebase` (project lands at `apps_lakebase/<APP_NAME>`, inside the git repo).
-> - **Genie Code:** `--output-dir .` to use the current folder page, or an explicit
->   `--output-dir /Workspace/Users/<your-email>/<repo>` — never let it default to the workspace root.
-> This is verified behavior: on Genie Code a flagless `apps init` placed the project at `/Workspace/<name>`
-> and required a re-run with `--output-dir` to land in the home directory.
+> **Client note — Genie Code (scaffold location).** On Genie Code, `databricks apps init` **ignores** the
+> `runDatabricksCli` working directory and writes the project to the **workspace root** (e.g.
+> `/Workspace/<APP_NAME>`), not your home/repo folder. Verified: a flagless `apps init` landed at
+> `/Workspace/<name>` and needed a re-run with `--output-dir` to reach the home directory. So on Genie Code
+> **always add `--output-dir`** to the commands below — `--output-dir .` for the current folder page, or an
+> explicit `--output-dir /Workspace/Users/<your-email>/<repo>`.
+> *(IDE: the local CLI scaffolds into the current directory as usual — no `--output-dir` needed unless you
+> want a different target.)*
 
 ### Option A: Blank Scaffold (Default)
 
 A minimal AppKit app with only the server plugin — no data plugins.
 
 ```bash
-databricks apps init --name <APP_NAME> --description "<DESCRIPTION>" --output-dir <PARENT_DIR> --run none --profile <PROFILE>
+databricks apps init --name <APP_NAME> --description "<DESCRIPTION>" --run none --profile <PROFILE>
 ```
 
 ### Option B: Scaffold with Plugins
@@ -202,20 +201,20 @@ Add plugins during scaffold using the `--features` flag. Combine multiple featur
 
 ```bash
 # Analytics only (SQL queries + dashboards)
-databricks apps init --name <APP_NAME> --description "<DESC>" --features analytics --set analytics.sql-warehouse.id=<WAREHOUSE_ID> --output-dir <PARENT_DIR> --run none --profile <PROFILE>
+databricks apps init --name <APP_NAME> --description "<DESC>" --features analytics --set analytics.sql-warehouse.id=<WAREHOUSE_ID> --run none --profile <PROFILE>
 
 # Lakebase only (PostgreSQL persistence)
-databricks apps init --name <APP_NAME> --description "<DESC>" --features lakebase --output-dir <PARENT_DIR> --run none --profile <PROFILE>
+databricks apps init --name <APP_NAME> --description "<DESC>" --features lakebase --run none --profile <PROFILE>
 
 # Multiple plugins
-databricks apps init --name <APP_NAME> --description "<DESC>" --features analytics,lakebase,genie --set analytics.sql-warehouse.id=<WAREHOUSE_ID> --output-dir <PARENT_DIR> --run none --profile <PROFILE>
+databricks apps init --name <APP_NAME> --description "<DESC>" --features analytics,lakebase,genie --set analytics.sql-warehouse.id=<WAREHOUSE_ID> --run none --profile <PROFILE>
 ```
 
 **Available features:** `analytics`, `lakebase`, `genie`, `files`
 
 ### Non-Interactive Shells (AI Assistants, CI)
 
-When running from a non-interactive shell (no TTY), `--name` is mandatory — the CLI will error with `"--name is required in non-interactive mode"` if omitted. Always provide `--name`, `--output-dir`, `--run none`, and `--profile`. **`--output-dir` is required in practice** (not just for TTY): the scaffold otherwise lands at the workspace root, never the repo/home dir (see the CRITICAL callout above).
+When running from a non-interactive shell (no TTY), `--name` is mandatory — the CLI will error with `"--name is required in non-interactive mode"` if omitted. Always provide `--name`, `--run none`, and `--profile`. *(On Genie Code, also add `--output-dir` — see the scaffold-location note above.)*
 
 > **Client note — Genie Code:** `apps init` is **pre-approved** via `runDatabricksCli` and completes even though `npm` is absent (it prints `⚠ npm not found` and skips `npm install` — that is expected; deps install **server-side** on deploy). Pass `--output-dir .` (or an explicit home path) so the project does not land at `/Workspace/<name>`.
 
@@ -305,8 +304,8 @@ npx @databricks/appkit docs --full       # full index with all API entries
 | Task | Command |
 |------|---------|
 | Install agent skills | `git clone --depth 1 https://github.com/databricks/databricks-agent-skills .agents/skills/databricks-skills` (all IDEs) |
-| Scaffold blank app | `databricks apps init --name <N> --output-dir <DIR> --run none --profile <P>` |
-| Scaffold with analytics | `databricks apps init --name <N> --features analytics --set analytics.sql-warehouse.id=<W> --output-dir <DIR> --run none --profile <P>` |
+| Scaffold blank app | `databricks apps init --name <N> --run none --profile <P>` (Genie Code: add `--output-dir`) |
+| Scaffold with analytics | `databricks apps init --name <N> --features analytics --set analytics.sql-warehouse.id=<W> --run none --profile <P>` (Genie Code: add `--output-dir`) |
 | Get warehouse ID | `databricks aitools tools get-default-warehouse --profile <P>` (fallback: `databricks warehouses list`) |
 | Explore table schema | `databricks aitools tools discover-schema catalog.schema.table --profile <P>` |
 | Run ad-hoc SQL | `databricks aitools tools query "SELECT ..." --profile <P>` |
