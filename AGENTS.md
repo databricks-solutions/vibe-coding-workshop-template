@@ -188,6 +188,7 @@ This framework is built on the open [Agent Skills (SKILL.md)](https://agentskill
 | **VS Code / Copilot** | Reads `AGENTS.md` or `.github/copilot-instructions.md` | `#file:path/to/file` |
 | **Windsurf** | Reads `AGENTS.md` or `.windsurfrules` at repo root | `@path/to/file` |
 | **Codex** | Reads `AGENTS.md` at repo root | Reference files by path |
+| **Genie Code** (in-workspace) | Recurses into this repo cloned under `/Users/<you>/.assistant/skills/` — see the Genie Code section below | Reference files by path; load `skills/genie-code-environment` first |
 | **Other** | Point the agent to this file manually | Paste file contents or path |
 
 **Databricks Agent Skills** are installed project-level into `.agents/skills/` (gitignored) for all IDEs:
@@ -197,6 +198,27 @@ git clone --depth 1 https://github.com/databricks/databricks-agent-skills .agent
 ```
 
 This follows the [agentskills.io](https://agentskills.io) cross-agent standard and is discovered by Cursor, VS Code, Windsurf, Claude Code, and any compatible agent. See `apps_lakebase/skills/01-appkit-scaffold/SKILL.md` Step 1 for details.
+
+### Genie Code (in-workspace agent)
+
+Genie Code runs **inside the Databricks workspace** (pre-authenticated, serverless) and discovers skills by **recursing into a cloned repo** placed in your per-user skills folder. **First-run kickstart — clone the whole workshop repo once**, before running any prompt:
+
+```bash
+git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git \
+  /Users/<your-username>/.assistant/skills/vibe-coding-workshop
+```
+
+Genie Code recurses into that clone and auto-loads every `SKILL.md` beneath it. Then **load `skills/genie-code-environment`** so the agent knows how it behaves on Genie Code (pre-auth, serverless, page-context CLI via `runDatabricksCli`, file placement under the clone root — never `/tmp`). Session state and client detection are owned by `skills/vibecoding-state` (it sets `client_context` and gates each prompt). Full setup: [PRE-REQUISITES.md](PRE-REQUISITES.md) (Genie Code path).
+
+**Skill roots** (Genie Code recurses all of these; any IDE can also reference them directly):
+
+| Root | Contents |
+|------|----------|
+| `skills/` | Controller + cross-cutting: `vibecoding-state`, `genie-code-environment`, `databricks-asset-bundles`, `databricks-expert-agent` |
+| `apps_lakebase/skills/` | AppKit workshop lifecycle (10 skills) |
+| `data_product_accelerator/skills/` | Data Product Accelerator (44 skills across 12 domains) |
+| `genai-agents/` | GenAI agent course (orchestrator, foundation, sdlc, tracks) |
+| `agentic-framework/skills/` | Multi-agent build framework |
 
 ---
 

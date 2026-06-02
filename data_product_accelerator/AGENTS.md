@@ -154,7 +154,10 @@ This framework is built on the open [Agent Skills (SKILL.md)](https://agentskill
 | **Windsurf** | Reads `AGENTS.md` or `.windsurfrules` at repo root | `@path/to/SKILL.md` |
 | **Copilot** | Reads `AGENTS.md` or `.github/copilot-instructions.md` | `#file:path/to/SKILL.md` |
 | **Codex** | Reads `AGENTS.md` at repo root | Reference files by path |
+| **Genie Code** (in-workspace) | Recurses into this repo cloned under `/Users/<you>/.assistant/skills/` | Reference files by path; load `skills/genie-code-environment` first |
 | **Other** | Point the agent to this file manually | Paste file contents or path |
+
+> **Genie Code:** runs inside the Databricks workspace (pre-authenticated, serverless). First-run kickstart — clone the **whole** repo into `/Users/<your-username>/.assistant/skills/` so Genie Code recurses and auto-discovers every skill, then load `skills/genie-code-environment` (behavior manifest) and let `skills/vibecoding-state` detect `client_context`. The clone command + the full skill-root list live in the **[repo-root AGENTS.md](../AGENTS.md)** ("Genie Code" section) and [PRE-REQUISITES.md](../PRE-REQUISITES.md).
 
 ### Prompting Pattern (all IDEs)
 
