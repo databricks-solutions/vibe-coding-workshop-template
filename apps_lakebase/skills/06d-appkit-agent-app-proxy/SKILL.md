@@ -132,7 +132,7 @@ The Sonnet endpoints used in the workshop are subject to an AI-Gateway output gu
 Operator obligations:
 
 - The synthesized-SSE branch MUST be tagged `debt: workspace_sse_guardrail` in `Globals.productized_debts[]`, with a `remove_when` predicate referencing `endpoint_guardrail_audit[llm_role_endpoints.agent_chat.endpoint].streaming_ok == true`.
-- Do **not** assume the workaround is invisible just because no admin ticket is filed. `audit_debts` (see [`vibecoding-state` SKILL.md](../../../genai-agents/vibecoding-state/SKILL.md)) re-evaluates `remove_when` on every audit run; once the upstream guardrail flips, the debt's `debt_lifted` evaluation flips and the synthesis branch must be removed.
+- Do **not** assume the workaround is invisible just because no admin ticket is filed. `audit_debts` (see [`vibecoding-state` SKILL.md](../../../skills/vibecoding-state/SKILL.md)) re-evaluates `remove_when` on every audit run; once the upstream guardrail flips, the debt's `debt_lifted` evaluation flips and the synthesis branch must be removed.
 - Ship a one-line revert path gated on `debt_lifted` (e.g. `return upstream.body` instead of synthesizing) so the proxy reverts to true streaming without further engineering when the policy changes.
 
 Without this discipline, the proxy productizes the workaround forever — Track A users get non-streaming UX even after the underlying policy is fixed, because no operator will know to delete the synthesized-SSE branch.

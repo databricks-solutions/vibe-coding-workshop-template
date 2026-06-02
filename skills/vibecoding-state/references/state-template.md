@@ -7,7 +7,7 @@ skill to any project that adopts this course.
 
 WORKFLOW:
   1. At the start of the workshop, the agent reads this template directly
-     from `genai-agents/vibecoding-state/references/state-template.md`
+     from `skills/vibecoding-state/references/state-template.md`
      and copies it to the bootstrap live path:
        example/<use_case_slug>/.vibecoding-state.md
      (there is NO intermediate per-use-case template — one copy, not two.)
@@ -34,7 +34,7 @@ WORKFLOW:
 
 DOWNSTREAM:
   - Retrospective entries accumulate in `example/<use_case>/retrospective.md`
-    using `genai-agents/vibecoding-state/references/retrospective-template.md`.
+    using `skills/vibecoding-state/references/retrospective-template.md`.
 
 SCHEMA VERSION:
   - This template corresponds to schema v2.0. `vibecoding-state.enter` will
@@ -45,6 +45,40 @@ SCHEMA VERSION:
 **Workshop:** <USE_CASE_SLUG>
 **Started:** <ISO timestamp>
 **Last updated:** <ISO timestamp>
+
+---
+
+## Environment Capabilities
+
+<!--
+Section 0. Written by `vibecoding-state.bootstrap` step 0 BEFORE anything else, and read by
+`enter` / `exit` and every prompt. This is the RULE_0 (navigation preamble) / RULE_1 (deploy
+verb) source of truth: the skill/prompt BODY stays one content set across clients — only the
+navigation preamble and the CLI channel vary by `client_context`.
+
+Detection (bootstrap step 0) — [inference, pending the live Genie Code probe]:
+  - `runDatabricksCli` tool / Genie serverless markers present  ⇒  client_context: genie_code
+      cli_channel: runDatabricksCli ; bundle_deploy.page_context_required: true
+      state_file_root: <git-folder workspace path>
+  - otherwise                                                    ⇒  client_context: ide_cli
+      cli_channel: local_shell ; bundle_deploy.page_context_required: false
+      state_file_root: <local repo path>
+Client-invariant fields (same for both clients):
+  bundle_deploy.verb = "bundle deploy --target dev"   (never a bare-shell `databricks` call)
+  app_deploy         = { verb: "apps deploy", gated: true }   (RULE_9 exception)
+  destructive_ops    = confirm_required
+-->
+
+```yaml
+environment_capabilities:
+  client_context: <ide_cli | genie_code>        # detected at bootstrap step 0
+  cli_channel: <local_shell | runDatabricksCli>
+  bundle_deploy: { verb: "bundle deploy --target dev", page_context_required: <true | false> }
+  app_deploy:    { verb: "apps deploy", gated: true }
+  destructive_ops: confirm_required
+  state_file_root: <local repo path | git-folder workspace path>
+  # detected_via: <runDatabricksCli | genie_serverless_marker | no_managed_cli_channel>
+```
 
 ---
 
@@ -226,7 +260,7 @@ llm_role_endpoints:
 
 <!--
 Populated by `vibecoding-state.endpoint_guardrail_audit`, which shells out to
-`genai-agents/vibecoding-state/scripts/probe_endpoints.py`. One entry per
+`skills/vibecoding-state/scripts/probe_endpoints.py`. One entry per
 endpoint considered (every candidate across every role, deduplicated). See
 `spec-schema.md` § *Endpoint Guardrail Audit* for the field definitions.
 -->
@@ -758,6 +792,6 @@ from the LLM output (after validation). Do NOT fill them in by hand.
       prd_sha256:       "..."
       llm_endpoint:     "..."
 
-See `genai-agents/vibecoding-state/references/spec-schema.md` for the full
+See `skills/vibecoding-state/references/spec-schema.md` for the full
 field list and validation rules.
 -->

@@ -305,7 +305,7 @@ Downstream iteration prompts (`first_scored_eval`, `instruction_iteration`) cons
 This skill is the **producer** of the
 `evaluation_runs_preflight.predict_fn_signature_matches_runner` boolean read by
 `preflight_check_registry.predict_fn_signature_matches_runner` (see
-`genai-agents/vibecoding-state/references/spec-schema.md` § *Evaluation Runs
+`skills/vibecoding-state/references/spec-schema.md` § *Evaluation Runs
 Preflight*). After every scored run, in addition to writing the
 `eval_telemetry.json` payload above, write the namespaced state block to the
 live state file:

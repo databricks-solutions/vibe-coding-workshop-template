@@ -97,3 +97,8 @@ apps_lakebase/prompts/
 
 #Lessons learnt
 retrospectives
+
+# Vibecoding runtime state files (per-user; never committed by any client — IDE or Genie Code)
+.vibecoding-state.md
+.vibecoding-state*.md
+**/.vibecoding-state.md

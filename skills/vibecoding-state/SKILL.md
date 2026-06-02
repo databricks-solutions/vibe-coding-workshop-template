@@ -74,6 +74,7 @@ All twelve operations take a typed parameter bag. The prompt invokes the operati
 
 **Behavior:**
 
+0. **Detect environment & write the `## Environment Capabilities` block (RULE_0 / RULE_1 enabling).** Before any other step, resolve the active coding client and write the capability block (schema in [`references/state-template.md`](references/state-template.md) § *Environment Capabilities*) as **section 0** of the state file. This is the block every prompt and the `enter` / `exit` operations read to resolve the deploy verb, CLI channel, and state-file root — so no skill or prompt body assumes a local IDE. Detection signal **[inference — pending the live Genie Code probe]**: if a Databricks-managed CLI channel is present in-session (the `runDatabricksCli` tool / Genie serverless markers), set `client_context: genie_code`, `cli_channel: runDatabricksCli`, `bundle_deploy.page_context_required: true`, and `state_file_root` to the git-folder workspace path; otherwise set `client_context: ide_cli`, `cli_channel: local_shell`, `bundle_deploy.page_context_required: false`, and `state_file_root` to the local repo path. The remaining fields are client-invariant: `bundle_deploy.verb` is always `bundle deploy --target dev`, `app_deploy` is always `{ verb: "apps deploy", gated: true }`, and `destructive_ops` is always `confirm_required`. Record the detection signal that fired in a trailing `# detected_via:` comment so a later live probe can confirm or correct it.
 1. **Workspace URL normalization & placeholder refusal.** Trim any trailing slash from `workspace_url` and normalize the scheme to `https://`. Refuse any literal placeholder — `<your-workspace-url>`, the empty string, or `https://<...>` — by halting with a remediation hint pointing the operator at Workshop Choices. Record the normalized value in `bootstrap_preflight.workspace_url_normalized` and the placeholder check in `workspace_url_was_placeholder`.
 2. **Profile selection & host match.** Run `databricks auth profiles` and select the profile whose host equals the normalized workspace host. Store it in `bootstrap_preflight.workspace_profile`. If no profile matches, set `workspace_host_auth_status: wrong_host` and halt; if the matching profile fails `databricks current-user me`, set `unauthenticated` and halt; on success set `authenticated`.
 3. **CLI version preflight.** Capture `databricks --version` into `bootstrap_preflight.databricks_cli_version`. Compare against `bootstrap_preflight.databricks_cli_min_version` (default `0.295.0`, may be raised by workshop config). Halt with an upgrade hint if the installed version is older.
@@ -89,7 +90,7 @@ All twelve operations take a typed parameter bag. The prompt invokes the operati
 13. **Derive `variant_id`** from `pathway` + `track` using the deterministic derivation table in [`references/resolver-prompt.md`](references/resolver-prompt.md) § *Variant-ID Derivation Table*.
 14. **Invoke `resolve_spec`** (see below) to parse the PRD at `prd_path` and populate the six spec sections (`## Variant`, `## Resources`, `## UI`, `## Agent`, `## Governance`, `## Spec Provenance`). This is a hard step: if `resolve_spec` halts, `bootstrap` halts.
 
-**Outputs:** Path of the bootstrap state file (also stored as `bootstrap_preflight.first_state_file_path`), populated with `## Bootstrap Preflight`, Workshop Choices, Global Variables (partial), and fully resolved Variant / Resources / UI / Agent / Governance / Provenance spec sections (schema v2.0). The workshop continues with this path until `migrate_canonical` runs.
+**Outputs:** Path of the bootstrap state file (also stored as `bootstrap_preflight.first_state_file_path`), populated with `## Environment Capabilities` (section 0), `## Bootstrap Preflight`, Workshop Choices, Global Variables (partial), and fully resolved Variant / Resources / UI / Agent / Governance / Provenance spec sections (schema v2.0). The workshop continues with this path until `migrate_canonical` runs.
 
 **Errors:** If the bootstrap path already exists, abort — do not overwrite. The operator must remove or migrate the stale file. Any of the four halt rules in `references/spec-schema.md` § Bootstrap Preflight (steps 1–4 above) abort before the template is copied. If `resolve_spec` fails validation twice, abort and surface the validation errors; the operator must fix the PRD before re-running.
 
@@ -143,9 +144,10 @@ All twelve operations take a typed parameter bag. The prompt invokes the operati
 **Behavior:**
 
 1. **Locate the live state file:**
-   - If `$APP_NAME` is known (Pathways A/B/C), use `apps_lakebase/$APP_NAME/.vibecoding-state.md`.
-   - Else if `$AGENT_NAME` is known (Pathway D), use `agents/$AGENT_NAME/.vibecoding-state.md`.
-   - Else fall back to the bootstrap path `example/<use_case_slug>/.vibecoding-state.md`.
+   - **First, resolve `state_file_root`** from the `## Environment Capabilities` block (section 0). Every path below is relative to it — the local repo root for `client_context: ide_cli`, the git-folder workspace path for `genie_code`. On a pre-capability state file (no section 0), default `state_file_root` to the repo root and proceed without assuming a deploy channel.
+   - If `$APP_NAME` is known (Pathways A/B/C), use `<state_file_root>/apps_lakebase/$APP_NAME/.vibecoding-state.md`.
+   - Else if `$AGENT_NAME` is known (Pathway D), use `<state_file_root>/agents/$AGENT_NAME/.vibecoding-state.md`.
+   - Else fall back to the bootstrap path `<state_file_root>/example/<use_case_slug>/.vibecoding-state.md`.
    - If none exists, stop and tell the operator to run `bootstrap` first.
 2. **Schema v2.0 gate (hard fail).** Parse the `## Spec Provenance` YAML block. If `schema_version != "2.0"`, halt with:
 
@@ -169,9 +171,9 @@ All twelve operations take a typed parameter bag. The prompt invokes the operati
 9. **Enforce `deferred_actions[]`.** Parse `## Deferred Actions`. Halt if the current prompt's role is in any open `deferred_action`'s `target_prompt_roles[]` and its `divergence_check` evaluates to false (or fails to parse under the divergence-check grammar in `references/spec-schema.md` § *Deferred Actions*). Halt is suppressed only when a `state_override` with `gate_type: hard_assert` (or `preflight_check`) on the current `prompt_id` exists AND its `references[]` contains `"deferred_action:<id>"` matching the action's `id`. If `divergence_check` returns true, flip `status` to `resolved` and proceed. Entries with `status: waived` are skipped without evaluation.
 10. **Enforce `mlflow_eval_known_quality_issues[]`.** Parse `## MLflow Eval Known Quality Issues`. If the current prompt's role appears in any open issue's `target_prompt_roles_blocked[]`, halt with a remediation hint citing `id`, `source_prompt_role`, and `error_signature` — unless a `state_override` exists on the current `prompt_id` whose `references[]` contains `"known_issue:<id>"` matching the issue's `id`. The issue's `error_signature` SHOULD be a name from `gate_load_bearing_checks[]` so audits and verify summaries align, but `enter` halts purely on `target_prompt_roles_blocked[]` membership and `status: open` — it does NOT consult `gate_load_bearing_checks[]` directly (that list drives `state_contract_audit` and the verify-job `warning_policy: block_if_load_bearing` rule per § *Gate Load Bearing Checks* in `references/spec-schema.md`).
 11. **Enforce `preflight_check_registry`.** Parse `## Preflight Check Registry`. For each registry entry, if the current prompt's role appears in `blocks_prompt_roles[]`, evaluate the matching state field per the *State-field mapping* table in `references/spec-schema.md` § *Preflight Check Registry*. If the pass condition is not met (the field is `<pending>`, missing, or fails the predicate), halt with a remediation hint pointing at `owner`. The halt is suppressed only when a matching `state_override` with `gate_type: preflight_check` exists on the current `prompt_id` whose `affected_state_field` matches the check's state field. For `reflection_lm_large_context_probe`, the check is treated as passing only when a synchronous ≥80000-character probe has been run against the currently bound `llm_role_endpoints.reflection_lm.endpoint` and `endpoint_guardrail_audit[<reflection_lm.endpoint>].long_context_ok == true` AND `accepted_min_context_chars >= 80000` — the generic bootstrap endpoint guardrail pass is NOT sufficient on its own. The owning skill (`instruction_iteration`) MUST invoke the probe synchronously before any 08b diff-summary helper or iteration helper call.
-12. **Resolve variables.** Return the subset of state the prompt body needs (it is declared in the prompt's `enter` invocation — e.g. `APP_NAME`, `PROFILE`, `warehouse_id`).
+12. **Resolve variables.** Return the subset of state the prompt body needs (it is declared in the prompt's `enter` invocation — e.g. `APP_NAME`, `PROFILE`, `warehouse_id`). **Always also return the environment-capability triple** so any deploy/run instruction the prompt emits uses the resolved verb + channel instead of assuming a local IDE: `bundle_deploy.verb` (always `bundle deploy --target dev`), `app_deploy.verb` (`apps deploy`), `cli_channel` (`local_shell` for `ide_cli`, `runDatabricksCli` for `genie_code`), and — when `bundle_deploy.page_context_required: true` — the page-context note (Genie Code must run the deploy from the bundle-folder page). The body never hardcodes a bare-shell `databricks` call.
 
-**Outputs:** `{skipped: bool, resolved: {<key>: <value>}}`.
+**Outputs:** `{skipped: bool, resolved: {<key>: <value>}, capabilities: {client_context, cli_channel, bundle_deploy, app_deploy, state_file_root}}`.
 
 **Errors:**
 
@@ -224,8 +226,8 @@ Other halt conditions (not numbered above): missing state file, unresolved `<pen
 
 **Behavior:**
 
-1. Run the prompt's verification checks (caller supplies `verification` if declared).
-2. Append a new `## Prompt <prompt_id> — <title>` section to the live state file using the Per-Step Log template in [`references/state-template.md`](references/state-template.md).
+1. Run the prompt's verification checks (caller supplies `verification` if declared). When a check involves a deploy/run, use the verb + CLI channel resolved by `enter` from `## Environment Capabilities` (never a bare-shell `databricks` call).
+2. Append a new `## Prompt <prompt_id> — <title>` section to the live state file (located under `environment_capabilities.state_file_root`, same resolution as `enter` step 1) using the Per-Step Log template in [`references/state-template.md`](references/state-template.md).
 3. Update `Captured Resource IDs` at the top — replace `<pending>` entries for every key in `captured`. Mark pathway-irrelevant IDs `<n/a>`.
 4. Bump `Last updated` in the header.
 5. **Gate rule (hard):** if the prompt is a build/modify prompt, `gate` MUST be `Local testing passed`. If it is anything else, `exit` stops and the next deployment-oriented prompt's `enter` will reject on the prior-gate check.
@@ -288,7 +290,7 @@ Surface `state_contract_audit.productized_debts_status` in the rollup as a one-l
 |---|---|---|---|
 | `prompt_registry_ref` | string | required | Path or SQL seed ref containing prompt `captured` fields. |
 | `skill_root` | string | optional | Default: `genai-agents`. |
-| `state_template_path` | string | optional | Default: `genai-agents/vibecoding-state/references/state-template.md`. |
+| `state_template_path` | string | optional | Default: `skills/vibecoding-state/references/state-template.md`. |
 | `mode` | enum | optional | `warn` for local authoring, `fail` before release. Default: `fail`. |
 
 **Behavior:**
@@ -444,8 +446,9 @@ This operation is the structural fix for retrospective recurring-issue #11 ("ski
 
 ## State File Layout
 
-Every live state file has twenty-two parts (schema v2.0). The full schema is in [`references/state-template.md`](references/state-template.md); the resolved-spec schema is in [`references/spec-schema.md`](references/spec-schema.md).
+Every live state file has a section-0 capability block plus twenty-two numbered parts (schema v2.0). The full schema is in [`references/state-template.md`](references/state-template.md); the resolved-spec schema is in [`references/spec-schema.md`](references/spec-schema.md).
 
+0. **Environment Capabilities** — written by `bootstrap` step 0 before anything else; read by `enter` / `exit` and every prompt. Resolves the active coding client (`client_context: ide_cli | genie_code`), the `cli_channel` (`local_shell` | `runDatabricksCli`), the client-invariant `bundle_deploy.verb` (`bundle deploy --target dev`) with its `page_context_required` flag, the `app_deploy` verb (gated), `destructive_ops: confirm_required`, and the `state_file_root` under which all state-file paths resolve. This is the RULE_0 (navigation preamble) / RULE_1 (deploy verb) source of truth — the skill/prompt body stays one content set across clients; only the preamble and channel vary.
 1. **Workshop Choices** — `use_case_slug`, `prd_path`, `pathway`, `track`, `dabs_bundle_path`, `llm_endpoint`. Set once at `bootstrap`, never changed.
 2. **Global Variables** — `APP_NAME`, `AGENT_NAME`, `PROFILE`, `Workspace URL`, `Workspace host`, `User email`, `workspace_serverless_only`, `UC catalog`, `UC schema (app|agent|ops)`.
 3. **Captured Resource IDs** — `warehouse_id`, `warehouse_name`, `llm_endpoint_ready`, `bundle_job_id`, `last_successful_run_id`, `last_verify_summary`, `app_url`, `serving_endpoint_name`, `ai_gateway_endpoint`, `mlflow_experiment_path`, `mlflow_feedback_experiment_path`, `lakebase_project`, `lakebase_host`, `doc_qa_backend`, `signoff_decision`, `prompt_iteration_ran`, `capstone_done`, plus list-valued sections for Genie Spaces, Vector Search indexes, Knowledge Assistants, custom `@function_tool` tools, and External MCP connections.
@@ -553,5 +556,5 @@ Live state and retrospective files are gitignored. Only the two files under `ref
 - [`references/spec-schema.md`](references/spec-schema.md) — schema v2.0 + Field Consumer Contract for Variant / Resources / UI / Agent / Governance / Provenance spec sections. Enforced by `resolve_spec` and audited by `retrospective.rollup`.
 - [`references/resolver-prompt.md`](references/resolver-prompt.md) — LLM prompt + deterministic guards used by `resolve_spec`.
 - [`references/retrospective-template.md`](references/retrospective-template.md) — per-prompt retro prompt + Session Rollup prompt.
-- [`genai-agents/00-course-orchestrator/SKILL.md`](../00-course-orchestrator/SKILL.md) — declares this skill as a runtime dependency.
+- [`genai-agents/00-course-orchestrator/SKILL.md`](../../genai-agents/00-course-orchestrator/SKILL.md) — declares this skill as a runtime dependency.
 - [`Instructions.md`](../../Instructions.md) and [`example/skyloyalty/WALKTHROUGH.md`](../../example/skyloyalty/WALKTHROUGH.md) — every prompt in these files invokes `enter` / `exit` from this skill and reads spec content by dotted path (`ui.*`, `agent.*`, `governance.*`, `resources.*`).
