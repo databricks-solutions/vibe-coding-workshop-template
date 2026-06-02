@@ -75,7 +75,7 @@ install_project_level() {
 install_ide_extra() {
   if [ -n "${CLAUDE_CODE:-}" ] || [ -d "$HOME/.claude" ]; then
     echo "Claude Code detected — also installing to ~/.claude/skills/ ..."
-    databricks experimental aitools skills install 2>/dev/null || echo "  (IDE-native install skipped — project-level clone is sufficient)"
+    databricks aitools install 2>/dev/null || echo "  (IDE-native install skipped — project-level clone is sufficient)"
   elif [ -n "${CURSOR_TRACE_ID:-}" ] || [ -d "$HOME/.cursor" ]; then
     echo ""
     echo "Cursor detected — optionally also run in Cursor chat:"
@@ -111,6 +111,6 @@ install_ide_extra
 
 echo ""
 echo "Verification — CLI tools should be available:"
-echo "  databricks experimental aitools tools --help"
+echo "  databricks aitools tools --help"
 echo ""
 echo "Done."

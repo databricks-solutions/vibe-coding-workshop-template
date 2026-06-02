@@ -119,6 +119,8 @@ When `databricks apps deploy` pushes code to the platform, the following sequenc
 
 **Authoritative source:** [Databricks Apps deploy — deployment logic](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy) and [post-deployment behavior](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/app-runtime).
 
+> **Client note — Genie Code (verified):** because this build pipeline runs **server-side in the container**, a Genie Code user with **no local npm** can deploy by editing source directly in the workspace and triggering a deployment via the SDK — `w.apps.deploy(<name>, AppDeployment(source_code_path=<workspace path>, mode=AppDeploymentMode.SNAPSHOT))`. This was tested end-to-end: editing an un-built `client/src/App.tsx` and redeploying produced deploy status `Building app…` and the edited string appeared in the **server-built** JS bundle (`/assets/index-*.js`). No local `npm install`/`npm run build` and no pre-synced `dist/` are required on Genie Code.
+
 ### Package Lock Management
 
 The platform's `npm install` depends on `package-lock.json` stability. Scenario table:
@@ -204,6 +206,8 @@ cd $APP_NAME && databricks apps validate --profile $PROFILE
 ```
 
 Fix any reported errors before proceeding.
+
+> **Client note — Genie Code:** `databricks apps validate` is **hard-blocked** via `runDatabricksCli` (not allow-listed). Skip this gate on Genie Code and rely on the **server-side build logs** after deploy (`databricks apps logs <name>`) as the authoritative schema/compile signal — the platform runs the same validation during the build pipeline.
 
 **Cross-validate `valueFrom` references against `databricks.yml` resources.** Every `valueFrom:` in `app.yaml` must have a matching resource declaration in `databricks.yml`. If not, `databricks apps deploy` (which runs `bundle deploy` internally) will fail to resolve the resource and the env var will be empty at runtime.
 
@@ -353,6 +357,23 @@ curl -s -H "Authorization: Bearer $TOKEN" "$APP_URL/api/health" | jq .
 ```
 
 If `curl` returns HTML (a login page) or 401, the token has expired. Re-run the `TOKEN=...` line to refresh it. Tokens are short-lived (~1 hour).
+
+> **Client note — Genie Code:** `databricks auth token` is **hard-blocked** via `runDatabricksCli`, and a raw `Authorization: Bearer` header (even from SDK `w.config.token`) is **rejected by AppKit's OAuth middleware** (`/api/health` → `401`; `/` → `302`). Two working ways to test a deployed app from Genie Code:
+>
+> 1. **Browser (simplest manual verify):** open the app URL (SDK `w.apps.get(<name>).url`) — the Databricks Apps OAuth flow establishes the session automatically. Use `databricks apps logs <name>` for backend assertions.
+> 2. **Programmatic (`executeCode`, for automated `/api/*` testing):** replay the 3-hop Apps OAuth handshake in **one `requests.Session()`** so the CSRF cookie persists (PKCE match), then reuse the session for all calls:
+>    ```python
+>    import requests
+>    from databricks.sdk import WorkspaceClient
+>    w = WorkspaceClient(); app_url = w.apps.get("<name>").url
+>    s = requests.Session()
+>    r1 = s.get(app_url, allow_redirects=False)                                  # __Host-databricksapps_csrf cookie
+>    r2 = s.get(r1.headers["location"],                                          # Databricks OIDC authorize
+>               headers={"Authorization": f"Bearer {w.config.token}"}, allow_redirects=False)
+>    s.get(r2.headers["location"])                                               # /.auth/callback → session cookie
+>    print(s.get(f"{app_url}/api/health").status_code)                          # now authenticated
+>    ```
+>    The single Session must carry the CSRF cookie through all 3 hops or the callback returns `403`.
 
 ---
 

@@ -441,6 +441,8 @@ databricks apps validate --profile $PROFILE
 
 If the smoke test fails because of default selectors ("Minimal Databricks App", "hello world"), update `tests/smoke.spec.ts` heading and text assertions to match your app's actual content. See [testing.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/testing.md).
 
+> **Client note — Genie Code:** `databricks apps validate` is **hard-blocked** via `runDatabricksCli`. Skip it and rely on the **server-side build logs** after deploy; see `03-appkit-deploy` Step 1 (Client note).
+
 ### 4b. Local Validation (Build Only)
 
 > **Do NOT run `npm run dev` at this step.** The `lakebase()` plugin throws `ConfigurationError` when `LAKEBASE_ENDPOINT` and `PGHOST` are not set. These env vars are provisioned by the platform on first deploy. `npm run build` is sufficient — it validates all TypeScript, imports, and bundling without executing the code.
@@ -491,7 +493,9 @@ Detailed callouts are embedded inline at the relevant step. This table is a comp
 | Check live Lakebase docs | `npx @databricks/appkit docs "lakebase"` |
 | Derive schema name | `DB_SCHEMA=$(echo "$APP_NAME" \| tr '-' '_')` |
 | Build gate | `npm run build` (must pass with zero errors) |
-| Test health endpoint (after deploy) | `curl -s "$APP_URL/api/health/lakebase" -H "Authorization: Bearer $TOKEN" \| jq .` |
+| Test health endpoint (after deploy) | `curl -s "$APP_URL/api/health/lakebase" -H "Authorization: Bearer $TOKEN" \| jq .` (IDE only — see note) |
+
+> **Client note — Genie Code:** a plain `curl … -H "Authorization: Bearer $TOKEN"` does **not** work (`auth token` hard-blocked; raw Bearer rejected by AppKit's OAuth gate → 401). Two working paths: **(1) browser** — open the app URL and read the `ConnectionStatus` indicator (live/mock), plus `databricks apps logs <name>` for `[Lakebase]` query lines; **(2) programmatic** — hit `/api/health/lakebase` via the **3-hop OAuth `requests.Session()` pattern** in `03-appkit-deploy` "Testing Deployed App APIs" (Client note).
 
 ---
 

@@ -27,7 +27,8 @@ await createApp({
 You need a SQL Warehouse ID. Discover it with:
 
 ```bash
-databricks experimental aitools tools get-default-warehouse --profile <PROFILE>
+databricks aitools tools get-default-warehouse --profile <PROFILE>
+# fallback if aitools is unavailable: databricks warehouses list --output json | jq -r '.[0].id'
 ```
 
 Add to `.env`:

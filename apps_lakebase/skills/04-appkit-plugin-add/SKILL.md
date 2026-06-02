@@ -184,7 +184,7 @@ npx @databricks/appkit docs --full       # full index with all API entries
 | Task | Command / Action |
 |------|-----------------|
 | Check live plugin docs | `npx @databricks/appkit docs "<plugin>"` |
-| Get warehouse ID (for Analytics/Genie) | `databricks experimental aitools tools get-default-warehouse --profile <P>` |
+| Get warehouse ID (for Analytics/Genie) | `databricks aitools tools get-default-warehouse --profile <P>` (fallback: `databricks warehouses list`) |
 | Generate query types (Analytics) | `npm run typegen` |
 | Validate app | `databricks apps validate` |
 | Deploy | `databricks apps deploy --profile <P>` |
