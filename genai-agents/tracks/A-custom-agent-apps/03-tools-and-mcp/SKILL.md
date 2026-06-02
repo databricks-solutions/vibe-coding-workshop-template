@@ -426,6 +426,8 @@ kinds — do not wrap them in `uc_securable`.
 
 Verify the bundle schema accepts each kind your agent needs before deploying:
 
+> **Client note:** IDE runs this in a terminal; Genie Code runs the `databricks bundle …` command via `runDatabricksCli`. See `skills/genie-code-environment`.
+
 ```bash
 # Generic "does this kind exist in my CLI's schema?"
 databricks bundle schema \

@@ -265,6 +265,8 @@ Before ANY deployment, confirm you are targeting the correct workspace:
 
 ### Step 1: Validate & Deploy
 
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page). See `skills/genie-code-environment`.
+
 ```bash
 databricks bundle validate -t <target>   # Pre-flight — catches ~80% of errors
 databricks bundle deploy -t <target>     # Deploy all resources

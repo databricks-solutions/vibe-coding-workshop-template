@@ -362,6 +362,9 @@ Report what was created and ask the user if they want to deploy and run.
 ---
 
 **Deployment Order (USER-TRIGGERED ONLY — do not auto-execute):**
+
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page; generated files anchor to `{REPO_ROOT}`). See `skills/genie-code-environment`.
+
 ```bash
 # 1. Deploy everything
 databricks bundle deploy -t dev

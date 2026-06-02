@@ -900,6 +900,8 @@ ws.alerts_v2.update_alert(
 
 ### Initial Setup (Hierarchical)
 
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page). See `skills/genie-code-environment`.
+
 ```bash
 # 1. Deploy all alerting infrastructure (composite orchestrator)
 databricks bundle run alerting_layer_setup_job -t dev

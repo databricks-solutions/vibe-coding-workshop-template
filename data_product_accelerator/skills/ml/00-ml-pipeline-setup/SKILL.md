@@ -98,6 +98,9 @@ else:
 4. Asset Bundle jobs for orchestration
 
 **Fast Track:**
+
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page; generated files anchor to `{REPO_ROOT}`). See `skills/genie-code-environment`.
+
 ```bash
 # 1. Create Feature Tables
 databricks bundle run ml_feature_pipeline_job -t dev

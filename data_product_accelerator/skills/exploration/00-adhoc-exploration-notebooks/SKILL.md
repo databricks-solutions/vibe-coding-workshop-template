@@ -186,6 +186,8 @@ notebook_task:
     catalog: ${var.catalog}
 ```
 
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page; generated files anchor to `{REPO_ROOT}`). See `skills/genie-code-environment`.
+
 ```bash
 # Deploy and run
 databricks bundle deploy -t dev

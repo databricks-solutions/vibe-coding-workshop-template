@@ -688,6 +688,9 @@ cp data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-a
    ```
 
 2. **Validate SQL Queries** (if benchmarks present)
+
+   > **Client note:** IDE runs this in a terminal; Genie Code runs the `databricks bundle …` command via `runDatabricksCli` (be on the bundle's page). See `skills/genie-code-environment`.
+
    ```bash
    databricks bundle run -t dev genie_benchmark_validation_job
    ```

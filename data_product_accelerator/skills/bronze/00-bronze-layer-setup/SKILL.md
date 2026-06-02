@@ -110,6 +110,9 @@ tasks:
 4. `bronze_setup_job.yml` + `bronze_data_generator_job.yml` - Asset Bundle jobs
 
 **Deployment Commands (run when ready — NOT auto-executed by this skill):**
+
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page; generated files anchor to `{REPO_ROOT}`). See `skills/genie-code-environment`.
+
 ```bash
 # 1. Deploy setup job
 databricks bundle deploy -t dev

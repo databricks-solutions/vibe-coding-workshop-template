@@ -127,6 +127,8 @@ source of deployment failures.
 
 ### Validate before deploying
 
+> **Client note:** IDE runs this in a terminal; Genie Code runs the `databricks bundle …` command via `runDatabricksCli` (be on the bundle's page). See `skills/genie-code-environment`.
+
 ```bash
 databricks bundle validate
 ```
