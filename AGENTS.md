@@ -74,6 +74,8 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 
 **MANDATORY:** Before starting any task, match keywords below to find the right component. Read the linked file FIRST.
 
+> **Client-agnostic by design.** Routing is the same for every client. The active client (`client_context`) is detected and gated by `skills/vibecoding-state`; for how the in-workspace agent behaves, load `skills/genie-code-environment` (pre-auth, serverless, page-context CLI, clone-rooted file placement). Routed prompts open with a client-specific RULE_0 preamble — follow it as written.
+
 ### Data Product Accelerator — `data_product_accelerator/AGENTS.md`
 
 | Keywords | Action |

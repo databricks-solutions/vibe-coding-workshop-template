@@ -10,7 +10,7 @@ license: Apache-2.0
 clients: [ide_cli, genie_code]
 bundle_resource: none
 deploy_verb: none
-deploy_note: "Course navigator/router — selects which genai-agents skills to load; no deployed resource and no deploy verb. Client-agnostic routing. The client-awareness layer (RULE_0 `client_context` detection + `skills/genie-code-environment` pointer) is added in Milestone 06 per the navigator plan; this sweep adds only the capability block."
+deploy_note: "Course navigator/router — selects which genai-agents skills to load; no deployed resource and no deploy verb. Client-agnostic routing. Client-awareness layer present (M06): `client_context` is detected/gated by `skills/vibecoding-state`; `skills/genie-code-environment` referenced by the Runtime Contract and the A7 deploy route. No inline behavior detail."
 coverage: full
 metadata:
   author: "prashanth-subrahmanyam"
@@ -18,7 +18,7 @@ metadata:
   domain: "genai-agents"
   role: "navigator"
   scope: "strictly genai-agents/; alternate tracks only linked as optional accelerator mirrors"
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: low
   upstream_sources: []
   references:
@@ -85,6 +85,14 @@ For vibecoding workshops, always load `../../skills/vibecoding-state/SKILL.md` b
 acting on a prompt. That sibling skill owns bootstrap, `enter`, `exit`,
 applicability checks, state-file updates, and retrospectives. This navigator
 only routes to the correct domain skill.
+
+**Client awareness (by reference).** `vibecoding-state` also detects and gates
+`client_context`. The course routes the same for every client; only deploy/run
+mechanics differ. On the in-workspace agent, load `../../skills/genie-code-environment/SKILL.md`
+(pre-auth, serverless, page-context CLI, clone-rooted files) — local dev servers
+and CLI/profile authentication do not apply there (see PRE-REQUISITES §11 for the
+IDE/CLI auth path). Routed prompts open with a client-specific RULE_0 preamble;
+follow it as written.
 
 Live state files are gitignored. Templates live in:
 
@@ -185,7 +193,7 @@ Live state files are gitignored. Templates live in:
 | "agent auth", "OBO", "service principal", "App Authorization", "User Authorization", "permissions" | `../tracks/A-custom-agent-apps/04-authentication/SKILL.md` | A4 |
 | "Lakebase memory", "conversation memory", "AsyncDatabricksSession", "DatabricksStore", "thread_id" | `../tracks/A-custom-agent-apps/05-lakebase-memory/SKILL.md` | A5 |
 | "agent-evaluate", "pre-deploy eval", "smoke test", "built-in judges" | `../tracks/A-custom-agent-apps/06-evaluation/SKILL.md` | A6 |
-| "deploy to Databricks Apps", "databricks apps deploy", "query deployed app", "OAuth token", "app URL" | `../tracks/A-custom-agent-apps/07-deploy-and-query/SKILL.md` | A7 |
+| "deploy to Databricks Apps", "databricks apps deploy", "query deployed app", "OAuth token", "app URL" | `../tracks/A-custom-agent-apps/07-deploy-and-query/SKILL.md` | A7 — deploy verb is client-agnostic; the local dev server / CLI-auth steps are IDE-only (see A7 + `../../skills/genie-code-environment/SKILL.md`) |
 | "debug app", "deployment failed", "runtime error", "auth failure", "resource permission", "Lakebase failure" | `../tracks/A-custom-agent-apps/08-debugging/SKILL.md` | A8 |
 
 ### SDLC Routes

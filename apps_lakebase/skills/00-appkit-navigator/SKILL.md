@@ -13,10 +13,10 @@ description: >
 license: Apache-2.0
 clients: [ide_cli, genie_code]
 coverage: full
-# Contract/index layer only (M5 5e, body sweep). The navigator's client-awareness body layer
-# (client_context detection, skills/genie-code-environment pointer, npx/$PROFILE IDE-gating,
-# Development-Lifecycle deploy/test client-annotation) is added in Milestone 06 (criterion 3 / step 4)
-# to keep this Tier-1-thin routing skill from being double-touched.
+# Client-awareness body layer added in Milestone 06 (batch 6e, criterion 3 / step 4):
+# Tier-1-thin client callout (client_context via skills/vibecoding-state, skills/genie-code-environment
+# pointer), npx docs IDE-gated with a Genie Code alternative, $PROFILE annotated as an IDE/CLI concept,
+# and the Development-Lifecycle deploy(agnostic)/local-test(IDE-only) split — all by reference, no inline behavior.
 metadata:
   author: prashanth subrahmanyam
   version: "1.1.0"
@@ -31,6 +31,8 @@ metadata:
 # AppKit Lakebase Navigator
 
 Route AppKit + Lakebase tasks to the correct specialized skill.
+
+> **Client awareness (Tier-1-thin).** Routing is identical for every client; only the run/test/docs mechanics differ. `skills/vibecoding-state` detects and gates `client_context`; on the in-workspace agent load `skills/genie-code-environment` for behavior (pre-auth, serverless, page-context CLI, clone-rooted files). The **deploy** verb is client-agnostic, but the **local dev server / E2E test** steps below are IDE/CLI-only — Genie Code verifies against the deployed app (see `03-appkit-deploy` and the routed skill's `deploy_note`). Routed prompts open with a client-specific RULE_0 preamble; follow it.
 
 ## Development Lifecycle
 
@@ -153,7 +155,7 @@ To see the full directory tree, run: `find apps_lakebase/skills/ -type f -name "
 
 - **`02-appkit-build`** requires a scaffolded project (`01-appkit-scaffold` must run first)
 - **`02-appkit-build`** cross-references `03-appkit-deploy` in its "What's Next" section
-- **`03-appkit-deploy`** expects `$APP_NAME` and `$PROFILE` to be set by the caller
+- **`03-appkit-deploy`** expects `$APP_NAME` and `$PROFILE` to be set by the caller. `$PROFILE` is an IDE/CLI concept (a `~/.databrickscfg` profile); on the in-workspace agent there is no profile (pre-auth/serverless) — see `skills/genie-code-environment`.
 - **`04-appkit-plugin-add`** can run at any point after scaffolding
 - **`05-appkit-lakebase-wiring`** requires the Lakebase plugin to be registered first (`04-appkit-plugin-add`)
 - **`06-appkit-serving-wiring`** requires the Serving plugin to be registered first (`04-appkit-plugin-add`)
@@ -169,10 +171,13 @@ To see the full directory tree, run: `find apps_lakebase/skills/ -type f -name "
 For the latest API details, always consult the live docs first:
 
 ```bash
+# IDE/CLI clients (local Node + npx):
 npx @databricks/appkit docs              # documentation index
 npx @databricks/appkit docs "<query>"    # search for a specific topic
 npx @databricks/appkit docs --full       # full index with all API entries
 ```
+
+> **Genie Code:** `npx` (local Node) is not available. Use the AppKit docs hub under **See Also** ([databricks.github.io/appkit](https://databricks.github.io/appkit/)) or the per-skill reference docs, and run any AppKit commands via the workspace page-context CLI (`runDatabricksCli`) — see `skills/genie-code-environment`.
 
 ---
 

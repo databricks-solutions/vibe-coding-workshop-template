@@ -32,6 +32,8 @@ repo-root/                           <-- workspace root / agent CWD
 
 **MANDATORY:** Before starting any Databricks implementation task, consult this routing table. For ambiguous tasks, read the full skill navigator: `data_product_accelerator/skills/skill-navigator/SKILL.md`
 
+> **Client-agnostic routing.** The active client (`client_context`) is detected and gated by `skills/vibecoding-state`; for in-workspace agent behavior load `skills/genie-code-environment`. Routed prompts open with a client-specific RULE_0 preamble — follow it. (Genie Code first-run clone kickstart lives in the [repo-root AGENTS.md](../AGENTS.md).)
+
 > **Visual learner?** See the [Interactive Skill Navigation Guide](data_product_accelerator/docs/framework-design/10-skill-navigation-visual-guide.html) — an animated walkthrough showing how the agent navigates from AGENTS.md through all 9 pipeline stages. Open the HTML file in any browser.
 
 ## Design-First Pipeline
