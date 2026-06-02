@@ -199,6 +199,8 @@ cat .env
 
 ## Step 1c: Start the Local Dev Server
 
+> **Genie Code:** there is no local dev server — this local-quickstart path is IDE-only. Instead deploy to the Databricks Apps runtime and test the deployed app (the platform builds it server-side). See `skills/genie-code-environment` §4.
+
 ```bash
 uv run start-app
 ```

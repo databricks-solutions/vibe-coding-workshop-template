@@ -158,6 +158,8 @@ At the bottom: `mlflow.openai.autolog()` enables automatic tracing and `mlflow.m
 
 ## Step 2: Test locally
 
+> **Genie Code:** run the Step 2–5 job submit/deploy through `runDatabricksCli` (pre-authenticated — omit `--profile`), and write the scaffolded agent source under the cloned repo root (`{REPO_ROOT}`), not a bare relative path. See `skills/genie-code-environment` §2, §8.
+
 ### Running Steps 2–5 as a job (recommended for workshops)
 
 If you don't have an interactive cluster attached, combine Steps 2–5 into a single Databricks notebook and submit it as a serverless job:

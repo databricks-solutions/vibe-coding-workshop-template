@@ -92,6 +92,8 @@ use the CLI workflow below.
 
 ## Path B: Deploy via CLI
 
+> **Genie Code:** run the create / sync / deploy CLI through `runDatabricksCli` (pre-authenticated) and be on the app's page; the enhanced CLI build flow is page/CWD-dependent, so the SDK `w.apps.deploy(...)` SNAPSHOT path is the reliable fallback, and verify the deployed app via the OAuth session. See `skills/genie-code-environment` §3–§4, §7.
+
 ### Step 7b-1: Create the App
 
 If you cloned the repository locally (not via the Workspace UI), create the

@@ -119,6 +119,8 @@ If the gate raises, the entire promote step exits non-zero and CI surfaces the f
 
 ## Databricks Asset Bundles (DAB)
 
+> **Genie Code:** run every deploy command through `runDatabricksCli` (pre-authenticated), and be on the bundle's page so the CWD resolves to the bundle root. The CI/CD spine is identical on both clients. See `skills/genie-code-environment` §3–§4.
+
 Define jobs, apps, and variables in `databricks.yml`, then deploy and run by target.
 
 ```yaml
