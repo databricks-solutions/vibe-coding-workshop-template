@@ -9,7 +9,7 @@
     "(root)::SHELL_DATABRICKS": 8,
     "agentic-framework::APP_DEPLOY": 17,
     "apps_lakebase::APP_DEPLOY": 1208,
-    "apps_lakebase::CLIENT_NAV": 21,
+    "apps_lakebase::CLIENT_NAV": 7,
     "apps_lakebase::GENIE_RESOURCE": 8,
     "apps_lakebase::INSESSION_CREATE": 100,
     "apps_lakebase::LOCAL_AUTH": 44,
@@ -40,7 +40,7 @@
   },
   "by_class": {
     "APP_DEPLOY": 1556,
-    "CLIENT_NAV": 22,
+    "CLIENT_NAV": 8,
     "GENIE_RESOURCE": 42,
     "INSESSION_CREATE": 264,
     "LOCAL_AUTH": 76,
@@ -51,5 +51,5 @@
     "SETUP_SCRIPT": 14,
     "SHELL_DATABRICKS": 605
   },
-  "total": 2921
+  "total": 2907
 }
