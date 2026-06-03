@@ -148,6 +148,160 @@ def check_roundtrip(allow_diff: bool) -> bool:
     return False
 
 
+def _tokens(text: str) -> set[str]:
+    """Template variables `{like_this}` (excludes bundle `${vars}`)."""
+    import re
+    return set(re.findall(r"(?<![$\\])\{[A-Za-z0-9_]+\}", text or ""))
+
+
+def _gate(text: str) -> str | None:
+    """The backtick-quoted gate name from a `**Gate:** \`...\`` line, if any."""
+    import re
+    m = re.search(r"\*\*Gate:\*\*\s*`([^`]+)`", text or "")
+    return m.group(1).strip() if m else None
+
+
+def check_fork_parity() -> bool:
+    """FORK_INTENT_PARITY (M07): every `*.genie-code.md` fork must preserve its default's
+    intent surface — the template `{tokens}` (per-user-prefix invariant, decision #7) and the
+    `**Gate:**` — and must NOT use bare `@.../SKILL.md` mentions (forks exist to give full
+    clone-rooted paths). Mechanics may differ; intent may not. Auto-skips if the prompts tree
+    is absent (git-ignored / separate repo)."""
+    import re
+    sections = os.path.join(REPO_ROOT, "apps_lakebase", "prompts", "sections")
+    print("\n=== fork intent-parity gate ===")
+    if not os.path.isdir(sections):
+        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        return True
+    sys.path.insert(0, os.path.join(REPO_ROOT, "apps_lakebase", "prompts"))
+    try:
+        from sync_markdown_to_seed import parse_markdown
+    except Exception as e:  # pragma: no cover
+        print(f"SKIP — cannot import parse_markdown ({e}).")
+        return True
+
+    from pathlib import Path
+    files = sorted(Path(sections).glob("*.md"))
+    forks, default_by_tag = [], {}
+    for p in files:
+        if p.name == "README.md":
+            continue
+        try:
+            f = parse_markdown(p)
+        except Exception as e:
+            print(f"  WARN: cannot parse {p.name}: {e}")
+            continue
+        if p.name.endswith(".genie-code.md") or f.get("coding_assistant"):
+            forks.append((p.name, f))
+        else:
+            default_by_tag[f.get("section_tag")] = f
+
+    if not forks:
+        print("no forks present — nothing to check. PASS")
+        return True
+
+    failures = []
+    for name, fk in forks:
+        tag = fk.get("section_tag")
+        base = default_by_tag.get(tag)
+        if base is None:
+            failures.append(f"{name}: orphan fork — no default section with section_tag '{tag}'")
+            continue
+        base_text = (base.get("input_template", "") + "\n" + base.get("system_prompt", ""))
+        fork_text = (fk.get("input_template", "") + "\n" + fk.get("system_prompt", ""))
+        missing = _tokens(base_text) - _tokens(fork_text)
+        if missing:
+            failures.append(f"{name}: dropped template token(s) {sorted(missing)} (intent/prefix regression)")
+        bg, fg = _gate(base_text), _gate(fork_text)
+        if bg and bg != fg:
+            failures.append(f"{name}: gate mismatch — default `{bg}` vs fork `{fg}`")
+        bare = re.findall(r"@[\w./-]+/SKILL\.md", fork_text)
+        if bare:
+            failures.append(f"{name}: bare @-mention(s) {sorted(set(bare))} — use full skill_ref_root path")
+
+    print(f"checked {len(forks)} fork(s) against {len(default_by_tag)} defaults")
+    if failures:
+        print("FAIL — fork intent-parity violations:")
+        for f in failures:
+            print(f"  {f}")
+        return False
+    print("fork intent-parity gate: PASS")
+    return True
+
+
+def check_deploy_fork_discipline() -> bool:
+    """DEPLOY_FORK_DISCIPLINE (M07): any `*.genie-code.md` fork that drives a `bundle deploy`
+    (a data-product / deploy fork) MUST carry the hardening signals that stop Genie Code
+    from taking the frictionless-but-wrong path observed in the field:
+      1. a no-direct-creation prohibition (DDL/CLONE is the bundle job's body, not a hand-run statement),
+      2. a page-context recovery recipe (`databricks.yml not found` ⇒ navigate to the bundle page,
+         don't fall back to direct SQL),
+      3. a mechanism-aware gate (tables existing is "not sufficient" — the job must have deployed/run),
+      4. a bundle-editor navigation directive (the field-confirmed fix for a blocked deploy is to open the
+         bundle editor, not to abandon the bundle),
+      5. a no-workaround / escape-hatch STOP rule (REST/SDK/direct-SQL fallback only on explicit operator
+         authorization — the silent pivot to `jobs/create` was the observed regression).
+    Static content check only; auto-skips if the prompts tree is absent."""
+    import re
+    sections = os.path.join(REPO_ROOT, "apps_lakebase", "prompts", "sections")
+    print("\n=== deploy-fork discipline gate ===")
+    if not os.path.isdir(sections):
+        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        return True
+    sys.path.insert(0, os.path.join(REPO_ROOT, "apps_lakebase", "prompts"))
+    try:
+        from sync_markdown_to_seed import parse_markdown
+    except Exception as e:  # pragma: no cover
+        print(f"SKIP — cannot import parse_markdown ({e}).")
+        return True
+
+    from pathlib import Path
+    failures, checked = [], 0
+    for p in sorted(Path(sections).glob("*.genie-code.md")):
+        try:
+            f = parse_markdown(p)
+        except Exception as e:
+            print(f"  WARN: cannot parse {p.name}: {e}")
+            continue
+        text = (f.get("input_template", "") or "") + "\n" + (f.get("system_prompt", "") or "")
+        # Only deploy/data-product forks (those that drive a bundle deploy) are in scope.
+        if "bundle deploy" not in text.lower():
+            continue
+        checked += 1
+        low = text.lower()
+        prohibition = (re.search(r"never\b[^\n]*\b(executecode|spark\.sql)", low) is not None
+                       or "body of the bundle job" in low
+                       or "do not fall back to direct sql" in low)
+        page_recipe = "databricks.yml not found" in low
+        mechanism_gate = "not sufficient" in low
+        bundle_editor = "bundle editor" in low or "bundle-editor" in low
+        escape_hatch = "escape hatch" in low
+        if not prohibition:
+            failures.append(f"{p.name}: missing no-direct-creation prohibition "
+                            "(name DDL/CLONE as the bundle job's body; forbid executeCode/spark.sql).")
+        if not page_recipe:
+            failures.append(f"{p.name}: missing page-context recovery recipe "
+                            "(`databricks.yml not found` ⇒ navigate to the bundle page, never direct SQL).")
+        if not mechanism_gate:
+            failures.append(f"{p.name}: gate is outcome-only — add a mechanism check "
+                            "(tables existing is 'not sufficient'; require deploy + run).")
+        if not bundle_editor:
+            failures.append(f"{p.name}: missing bundle-editor navigation directive "
+                            "(a blocked deploy is a wrong-page signal — open the bundle editor, don't abandon the bundle).")
+        if not escape_hatch:
+            failures.append(f"{p.name}: missing no-workaround / escape-hatch STOP rule "
+                            "(REST/SDK/direct-SQL fallback only on explicit operator authorization).")
+
+    print(f"checked {checked} deploy fork(s)")
+    if failures:
+        print("FAIL — deploy-fork discipline violations:")
+        for f in failures:
+            print(f"  {f}")
+        return False
+    print("deploy-fork discipline gate: PASS")
+    return True
+
+
 def check_bundle(profile: str | None) -> bool:
     print("\n=== bundle validate gate ===")
     if not os.path.exists(os.path.join(REPO_ROOT, "databricks.yml")):
@@ -173,6 +327,10 @@ def main() -> int:
     ap.add_argument("--allow-seed-diff", action="store_true",
                     help="Permit an intentional seed diff (e.g. during the M3 sweep).")
     ap.add_argument("--skip-roundtrip", action="store_true")
+    ap.add_argument("--skip-fork-parity", action="store_true",
+                    help="Skip the FORK_INTENT_PARITY check (M07 genie-code forks).")
+    ap.add_argument("--skip-deploy-discipline", action="store_true",
+                    help="Skip the DEPLOY_FORK_DISCIPLINE check (M07 genie-code deploy forks).")
     ap.add_argument("--bundle", action="store_true",
                     help="Also run `databricks bundle validate --target dev`.")
     ap.add_argument("--profile", default=None,
@@ -186,6 +344,10 @@ def main() -> int:
     ok = check_audit(set(args.touched))
     if not args.skip_roundtrip:
         ok = check_roundtrip(args.allow_seed_diff) and ok
+    if not args.skip_fork_parity:
+        ok = check_fork_parity() and ok
+    if not args.skip_deploy_discipline:
+        ok = check_deploy_fork_discipline() and ok
     if args.bundle:
         ok = check_bundle(args.profile) and ok
 

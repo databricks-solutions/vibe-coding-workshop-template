@@ -1,4 +1,6 @@
-# Running Steps 2–5 as a Serverless Job
+# Running Steps 2–5 as a Serverless Job (fallback)
+
+> **This is the fallback path, not the canonical one.** The canonical deploy is the **bundle job** `agent_deploy_job` (`bundle deploy` → `bundle run`, see SKILL.md Step 2 + references/agent_deploy_job.yml) — version-controlled and identical to the Bronze/Silver/Gold spine. Use the standalone `databricks jobs submit` documented here only as a one-off IDE convenience when you explicitly do not want a bundle, or for debugging. On Genie Code prefer the bundle job from the bundle-editor page; `jobs submit` is not in the runDatabricksCli pre-approved allow-list.
 
 Loaded by `SKILL.md` Step 2 when no interactive cluster is available (common in workshop and restricted workspaces).
 

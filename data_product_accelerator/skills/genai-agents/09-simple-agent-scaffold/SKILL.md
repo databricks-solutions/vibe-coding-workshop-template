@@ -14,7 +14,7 @@ license: Apache-2.0
 clients: [ide_cli, genie_code]
 bundle_resource: jobs
 deploy_verb: bundle_deploy
-deploy_note: "Scaffolds a minimal MCP tool-calling agent and deploys it to Model Serving via a deploy job. On Genie Code run the job submit/deploy through runDatabricksCli (pre-authenticated — no `--profile`); on IDE via the local CLI with a profile. On Genie Code write the scaffolded agent source under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path — relative paths resolve against the page CWD (see `skills/genie-code-environment` §8)."
+deploy_note: "Scaffolds a minimal MCP tool-calling agent and deploys it to Model Serving by RUNNING a bundle job (`agent_deploy_job` — references/agent_deploy_job.yml + references/agent-deploy-notebook.py): the same `bundle deploy` -> `bundle run` spine as Bronze/Silver/Gold. The endpoint is created by the job, never by ad-hoc `agents.deploy()` in a loose notebook nor by `jobs submit`. The UC agent schema is created by the job notebook via direct SQL (`CREATE SCHEMA IF NOT EXISTS`) — the deliberate schema exception, NOT a bundle `schemas:` resource. On Genie Code run `bundle deploy`/`bundle run` through runDatabricksCli from the bundle-editor page (pre-authenticated — no `--profile`, no `databricks sync`); on IDE via the local CLI with a profile. Keep agent.py/agent-config.yaml/deploy_agent inside the bundle under `{REPO_ROOT}` (= `state_file_root` from `skills/vibecoding-state`) so `bundle deploy` syncs them — never a bare relative path (see `skills/genie-code-environment` §8)."
 coverage: full
 metadata:
   author: prashanth subrahmanyam
@@ -96,7 +96,7 @@ agent.py                                                       │
 | Memory | None (stateless) | `03-lakebase-memory-patterns` |
 | Evaluation | Skip | `02-mlflow-genai-evaluation` |
 | Prompt management | Inline system prompt via `ModelConfig` | `04-prompt-registry-patterns` |
-| Deployment | `databricks.agents.deploy()` | `06-deployment-automation` for CI/CD |
+| Deployment | Bundle job `agent_deploy_job` (`bundle deploy` -> `bundle run`) whose notebook calls `agents.deploy()` | `06-deployment-automation` for CI/CD |
 | Frontend | AI Playground (default) | `06-appkit-serving-wiring` for AppKit UI |
 
 ---
@@ -158,33 +158,29 @@ At the bottom: `mlflow.openai.autolog()` enables automatic tracing and `mlflow.m
 
 ## Step 2: Test locally
 
-> **Genie Code:** run the Step 2–5 job submit/deploy through `runDatabricksCli` (pre-authenticated — omit `--profile`), and write the scaffolded agent source under the cloned repo root (`{REPO_ROOT}`), not a bare relative path. See `skills/genie-code-environment` §2, §8.
+### Deploy Steps 2–5 as a bundle job (canonical — same spine as Bronze/Silver/Gold)
 
-### Running Steps 2–5 as a job (recommended for workshops)
+Workshop workspaces usually have no interactive cluster, and — more importantly — the agent endpoint should be created the same versioned way as every other artifact: **by running a bundle job**, not by an ad-hoc `agents.deploy()` in a loose notebook or a one-off `jobs submit`. Combine Steps 2–5 into one notebook (`deploy_agent`) and run it as a serverless **bundle job**:
 
-If you don't have an interactive cluster attached, combine Steps 2–5 into a single Databricks notebook and submit it as a serverless job:
+1. Copy the templates into your bundle (keep them beside `agent.py`/`agent-config.yaml` so `bundle deploy` syncs them):
+   - `references/agent-deploy-notebook.py` → `<bundle>/agents/deploy_agent.py` — the notebook-task body: Step 0 schema creation (direct SQL), Steps 2–5, Step 5b auto-grant, Step 5c checkpoint.
+   - `references/agent_deploy_job.yml` → `<bundle>/resources/agent_deploy_job.yml`.
+2. Wire the `variables:` block in `databricks.yml` (`catalog`, `agent_schema`, `agent_model_name`, `gold_schema`, `semantic_warehouse_id`, `genie_space_id`, `agents_folder_ws_path`) — see the YAML header.
+3. Validate → deploy → run:
 
 ```bash
-databricks jobs submit --no-wait --profile $PROFILE --json '{
-  "run_name": "deploy-agent",
-  "tasks": [{"task_key": "deploy", "notebook_task": {
-    "notebook_path": "/Workspace/Users/<your-email>/booking_app_agents/deploy_agent"
-  }, "environment_key": "default"}],
-  "environments": [{"environment_key": "default", "spec": {
-    "client": "1",
-    "dependencies": [
-      "databricks-agents","databricks-openai","mlflow[databricks]",
-      "mcp","nest_asyncio","uv"
-    ]
-  }}]
-}'
+databricks bundle validate -t dev
+databricks bundle deploy   -t dev
+databricks bundle run      -t dev agent_deploy_job
 ```
 
-Always use serverless (`environment_key`), not classic clusters (`new_cluster`). Workshop and restricted workspaces often block classic clusters with `NETWORK_CONFIGURATION_FAILURE`.
+The job's notebook creates the UC agent schema with direct SQL (`CREATE SCHEMA IF NOT EXISTS` — the schema exception, **not** a bundle resource), then logs, registers, deploys, auto-grants the endpoint system SP (Step 5b), and writes `DEPLOY_CHECKPOINT.md` (Step 5c).
 
-**Important:** when running as a job the working directory is NOT the notebook's directory. This is why `model_config="agent-config.yaml"` is required in Step 3.
+Always use serverless (`environment_key`), never classic clusters (`new_cluster`) — workshop workspaces block classic clusters with `NETWORK_CONFIGURATION_FAILURE`. When run as a job the working directory is NOT the notebook's directory, which is why `model_config="agent-config.yaml"` is required in Step 3.
 
-See [references/job-submission.md](references/job-submission.md) for the polling loop and failure-mode table.
+> **Genie Code:** run `bundle deploy`/`bundle run` through `runDatabricksCli` **from the bundle-editor page** (open `<bundle>/databricks.yml` → "Open in bundle editor"); omit `--profile` (pre-authenticated) and do NOT `databricks sync` (deploy syncs the source). If a `bundle` command is blocked you are not on the bundle page — navigate there; do not fall back to `jobs submit` or a direct `agents.deploy()`. Keep the agent source under `{REPO_ROOT}`, never a bare relative path. See `skills/genie-code-environment` §2, §8.
+
+> **Fallback (one-off, IDE only, no bundle):** if you explicitly need a non-bundle run, [references/job-submission.md](references/job-submission.md) documents a standalone `databricks jobs submit` + polling loop. It is a convenience escape hatch — the bundle job above is the canonical, version-controlled path.
 
 ### Running Steps 2–5 interactively
 

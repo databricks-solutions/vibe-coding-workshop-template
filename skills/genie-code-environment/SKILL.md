@@ -90,6 +90,31 @@ The deploy contract is identical to the IDE — `bundle deploy --target dev`, ru
 - **CWD is pinned to the current page's bundle root** — be **on the page of the bundle you are deploying**.
   There is no `cd`, no `--bundle-root` flag; you can only validate/deploy the bundle tied to the current
   page. [TESTED P2]
+- **How to GET on the bundle page: open the bundle editor.** As soon as a folder contains a `databricks.yml`,
+  the Databricks workspace file browser shows an **"Open in bundle editor"** affordance for that folder (and an
+  "Open in editor" button at the top of the folder view). Click it to enter the **Bundle UI**, whose page CWD
+  IS that bundle root — this is the reliable way to satisfy the CWD pin above, and Genie Code operates more
+  predictably (deploy/run pre-approved) from inside the bundle editor than from a generic file page. So the
+  canonical sequence is: write `databricks.yml` under `dp_bundle_root` → open that folder's **bundle editor** →
+  run `bundle validate`/`deploy`/`run` there. A `databricks.yml not found` error means you are NOT on the
+  bundle page — open the bundle editor for the `dp_bundle_root` folder; never fall back to direct SQL. [TESTED — user-observed]
+- **Surface a clickable bundle-editor link — don't make the operator hunt for the icon.** With the
+  pre-authenticated `WorkspaceClient` (`w`): `host = w.config.host`; `o = w.get_workspace_id()`;
+  `file_id = w.workspace.get_status("<dp_bundle_root>/databricks.yml").object_id`;
+  `folder_id = w.workspace.get_status("<dp_bundle_root>").object_id`. Then the **bundle-editor URL** is
+  `{host}/editor/files/{file_id}?o={o}&contextId=folder%3A{folder_id}` (the plain folder is
+  `{host}/browse/folders/{folder_id}?o={o}`). Print the bundle-editor link and tell the operator to open it
+  *before* deploy. [TESTED — user-observed]
+- **🛑 Blocked `bundle` command ⇒ navigate, don't improvise. If still blocked, STOP.** `bundle deploy`/`run`
+  are page-context-gated: BLOCKED on a generic file/notebook page, but they work normally from the bundle
+  editor — CONFIRMED in the field, the *same* `bundle deploy` that returned "blocked by safety guardrails" from
+  a file page returned "Deployment complete!" and `bundle run … SUCCESS` once the operator opened the bundle
+  editor. So a "blocked" / `databricks.yml not found` message is a **wrong-page signal, not a dead end**: open
+  the bundle-editor link and retry. Only if it still fails *from the bundle editor* do you STOP and report the
+  blocker. Do **NOT** fall back to the Jobs/Pipelines REST API (`jobs/create`, `/api/2.0/pipelines`), the SDK,
+  or direct SQL to "get the tables created" — that silently defeats version control and `bundle destroy`
+  cleanup and is the exact regression this spine prevents. The REST/SDK route is an **escape hatch available
+  only on explicit operator authorization.** [TESTED — user-observed]
 - **Edit the *existing* on-page `databricks.yml`.** Files newly written via `createAsset`/the workspace API
   **do not reach the CLI's FUSE mount** in the same session, so "create a new bundle then validate it"
   fails — edit the bundle already on the page. [TESTED P3]
@@ -146,6 +171,34 @@ This is *how* a session runs — distilled from the field forks (someone ran thi
   **serverless** directly.
 - **Read and write *workspace* files**, not `/tmp` — `/tmp` is not durable and is not where artifacts
   belong. Build artifacts **in memory** or write to a project/workspace path.
+- **Anchor every relative artifact path to `artifact_root`, never the page CWD or your home dir.**
+  `artifact_root` is the workshop clone / git-folder root that `skills/vibecoding-state` captures into the
+  `## Environment Capabilities` block (= the local repo root on `ide_cli`; the cloned-repo path under
+  `/Workspace/Users/<email>/.assistant/skills/<repo>` on `genie_code`). A bare `docs/design_prd.md` is
+  unsafe here because Genie Code's CWD is **page-type-dependent** (the bundle root on a bundle page, the
+  workspace home otherwise — see §"Resolved vs. open"), so the same relative path resolves to different
+  places.   Write deliverables to `<ARTIFACT_ROOT>/<relpath>` (e.g. `<ARTIFACT_ROOT>/docs/design_prd.md`),
+  filling `<ARTIFACT_ROOT>` from the captured `artifact_root`. `/tmp` remains forbidden. [TESTED P2]
+- **The data-product bundle anchors to `dp_bundle_root`, a dedicated subdir — not the bare clone root.**
+  `skills/vibecoding-state` captures `dp_bundle_root = <artifact_root>/<use_case_slug>_dab` (e.g.
+  `…/vibe-coding-workshop/booking_app_dab`). The whole DP pipeline (bronze→silver→gold→semantic) writes its
+  `databricks.yml` / `src/` / `resources/` UNDER `<DP_BUNDLE_ROOT>`. Writing them at the clone root is the
+  observed "one level too high" bug (generated artifacts mixed into the framework clone). Because `bundle
+  deploy`'s CWD is pinned to the current page's bundle root, `<DP_BUNDLE_ROOT>` is ALSO the page you deploy
+  from: be on that folder's page, then run `bundle validate`/`deploy`/`run`. A `databricks.yml not found`
+  error means you are on the wrong page — navigate to `<DP_BUNDLE_ROOT>`; never fall back to direct SQL.
+- **Load every workshop skill by its clone-rooted `readSkillFile` path, never a bare repo-relative path or
+  `@`-mention.** Genie Code loads skills through `readSkillFile`, which has **no repo-root-relative
+  resolution**: a file under `.assistant/skills/` is loadable only as `skills/{path-after-.assistant/skills/}`.
+  Because this repo is cloned to `.assistant/skills/<clone-folder>/`, a repo-relative skill path `X/Y/SKILL.md`
+  must be loaded as `readSkillFile("<skill_ref_root>/X/Y/SKILL.md")` where `skill_ref_root` is captured by
+  `skills/vibecoding-state` (= `"skills/" + basename(artifact_root)`, default `skills/vibe-coding-workshop`;
+  **empty on `ide_cli`**, where `@`-mentions resolve from the workspace root). Nesting depth is irrelevant —
+  e.g. `data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md` loads as
+  `skills/vibe-coding-workshop/data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md`. A bare
+  `@data_product_accelerator/…` sends Genie Code on a goose chase. **`AGENTS.md` does not help here** — it is
+  read once at the clone root and does **not** propagate across Agent threads, so each prompt must name the
+  skill by its `skill_ref_root`-prefixed path (the `genie-code` prompt forks do exactly this). [TESTED — user-observed]
 - The forks evolved a small helper shape — `w`, `read_file`/`write_file`, `run_sql`, `run_job_by_name`.
   These are **session conveniences for inspection and orchestration, NOT artifact-creation channels.**
 
@@ -155,6 +208,17 @@ This is *how* a session runs — distilled from the field forks (someone ran thi
 > are **superseded by the bundle-deploy spine** (`databricks-asset-bundles`): every artifact is a bundle
 > resource brought to life by `bundle deploy`, identically on both clients. The only sanctioned in-session
 > creation is RULE_8 **Tier 3** Genie-Space `createAsset` (last-resort). [decision #6/#8; M3 §2a Bucket C]
+>
+> **This explicitly includes data-product table DDL.** Creating Bronze/Silver/Gold schemas and tables —
+> `CREATE SCHEMA`, `CREATE TABLE`, `DEEP CLONE`, `ALTER TABLE … SET TBLPROPERTIES`, `CLUSTER BY`, and the
+> data load — directly via `executeCode`/`spark.sql` is the SAME regression: it produces live tables with
+> no versioned bundle behind them. Those statements are the **body of a bundle job notebook**, executed by
+> `bundle run`, not run by hand. The frictionless `executeCode` path is the trap (it "works" and the tables
+> appear, so the gate passes) — but it bypasses the spine. If `bundle deploy` is blocked, FIX the page
+> context (open the `dp_bundle_root` **bundle editor**, §"bundle-deploy reality"); do **not** fall back to
+> direct SQL, the Jobs/Pipelines REST API (`jobs/create`, `/api/2.0/pipelines`), or the SDK — those are an
+> escape hatch only on explicit operator authorization, and the field-confirmed fix is the bundle editor, not
+> the API. Read-only inspection (`SHOW TABLES`, `DESCRIBE`, `SELECT COUNT(*)`) via `executeCode` is fine.
 
 This section is the **canonical home** for the session operating model — the RULE_0 `client_context`
 preamble and the PRE-REQUISITES Genie branch point **here** rather than re-inlining it.
@@ -167,7 +231,44 @@ as the *explanation*, not the rule:
 - **No `--var` resolver at the page.** Asset Bundle variables resolve **at deploy time**; you cannot
   "pass a var" interactively. The agnostic body states the concrete-value requirement once.
 - **`/tmp` is not durable** and is not the place to write deliverables — write to a workspace/project path.
+- **CWD is page-type-dependent**, so a bare relative path (`docs/design_prd.md`) is unstable across pages.
+  The `artifact_root` rule above exists for this reason: resolve relative artifacts against the captured
+  clone root, not the page CWD. The agnostic body keeps a single anchored form (`<ARTIFACT_ROOT>/…`).
+- **No repo-root-relative skill resolution and no cross-thread `AGENTS.md`.** `readSkillFile` only resolves
+  `skills/{path-after-.assistant/skills/}`, and `AGENTS.md` is read once at the clone root without propagating
+  to later Agent threads. The `skill_ref_root` rule above exists for this reason: prompts (and the
+  `genie-code` forks) name each skill by its `skill_ref_root`-prefixed path so it loads regardless of thread.
 - **Don't rely on `jq` / raw shell** for control flow — build and inspect artifacts in-memory via the SDK.
+
+## 10. Session ergonomics — parallel skill reads, file-write tiers, and `executeCode` timeouts
+
+Three behaviors that materially change session speed and reliability. All [TESTED — user-observed,
+Gold-design run].
+
+- **Read every skill a phase needs in ONE batched turn.** `readSkillFile` calls run **in parallel** —
+  issuing all of a phase's skill reads in a single turn returned every file successfully, whereas
+  serializing them costs one full turn each. When a step's Step-1 list (or an orchestrator's "Mandatory
+  Skill Dependencies") names several skills with **no inter-dependency**, load them together, not one per
+  turn. [TESTED]
+- **File writes — two paths, choose by situation (there is NO single-call, compute-free file-creation
+  tool):**
+  - **`executeCode` with `open(path,"w").write(...)`** — one call; creates and writes any workspace file
+    directly; but **needs warm serverless compute** (see cold-start below). Best for creating **many** files
+    or **large** content — once compute is warm.
+  - **`createAsset` → `readFile` → `workspaceUpdateFile`** — a **compute-free** trio (no cold-start risk),
+    but with two field-proven constraints: `workspaceUpdateFile` **cannot create a new file** (the file must
+    already exist) **and requires the file to have been read in the current thread first**. So:
+    `createAsset` (with `assetType: file`) makes the empty file → `readFile` satisfies the read-first guard →
+    `workspaceUpdateFile` populates it. Three calls, zero compute. Best for **updating a single
+    already-read file**, or writing a few files **before** compute is warm. [TESTED]
+- **`executeCode` cold start & timeout — never starve the first call.** The **first** `executeCode` in a
+  session pays a **serverless cold start of ~3–5 minutes** before any code runs; subsequent calls are warm
+  (~0 s). `timeoutMinutes` **defaults to 15** (minimum 5). **Never set `timeoutMinutes` below 15** — the
+  only thing a smaller budget buys is a cold-start timeout and a wasted retry (the retry then "succeeds"
+  only because the failed first attempt warmed the compute). For **heavy phases** (e.g. Gold design — CSV
+  parsing, per-table YAML generation, cross-table validation) set it **higher (≥ 20)**, and/or send a
+  trivial `print("ready")` **warm-up** call first so the cold start is paid once, up front. [TESTED — two
+  5-min timeouts on cold first calls; identical code on warm compute ran instantly]
 
 ## Resolved vs. open
 

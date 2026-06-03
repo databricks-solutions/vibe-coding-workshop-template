@@ -9,7 +9,7 @@ description: >
   "run job", "run pipeline", "make it work", "job failed", "troubleshoot", "fix and redeploy".
 metadata:
   author: prashanth subrahmanyam
-  version: "3.1"
+  version: "3.2"
   domain: operations
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -61,7 +61,7 @@ metadata:
   volatility: medium
   clients: [ide_cli, genie_code]   # CLI surface accessed via local shell (IDE) or runDatabricksCli (Genie Code)
   deploy_verb: "bundle deploy --target dev"   # deploy mechanics owned by databricks-asset-bundles (the spine)
-  deploy_note: "operations/CLI reference — on Genie Code every databricks command routes via runDatabricksCli; see genie-code-environment"
+  deploy_note: "operations/CLI reference — on Genie Code every databricks command routes via runDatabricksCli FROM THE BUNDLE EDITOR (dp_bundle_root); a blocked bundle deploy/run is a page-context signal, NEVER substitute SDK/REST creation (RULE_10); see genie-code-environment"
   coverage: all_stages
   upstream_sources:
     - name: "ai-dev-kit"
@@ -133,6 +133,25 @@ This skill is both an **SDK/CLI/Connect reference** and an **autonomous operatio
 >   allow-list / CWD / FUSE / escape-hatch detail is in the **`genie-code-environment`** skill — load it on
 >   demand. The CLI command examples below run via path 1 on Genie Code (local shell on the IDE); where a
 >   verb is CLI-blocked, reach for the SDK (path 2).
+>
+> **⛔ The carve-out the "fall to the SDK" rule does NOT cover — `bundle deploy`/`run` and resource creation.**
+> "Blocked ≠ impossible, try the SDK" is for **read-only / ad-hoc** ops (polling, inspecting schemas, lineage,
+> token retrieval, `apps deploy`). It is **NOT** a license to substitute the SDK/REST for the bundle. When
+> `bundle deploy`/`run` is blocked, that is a **page-context signal, not a dead end**: the verb is gated to the
+> **bundle-folder page**, which on Genie Code you reach by opening the **"Open in bundle editor"** affordance on
+> the `dp_bundle_root` folder (the bundle editor's CWD *is* the bundle root, where `validate`/`deploy`/`run` are
+> pre-approved). **FIELD-CONFIRMED:** the same `bundle deploy` that returned "blocked by safety guardrails" /
+> "`databricks.yml` not found" from a file/notebook page returned "Deployment complete!" and `bundle run …
+> SUCCESS` from the bundle editor. So the fix is **navigate to the bundle editor**, never `w.jobs.create()` /
+> `POST /api/2.1/jobs/create` / `POST /api/2.0/pipelines` / `CREATE TABLE` via `executeCode`. Creating
+> jobs/pipelines/tables directly is the **RULE_10 authoring-discipline violation** — it produces live,
+> un-versioned state that diverges from the bundle and is the exact regression this spine prevents. If
+> `bundle deploy`/`run` **still** fails *from the bundle editor*, STOP and report the blocker — the SDK/REST
+> creation route is an **escape hatch only on explicit operator authorization.** Surface a clickable
+> bundle-editor link: `file_id = w.workspace.get_status("<dp_bundle_root>/databricks.yml").object_id`,
+> `folder_id = w.workspace.get_status("<dp_bundle_root>").object_id`, link =
+> `{w.config.host}/editor/files/{file_id}?o={w.get_workspace_id()}&contextId=folder%3A{folder_id}`. Detail in
+> `genie-code-environment` §3/§8.
 
 ### Setup
 
@@ -265,7 +284,11 @@ Before ANY deployment, confirm you are targeting the correct workspace:
 
 ### Step 1: Validate & Deploy
 
-> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page). See `skills/genie-code-environment`.
+> **Client note:** IDE runs these in a terminal. **Genie Code runs `databricks bundle …` via `runDatabricksCli`
+> from the bundle editor** — open the **"Open in bundle editor"** affordance on the `dp_bundle_root` folder
+> (the icon that appears next to `databricks.yml`) *before* deploying; the bundle editor's CWD is the bundle
+> root, where `validate`/`deploy`/`run` are pre-approved. Surface the clickable editor link for the operator
+> (see §2 carve-out). See `skills/genie-code-environment` §3.
 
 ```bash
 databricks bundle validate -t <target>   # Pre-flight — catches ~80% of errors
@@ -273,7 +296,12 @@ databricks bundle deploy -t <target>     # Deploy all resources
 ```
 
 **If validate fails:** Read the error, fix the YAML (see Section 6 + `skills/databricks-asset-bundles` skill), re-validate.
-**If deploy fails:** Common causes: auth expired (403), path resolution errors, invalid task types. See Section 6.
+**If deploy is BLOCKED (≠ failed — Genie Code):** symptoms are "blocked by safety guardrails," "not in the
+allow-list," or "`databricks.yml` not found." This is a **page-context** signal, not a YAML/code defect and not
+a job failure. **Do not** enter the diagnose-fix loop and **do not** create resources via SDK/REST/`CREATE` as a
+substitute (RULE_10 violation). Navigate to the **bundle editor** on `dp_bundle_root` and retry. Only on explicit
+operator authorization is the escape hatch (§2) permitted.
+**If deploy FAILS (executes, returns an error):** Common causes: auth expired (403), path resolution errors, invalid task types. See Section 6.
 **`--force` clarification:** `--force` handles **Terraform state drift** only (e.g., resource deleted outside bundle). It does NOT fix API name-uniqueness conflicts. For "pipeline name already used" or "resource already exists": list and delete the conflicting resource, then redeploy without `--force`.
 
 ### Step 2: Run
@@ -427,6 +455,7 @@ After every resolved failure (or escalation), trigger `admin/self-improvement`:
 | `Parameter not found` | Use `base_parameters` dict, not CLI-style `parameters` |
 | `run_job_task` vs `job_task` | Use `run_job_task` (not `job_task`) |
 | Genie `INTERNAL_ERROR` | Deploy semantic layer (TVFs + Metric Views) first |
+| `bundle deploy` "blocked by safety guardrails" / "`databricks.yml` not found" (Genie Code) | **Page context, not a code bug** — open the **bundle editor** on `dp_bundle_root` and retry; never substitute SDK/REST job creation (RULE_10) |
 
 ---
 
@@ -540,6 +569,19 @@ Without explicit user confirmation, NEVER retry:
 - `DROP TABLE` / `DROP SCHEMA`
 - `w.quality_monitors.delete()`
 - `w.alerts_v2.delete_alert()`
+
+### Safety: Never Substitute Direct Creation for a Blocked Bundle Deploy (RULE_10)
+
+A **blocked** `bundle deploy`/`run` (Genie Code "safety guardrails" / "not in allow-list" / "`databricks.yml`
+not found") is a **page-context** signal, never a license to create the deliverable another way. NEVER, as a
+workaround for a blocked deploy:
+- `w.jobs.create()` / `POST /api/2.1/jobs/create`
+- `w.pipelines.create()` / `POST /api/2.0/pipelines` / `createAsset(pipeline)`
+- `w.schemas.create()` / `CREATE SCHEMA` / `CREATE VOLUME` / `CREATE TABLE` to provision the deliverable
+
+The fix is **navigate to the bundle editor** on `dp_bundle_root` and redeploy. The SDK/REST creation route is an
+**escape hatch only on explicit operator authorization.** Likewise, a **failed** *job* is fixed by editing the
+bundle source file under `dp_bundle_root` and **redeploying** — never by patching the live job via API/UI.
 
 ---
 

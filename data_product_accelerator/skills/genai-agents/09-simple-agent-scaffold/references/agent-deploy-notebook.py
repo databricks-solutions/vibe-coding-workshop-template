@@ -44,6 +44,19 @@ print(f"Endpoint:     {ENDPOINT_NAME}")
 print(f"Agent folder: {AGENT_FOLDER_WS_PATH}")
 
 # COMMAND ----------
+# MAGIC %md ## Ensure the agent UC schema exists (direct SQL — the schema exception)
+# MAGIC
+# MAGIC Schemas are NOT modeled as bundle resources in this workshop — they are the
+# MAGIC deliberate exception, created directly with SQL DDL (`CREATE SCHEMA IF NOT
+# MAGIC EXISTS`). `databricks schemas create` is also hard-blocked on Genie Code, so
+# MAGIC SQL is the portable path. This runs INSIDE the deployed job, so the schema is
+# MAGIC guaranteed to exist before `register_model()` in Step 4.
+
+# COMMAND ----------
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS `{UC_CATALOG}`.`{UC_AGENT_SCHEMA}`")
+print(f"Schema ready: {UC_CATALOG}.{UC_AGENT_SCHEMA}")
+
+# COMMAND ----------
 # MAGIC %md ## Step 2 — Local test (non-streaming + streaming)
 
 # COMMAND ----------

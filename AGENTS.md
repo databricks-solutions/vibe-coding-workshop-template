@@ -69,6 +69,8 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 | **Write to** (artifacts) | Repository root | `gold_layer_design/`, `src/`, `plans/`, `resources/`, `databricks.yml` |
 
 > **Rule:** Generated artifact paths (`gold_layer_design/`, `src/`, `plans/`, `resources/`, `databricks.yml`) are relative to the repository root. Never create generated files inside `data_product_accelerator/`, `apps_lakebase/`, or `agentic-framework/`.
+>
+> **Data-product bundle root (`dp_bundle_root`):** The data-product pipeline (bronze → silver → gold → semantic) writes its generated Asset Bundle into a single **self-contained project subdirectory at the repo/clone root**, `<repo-root>/<use_case_slug>_dab/` (e.g. `booking_app_dab/`) — its own `databricks.yml`, `src/`, and `resources/` live there. This is sanctioned by the rule above: it is at the repo root (not inside a read-only framework dir), and isolating the bundle gives `bundle deploy` an unambiguous page-context root on Genie Code (the agent must be on that folder's page to deploy — see `skills/genie-code-environment` §8). `skills/vibecoding-state` captures this path as `dp_bundle_root = <artifact_root>/<use_case_slug>_dab` in the `## Environment Capabilities` block; data-product prompts anchor every write to it and never to the bare clone root.
 
 ---
 

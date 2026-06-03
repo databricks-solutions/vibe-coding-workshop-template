@@ -60,9 +60,28 @@ Detection (bootstrap step 0) — [inference, pending the live Genie Code probe]:
   - `runDatabricksCli` tool / Genie serverless markers present  ⇒  client_context: genie_code
       cli_channel: runDatabricksCli ; bundle_deploy.page_context_required: true
       state_file_root: <git-folder workspace path>
+      artifact_root:  <git-folder workspace path>   # clone root, e.g. /Workspace/Users/<email>/.assistant/skills/<repo>
+      skill_ref_root: skills/<clone-folder>          # readSkillFile prefix, = "skills/" + basename(artifact_root), e.g. skills/vibe-coding-workshop
   - otherwise                                                    ⇒  client_context: ide_cli
       cli_channel: local_shell ; bundle_deploy.page_context_required: false
       state_file_root: <local repo path>
+      artifact_root:  <local repo path>
+      skill_ref_root: ""                             # empty — repo-relative skill paths / @-mentions resolve as-is
+
+`artifact_root` is where RELATIVE artifact paths in prompt bodies resolve (`<ARTIFACT_ROOT>/docs/design_prd.md`).
+It defaults equal to `state_file_root` (the clone / git-folder root) and is kept as a distinct field so an
+app/agent subdir can later diverge without overloading `state_file_root`. Bare relative paths are unsafe on
+genie_code because its CWD is page-type-dependent — see `skills/genie-code-environment` §8.
+`skill_ref_root` is the read-side sibling: the prefix that makes a repo-relative SKILL path loadable on
+genie_code via `readSkillFile` (`<skill_ref_root>/data_product_accelerator/skills/.../SKILL.md`). Empty on
+ide_cli (paths/@-mentions resolve from the workspace root). See `skills/genie-code-environment` §8.
+`dp_bundle_root` is the write-side anchor for the data-product pipeline: a SELF-CONTAINED Databricks Asset
+Bundle project directory `<artifact_root>/<use_case_slug>_dab` (e.g. `…/vibe-coding-workshop/booking_app_dab`)
+shared by every DP stage (bronze→silver→gold→semantic). Generated `databricks.yml` / `src/` / `resources/`
+live UNDER it — never at the bare clone root (mixing generated artifacts into the framework clone is the
+"one level too high" bug) and never inside a read-only framework dir (`data_product_accelerator/` etc.).
+On genie_code it is also the **`bundle deploy` page-context root** (be on this folder's page to deploy). It is
+derived once `use_case_slug` is known (bootstrap), so `resolve_root` (pre-bootstrap) does not produce it.
 Client-invariant fields (same for both clients):
   bundle_deploy.verb = "bundle deploy --target dev"   (never a bare-shell `databricks` call)
   app_deploy         = { verb: "apps deploy", gated: true }   (RULE_9 exception)
@@ -77,6 +96,9 @@ environment_capabilities:
   app_deploy:    { verb: "apps deploy", gated: true }
   destructive_ops: confirm_required
   state_file_root: <local repo path | git-folder workspace path>
+  artifact_root: <local repo path | git-folder workspace path>   # relative artifact paths resolve here (<ARTIFACT_ROOT>/<relpath>); defaults to state_file_root
+  skill_ref_root: <"" | "skills/<clone-folder>">   # readSkillFile prefix for repo-relative SKILL paths on genie_code (= "skills/" + basename(artifact_root)); empty on ide_cli
+  dp_bundle_root: <artifact_root>/<use_case_slug>_dab   # self-contained DAB project dir for the data-product pipeline; generated databricks.yml/src/resources live here, and on genie_code it is the `bundle deploy` page-context root. Derived at bootstrap (needs use_case_slug); <pending> until then.
   genie_code_manifest_loaded: <n/a | false | true>   # G3 — seeded by bootstrap step 0: `n/a` on ide_cli (check is inert), `false` on genie_code. On genie_code the owning skill `skills/genie-code-environment` MUST flip this to `true` once it is read in the current thread; the first deploy/divergent prompt's `enter` halts while it is `false`/`<pending>`.
   # detected_via: <runDatabricksCli | genie_serverless_marker | no_managed_cli_channel>
 ```

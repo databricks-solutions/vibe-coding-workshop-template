@@ -4,7 +4,7 @@ description: End-to-end orchestrator for creating Silver layer pipelines using S
 clients: [ide_cli, genie_code]
 bundle_resource: pipelines
 deploy_verb: bundle_deploy
-deploy_note: "Silver SDP/DLT pipeline + DQ-rules setup job deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code). The DQ-rules job runs before the pipeline; DLT updates use full_refresh=True; no DEFAULT clauses in serverless table DDL. On Genie Code, write generated pipeline/DQ scripts under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`, e.g. `src/`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
+deploy_note: "Silver SDP/DLT pipeline + DQ-rules setup job deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code) — the bundle is the execution mechanism; NEVER create Silver schemas/tables or load data directly via executeCode/spark.sql, they are the pipeline/job body. The DQ-rules job runs before the pipeline; DLT updates use full_refresh=True; no DEFAULT clauses in serverless table DDL. Write the generated bundle (databricks.yml, src/, resources/) under `dp_bundle_root` (= `<artifact_root>/<use_case_slug>_dab` from `skills/vibecoding-state`) — a self-contained DAB project dir shared across the DP pipeline, NOT the bare clone root. On Genie Code `dp_bundle_root` is also the `bundle deploy` page-context root: be on that folder's page to deploy (see `skills/genie-code-environment` \u00a78)."
 coverage: full
 metadata:
   author: prashanth subrahmanyam
@@ -363,7 +363,7 @@ Report what was created and ask the user if they want to deploy and run.
 
 **Deployment Order (USER-TRIGGERED ONLY — do not auto-execute):**
 
-> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page; generated files anchor to `{REPO_ROOT}`). See `skills/genie-code-environment`.
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli`. Generated bundle files anchor to `dp_bundle_root` (= `<artifact_root>/<use_case_slug>_dab`), and on Genie Code that folder is also the `bundle deploy` page-context root — **be on the `dp_bundle_root` page to deploy.** The pipeline/job is the only mechanism that creates Silver tables; never run the DDL/ingest directly. See `skills/genie-code-environment`.
 
 ```bash
 # 1. Deploy everything

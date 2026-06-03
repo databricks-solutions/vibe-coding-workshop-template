@@ -4,7 +4,7 @@ description: End-to-end Bronze layer creation for testing and demos. Creates tab
 clients: [ide_cli, genie_code]
 bundle_resource: jobs
 deploy_verb: bundle_deploy
-deploy_note: "Bronze schema/tables + Faker data load deploy as a bundle job via `bundle deploy --target dev` (runDatabricksCli on Genie Code). Job notebooks start with %pip install databricks-sdk + restartPython; use TBLPROPERTIES 'layer'='bronze', never the reserved 'table_type'. On Genie Code, write generated setup/seed scripts under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`, e.g. `src/`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
+deploy_note: "Bronze schema/tables + Faker/clone data load deploy as a bundle job via `bundle deploy --target dev` (runDatabricksCli on Genie Code) — the bundle job IS the execution mechanism; NEVER run the CREATE/CLONE/ALTER/load statements directly via executeCode/spark.sql, they are the job's body. Job notebooks start with %pip install databricks-sdk + restartPython; use TBLPROPERTIES 'layer'='bronze', never the reserved 'table_type'. Write the generated bundle (databricks.yml, src/, resources/) under `dp_bundle_root` (= `<artifact_root>/<use_case_slug>_dab` from `skills/vibecoding-state`, e.g. `…/booking_app_dab/src/`) — a self-contained DAB project dir, NOT the bare clone root and NOT a bare relative path. On Genie Code `dp_bundle_root` is also the `bundle deploy` page-context root: be on that folder's page to deploy (see `skills/genie-code-environment` \u00a78)."
 coverage: full
 metadata:
   author: prashanth subrahmanyam
@@ -111,7 +111,7 @@ tasks:
 
 **Deployment Commands (run when ready — NOT auto-executed by this skill):**
 
-> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page; generated files anchor to `{REPO_ROOT}`). See `skills/genie-code-environment`.
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli`. Generated bundle files anchor to `dp_bundle_root` (= `<artifact_root>/<use_case_slug>_dab`), and on Genie Code that folder is also the `bundle deploy` page-context root — **be on the `dp_bundle_root` page to deploy.** The bundle job is the only mechanism that creates tables; never run the DDL/clone directly. See `skills/genie-code-environment`.
 
 ```bash
 # 1. Deploy setup job

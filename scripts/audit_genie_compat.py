@@ -61,6 +61,29 @@ PATTERNS = [
      "LOCAL_AUTH", "Local auth bootstrap; Genie Code is pre-authenticated.", "RULE_2_auth_to_ide_branch"),
     (re.compile(r"/Users/[\w\-/]+|/home/[\w\-/]+|~/[\w\-/]+|[A-Za-z]:\\\\|\.\./\.\."),
      "LOCAL_PATH", "Local absolute/relative path; resolve via project/UC.", "RULE_6_normalize_paths"),
+    # Bare RELATIVE artifact paths in write/save instructions. On Genie Code the CWD is
+    # page-type-dependent, so a bare `docs/design_prd.md` lands in the wrong place. Anchor every
+    # artifact write to `<ARTIFACT_ROOT>/...` (the clone root captured by vibecoding-state.resolve_root).
+    # Flags save/write/output-... <relpath> and create(s)/creating a `<relpath>` (backtick-guarded).
+    # Does NOT flag anchored `<ARTIFACT_ROOT>/...`, absolute `/...`, `~/...`, `@`-mentions (read refs),
+    # `${...}` / `{...}`-leading paths, or URLs.
+    (re.compile(
+        r"(?i)(?:"
+        # save/output ... <relpath.ext>  (colon/to/as anchored; optional quote/backtick)
+        r"(?:save(?:\s+(?:it|this|the\s+\w+|the\s+following[^:`\n]*))?\s*(?:to|as)"
+        r"|saved\s+to|saves?\s+the\s+\w+\s+to|output(?:\s+file)?\s*(?::|\bto\b))"
+        r"\s*:?\s*[`'\"]?"
+        r"(?!<ARTIFACT_ROOT>|\$\{?ARTIFACT_ROOT|/|~|@|https?:|[A-Za-z]:\\|\{)"
+        r"[\w.{}+-]*(?:/[\w.{}+-]+)*\.(?:md|csv|ya?ml|json|sql)\b"
+        r"|"
+        # write/create `<relpath.ext>`  (backtick-guarded — kills 'write Python/SQL', 'Write SKILL.md')
+        r"(?:writes?|creat(?:e|es|ing)\s+(?:a|an|the))\s+`"
+        r"(?!<ARTIFACT_ROOT>|/|~|@|\{)"
+        r"[\w.{}+-]*(?:/[\w.{}+-]+)*\.(?:md|csv|ya?ml|json|sql)`"
+        r")"),
+     "BARE_ARTIFACT_PATH",
+     "Bare relative artifact path in a write/save instruction; anchor to <ARTIFACT_ROOT> (clone root).",
+     "RULE_6_normalize_paths"),
     (re.compile(r"databricks-connect|spark-submit\b|local\[\d*\]"),
      "LOCAL_SPARK", "Local Spark; use workspace serverless compute.", "RULE_4_workspace_compute"),
     (re.compile(r"\./scripts/\S*deploy\S*\.sh|bash\s+\S*deploy\S*\.sh"),
