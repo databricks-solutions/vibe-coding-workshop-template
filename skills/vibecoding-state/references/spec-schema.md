@@ -466,6 +466,15 @@ Pathways A, B, and pure-D runs that touch only one file omit `state_file_set`
 (or set `secondary: null`). The block is required only when a prompt MUST read
 both files in the same step.
 
+A **data-product / lakehouse** run (Bronze→Silver→Gold→semantic, no app/agent app)
+keeps its single canonical live file at `<dp_bundle_root>/.vibecoding-state.md`
+(= `<artifact_root>/{user_schema_prefix}_<use_case_slug>_dab/.vibecoding-state.md`),
+the data-product analog of `<app_root>` / `<agent_app_root>`. It is **bootstrap-created
+by the FIRST lakehouse prompt (Bronze)** if absent — DP-track state must never be left
+in the temporary `example/<use_case_slug>/.vibecoding-state.md` bootstrap path (doing so
+was the "state survived only in chat summary" defect). `enter` resolves it via the
+`dp_bundle_root` branch in step 1; `exit` appends every DP step's Per-Step Log entry to it.
+
 ```yaml
 state_file_set:
   primary:

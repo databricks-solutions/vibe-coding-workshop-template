@@ -2,11 +2,27 @@
 
 This template lives inside the `vibecoding-state` skill so it travels with the runtime contract to any project that adopts the Instructions.md workshop.
 
-Use it **once per prompt** executed during the workshop (count depends on pathway + track recorded in the live state file — `<app_root>/.vibecoding-state.md` for Pathways A/B/C, `<agent_app_root>/.vibecoding-state.md` for the Track A agent app on Pathways C/D). Run retrospectives **async after the full workshop completes** — do not interleave them with active prompts.
+Use it **once per prompt** executed during the workshop (count depends on pathway + track recorded in the live state file — `<app_root>/.vibecoding-state.md` for Pathways A/B/C, `<agent_app_root>/.vibecoding-state.md` for the Track A agent app on Pathways C/D, `<dp_bundle_root>/.vibecoding-state.md` for a pure data-product / lakehouse run). Run retrospectives **async after the full workshop completes** — do not interleave them with active prompts.
 
 Paste the block below into a fresh Agent thread, replacing `<N>` and `<title>` with the prompt/module identifier and title you are reviewing. Point the agent at the state file, the retrospective file, and [`Instructions.md`](../../../Instructions.md) so it has the full context.
 
 The output format is fixed so individual retros can be aggregated by the rollup prompt into a prioritized edit backlog.
+
+---
+
+## Handoff invariant (every summary, context-compaction, or thread handoff MUST record this)
+
+The live `.vibecoding-state.md` file — NOT the chat summary — is the state store. Whenever a run is summarized, compacted, or handed to a fresh thread, the handoff MUST carry these five fields verbatim so the next thread can re-open the durable state instead of trusting prose:
+
+| Field | Source |
+|---|---|
+| `state_file_path` | the canonical live file for this track: `<dp_bundle_root>/.vibecoding-state.md` (data-product), `<app_root>/.vibecoding-state.md` (apps), or `<agent_app_root>/.vibecoding-state.md` (agents) — never the temporary `example/…` path |
+| `last_completed_prompt` | the `prompt_id` of the most recent `exit` that was confirmed by re-read |
+| `last_gate` | the exact Gate string that `exit` recorded |
+| `environment_capabilities` | the `## Environment Capabilities` block (incl. `lakehouse_default_catalog`, `client_context`) |
+| `state file updated: yes/no` | whether the last step's `exit` actually appended to the live file and the write was verified by re-read |
+
+If `state file updated: no`, the next thread MUST treat the run as **unverified** and re-run the last `exit` before advancing. A handoff that omits these fields is non-conformant.
 
 ---
 
@@ -68,6 +84,9 @@ The output format is fixed so individual retros can be aggregated by the rollup 
 > - **Values the next prompt needs:** <list>
 > - **All present in state file?** yes | no
 > - **If no, which are missing and how should they be captured:** <list>
+> - **state_file_path:** <canonical live file path for this track>
+> - **last_completed_prompt / last_gate:** <prompt_id> / <gate string>
+> - **state file updated (exit appended + verified by re-read)?** yes | no
 >
 > ### Top 3 concrete improvements
 > 1. <proposed new wording or structural change — be specific>

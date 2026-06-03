@@ -14,7 +14,7 @@
     "apps_lakebase::GENIE_RESOURCE": 8,
     "apps_lakebase::INSESSION_CREATE": 106,
     "apps_lakebase::LOCAL_AUTH": 44,
-    "apps_lakebase::LOCAL_PATH": 51,
+    "apps_lakebase::LOCAL_PATH": 53,
     "apps_lakebase::SCRIPT_DEPLOY": 5,
     "apps_lakebase::SETUP_SCRIPT": 10,
     "apps_lakebase::SHELL_DATABRICKS": 287,
@@ -50,12 +50,12 @@
     "GENIE_RESOURCE": 42,
     "INSESSION_CREATE": 280,
     "LOCAL_AUTH": 58,
-    "LOCAL_PATH": 335,
+    "LOCAL_PATH": 337,
     "LOCAL_SPARK": 9,
     "PY_BUNDLE_CONFIG": 1,
     "SCRIPT_DEPLOY": 5,
     "SETUP_SCRIPT": 14,
     "SHELL_DATABRICKS": 587
   },
-  "total": 3160
+  "total": 3162
 }

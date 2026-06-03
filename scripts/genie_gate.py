@@ -302,6 +302,143 @@ def check_deploy_fork_discipline() -> bool:
     return True
 
 
+def check_lakehouse_fork_discipline() -> bool:
+    """LAKEHOUSE_FORK_DISCIPLINE (WS5): the data-product / lakehouse `*.genie-code.md`
+    forks must carry the field-hardening signals so Genie Code cannot take the
+    frictionless-but-wrong path:
+      (a) every lakehouse fork names its prerequisites via full `skill_ref_root`
+          (`readSkillFile("skills/vibe-coding-workshop/...")`) AND has the
+          preflight-acknowledgement hard gate;
+      (b) every bundle-authoring lakehouse fork pins `source_linked_deployment: false`;
+      (c) the Bronze fork carries the catalog no-create hard-stop language;
+      (d) the Gold-pipeline fork forbids `saveAsTable` for gold loads and keeps the
+          post-merge `validate_gold` task.
+    Static content check only; auto-skips if the prompts tree is absent."""
+    sections = os.path.join(REPO_ROOT, "apps_lakebase", "prompts", "sections")
+    print("\n=== lakehouse-fork discipline gate ===")
+    if not os.path.isdir(sections):
+        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        return True
+    sys.path.insert(0, os.path.join(REPO_ROOT, "apps_lakebase", "prompts"))
+    try:
+        from sync_markdown_to_seed import parse_markdown
+    except Exception as e:  # pragma: no cover
+        print(f"SKIP — cannot import parse_markdown ({e}).")
+        return True
+    from pathlib import Path
+
+    # Bundle-authoring lakehouse forks (must pin source_linked_deployment: false).
+    bundle_authoring = {
+        "bronze_layer_creation", "silver_layer_sdp", "gold_layer_pipeline",
+        "deploy_lakehouse_assets", "genie_space", "aibi_dashboard", "deploy_di_assets",
+    }
+    # Design/plan forks author no bundle (no source-linked requirement).
+    design_plan = {"gold_layer_design", "usecase_plan"}
+    lakehouse = bundle_authoring | design_plan
+
+    failures, checked = [], 0
+    for stem in sorted(lakehouse):
+        p = Path(sections) / f"99-{stem}.genie-code.md"
+        if not p.exists():
+            failures.append(f"99-{stem}.genie-code.md: expected lakehouse fork is missing.")
+            continue
+        try:
+            f = parse_markdown(p)
+        except Exception as e:
+            print(f"  WARN: cannot parse {p.name}: {e}")
+            continue
+        text = (f.get("input_template", "") or "") + "\n" + (f.get("system_prompt", "") or "")
+        low = text.lower()
+        checked += 1
+        # (a) skill-load discoverability
+        if 'readskillfile("skills/vibe-coding-workshop/' not in low:
+            failures.append(f"{p.name}: prerequisites not named via full skill_ref_root "
+                            "(`readSkillFile(\"skills/vibe-coding-workshop/...\")`).")
+        if "preflight acknowledgement" not in low:
+            failures.append(f"{p.name}: missing Step 1 preflight-acknowledgement hard gate.")
+        # (b) source-linked off (bundle-authoring forks only)
+        if stem in bundle_authoring and "source_linked_deployment" not in low:
+            failures.append(f"{p.name}: bundle-authoring fork missing `source_linked_deployment: false`.")
+        # (c) Bronze catalog no-create
+        if stem == "bronze_layer_creation":
+            if "no-create invariant" not in low and "hard stop" not in low:
+                failures.append(f"{p.name}: missing catalog no-create hard-stop language.")
+            if "create catalog" not in low:  # the prohibition must name CREATE CATALOG to forbid it
+                failures.append(f"{p.name}: catalog rule does not name/forbid CREATE CATALOG.")
+        # (d) Gold pipeline rules
+        if stem == "gold_layer_pipeline":
+            if "saveastable" not in low:
+                failures.append(f"{p.name}: missing the saveAsTable-FORBIDDEN gold-load rule.")
+            if "validate_gold" not in low:
+                failures.append(f"{p.name}: missing the post-merge `validate_gold` task.")
+
+    print(f"checked {checked} lakehouse fork(s)")
+    if failures:
+        print("FAIL — lakehouse-fork discipline violations:")
+        for f in failures:
+            print(f"  {f}")
+        return False
+    print("lakehouse-fork discipline gate: PASS")
+    return True
+
+
+def check_state_persistence_discipline() -> bool:
+    """STATE_PERSISTENCE_DISCIPLINE (WS8): every track fork (lakehouse / apps / agents)
+    that carries a `**State-lock:**` paragraph must make vibecoding-state persistence
+    LOAD-BEARING, not advisory. Each in-scope fork must contain:
+      - an `exit` invocation with `prompt_id:` and `gate:`,
+      - the canonical track state path (`<dp_bundle_root|app_root|agent_app_root>/.vibecoding-state.md`),
+      - the verify-write ritual sentinel ("mandatory ritual, not advisory"),
+      - the hard completion rule ("NOT complete until ...").
+    Spans lakehouse + apps + agents forks. Static content check; auto-skips if absent."""
+    import re
+    sections = os.path.join(REPO_ROOT, "apps_lakebase", "prompts", "sections")
+    print("\n=== state-persistence discipline gate ===")
+    if not os.path.isdir(sections):
+        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        return True
+    sys.path.insert(0, os.path.join(REPO_ROOT, "apps_lakebase", "prompts"))
+    try:
+        from sync_markdown_to_seed import parse_markdown
+    except Exception as e:  # pragma: no cover
+        print(f"SKIP — cannot import parse_markdown ({e}).")
+        return True
+    from pathlib import Path
+
+    path_rx = re.compile(r"<(dp_bundle_root|app_root|agent_app_root)>/\.vibecoding-state\.md")
+    failures, checked = [], 0
+    for p in sorted(Path(sections).glob("*.genie-code.md")):
+        try:
+            f = parse_markdown(p)
+        except Exception as e:
+            print(f"  WARN: cannot parse {p.name}: {e}")
+            continue
+        text = (f.get("input_template", "") or "") + "\n" + (f.get("system_prompt", "") or "")
+        if "State-lock:" not in text:
+            continue  # not a state-bearing track fork
+        checked += 1
+        if "prompt_id:" not in text or "gate:" not in text:
+            failures.append(f"{p.name}: State-lock missing an `exit` with `prompt_id:` + `gate:`.")
+        if not path_rx.search(text):
+            failures.append(f"{p.name}: missing the canonical track state path "
+                            "(`<dp_bundle_root|app_root|agent_app_root>/.vibecoding-state.md`).")
+        if "mandatory ritual, not advisory" not in text:
+            failures.append(f"{p.name}: enter/exit not marked load-bearing "
+                            "(missing the 'mandatory ritual, not advisory' verify-write ritual).")
+        if "NOT complete until" not in text:
+            failures.append(f"{p.name}: missing the hard Gate completion rule "
+                            "('NOT complete until' the live state file write is confirmed by re-read).")
+
+    print(f"checked {checked} state-bearing fork(s)")
+    if failures:
+        print("FAIL — state-persistence discipline violations:")
+        for f in failures:
+            print(f"  {f}")
+        return False
+    print("state-persistence discipline gate: PASS")
+    return True
+
+
 def check_bundle(profile: str | None) -> bool:
     print("\n=== bundle validate gate ===")
     if not os.path.exists(os.path.join(REPO_ROOT, "databricks.yml")):
@@ -331,6 +468,10 @@ def main() -> int:
                     help="Skip the FORK_INTENT_PARITY check (M07 genie-code forks).")
     ap.add_argument("--skip-deploy-discipline", action="store_true",
                     help="Skip the DEPLOY_FORK_DISCIPLINE check (M07 genie-code deploy forks).")
+    ap.add_argument("--skip-lakehouse-discipline", action="store_true",
+                    help="Skip the LAKEHOUSE_FORK_DISCIPLINE check (WS5 genie-code lakehouse forks).")
+    ap.add_argument("--skip-state-discipline", action="store_true",
+                    help="Skip the STATE_PERSISTENCE_DISCIPLINE check (WS8 enter/exit load-bearing).")
     ap.add_argument("--bundle", action="store_true",
                     help="Also run `databricks bundle validate --target dev`.")
     ap.add_argument("--profile", default=None,
@@ -348,6 +489,10 @@ def main() -> int:
         ok = check_fork_parity() and ok
     if not args.skip_deploy_discipline:
         ok = check_deploy_fork_discipline() and ok
+    if not args.skip_lakehouse_discipline:
+        ok = check_lakehouse_fork_discipline() and ok
+    if not args.skip_state_discipline:
+        ok = check_state_persistence_discipline() and ok
     if args.bundle:
         ok = check_bundle(args.profile) and ok
 
