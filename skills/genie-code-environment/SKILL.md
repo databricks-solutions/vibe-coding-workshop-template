@@ -7,12 +7,13 @@ metadata:
   domain: common
   role: shared
   used_by_stages: [all]
-  last_verified: "2026-06-02"
+  last_verified: "2026-06-03"
   volatility: high
   clients: [genie_code]
   evidence:
     - "retrospectives/genie-code-field-guide.md (narrative)"
     - "probe Ledger P1–P18 (00-overview.md + genie-code-refactor-handoff.md)"
+    - "probe Ledger P19–P23 (uv/pip toolchain; uv-FastAPI SNAPSHOT server-side build; agent-app /invocations OAuth; Knowledge-Assistant REST via api_client.do on SDK 0.67.0; mlflow.genai eval stack incl GEPA) — agents+mlflow track session 2026-06-03"
     - "coding_assistant='genie-code' fork lessons (03-prompt-section-chain.md §2a, Buckets A-rationale + C)"
 ---
 
@@ -64,7 +65,8 @@ Genie Code can act on Databricks three independent ways, in order of preference:
    safety guardrails. The primary path. [TESTED]
 2. **Python SDK** — `from databricks.sdk import WorkspaceClient` via `executeCode`; auto-authenticated;
    full REST surface. This is the **most capable** path: it **bypasses the CLI allow-list** and is the
-   reliable way to `w.apps.deploy(...)`, retrieve `w.config.token`, and poll deployment/run state.
+   reliable way to `w.apps.deploy(...)`, obtain a runtime bearer via `w.config.authenticate()` (note:
+   `w.config.token` is `None` on serverless — see §7), and poll deployment/run state.
    **Caveat:** the SDK has **no bundle-deploy equivalent** — `bundle deploy` is a composite client-side
    operation (read `databricks.yml`, resolve templates, sync files, Terraform state), so it stays on
    `runDatabricksCli`. [TESTED]
@@ -135,6 +137,22 @@ The deploy contract is identical to the IDE — `bundle deploy --target dev`, ru
   and falls through to the build-skipping API-direct path). The reliable cross-context path is the
   **SDK**: `w.apps.deploy(<name>, AppDeployment(source_code_path=…, mode=SNAPSHOT))` via `executeCode`.
   [TESTED P10/P11]
+- **Python toolchain IS present (Track A agent apps are Python, not Node).** Unlike npm, the **`uv`** binary
+  (`/usr/local/bin/uv`), **`pip` 25.0.1**, and **Python 3.12** in a writable ephemeral venv ARE available in
+  the shell — `uv pip install -e .` / `python -m pip install -e .` against a `pyproject.toml` complete
+  in-session. The venv is **ephemeral** (no persistence across sessions/cluster restarts), so treat installs
+  as per-session. (The field guide only tested the *Node* toolchain; this closes the Python side.) [TESTED P19]
+- **A `uv`-based FastAPI app builds server-side on a SNAPSHOT deploy, exactly like Node/Vite.** The
+  `agent-openai-advanced` Track A template (`pyproject.toml` + `app.yaml` with a `uv run …` command) deploys
+  via the SDK `w.apps.deploy(<name>, AppDeployment(source_code_path=…, mode=SNAPSHOT))`: the platform resolves
+  deps with `uv` and starts the process **server-side**, reaching `SUCCEEDED` ("App started successfully") —
+  no local build. So Track A agent apps follow the **same SDK-SNAPSHOT deploy path** as AppKit, and the agent
+  app can live at a clone-rooted top-level root (SNAPSHOT *copies* the source). [TESTED P20]
+  - **SDK ergonomics (carry into the deploy code):** `w.apps.deploy(...)` returns a **`Wait`** object — read
+    `wait.response` / `wait.deployment_id`, then poll `w.apps.get_deployment(app_name, deployment_id)` →
+    `dep.status.state.value` (`IN_PROGRESS`→`SUCCEEDED`) / `dep.status.message`. The `App` object has **no
+    `.status`** attribute — use `app.compute_status`, `app.active_deployment`, `app.pending_deployment`,
+    `app.url`. [TESTED P20]
 
 ## 5. Agent-Skills install
 
@@ -151,6 +169,28 @@ fallback, both clients), **Tier 3 `createAsset({assetType:"genie", …})`** — 
 last-resort escape hatch that creates a live Space immediately and returns an ID. [TESTED P8] The Space
 title always carries the per-user prefix. Point to the spine for the canonical recipe; do not restate it.
 
+## 6b. Knowledge Assistants (Agent Bricks)
+
+A Knowledge Assistant is **not a bundle resource** (no `knowledge_assistant` DABs type) — like Genie Spaces
+it is an authoring-discipline exception created via the Agent Bricks **REST API**. The Genie-Code gotcha:
+the bundled **`databricks-sdk 0.67.0` has no `w.knowledge_assistants` wrapper** (`hasattr → False`), **even
+though the REST API is live**. Call it through the generic SDK escape hatch `w.api_client.do(<verb>, <path>,
+body=…)` — **no SDK upgrade needed** (an `uv pip install -U databricks-sdk` would be ephemeral and is
+unnecessary). Verified contract (mirrors the newer SDK's `KnowledgeAssistantsAPI`): [TESTED P22]
+
+| Operation | Verb + path |
+|---|---|
+| list | `GET /api/2.1/knowledge-assistants` |
+| create | `POST /api/2.1/knowledge-assistants` (body requires ≥1 knowledge source) |
+| get / update / delete | `GET` / `PATCH` / `DELETE /api/2.1/{name}` |
+| list / create sources | `GET` / `POST /api/2.1/{parent}/knowledge-sources` |
+| sync sources | `POST /api/2.1/{name}/knowledge-sources:sync` |
+
+`GET /api/2.1/knowledge-assistants` returned a live KA under Genie Code runtime auth. Some verbs also answer
+on the older `/api/2.0/...` prefix (the API is mid-migration) — **prefer `2.1`, fall back to `2.0` only if a
+`2.1` verb 404s.** Readiness polls via `serving-endpoints get` / `WorkspaceClient.serving_endpoints` (both
+available). [TESTED P22]
+
 ## 7. Verifying a deployed app
 
 A deployed App sits behind the Databricks Apps **OAuth gate** — a raw `Authorization: Bearer` token (even
@@ -162,6 +202,14 @@ SDK `w.config.token`) is rejected (`/api/health` → 401). [TESTED P16] Two work
    cookie persists through the callback (PKCE match), then reuse the session for all `/api/*` calls.
    [TESTED P17] Reusable snippet in
    **[references/app-verification.md](references/app-verification.md)**.
+
+> **Serverless token nuance (decisive — captured live).** On serverless compute **`w.config.token` is
+> `None`**; the runtime bearer that the OIDC *authorize* endpoint (Hop 2) accepts comes from
+> **`w.config.authenticate()["Authorization"]`** (a short `dkea…` token). Use that for Hop 2 — a missing/raw
+> token bounces Hop 2 to `/login.html`. After Hop 3 the `__Host-databricksapps` session cookie authenticates
+> everything; **no `Authorization` header is needed post-handshake.** The 3-hop handshake is confirmed not
+> just for static apps but against a **Track A Agent App `/invocations`** (FastAPI host, not Model Serving):
+> `POST /invocations` carrying only the session cookie → `200` + a valid ChatCompletion body. [TESTED P21]
 
 ## 8. How a Genie Code session actually operates (operating model)
 
@@ -282,6 +330,10 @@ The field guide flagged several items `[CONTESTED]`/`[INCOMPLETE]`. The session-
 | Is the `runDatabricksCli` CWD the page's bundle root or the workspace home? `[CONTESTED]` | **Page-type-dependent:** = the **bundle root on a bundle page** (proven), = workspace **home on non-bundle pages** (notebook/AppKit). **Be on the bundle's page to deploy it.** [TESTED P2] |
 | Is FUSE-invisibility of new files latency or a hard boundary? `[OPEN]` | Unresolved upstream — treat as a boundary in-session: **edit the on-page file.** [TESTED P3] |
 | Does any allow-listed path reach the AppKit *enhanced* (`apps deploy`) build in-session? `[OPEN]` | Not demonstrated — use the **SDK SNAPSHOT** path (build still runs server-side). [TESTED P11/P18] |
+| Does a `uv`/FastAPI (non-Node) app also build server-side on SNAPSHOT? (not in field guide) | **RESOLVED — yes.** uv-based Track A agent apps install deps + start server-side → `SUCCEEDED`. [TESTED P20] |
+| Does the 3-hop OAuth handshake work against a Track A Agent App `/invocations`, and what token does Hop 2 need on serverless? (extends P16/P17) | **RESOLVED — yes; Hop 2 uses `w.config.authenticate()` (not `w.config.token`, which is `None` on serverless).** [TESTED P21] |
+| Does the Knowledge Assistant API work on Genie Code's SDK 0.67.0? (agents track) | **RESOLVED — REST yes, SDK wrapper no.** `w.knowledge_assistants` absent in 0.67.0; call `/api/2.1/knowledge-assistants` via `w.api_client.do` (no upgrade). [TESTED P22] |
+| Is the full `mlflow.genai` eval stack on the Genie runtime? | **RESOLVED — yes.** mlflow 3.8.1 has scorers, `evaluate`, and `optimize_prompts` (GEPA). [TESTED P23] |
 
 ## Reference files
 

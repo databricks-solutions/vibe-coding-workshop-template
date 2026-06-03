@@ -2,7 +2,7 @@
 
 This template lives inside the `vibecoding-state` skill so it travels with the runtime contract to any project that adopts the Instructions.md workshop.
 
-Use it **once per prompt** executed during the workshop (count depends on pathway + track recorded in the live state file — `apps_lakebase/$APP_NAME/.vibecoding-state.md` for Pathways A/B/C, `agents/$AGENT_NAME/.vibecoding-state.md` for Pathway D). Run retrospectives **async after the full workshop completes** — do not interleave them with active prompts.
+Use it **once per prompt** executed during the workshop (count depends on pathway + track recorded in the live state file — `<app_root>/.vibecoding-state.md` for Pathways A/B/C, `<agent_app_root>/.vibecoding-state.md` for the Track A agent app on Pathways C/D). Run retrospectives **async after the full workshop completes** — do not interleave them with active prompts.
 
 Paste the block below into a fresh Agent thread, replacing `<N>` and `<title>` with the prompt/module identifier and title you are reviewing. Point the agent at the state file, the retrospective file, and [`Instructions.md`](../../../Instructions.md) so it has the full context.
 
@@ -18,7 +18,7 @@ The output format is fixed so individual retros can be aggregated by the rollup 
 >
 > **Inputs available to you:**
 > - The walkthrough prompt text at `Instructions.md`, Prompt `<N>`.
-> - The state file at `apps_lakebase/$APP_NAME/.vibecoding-state.md` (Pathways A/B/C) or `agents/$AGENT_NAME/.vibecoding-state.md` (Pathway D) — specifically the `## Prompt <N>` section plus any prior sections it depended on.
+> - The state file at `<app_root>/.vibecoding-state.md` (Pathways A/B/C) or `<agent_app_root>/.vibecoding-state.md` (Track A agent app, Pathways C/D) — specifically the `## Prompt <N>` section plus any prior sections it depended on.
 > - The `Workshop Choices` and `Pathway Applicability Matrix` in the same state file — these tell you whether this prompt should have executed at all for the chosen pathway/track.
 > - The agent transcript for this step if provided; otherwise reconstruct from the state file's "Resolved issues / workarounds" and "Verification" notes.
 >

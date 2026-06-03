@@ -457,8 +457,8 @@ unprefixed variable.
 
 Pathway C runs that combine an AppKit app with a separately authored agent (and
 some Pathway D variants that read AppKit context) keep state in **two** files:
-the AppKit app's `apps_lakebase/$APP_NAME/.vibecoding-state.md` and the agent's
-`agents/$AGENT_NAME/.vibecoding-state.md`. Any prompt that needs to read both
+the AppKit app's `<app_root>/.vibecoding-state.md` (= `<artifact_root>/<app_name>/.vibecoding-state.md`, the top-level app dir) and the Track A agent app's
+`<agent_app_root>/.vibecoding-state.md` (= `<artifact_root>/<agent_app_name>/.vibecoding-state.md`, the top-level agent app dir). Any prompt that needs to read both
 declares `state_file_set` so `enter` knows which file is authoritative for which
 canonical field, and `enter` can fail fast on conflicts.
 
@@ -469,10 +469,10 @@ both files in the same step.
 ```yaml
 state_file_set:
   primary:
-    path:                  string                  # e.g. "apps_lakebase/$APP_NAME/.vibecoding-state.md"
+    path:                  string                  # e.g. "<app_root>/.vibecoding-state.md" (top-level app dir)
     owner:                 string                  # enum: appkit | agent | root | example
   secondary:
-    path:                  string                  # e.g. "agents/$AGENT_NAME/.vibecoding-state.md"
+    path:                  string                  # e.g. "<agent_app_root>/.vibecoding-state.md" (top-level agent app dir)
     owner:                 string                  # enum: appkit | agent | root | example
     required_for_prompts:  [string]                # prompt_ids that must read secondary
   lookup_order:            [string]                # e.g. ["primary", "secondary"]

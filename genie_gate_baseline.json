@@ -1,23 +1,23 @@
 {
   "_note": "Locked regression baseline for genie-code-integration. Advance only after a milestone gate passes review.",
   "by_area_class": {
-    "(root)::APP_DEPLOY": 85,
+    "(root)::APP_DEPLOY": 86,
     "(root)::CLIENT_NAV": 1,
     "(root)::INSESSION_CREATE": 3,
     "(root)::LOCAL_AUTH": 7,
     "(root)::SETUP_SCRIPT": 3,
     "(root)::SHELL_DATABRICKS": 8,
     "agentic-framework::APP_DEPLOY": 17,
-    "apps_lakebase::APP_DEPLOY": 1297,
-    "apps_lakebase::BARE_ARTIFACT_PATH": 32,
+    "apps_lakebase::APP_DEPLOY": 1409,
+    "apps_lakebase::BARE_ARTIFACT_PATH": 34,
     "apps_lakebase::CLIENT_NAV": 7,
     "apps_lakebase::GENIE_RESOURCE": 8,
-    "apps_lakebase::INSESSION_CREATE": 104,
-    "apps_lakebase::LOCAL_AUTH": 38,
+    "apps_lakebase::INSESSION_CREATE": 106,
+    "apps_lakebase::LOCAL_AUTH": 44,
     "apps_lakebase::LOCAL_PATH": 51,
     "apps_lakebase::SCRIPT_DEPLOY": 5,
     "apps_lakebase::SETUP_SCRIPT": 10,
-    "apps_lakebase::SHELL_DATABRICKS": 283,
+    "apps_lakebase::SHELL_DATABRICKS": 287,
     "data_product_accelerator::APP_DEPLOY": 24,
     "data_product_accelerator::BARE_ARTIFACT_PATH": 9,
     "data_product_accelerator::GENIE_RESOURCE": 10,
@@ -34,7 +34,7 @@
     "genai-agents::LOCAL_PATH": 167,
     "genai-agents::LOCAL_SPARK": 2,
     "genai-agents::SHELL_DATABRICKS": 84,
-    "skills::APP_DEPLOY": 80,
+    "skills::APP_DEPLOY": 90,
     "skills::BARE_ARTIFACT_PATH": 1,
     "skills::GENIE_RESOURCE": 15,
     "skills::INSESSION_CREATE": 11,
@@ -44,18 +44,18 @@
     "skills::SHELL_DATABRICKS": 59
   },
   "by_class": {
-    "APP_DEPLOY": 1651,
-    "BARE_ARTIFACT_PATH": 45,
+    "APP_DEPLOY": 1774,
+    "BARE_ARTIFACT_PATH": 47,
     "CLIENT_NAV": 8,
     "GENIE_RESOURCE": 42,
-    "INSESSION_CREATE": 278,
-    "LOCAL_AUTH": 52,
+    "INSESSION_CREATE": 280,
+    "LOCAL_AUTH": 58,
     "LOCAL_PATH": 335,
     "LOCAL_SPARK": 9,
     "PY_BUNDLE_CONFIG": 1,
     "SCRIPT_DEPLOY": 5,
     "SETUP_SCRIPT": 14,
-    "SHELL_DATABRICKS": 583
+    "SHELL_DATABRICKS": 587
   },
-  "total": 3023
+  "total": 3160
 }
