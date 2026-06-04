@@ -255,7 +255,7 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
    - Identify quarantine candidates
    - Skipping this step consistently leads to incomplete DQ coverage and ad-hoc quarantine patterns
 2. Create Silver schema using pattern from `schema-management-patterns`
-3. Verify Bronze tables exist — run SQL, do NOT infer from local files:
+3. Verify Bronze tables exist AND pin each table's column inventory — run SQL, do NOT infer from local files:
    ```bash
    databricks api post /api/2.0/sql/statements -p $PROFILE --json '{
      "warehouse_id": "<WAREHOUSE_ID>",
@@ -265,6 +265,8 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
    }'
    ```
    If the Bronze schema doesn't exist or has zero tables, STOP and report — the Bronze layer must be completed first. Reading a clone script or inferring from the schema CSV is NOT runtime verification.
+
+   Then, for EVERY Bronze table you will read, run `DESCRIBE TABLE <CATALOG>.<BRONZE_SCHEMA>.<table>` and capture the column names into a `{table: [columns]}` map held in working memory (the **pinned column inventory**). Every DQ rule's `constraint_sql`, every Silver column reference, and every `get_bronze_table()` column authored in Phases 2-4 MUST use a name from this pinned inventory — a reference to a column absent from the live `DESCRIBE` is a hard error, not a "close enough" guess. PRD/CSV names (e.g. `price`, `latitude`) routinely differ from live prefixed names (e.g. `base_price`, `property_latitude`); pinning the inventory first prevents authoring rules against names that do not exist.
 
 ---
 
@@ -356,6 +358,8 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
 ### 🛑 STOP — Artifact Creation Complete
 
 **Phases 1–6 are complete.** All files (DQ rules table script, rules loader, DLT notebooks, monitoring views, pipeline/job YAMLs) have been created. **Do NOT proceed to deployment or Phase 7 unless the user explicitly requests it.**
+
+**Contract test before any deploy (read-only).** Before reporting completion, validate the authored files against the live schema so column/DDL bugs surface now, not in a failed job run: (1) dry-import `dq_rules_loader.py` — it must import cleanly and stay pure Python (no notebook header); (2) for every rule, run its `constraint_sql` read-only as `SELECT <constraint_sql> FROM <catalog>.<bronze_schema>.<table> LIMIT 1` and confirm each referenced column is in the Phase 1 pinned column inventory — an `UNRESOLVED_COLUMN`/parse error here is the exact failure that otherwise only appears as a failed DQ-setup/pipeline run; (3) confirm the loader's expected `dq_rules` row shape matches `setup_dq_rules_table.py`'s INSERT columns, and that no DDL uses a `DEFAULT` clause or an invented column. Fix and re-run until clean before deploying.
 
 Report what was created and ask the user if they want to deploy and run.
 

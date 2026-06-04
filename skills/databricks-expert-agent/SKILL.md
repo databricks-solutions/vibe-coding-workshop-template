@@ -158,7 +158,7 @@ If Gold YAML doesn't exist yet (initial design phase):
 These patterns caused P0/Critical failures across 14 pipeline executions:
 
 1. **Prompt Sufficiency Illusion** — A detailed user prompt does NOT substitute for reading skills or extracting from source files. Prompt completeness masks the need to verify against existing artifacts.
-2. **Hardcoding YAML-Extractable Values** — Silver table names, column renames, dedup keys, and constraint values MUST come from Gold YAML or live catalog, never from memory.
+2. **Hardcoding YAML-Extractable Values** — Silver table names, column renames, dedup keys, and constraint values MUST come from Gold YAML or live catalog, never from memory. **Before referencing any column, enumerate the live schema with `DESCRIBE TABLE` and treat that output as the only valid column namespace — a name absent from `DESCRIBE` is a hard error, not a "close enough" guess** (the recurring failure: DQ rules / Silver transforms authored against PRD names like `price`/`latitude` when the live schema had `base_price`/`property_latitude`).
 3. **Manifest-as-Truth** — Plans, manifests, and design docs describe *intended* state. Always verify against live catalog (`SHOW TABLES`, `DESCRIBE TABLE`, `information_schema`) before generating code.
 4. **Domain Knowledge Injection** — Never reference business concepts (enums, status values, fee types) not present in source data. If a concept isn't in the YAML or catalog, flag it as an extension requiring user confirmation.
 

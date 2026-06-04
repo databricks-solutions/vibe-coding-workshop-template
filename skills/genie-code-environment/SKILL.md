@@ -14,6 +14,7 @@ metadata:
     - "retrospectives/genie-code-field-guide.md (narrative)"
     - "probe Ledger P1–P18 (00-overview.md + genie-code-refactor-handoff.md)"
     - "probe Ledger P19–P23 (uv/pip toolchain; uv-FastAPI SNAPSHOT server-side build; agent-app /invocations OAuth; Knowledge-Assistant REST via api_client.do on SDK 0.67.0; mlflow.genai eval stack incl GEPA) — agents+mlflow track session 2026-06-03"
+    - "probe Ledger P24–P32 (AppKit hardening: import-specifier root-cause bisect; pristine scaffold defaults; build logs unreadable from compute; /logz human-readable; deploy ladder + ~50s cost; package-lock.json hard requirement; no-npm/local-typecheck-impossible + non-deterministic CLI allow-list; green-deploy != working app; don't-fabricate-state) — AppKit hardening session 2026-06-03"
     - "coding_assistant='genie-code' fork lessons (03-prompt-section-chain.md §2a, Buckets A-rationale + C)"
 ---
 
@@ -43,6 +44,13 @@ detection vs. explanation, no duplication. If `client_context == ide_cli`, you d
 > **Match the surface to the task. If a path is blocked, try the next of the three execution paths. Never
 > conclude "impossible" from one path or one page.** Every operation that was hard-blocked on one path in
 > the probes had a working alternative on another. [TESTED, recurring P1–P18]
+
+> **Don't fabricate state — report unverified facts as `unknown`.** Never claim a page, surface, deploy
+> state, or capability you did not actually observe (e.g. "I'm on the Apps page" when you never navigated
+> there, or "the deploy succeeded" without reading `deployment.state`). If you haven't verified it this
+> turn, say so and probe it. The `runDatabricksCli` allow-list is **non-deterministic** (a verb blocked on
+> one attempt can be allowed on the next), so "blocked once" is not "impossible" — and "worked once" is not
+> "always works." [TESTED P32]
 
 ## 1. What Genie Code is, and why the surface matters
 
@@ -131,12 +139,15 @@ The deploy contract is identical to the IDE — `bundle deploy --target dev`, ru
   server-side**: a SNAPSHOT deploy runs `npm install` + `npm run build` (Vite) from un-built source. A
   Genie-Code participant can edit `client/src/*.tsx` directly and redeploy with **no local Node toolchain**.
   [TESTED P9/P11/P18 — verified: an edited string appeared in the server-built JS bundle]
-- **`apps deploy` via `runDatabricksCli` is unreliable** — *page-dependent* (hard-blocked on
-  dashboard/file-editor pages, available on an AppKit project page) **and CWD-defeated** (the enhanced
-  build flow only fires when CWD = the project root, which never held in probes → it demands `APP_NAME`
-  and falls through to the build-skipping API-direct path). The reliable cross-context path is the
-  **SDK**: `w.apps.deploy(<name>, AppDeployment(source_code_path=…, mode=SNAPSHOT))` via `executeCode`.
-  [TESTED P10/P11]
+- **`apps deploy` via `runDatabricksCli` is unreliable** — the allow-list is **non-deterministic** (blocked
+  on one attempt, allowed on the next on the same page type — not cleanly page-gated) **and CWD-defeated**
+  (the enhanced build flow only fires when CWD = the project root, which never held in probes → it demands
+  `APP_NAME` and falls through to the build-skipping API-direct path; the enhanced flow also runs a *local*
+  build/typecheck/lint that needs `npm`, which is absent). The reliable cross-context path is the
+  **SDK**: `w.apps.deploy(<name>, AppDeployment(source_code_path=…, mode=SNAPSHOT))` via `executeCode`,
+  which bypasses the allow-list and runs the build server-side. **Prefer the SDK SNAPSHOT path; treat a
+  blocked `apps deploy`/`apps init` as transient — retry or set `ENABLE_DATABRICKS_CLI=true`, never declare
+  it impossible.** [TESTED P10/P11/P32]
 - **Python toolchain IS present (Track A agent apps are Python, not Node).** Unlike npm, the **`uv`** binary
   (`/usr/local/bin/uv`), **`pip` 25.0.1**, and **Python 3.12** in a writable ephemeral venv ARE available in
   the shell — `uv pip install -e .` / `python -m pip install -e .` against a `pyproject.toml` complete
@@ -153,6 +164,25 @@ The deploy contract is identical to the IDE — `bundle deploy --target dev`, ru
     `dep.status.state.value` (`IN_PROGRESS`→`SUCCEEDED`) / `dep.status.message`. The `App` object has **no
     `.status`** attribute — use `app.compute_status`, `app.active_deployment`, `app.pending_deployment`,
     `app.url`. [TESTED P20]
+- **AppKit build failures trace to two import specifiers — preserve the scaffold.** A pristine `apps init`
+  ships `client/src/index.css` with `@import "@databricks/appkit-ui/styles.css";` and `.tsx` importing from
+  `@databricks/appkit-ui/react`. Hand-regenerating these from memory reintroduces the bare
+  `@databricks/appkit-ui` (no React export) and extension-less `…/styles` (unresolvable) — the dominant
+  first-deploy failure. Edit `App.tsx`/`index.css` incrementally; keep `ErrorBoundary.tsx`. [TESTED P24/P25]
+- **There is no local typecheck — a regex pre-flight is the only static gate.** `npm`/`npx`/`corepack` are
+  dangling symlinks and `tsc` cannot resolve `@databricks/appkit-ui`/`vite/client` without `node_modules`,
+  so the import-specifier failure is **not** catchable locally. Before a (~50s) deploy, scan
+  `client/src/**` via `executeCode`+regex for the two bad specifiers and fix hits first. [TESTED P30]
+- **Build logs are unreadable from compute — escalate to `/logz` in a browser.** `deployment.status.message`
+  + REST only say "check /logz"; `databricks apps logs <name>` → OAuth error; `/logz` over raw HTTP → 401.
+  On `FAILED`, hand the operator `<app-url>/logz` (already authenticated) to read the exact `error TS…`
+  line; no-browser fallback = the 2–3-file batch ladder (redeploy small batches; the batch that flips
+  green→FAILED holds the break). [TESTED P26/P27/P28]
+- **`package-lock.json` is a hard requirement on SNAPSHOT.** Deleting it hard-fails the source-export phase
+  in ~10s (`RESOURCE_DOES_NOT_EXIST`), before `npm install`. Never delete it as a reset. [TESTED P29]
+- **A green deploy does NOT mean a working app.** A server boot crash → `FAILED` (agent-visible); a client
+  runtime crash compiles and deploys `SUCCEEDED`/`ACTIVE` but renders blank — invisible to the agent.
+  Require a **human render check** in the browser (the scaffold `ErrorBoundary` surfaces the stack). [TESTED P31]
 
 ## 5. Agent-Skills install
 
@@ -309,6 +339,12 @@ Gold-design run].
     `createAsset` (with `assetType: file`) makes the empty file → `readFile` satisfies the read-first guard →
     `workspaceUpdateFile` populates it. Three calls, zero compute. Best for **updating a single
     already-read file**, or writing a few files **before** compute is warm. [TESTED]
+- **Verify file writes with `os.path.exists` / `os.listdir`, NOT `listFiles`.** After writing a file via
+  `executeCode` `open(...)`, confirm it landed with `os.path.exists(path)` (or `os.listdir(dir)`) **in the
+  same `executeCode` block**. Do **NOT** use `listFiles` to confirm a just-written file: the workspace REST
+  API that backs `listFiles` lags files written through the FUSE mount, so it returns false "missing-file"
+  negatives — and you waste turns recreating files that already exist. [TESTED — a live run saw
+  `listFiles`=7 while `os.listdir`=12 for the same directory immediately after writing]
 - **`executeCode` cold start & timeout — never starve the first call.** The **first** `executeCode` in a
   session pays a **serverless cold start of ~3–5 minutes** before any code runs; subsequent calls are warm
   (~0 s). `timeoutMinutes` **defaults to 15** (minimum 5). **Never set `timeoutMinutes` below 15** — the
@@ -334,6 +370,23 @@ The field guide flagged several items `[CONTESTED]`/`[INCOMPLETE]`. The session-
 | Does the 3-hop OAuth handshake work against a Track A Agent App `/invocations`, and what token does Hop 2 need on serverless? (extends P16/P17) | **RESOLVED — yes; Hop 2 uses `w.config.authenticate()` (not `w.config.token`, which is `None` on serverless).** [TESTED P21] |
 | Does the Knowledge Assistant API work on Genie Code's SDK 0.67.0? (agents track) | **RESOLVED — REST yes, SDK wrapper no.** `w.knowledge_assistants` absent in 0.67.0; call `/api/2.1/knowledge-assistants` via `w.api_client.do` (no upgrade). [TESTED P22] |
 | Is the full `mlflow.genai` eval stack on the Genie runtime? | **RESOLVED — yes.** mlflow 3.8.1 has scorers, `evaluate`, and `optimize_prompts` (GEPA). [TESTED P23] |
+
+## AppKit hardening ledger (P24–P32)
+
+Live Genie-Code probes from the AppKit hardening session (2026-06-03), distilling an ~11-deploy booking-app
+failure into preventable causes. These extend the P1–P23 ledger; the §4 AppKit facts cite these rows.
+
+| # | Finding | Result |
+|---|---|---|
+| P24 | Root cause of the original build failures (reproduce-then-bisect) | Green **only** when BOTH fixed: `index.css` `@import "@databricks/appkit-ui/styles"` → `styles.css`; component imports `from "@databricks/appkit-ui"` → `/react`. Neither alone. |
+| P25 | Scaffold defaults are correct | Pristine `apps init` ships `styles.css` + `/react`; the agent had overwritten correct files with hallucinated specifiers (regenerating from memory). |
+| P26 | Build logs unreadable from compute | SDK/REST return only generic "check /logz"; `apps logs` → OAuth error; programmatic `/logz` → PKCE/401. No agent-visible build error. |
+| P27 | `/logz` is human-readable in a browser | Authenticated `<app-url>/logz` shows the exact `App.tsx(L,C): error TS…` + full Vite/tsc pipeline. Escalation = hand the operator the link. |
+| P28 | Deploy ladder localizes a break; cost = the deploy loop | 2–3-file batches localize a break; deploy ≈ 50s cold / 30s warm; file writes ≈ 0.15s → deploy loop is the bottleneck, not file I/O. |
+| P29 | `package-lock.json` is a hard deploy requirement | Deleting it fails at the source-export phase in ~10s (`RESOURCE_DOES_NOT_EXIST`), before `npm install`. |
+| P30 | No functional npm; local full typecheck impossible | `node` present; `npm`/`npx`/`corepack` dangling symlinks; `tsc` can't resolve appkit-ui/vite without `node_modules`. → grep/regex pre-flight is the only static gate. |
+| P31 | Green deploy ≠ working app | Server boot crash → `FAILED` (visible); client runtime crash → `SUCCEEDED`/`ACTIVE` but blank (invisible) → human render check required; keep `ErrorBoundary`. |
+| P32 | CLI allow-list non-deterministic; agent fabricated page-state | `apps init` blocked once then allowed on the same page type; agent reported an "Apps page" it never navigated to. SDK deploy bypasses the guardrail → reliable. Don't-fabricate-state. |
 
 ## Reference files
 

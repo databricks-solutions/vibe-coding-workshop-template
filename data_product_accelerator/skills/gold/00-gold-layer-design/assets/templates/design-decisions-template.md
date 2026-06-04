@@ -125,6 +125,19 @@ Per `02-dimension-patterns` Rule 3, every boolean source column in a **business-
 
 ---
 
+## 7. Population Strategy
+
+Every Gold table's YAML declares a `population_strategy` so the Gold pipeline (step `01-gold-layer-setup`) knows how to load it:
+
+| Table | `population_strategy` | Pipeline behavior |
+|-------|----------------------|-------------------|
+| All Silver-sourced dims/facts | `merge_from_silver` | MERGE from the Silver source named in lineage |
+| `dim_date` (and `dim_time`) | `generate_sequence` | INSERT from a generated date/time sequence — NO Silver source |
+
+**`dim_date` is a special case:** it has `silver_table: None` in lineage and is populated by a one-time INSERT from sequence generation, NOT a MERGE from Silver. Document it here so the Gold pipeline does not fail trying to read a non-existent Silver source.
+
+---
+
 ## Sign-off Checklist
 
 Before handing off to Phase 3:
@@ -136,5 +149,6 @@ Before handing off to Phase 3:
 - [ ] Transformation enum in §4 is the only allowed set
 - [ ] Top-level key contract in §5 matches `references/yaml-schema-patterns.md`
 - [ ] Boolean-to-text list in §6 is complete for every business dim
+- [ ] Population strategy in §7 set for every table (`generate_sequence` for `dim_date`/`dim_time`, `merge_from_silver` otherwise)
 - [ ] `gold_layer_design/DESIGN_DECISIONS.md` written to disk
 - [ ] This file will be embedded verbatim in every Phase 4 subagent prompt

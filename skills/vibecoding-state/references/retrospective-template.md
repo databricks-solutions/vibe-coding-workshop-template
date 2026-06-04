@@ -24,6 +24,8 @@ The live `.vibecoding-state.md` file — NOT the chat summary — is the state s
 
 If `state file updated: no`, the next thread MUST treat the run as **unverified** and re-run the last `exit` before advancing. A handoff that omits these fields is non-conformant.
 
+**State supersedes summary (drift defense).** Generate the summary FROM the live state file's Per-Step Log, not from recollection. When the summary and the state file disagree, the state file wins: a prompt logged with its gate PASSED is DONE even if a summary says "NOT DONE" / "IN PROGRESS." A mid-execution summary snapshot must NEVER cause a completed, gated step to be re-run. The `exit` write is idempotent by `prompt_id` (replace-in-place, never a duplicate section), so a re-run after a reset updates the existing entry rather than appending a second one.
+
 ---
 
 ## Per-Prompt Retrospective Prompt (copy this block)

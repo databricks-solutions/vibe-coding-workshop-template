@@ -62,7 +62,7 @@ This skill is **source editing** — designing SQL queries, writing `server/serv
 |----------------------|--------------------------|
 | `npm run typegen` (generates `client/src/appKitTypes.d.ts`) | no local Node — typegen runs **server-side on deploy**. Write UI against the `.sql` `-- @param` annotations + the appkit-ui docs; the generated types land at deploy/build time |
 | `npm run dev` / `http://localhost:8000` checks (Step 6) | no local dev server — verify UI/queries on the **deployed** app (browser, or the OAuth-session test in `03-appkit-deploy`) |
-| `npx tsc --noEmit` (Step 4b) / `npm run build` | IDE-only gates — the platform type-checks + builds **server-side** on deploy; TS errors surface in `databricks apps logs <name>` |
+| `npx tsc --noEmit` (Step 4b) / `npm run build` | no local typecheck — `npm`/`npx`/`tsc` cannot resolve `@databricks/appkit-ui` without `node_modules`. The platform builds **server-side** on deploy, but TS errors do **NOT** come back through `databricks apps logs <name>` (OAuth error from compute) — they appear only at `<app-url>/logz` in a browser. The one viable static pre-flight is the **import-specifier regex gate** in the `99-deploy_databricks_app.genie-code.md` fork (Step 2b) — run it before deploy |
 | `npx @databricks/appkit docs …` | npx absent (P9) — WebFetch https://databricks.github.io/appkit/ |
 | `ls node_modules/@databricks/appkit-ui/…` | no local `node_modules` — consult the appkit-ui docs (WebFetch) instead |
 | `databricks apps validate --profile $PROFILE` (checklist) | hard-blocked on Genie Code — skip; rely on `bundle validate` (`runDatabricksCli`, omit `--profile`) + server-side build logs per `03-appkit-deploy` / `07-appkit-chat-history` Step 9 |
@@ -276,7 +276,11 @@ All static demo data must be replaced with query-driven data before declaring th
 - **Never invent APIs** — only use documented exports from `@databricks/appkit` and `@databricks/appkit-ui`
 - **Never build SQL strings dynamically** — use parameterized queries
 - **`createApp()` is async** — always `await` it
-- **Wrap root with `<TooltipProvider>`** — many AppKit components use tooltips internally; add this to `App.tsx` by default
+- **Wrap root with `<TooltipProvider>`** — many AppKit components use tooltips internally; add this to `App.tsx` by default (imported from `@databricks/appkit-ui/react`, per the specifier rule below)
+- **AppKit import specifiers are exact:**
+  - Components/hooks: `import { … } from "@databricks/appkit-ui/react"` — **never** the bare `@databricks/appkit-ui` (the bare path has no React export and the build cannot resolve it).
+  - Global stylesheet: `@import "@databricks/appkit-ui/styles.css";` in `client/src/index.css` — **never** the extension-less `@import "@databricks/appkit-ui/styles";` (the package only exports the `.css` path; the extension-less form is unresolvable). These two are the exact paths the scaffold ships.
+- **Preserve the scaffold — do NOT regenerate from memory.** Edit `client/src/App.tsx` and `client/src/index.css` **incrementally**; never overwrite them with hand-authored versions. Regenerating these from memory is how the wrong (shorter) import specifiers get reintroduced. Likewise, **keep the scaffold's `client/src/ErrorBoundary.tsx`** — it is the only thing that surfaces a client-side runtime crash in the browser (a crash that otherwise deploys "green").
 
 ### UI Components
 

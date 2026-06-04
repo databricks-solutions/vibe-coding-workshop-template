@@ -199,6 +199,7 @@ These rules are the authoritative source whenever a domain-specific skill below 
      - **fact**: 2+ FK columns AND numeric measures, OR 2+ timestamps AND 2+ FKs
      - **dimension**: everything else
    - Also identifies: PK candidates, FK columns, measures, timestamps per table
+   - **This classification is a HEURISTIC, not ground truth.** It mis-classifies tables whose numeric columns are descriptive attributes rather than additive measures (geographic coordinates, prices, physical counts), and tables with no numeric columns or only one FK. After running it, **print the full classification, then explicitly document every override you make and WHY** (e.g. "`properties` reclassified dimension→… : `base_price`/`latitude`/`bedrooms` are attributes, not measures"). **Never silently correct a classification** — an undocumented override becomes invisible technical debt if a later step reads the raw classification instead of `DESIGN_DECISIONS.md`.
 
 3. **Identify FK relationships from column comments and naming patterns:**
 
@@ -457,7 +458,7 @@ The file MUST contain these six sections:
 4. Validate PRIMARY KEY definitions match grain type
 5. Validate FOREIGN KEY references point to valid tables/columns
 6. Run lineage validation script
-7. **Upstream cross-reference (conditional):** If upstream source tables already exist (check via `spark.catalog.tableExists()`), run `cross_reference_silver_at_design_time()` from `references/schema-intake-patterns.md` to validate YAML lineage `silver_column` values against actual source table schemas. Fix any mismatches found. If source tables do not exist yet, note that this validation will be enforced as a hard gate during Phase 0 of `01-gold-layer-setup`.
+7. **Upstream cross-reference (MANDATORY when Silver exists):** Check whether upstream source tables exist (via `spark.catalog.tableExists()`). If they do, you MUST run `cross_reference_silver_at_design_time()` from `references/schema-intake-patterns.md` to validate YAML lineage `silver_column` values against the actual source-table schemas, fix any mismatches found, and **record the resulting mismatch count (target: 0) as an explicit line in the validation report** — running it silently does not satisfy this check. This is the only validation that confirms the artifacts agree with *reality* rather than just with each other (the YAML/ERD/lineage consistency checks are self-referential — all three are generated from the same session data, so a systematic column error would pass them while failing here). Only when source tables do not exist yet is this deferred — in that case note that it will be enforced as a hard gate during Phase 0 of `01-gold-layer-setup`.
 
 **Outputs:**
 - Validation report (pass/fail for each category)

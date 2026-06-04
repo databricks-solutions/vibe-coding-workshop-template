@@ -114,6 +114,21 @@ ALTER TABLE fact_sales
 - ✅ Separate constraint script - Create dedicated `constraints.py` to apply all FKs after tables exist
 - ✅ Dependency order matters - Reference tables (dims) before fact tables, constraints last
 
+### 5. Never Use `DEFAULT` Column Clauses in DDL
+
+**❌ FORBIDDEN:** a `DEFAULT <expr>` clause on any column in `CREATE TABLE` (Delta / serverless).
+
+```sql
+-- ❌ WRONG — fails with "...requires table feature allowColumnDefaults..." by default
+is_active BOOLEAN NOT NULL DEFAULT true
+
+-- ✅ CORRECT — declare the column, set the default at INSERT time
+is_active BOOLEAN NOT NULL          -- in CREATE TABLE
+... INSERT ... SELECT ..., true AS is_active, ...   -- default supplied on write
+```
+
+Column `DEFAULT` expressions require the `delta.feature.allowColumnDefaults` table feature, which is **off by default** — DDL using `DEFAULT` fails on a standard table. Do NOT enable the feature flag to make `DEFAULT` work; **set defaults at INSERT time instead** (and do not add columns the design/template did not call for — this rule exists because an agent invented an `is_active BOOLEAN NOT NULL DEFAULT true` column that was never in the template). This applies to every layer's DDL (Bronze, Silver `dq_rules`, Gold), not just constraints.
+
 ## Quick Reference
 
 ### Dimension Table (SCD Type 1)
@@ -150,6 +165,7 @@ ALTER TABLE fact_sales
 ### Table Creation Phase
 - [ ] All dimension tables define PRIMARY KEY inline in CREATE TABLE
 - [ ] **NO** fact tables define FOREIGN KEY inline in CREATE TABLE
+- [ ] **NO** `DEFAULT` column clauses anywhere in DDL (set defaults at INSERT time)
 - [ ] Date columns use explicit `CAST(DATE_TRUNC(...) AS DATE)`
 - [ ] All surrogate key columns are `NOT NULL`
 - [ ] Reference dimension (dim_date) created before facts that reference it

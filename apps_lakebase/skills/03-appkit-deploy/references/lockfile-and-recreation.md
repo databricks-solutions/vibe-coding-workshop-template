@@ -4,7 +4,7 @@ Two of the highest-cost failure classes during AppKit deployment are caused by *
 
 > **Read this when:** preparing to deploy, hitting `ENOTEMPTY` / `Exit handler never called` during platform `npm install`, or when `permission denied for schema` starts appearing after recreating the app.
 
-> **Client note — Genie Code:** Rule 1 (lockfile regeneration) is an **IDE/CLI-only** hazard — Genie Code has no local `npm`, so it never regenerates the lockfile and avoids this class entirely (the build runs server-side). Rule 2 (app-recreation → new SP → Lakebase ownership) applies on **both** clients: avoid deleting/recreating the app regardless of how you deploy.
+> **Client note — Genie Code:** Rule 1's *regeneration* hazard is **IDE/CLI-only** — Genie Code has no local `npm`, so it never regenerates the lockfile (the build runs server-side). **But Genie Code has its own, opposite hazard:** on the SDK SNAPSHOT deploy path, a **missing** `package-lock.json` **hard-fails the source-export phase in ~10s** (`RESOURCE_DOES_NOT_EXIST`), *before* the platform's `npm install` ever runs. So on Genie Code the lockfile is a **hard requirement** — the Recovery-ladder step 2 ("Delete the lockfile") and the "Absent → usually succeeds" scenario row are **IDE-only** and must NOT be used on Genie Code. Change deps by editing `package.json` and keeping the lockfile consistent; never delete it as a reset. Rule 2 (app-recreation → new SP → Lakebase ownership) applies on **both** clients: avoid deleting/recreating the app regardless of how you deploy.
 
 ---
 
@@ -56,7 +56,7 @@ Add this to your deploy wrapper script (or the CI pre-deploy job) so a regenerat
 Apply in order. Escalate only if the previous step fails.
 
 1. **Revert the lockfile.** If `git diff package-lock.json` shows local changes, `git checkout -- package-lock.json` and redeploy.
-2. **Delete the lockfile.** If the lockfile is the problem and reverting isn't possible (e.g., after an AppKit upgrade), `rm -f package-lock.json`, commit the deletion, and redeploy. The platform will do a full fresh resolve.
+2. **Delete the lockfile.** *(IDE/CLI only — never on Genie Code; see the client note above, where a missing lockfile hard-fails the SNAPSHOT export.)* If the lockfile is the problem and reverting isn't possible (e.g., after an AppKit upgrade), `rm -f package-lock.json`, commit the deletion, and redeploy. The platform will do a full fresh resolve.
 3. **Upgrade in-place with `--package-lock-only`.** If you must refresh dep versions without running a full `npm install` locally, `npm install @databricks/appkit@latest --package-lock-only` keeps the lockfile coherent with your local registry config; then redeploy and see if step 2 is needed.
 4. **Last resort: delete and recreate the app.** Only if `Exit handler never called` persists across multiple clean deploys. Read Rule 2 below first — app deletion has Lakebase side effects.
 

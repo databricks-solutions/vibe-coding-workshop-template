@@ -371,6 +371,42 @@ def check_lakehouse_fork_discipline() -> bool:
                 failures.append(f"{p.name}: missing the saveAsTable-FORBIDDEN gold-load rule.")
             if "validate_gold" not in low:
                 failures.append(f"{p.name}: missing the post-merge `validate_gold` task.")
+        # (e) FUSE write-verification (R2) — every lakehouse fork that writes files
+        #     must verify with os.path.exists and explicitly avoid listFiles.
+        if "os.path.exists" not in low or "listfiles" not in low:
+            failures.append(f"{p.name}: missing the FUSE write-verification rule "
+                            "(verify writes with `os.path.exists`, NOT `listFiles`).")
+        # (f) no-DEFAULT-in-DDL inline rule (R8) — table-authoring forks only.
+        if stem in {"bronze_layer_creation", "silver_layer_sdp", "gold_layer_pipeline"}:
+            if "default` column clause" not in low:
+                failures.append(f"{p.name}: missing the no-`DEFAULT`-column-clause inline DDL rule.")
+        # (g) Bronze-column reconciliation (R1) — forks that author DQ/merge code.
+        if stem in {"silver_layer_sdp", "gold_layer_pipeline"}:
+            if "column inventory" not in low or "describe table" not in low:
+                failures.append(f"{p.name}: missing the column-inventory `DESCRIBE TABLE` pin (R1).")
+        # (h) contract test before deploy (R4) — Silver fork.
+        if stem == "silver_layer_sdp":
+            if "contract test" not in low:
+                failures.append(f"{p.name}: missing the pre-deploy contract-test step (R4).")
+        # (i) Gold-design fork hardening (G1-G4).
+        if stem == "gold_layer_design":
+            # G1: design workers load just-in-time, NOT batched upfront.
+            if "just-in-time" not in low:
+                failures.append(f"{p.name}: missing the just-in-time design-worker load rule (G1).")
+            if "in one batched" in low:
+                failures.append(f"{p.name}: still instructs batch-reading design workers, "
+                                "contradicting the orchestrator anti-pattern (G1).")
+            # G2: gate lists the full mandatory deliverables.
+            if "design_gap_analysis.md" not in low or "readme.md" not in low:
+                failures.append(f"{p.name}: gate/deliverables omit README.md and/or "
+                                "DESIGN_GAP_ANALYSIS.md (G2).")
+            # G3: upstream cross-reference surfaced in the fork.
+            if "upstream cross-reference" not in low:
+                failures.append(f"{p.name}: missing the upstream cross-reference rule (G3).")
+            # G4: population_strategy signal for generated dims.
+            if "population_strategy" not in low:
+                failures.append(f"{p.name}: missing the population_strategy signal for "
+                                "generated dimensions (G4).")
 
     print(f"checked {checked} lakehouse fork(s)")
     if failures:
@@ -428,6 +464,20 @@ def check_state_persistence_discipline() -> bool:
         if "NOT complete until" not in text:
             failures.append(f"{p.name}: missing the hard Gate completion rule "
                             "('NOT complete until' the live state file write is confirmed by re-read).")
+
+    # R5: the vibecoding-state skill itself must encode idempotent exit +
+    # state-supersedes-summary + recovery-reconcile (the drift/dup defenses).
+    skill = os.path.join(REPO_ROOT, "skills", "vibecoding-state", "SKILL.md")
+    if os.path.exists(skill):
+        with open(skill, encoding="utf-8") as fh:
+            stext = fh.read().lower()
+        checked += 1
+        if "idempotent by `prompt_id`" not in stext and "idempotent by prompt_id" not in stext:
+            failures.append("vibecoding-state/SKILL.md: missing the idempotent-by-prompt_id `exit` rule (R5).")
+        if "supersede" not in stext:
+            failures.append("vibecoding-state/SKILL.md: missing the state-supersedes-summary rule (R5).")
+        if "recovery reconcile" not in stext:
+            failures.append("vibecoding-state/SKILL.md: missing the resume recovery-reconcile rule (R5).")
 
     print(f"checked {checked} state-bearing fork(s)")
     if failures:

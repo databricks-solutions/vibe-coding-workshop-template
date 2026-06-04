@@ -26,9 +26,14 @@ WORKFLOW:
        - Pathways A / B / C:  <app_root>/.vibecoding-state.md  (= <artifact_root>/<app_name>/.vibecoding-state.md, the top-level app dir — NOT apps_lakebase/<app_name>/), once $APP_NAME is known (Module 1).
        - Track A agent app (Pathways C / D): <agent_app_root>/.vibecoding-state.md  (= <artifact_root>/<agent_app_name>/.vibecoding-state.md, the top-level agent app dir — NOT apps_lakebase/<agent_app_name>/), once $AGENT_APP_NAME is known (Track A clone / Module 4).
        - Data-product / lakehouse track (Bronze→Silver→Gold→semantic, no app/agent app): <dp_bundle_root>/.vibecoding-state.md  (= <artifact_root>/{user_schema_prefix}_<use_case_slug>_dab/.vibecoding-state.md, the data-product bundle root). The FIRST lakehouse prompt (Bronze) bootstrap-creates it from this template if absent — DP-track state must NOT be left in the temporary example/ path (that omission was the "state survived only in chat summary" defect). This is the data-product analog of <app_root>/<agent_app_root>.
-  5. Every subsequent prompt READS the entire file first, then APPENDS a new
-     `## Prompt <N>` (or `## Phase <N.M>` / `## Module <N>`) section.
-  6. Never edit prior step sections — treat them as an append-only log.
+  5. Every subsequent prompt READS the entire file first, then writes its
+     `## Prompt <N>` (or `## Phase <N.M>` / `## Module <N>`) section. The write is
+     IDEMPOTENT by prompt id: if a `## Prompt <N>` section already exists (a
+     re-run after a retry / context reset), REPLACE it in place; only APPEND when
+     no section for that id exists. Never create a second section for the same id
+     (duplicate entries were a live regression).
+  6. Never edit a DIFFERENT prior step's section — treat other steps as an
+     append-only log; only a step's own re-run may replace its own section.
   7. Live state files are gitignored. Only this template (inside the skill)
      is committed.
 
@@ -749,7 +754,10 @@ skill_helper_resolutions: []
 ## Per-Step Log
 
 <!--
-Every completed prompt appends a section below using this template.
+Every completed prompt writes a section below using this template. The write is
+idempotent by prompt id: if a `## Prompt <id>` section already exists (re-run
+after a retry/reset), REPLACE it in place; only APPEND when none exists. Never
+log the same prompt id twice.
 
 For prompts that do NOT apply to the chosen pathway, the agent still writes a
 section with Outcome = `Skipped (N/A for pathway <X>)` so the log is complete

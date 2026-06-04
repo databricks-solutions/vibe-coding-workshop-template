@@ -16,9 +16,11 @@ bundle_resource: apps
 deploy_verb: apps_deploy
 deploy_note: >
   Scaffolding does not deploy — it delegates deploy to `03-appkit-deploy` (the `apps_deploy` contract).
-  `apps init` is **pre-approved** on Genie Code via `runDatabricksCli` and completes without local npm
-  (deps install **server-side** on deploy); pass `--output-dir` so the project lands in your repo/home, not
-  `/Workspace/<name>`. The `aitools install` + `apps manifest` verbs are **hard-blocked** on Genie Code —
+  `apps init` is **usually allow-listed** on Genie Code via `runDatabricksCli` and completes without local npm
+  (deps install **server-side** on deploy); the allow-list is **non-deterministic**, so if it is transiently
+  blocked, retry / set `ENABLE_DATABRICKS_CLI=true` rather than declaring it impossible. Pass `--output-dir`
+  so the project lands in your repo/home, not `/Workspace/<name>`. The reliable deploy spine remains the
+  **SDK SNAPSHOT** path (`03-appkit-deploy`). The `aitools install` + `apps manifest` verbs are **hard-blocked** on Genie Code —
   use the `git clone` skills-install path and blank-scaffold plugin discovery instead. `npx @databricks/appkit
   docs` is IDE-only (npx absent on Genie Code → WebFetch the docs site). Omit `--profile` on Genie Code.
 coverage: full
@@ -53,7 +55,7 @@ Scaffolding works on both clients; the per-step notes below carry the details. T
 |----------------------|--------------------------|------|
 | `databricks aitools install` / `aitools tools` | **hard-blocked** via `runDatabricksCli` — skills are loaded in-session, so the install/gate is a no-op; if you need the files materialized, use the `git clone` install path | 1, 2 |
 | `databricks apps manifest` | **hard-blocked** — discover plugins by blank-scaffolding first and reading `appkit.plugins.json`, or WebFetch the AppKit docs | 2 |
-| `databricks apps init …` | **pre-approved** via `runDatabricksCli`; **add `--output-dir`** (`.` or an explicit home path) so it doesn't land at `/Workspace/<name>`; `⚠ npm not found` is expected (deps install server-side on deploy) | 2 |
+| `databricks apps init …` | **usually allow-listed** via `runDatabricksCli` (allow-list is **non-deterministic** — may be transiently blocked; if so retry or set `ENABLE_DATABRICKS_CLI=true`, don't declare it impossible); **add `--output-dir`** (`.` or an explicit home path) so it doesn't land at `/Workspace/<name>`; `⚠ npm not found` is expected (deps install server-side on deploy) | 2 |
 | `databricks warehouses list` / `aitools tools get-default-warehouse` | `aitools` blocked → use `databricks warehouses list --output json` via `runDatabricksCli` | 2 |
 | `npm install` / `npm run dev` (local dev server) | no local Node toolchain — skip; verify on the **deployed** app (`03-appkit-deploy`) | 3 |
 | `npx @databricks/appkit docs …` | npx absent (P9) — WebFetch https://databricks.github.io/appkit/ | docs |
@@ -241,7 +243,7 @@ databricks apps init --name <APP_NAME> --description "<DESC>" --features analyti
 
 When running from a non-interactive shell (no TTY), `--name` is mandatory — the CLI will error with `"--name is required in non-interactive mode"` if omitted. Always provide `--name`, `--run none`, and `--profile`. *(On Genie Code, also add `--output-dir` — see the scaffold-location note above.)*
 
-> **Client note — Genie Code:** `apps init` is **pre-approved** via `runDatabricksCli` and completes even though `npm` is absent (it prints `⚠ npm not found` and skips `npm install` — that is expected; deps install **server-side** on deploy). Pass `--output-dir .` (or an explicit home path) so the project does not land at `/Workspace/<name>`.
+> **Client note — Genie Code:** `apps init` is **usually allow-listed** via `runDatabricksCli` and completes even though `npm` is absent (it prints `⚠ npm not found` and skips `npm install` — that is expected; deps install **server-side** on deploy). Pass `--output-dir .` (or an explicit home path) so the project does not land at `/Workspace/<name>`. The `runDatabricksCli` allow-list is **non-deterministic** (not cleanly page-gated): `apps init` may be blocked on one attempt and allowed on the next. If it is blocked, **do not declare scaffolding impossible** — retry, or set `ENABLE_DATABRICKS_CLI=true` to run the raw CLI in the shell. Whatever happens here, the **reliable deploy spine is the SDK SNAPSHOT path** (`w.apps.deploy(..., mode=AppDeploymentMode.SNAPSHOT)` via `executeCode`), which bypasses the allow-list entirely — see `03-appkit-deploy`. *blocked ≠ impossible — try the next path.*
 
 ### Naming Rules
 

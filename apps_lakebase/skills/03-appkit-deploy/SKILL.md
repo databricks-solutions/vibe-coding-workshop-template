@@ -66,7 +66,7 @@ This skill is written for the **IDE/CLI path** — the commands below are correc
 |----------------------|--------------------------|
 | `databricks <cmd> … --profile $PROFILE` | run `databricks <cmd> …` via `runDatabricksCli`, **omit `--profile`** (ambient auth) |
 | `databricks apps deploy …` (when the project page blocks it) | SDK fallback via `executeCode`: `w.apps.deploy(<name>, AppDeployment(source_code_path=<workspace path>, mode=AppDeploymentMode.SNAPSHOT))` |
-| `npm run build` / `npm run dev` (local) | **skip** — the frontend build runs server-side in the container during deploy; assert on `databricks apps logs <name>` instead |
+| `npm run build` / `npm run dev` (local) | **skip** — the frontend build runs server-side in the container during deploy; the build error is **not readable from compute** (`databricks apps logs <name>` → OAuth error) — read it at `<app-url>/logz` in a browser instead |
 | `databricks bundle deploy` (targetless) | add `--target dev` (a targetless bundle deploy is guardrail-blocked on Genie Code) |
 
 Everything else (config validation, log streaming, the fix loop, error table) is identical across clients. Inline `> **Client note — Genie Code:**` callouts below flag the few steps where the behavior — not just the syntax — differs. See `skills/genie-code-environment` for the full behavioral manifest.
@@ -158,6 +158,8 @@ The platform's `npm install` depends on `package-lock.json` stability. Scenario 
 
 > **NEVER run `rm -f package-lock.json && npm install` locally before deploying.** The regenerated lockfile picks up your local npm proxy URLs, breaking platform install. If you must refresh, use `--package-lock-only`, or delete the lockfile and let the platform resolve.
 
+> **Client note — Genie Code:** the "Absent → acceptable for first deploy" row does **NOT** apply on the SDK SNAPSHOT path. With no `package-lock.json`, the deploy **hard-fails at the source-export phase in ~10s** (`RESOURCE_DOES_NOT_EXIST`), before `npm install` runs — so the lockfile is a **hard requirement**, not optional. Never delete it as a "reset"; change deps by editing `package.json` and keeping the lockfile consistent.
+
 Full recovery ladder + prevention rules: [references/lockfile-and-recreation.md](references/lockfile-and-recreation.md).
 
 ### App Deletion Is Destructive (Lakebase Ownership)
@@ -231,7 +233,7 @@ cd $APP_NAME && databricks apps validate --profile $PROFILE
 
 Fix any reported errors before proceeding.
 
-> **Client note — Genie Code:** `databricks apps validate` is **hard-blocked** via `runDatabricksCli` (not allow-listed). Skip this gate on Genie Code and rely on the **server-side build logs** after deploy (`databricks apps logs <name>`) as the authoritative schema/compile signal — the platform runs the same validation during the build pipeline.
+> **Client note — Genie Code:** `databricks apps validate` is **hard-blocked** via `runDatabricksCli` (not allow-listed). Skip this gate on Genie Code. The platform runs the same validation server-side during the build pipeline, but those build logs are **not readable from compute** — `databricks apps logs <name>` returns an OAuth-token error. Read the authoritative schema/compile signal at **`<app-url>/logz` in a browser** (where you are already authenticated) instead.
 
 **Cross-validate `valueFrom` references against `databricks.yml` resources.** Every `valueFrom:` in `app.yaml` must have a matching resource declaration in `databricks.yml`. If not, `databricks apps deploy` (which runs `bundle deploy` internally) will fail to resolve the resource and the env var will be empty at runtime.
 
@@ -282,7 +284,7 @@ npm run build
 
 This must complete without errors. A successful build produces the output referenced by `app.yaml`'s command (typically `build/index.mjs` or `dist/server.js`).
 
-> **Client note — Genie Code:** this local pre-build is an **IDE/CLI convenience**, not a hard gate — there is no local Node toolchain on Genie Code. **Skip Step 2 entirely** and deploy directly (Step 3); the platform runs the same `npm install` + `npm run build` **server-side** during the deploy pipeline. TypeScript/compile errors surface in `databricks apps logs <name>` after deploy — treat those logs as the authoritative build signal and feed them into the Step 5 fix loop. (Build-runs-server-side was verified end-to-end — see the Platform Build Pipeline note above.)
+> **Client note — Genie Code:** this local pre-build is an **IDE/CLI convenience**, not a hard gate — there is no local Node toolchain on Genie Code. **Skip Step 2 entirely** and deploy directly (Step 3); the platform runs the same `npm install` + `npm run build` **server-side** during the deploy pipeline. TypeScript/compile errors do **NOT** come back through `databricks apps logs <name>` (it returns an OAuth error from compute); they appear only at **`<app-url>/logz` in a browser** — read the exact `error TS…` line there and feed it into the Step 5 fix loop. Because there is no local `tsc`/`npm` to catch them first, run the import-specifier grep gate (see the `99-deploy_databricks_app.genie-code.md` fork, Step 2b) before deploying. (Build-runs-server-side was verified end-to-end — see the Platform Build Pipeline note above.)
 
 Verify the build output exists before deploying:
 
@@ -326,7 +328,7 @@ databricks apps deploy --profile $PROFILE
 
 This is equivalent to running `npm run build` + `databricks bundle deploy` + `databricks apps start` in sequence.
 
-> **Client note — Genie Code:** run `databricks apps deploy` (no `--profile`) through `runDatabricksCli` from the `$APP_NAME` directory. If the project page blocks `apps deploy`, use the SDK fallback via `executeCode` — `w.apps.deploy(<name>, AppDeployment(source_code_path=<workspace path>, mode=AppDeploymentMode.SNAPSHOT))` — which triggers the same server-side build (no pre-synced `dist/` needed). Then poll `w.apps.get(<name>)` / `databricks apps logs <name>` for the `Building app…` → `ACTIVE` transition.
+> **Client note — Genie Code:** run `databricks apps deploy` (no `--profile`) through `runDatabricksCli` from the `$APP_NAME` directory. If the project page blocks `apps deploy`, use the SDK fallback via `executeCode` — `w.apps.deploy(<name>, AppDeployment(source_code_path=<workspace path>, mode=AppDeploymentMode.SNAPSHOT))` — which triggers the same server-side build (no pre-synced `dist/` needed). Then poll `w.apps.get(<name>)` for the `Building app…` → `ACTIVE` transition; on `FAILED`, read the build error at `<app-url>/logz` in a browser (`databricks apps logs <name>` returns an OAuth error from compute).
 
 For faster iteration after the first deploy, skip the build step:
 
@@ -388,7 +390,7 @@ If `curl` returns HTML (a login page) or 401, the token has expired. Re-run the 
 
 > **Client note — Genie Code:** `databricks auth token` is **hard-blocked** via `runDatabricksCli`, and a raw `Authorization: Bearer` header (even from SDK `w.config.token`) is **rejected by AppKit's OAuth middleware** (`/api/health` → `401`; `/` → `302`). Two working ways to test a deployed app from Genie Code:
 >
-> 1. **Browser (simplest manual verify):** open the app URL (SDK `w.apps.get(<name>).url`) — the Databricks Apps OAuth flow establishes the session automatically. Use `databricks apps logs <name>` for backend assertions.
+> 1. **Browser (simplest manual verify):** open the app URL (SDK `w.apps.get(<name>).url`) — the Databricks Apps OAuth flow establishes the session automatically. Confirm the React UI actually renders (a green deploy with a client-side runtime crash still shows a blank/error page — the scaffold's `ErrorBoundary` surfaces the stack). For backend/build logs, open `<app-url>/logz` in the same browser; `databricks apps logs <name>` returns an OAuth error from Genie compute.
 > 2. **Programmatic (`executeCode`, for automated `/api/*` testing):** replay the 3-hop Apps OAuth handshake in **one `requests.Session()`** so the CSRF cookie persists (PKCE match), then reuse the session for all calls:
 >    ```python
 >    import requests
@@ -424,6 +426,8 @@ If errors exist:
 If no errors: deployment is successful.
 
 Repeat up to 3 times. If errors persist after 3 attempts, report them for manual investigation.
+
+> **Client note — Genie Code (fix loop):** Step 1 above (`databricks apps logs`) does **not** work — it returns an OAuth error from compute, and the SDK/REST `deployment.status.message` only says "check /logz". On `FAILED`, route to the **`/logz`-human loop**: print `<app-url>/logz`, have the operator open it (already authenticated) and paste back the exact `error TS…`/Vite line, fix that file:line, and redeploy. If no browser is available, use the **2–3-file batch ladder** (revert to the last `SUCCEEDED` source, re-apply changes 2–3 files at a time, redeploy after each ~50s batch; the batch that flips green→`FAILED` holds the break). See the `99-deploy_databricks_app.genie-code.md` fork Steps 2b/3 for the full procedure.
 
 > **Before diagnosing errors:** Run `npx @databricks/appkit docs "app-management"` and `databricks apps deploy --help` for the latest CLI options and deployment behavior. These are the source of truth for deploy commands.
 

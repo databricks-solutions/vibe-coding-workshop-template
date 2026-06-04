@@ -20,6 +20,8 @@
 8. **Never use `require()`.** Use ESM `import`/`export` only. `package.json` must have `"type": "module"`.
 9. **Never import Express directly.** Express is bundled inside `@databricks/appkit`. Access it only via `server.extend((app) => { ... })`. Importing Express directly may work locally due to `node_modules` hoisting but fails in production builds where only declared dependencies are bundled.
 10. **Chart `data` props require index signatures.** If passing a named TypeScript interface to chart component `data` props, the interface must include `[key: string]: unknown` because `ChartData` expects `Record<string, unknown>[]`.
+11. **Import appkit-ui components from `@databricks/appkit-ui/react`.** Always `import { … } from "@databricks/appkit-ui/react"` — **never** the bare `@databricks/appkit-ui`, which has no React export and fails to resolve at build time.
+12. **Import the appkit-ui stylesheet as `@databricks/appkit-ui/styles.css`.** In `client/src/index.css` use `@import "@databricks/appkit-ui/styles.css";` — **never** the extension-less `@import "@databricks/appkit-ui/styles";` (only the `.css` path is exported; the extension-less form is unresolvable). Both are exactly what the scaffold ships — preserve them rather than hand-authoring `App.tsx`/`index.css` from memory.
 
 ---
 
@@ -76,6 +78,9 @@ Failure to do this causes build errors in strict TypeScript setups.
 - [ ] Loading/error/empty states are explicit on every data component
 - [ ] Charts use props, NOT Recharts children
 - [ ] `import type` used for type-only imports
+- [ ] appkit-ui components imported from `@databricks/appkit-ui/react` (never bare `@databricks/appkit-ui`)
+- [ ] `client/src/index.css` uses `@import "@databricks/appkit-ui/styles.css";` (never extension-less `…/styles`)
+- [ ] Scaffold `App.tsx` / `index.css` edited incrementally (not regenerated); `ErrorBoundary.tsx` kept
 
 ### Never Do
 - [ ] Don't build SQL strings manually
