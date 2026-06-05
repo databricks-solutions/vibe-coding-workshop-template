@@ -146,147 +146,160 @@ _UUID4_HEX_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
 def validate_genie_json_structure(space: dict) -> list[str]:
-    """Pre-flight validation of Genie Space JSON structure. Returns list of errors.
+    """Non-fatal pre-flight reporter — SUPERSEDED by `_assert_sql_arrays`.
 
-    NOTE: This validator walks a flat-schema shape (top-level `tables`,
-    `materialized_views`, `sql_functions`, `example_question_sqls`). Real
-    exported configs use the nested schema documented in SKILL.md §4
-    (ID Generation) and §7 (Field Validation Rules) — see
-    `data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/SKILL.md`.
-    For nested-schema inputs, the loops below are effectively no-ops and
-    the authoritative rules in those SKILL.md sections supersede the
-    assertions here. A test-backed update to this validator is tracked
-    separately; do not treat a clean result here as full coverage.
+    The canonical v3.7.0 validator (`_assert_sql_arrays` below) is the
+    authoritative, fail-loud check (run inside `deploy_space` before every
+    POST/PATCH). This wrapper runs the SAME nested-schema checks non-fatally so
+    the deploy summary can list structural issues up front. The previous body
+    walked a deprecated flat schema (top-level `tables`/`materialized_views`,
+    `id` on data sources) that contradicts the live API; it is removed.
+    Schema reference:
+    data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/SKILL.md
     """
-    errors = []
-
-    def _check_id(path: str, value):
-        if not isinstance(value, str) or not _UUID4_HEX_PATTERN.match(value):
-            errors.append(f"{path}: ID must be 32-char hex (uuid4.hex), got: {value!r}")
-
-    if "id" in space:
-        _check_id("space.id", space["id"])
-
-    for arr_name, id_field in [
-        ("tables", "id"),
-        ("sql_functions", "id"),
-        ("materialized_views", "id"),
-        ("example_question_sqls", "id"),
-    ]:
-        for i, item in enumerate(space.get(arr_name, [])):
-            if id_field in item:
-                _check_id(f"{arr_name}[{i}].{id_field}", item[id_field])
-
-    string_array_fields = [
-        ("example_question_sqls", "question"),
-        ("tables", "description"),
-        ("materialized_views", "description"),
-        ("sql_functions", "description"),
-    ]
-    for arr_name, field in string_array_fields:
-        for i, item in enumerate(space.get(arr_name, [])):
-            val = item.get(field)
-            if val is not None and not isinstance(val, list):
-                errors.append(
-                    f"{arr_name}[{i}].{field}: must be array, got {type(val).__name__}"
-                )
-
-    for i, q in enumerate(space.get("example_question_sqls", [])):
-        for j, ans in enumerate(q.get("answer", [])):
-            content = ans.get("content")
-            if content is not None and not isinstance(content, list):
-                errors.append(
-                    f"example_question_sqls[{i}].answer[{j}].content: must be array"
-                )
-
-    if "expected_sql" in space:
-        errors.append(
-            "Top-level 'expected_sql' field is invalid. "
-            "Use answer: [{format: 'SQL', content: ['SELECT ...']}] in benchmarks."
-        )
-
-    return errors
+    try:
+        _assert_sql_arrays(sort_all_arrays(space))
+    except RuntimeError as exc:
+        return [str(exc)]
+    return []
 
 
 def _assert_sql_arrays(space: dict) -> None:
     """
-    Enforce serialized_space invariants BEFORE POST/PATCH.
+    Validate serialized_space invariants before POST / PATCH (canonical v3.7.0).
 
-    This is the authoritative fail-loud validator — it checks the #1 silent
-    failure (sql field submitted as a bare string instead of List[str]) plus
-    deploy-time invariants (version=2, concrete warehouse id, sorted data
-    sources, uuid4.hex ids, 50-entry limits). See the invariants table in
+    Authoritative fail-loud validator. Raises RuntimeError on the first batch of
+    violations — never logs-and-continues. Reconciled with the live
+    getspace/createspace/updatespace API and the invariants table in
     `data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/SKILL.md`.
 
-    Raises RuntimeError on the first violation. Never logs-and-continues.
+    Enforces:
+      - data_sources.tables / metric_views entries use `identifier` only (NO `id`;
+        the API rejects `id` with `Cannot find field: id`).
+      - instructions.sql_functions entries: {id, identifier} only.
+      - instructions.example_question_sqls entries: {id, question: List[str], sql: List[str]}.
+      - benchmarks.questions[].answer[].content must be List[str] (SQL lives there,
+        not as a top-level `sql` field).
     """
     errors: list = []
 
+    def _is_uuid_hex(value) -> bool:
+        return isinstance(value, str) and bool(_UUID4_HEX_PATTERN.match(value))
+
     if space.get("version") != 2:
-        errors.append(f"version must be exactly 2 (got {space.get('version')!r})")
+        errors.append("serialized_space.version must be exactly 2 (got %r)" % space.get("version"))
 
     cfg = space.get("config") or {}
     if not isinstance(cfg.get("title"), str) or not cfg.get("title"):
         errors.append("config.title must be a non-empty string")
     if not isinstance(cfg.get("description"), str) or not cfg.get("description"):
         errors.append("config.description must be a non-empty string")
+
     wh = cfg.get("semantic_warehouse_id")
     if not isinstance(wh, str) or not re.match(r"^[0-9a-f]{16,}$", wh or ""):
         errors.append(
-            "config.semantic_warehouse_id must be a concrete deploy-time warehouse id; "
-            f"got {wh!r}. Template placeholders are never acceptable."
+            "config.semantic_warehouse_id must be a concrete warehouse id baked at deploy time; "
+            f"got {wh!r}. Template placeholders like '${{warehouse_id}}' are never acceptable."
         )
 
+    # Data sources — sorted by `identifier`, NEVER include `id` on these entries.
     ds = space.get("data_sources") or {}
-    for key, name_field in [("tables", "table_full_name"), ("metric_views", "metric_view_full_name")]:
+    for key in ("tables", "metric_views"):
         items = ds.get(key) or []
         if not isinstance(items, list):
             errors.append(f"data_sources.{key} must be a list")
             continue
-        names = [it.get(name_field, "") for it in items]
-        if names != sorted(names):
-            errors.append(f"data_sources.{key} must be sorted by {name_field}")
+        idents = [it.get("identifier", "") for it in items]
+        if idents != sorted(idents):
+            errors.append(f"data_sources.{key} must be sorted by identifier (got {idents})")
         for it in items:
-            _id = it.get("id", "")
-            if not (isinstance(_id, str) and _UUID4_HEX_PATTERN.match(_id)):
-                errors.append(f"data_sources.{key} entry id must be uuid4.hex: {it}")
-
-    def _check_sql_list(path: str, entries):
-        if entries is None:
-            return
-        if not isinstance(entries, list):
-            errors.append(f"{path} must be a list (got {type(entries).__name__})")
-            return
-        for idx, it in enumerate(entries):
-            if not isinstance(it, dict):
-                errors.append(f"{path}[{idx}] must be an object")
-                continue
-            _id = it.get("id", "")
-            if not (isinstance(_id, str) and _UUID4_HEX_PATTERN.match(_id)):
-                errors.append(f"{path}[{idx}].id must be uuid4.hex (32 hex chars)")
-            sql_field = it.get("sql")
-            if sql_field is None:
-                continue
-            if not isinstance(sql_field, list):
+            if "id" in it:
                 errors.append(
-                    f"{path}[{idx}].sql must be List[str] — got {type(sql_field).__name__}. "
-                    "This is the #1 silent-failure: the API accepts a bare string but the "
-                    'resulting space has broken example queries. Wrap SQL in ["..."].'
+                    f"data_sources.{key} entry MUST NOT include `id` — the API rejects with "
+                    f"`Cannot find field: id`. Use only `identifier` and optional `description`. Got: {it}"
                 )
-                continue
-            for sidx, s in enumerate(sql_field):
-                if not isinstance(s, str) or not s.strip():
-                    errors.append(f"{path}[{idx}].sql[{sidx}] must be a non-empty string")
+            ident = it.get("identifier")
+            if not isinstance(ident, str) or ident.count(".") != 2:
+                errors.append(
+                    f"data_sources.{key} entry `identifier` must be 'catalog.schema.name': {it}"
+                )
 
     instr = space.get("instructions") or {}
-    _check_sql_list("instructions.sql_functions", instr.get("sql_functions"))
-    _check_sql_list("instructions.sample_queries", instr.get("sample_queries"))
-    _check_sql_list("benchmarks.questions", (space.get("benchmarks") or {}).get("questions"))
 
-    if len(instr.get("sql_functions") or []) > 50:
-        errors.append("instructions.sql_functions exceeds 50-entry limit")
-    if len((space.get("benchmarks") or {}).get("questions") or []) > 50:
-        errors.append("benchmarks.questions exceeds 50-entry limit")
+    # instructions.sql_functions — {id, identifier} only.
+    sqlfns = instr.get("sql_functions") or []
+    if not isinstance(sqlfns, list):
+        errors.append("instructions.sql_functions must be a list")
+    else:
+        for idx, it in enumerate(sqlfns):
+            if not isinstance(it, dict):
+                errors.append(f"instructions.sql_functions[{idx}] must be an object")
+                continue
+            if not _is_uuid_hex(it.get("id")):
+                errors.append(f"instructions.sql_functions[{idx}].id must be uuid4.hex (32 hex chars)")
+            ident = it.get("identifier")
+            if not isinstance(ident, str) or ident.count(".") != 2:
+                errors.append(
+                    f"instructions.sql_functions[{idx}].identifier must be 'catalog.schema.fn_name'"
+                )
+
+    # instructions.example_question_sqls — {id, question: List[str], sql: List[str]}.
+    eqs = instr.get("example_question_sqls") or []
+    if not isinstance(eqs, list):
+        errors.append("instructions.example_question_sqls must be a list")
+    else:
+        for idx, it in enumerate(eqs):
+            if not isinstance(it, dict):
+                errors.append(f"instructions.example_question_sqls[{idx}] must be an object")
+                continue
+            if not _is_uuid_hex(it.get("id")):
+                errors.append(f"instructions.example_question_sqls[{idx}].id must be uuid4.hex")
+            for arr_field in ("question", "sql"):
+                arr = it.get(arr_field)
+                if not isinstance(arr, list) or not all(isinstance(s, str) and s.strip() for s in arr):
+                    errors.append(
+                        f"instructions.example_question_sqls[{idx}].{arr_field} must be a non-empty "
+                        f"List[str] — single strings cause silent breakage. Wrap as [\"...\"]."
+                    )
+
+    # benchmarks.questions — SQL lives inside answer[].content, NOT a top-level sql field.
+    bench = (space.get("benchmarks") or {}).get("questions") or []
+    if not isinstance(bench, list):
+        errors.append("benchmarks.questions must be a list")
+    else:
+        for idx, it in enumerate(bench):
+            if not isinstance(it, dict):
+                errors.append(f"benchmarks.questions[{idx}] must be an object")
+                continue
+            if not _is_uuid_hex(it.get("id")):
+                errors.append(f"benchmarks.questions[{idx}].id must be uuid4.hex")
+            q = it.get("question")
+            if not isinstance(q, list) or not all(isinstance(s, str) and s.strip() for s in q):
+                errors.append(f"benchmarks.questions[{idx}].question must be List[str]")
+            answers = it.get("answer") or []
+            if not isinstance(answers, list):
+                errors.append(f"benchmarks.questions[{idx}].answer must be a list")
+                continue
+            for aidx, ans in enumerate(answers):
+                if not isinstance(ans, dict):
+                    errors.append(f"benchmarks.questions[{idx}].answer[{aidx}] must be an object")
+                    continue
+                if ans.get("format") not in ("SQL", "INSTRUCTIONS"):
+                    errors.append(
+                        f"benchmarks.questions[{idx}].answer[{aidx}].format must be 'SQL' or 'INSTRUCTIONS'"
+                    )
+                content = ans.get("content")
+                if not isinstance(content, list) or not all(isinstance(s, str) and s.strip() for s in content):
+                    errors.append(
+                        f"benchmarks.questions[{idx}].answer[{aidx}].content must be List[str] — "
+                        f"this is the #1 silent-failure mode for benchmark answers."
+                    )
+
+    # Limits
+    if len(sqlfns) > 50:
+        errors.append("instructions.sql_functions exceeds 50-entry limit — truncate before POST")
+    if len(bench) > 50:
+        errors.append("benchmarks.questions exceeds 50-entry limit — truncate before POST")
 
     gi = instr.get("general_instructions")
     if gi is not None:
@@ -484,7 +497,7 @@ for r in results:
     stem = Path(r["config_file"]).stem
     var_name = f"genie_space_id_{stem}"
     print(f"  {var_name}:")
-    print(f"    description: 'Persisted Genie Space id for {r[\"title\"]!s} (do NOT edit)'")
+    print(f"    description: 'Persisted Genie Space id for {r['title']!s} (do NOT edit)'")
     print(f"    default: '{sid}'")
 print()
 print("After pasting, re-run `databricks bundle deploy -t <target>` so the workspace")

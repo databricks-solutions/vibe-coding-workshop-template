@@ -19,8 +19,8 @@ Databricks Apps agents **require OAuth tokens**. Personal Access Tokens (PATs)
 are **not supported** for querying agents on Apps.
 
 ```bash
-# Generate an OAuth token via Databricks CLI
-databricks auth login --host https://your-workspace.cloud.databricks.com
+# Fetch an OAuth token. IDE/CLI: authenticate first per PRE-REQUISITES §11.
+# Genie Code: pre-authenticated — run via runDatabricksCli (no login step).
 databricks auth token
 ```
 

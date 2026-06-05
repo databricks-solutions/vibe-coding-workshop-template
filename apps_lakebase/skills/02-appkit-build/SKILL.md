@@ -12,13 +12,26 @@ description: >
   "static data", "two-phase data".
 license: Apache-2.0
 compatibility: Requires an existing AppKit project scaffolded via 01-appkit-scaffold skill, Node.js v22+, Databricks CLI >= 0.295.0
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  Building features is **source editing** (`.sql` queries, `server/server.ts`, `client/src/**`) — fully
+  client-agnostic; the same files are written on both clients. Deploy is delegated to `03-appkit-deploy`.
+  The local toolchain steps are an **IDE convenience**: `npm run typegen`, `npm run dev`, `npx tsc --noEmit`,
+  `npm run build`, and the `http://localhost:8000` checks have **no Genie Code equivalent** (no local Node) —
+  on Genie Code typegen/tsc/build run **server-side on deploy**; write UI against the SQL schema + the
+  appkit-ui docs and verify on the deployed app. `npx @databricks/appkit docs` is IDE-only (WebFetch on
+  Genie Code). `databricks apps validate` is skipped on Genie Code (hard-blocked) — rely on `bundle validate`
+  + server-side build logs.
+coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.1.0"
   domain: apps
   role: build
   standalone: false
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources: []  # Project-specific PRD-to-UI workflow; see See Also for canonical upstream.
 ---
@@ -40,6 +53,21 @@ Implement full-stack UI and backend features on an already-scaffolded AppKit pro
 ---
 
 ## Before You Begin
+
+### Working in Genie Code (client routing)
+
+This skill is **source editing** — designing SQL queries, writing `server/server.ts`, and building React under `client/src/`. All of that is **identical on both clients**; only the local-toolchain gates differ:
+
+| IDE/CLI (as written) | Genie Code substitution |
+|----------------------|--------------------------|
+| `npm run typegen` (generates `client/src/appKitTypes.d.ts`) | no local Node — typegen runs **server-side on deploy**. Write UI against the `.sql` `-- @param` annotations + the appkit-ui docs; the generated types land at deploy/build time |
+| `npm run dev` / `http://localhost:8000` checks (Step 6) | no local dev server — verify UI/queries on the **deployed** app (browser, or the OAuth-session test in `03-appkit-deploy`) |
+| `npx tsc --noEmit` (Step 4b) / `npm run build` | no local typecheck — `npm`/`npx`/`tsc` cannot resolve `@databricks/appkit-ui` without `node_modules`. The platform builds **server-side** on deploy, but TS errors do **NOT** come back through `databricks apps logs <name>` (OAuth error from compute) — they appear only at `<app-url>/logz` in a browser. The one viable static pre-flight is the **import-specifier regex gate** in the `99-deploy_databricks_app.genie-code.md` fork (Step 2b) — run it before deploy |
+| `npx @databricks/appkit docs …` | npx absent (P9) — WebFetch https://databricks.github.io/appkit/ |
+| `ls node_modules/@databricks/appkit-ui/…` | no local `node_modules` — consult the appkit-ui docs (WebFetch) instead |
+| `databricks apps validate --profile $PROFILE` (checklist) | hard-blocked on Genie Code — skip; rely on `bundle validate` (`runDatabricksCli`, omit `--profile`) + server-side build logs per `03-appkit-deploy` / `07-appkit-chat-history` Step 9 |
+
+Edit files **in your repo clone** — paths are relative to the top-level app dir `$APP_ROOT` (= `<artifact_root>/<app_name>`; on Genie Code, under `/Workspace/Users/<your-email>/.assistant/skills/vibe-coding-workshop/<app_name>`), never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 **Optional upstream checks** (skip if latency-constrained or the `last_verified` date above is < 30 days old):
 
@@ -248,7 +276,13 @@ All static demo data must be replaced with query-driven data before declaring th
 - **Never invent APIs** — only use documented exports from `@databricks/appkit` and `@databricks/appkit-ui`
 - **Never build SQL strings dynamically** — use parameterized queries
 - **`createApp()` is async** — always `await` it
-- **Wrap root with `<TooltipProvider>`** — many AppKit components use tooltips internally; add this to `App.tsx` by default
+- **Wrap root with `<TooltipProvider>`** — many AppKit components use tooltips internally; add this to `App.tsx` by default (imported from `@databricks/appkit-ui/react`, per the specifier rule below)
+- **AppKit import specifiers are exact:**
+  - Components/hooks: `import { … } from "@databricks/appkit-ui/react"` — **never** the bare `@databricks/appkit-ui` (the bare path has no React export and the build cannot resolve it).
+  - Global stylesheet: `@import "@databricks/appkit-ui/styles.css";` in `client/src/index.css` — **never** the extension-less `@import "@databricks/appkit-ui/styles";` (the package only exports the `.css` path; the extension-less form is unresolvable). These two are the exact paths the scaffold ships.
+- **Preserve the scaffold — do NOT regenerate from memory.** Edit `client/src/App.tsx` and `client/src/index.css` **incrementally**; never overwrite them with hand-authored versions. Regenerating these from memory is how the wrong (shorter) import specifiers get reintroduced. Likewise, **keep the scaffold's `client/src/ErrorBoundary.tsx`** — it is the only thing that surfaces a client-side runtime crash in the browser (a crash that otherwise deploys "green").
+- **Images: external CDN primary, deterministic `onError` fallback (mandatory).** A generated mock has no realistic photo library to bundle, so external CDN hotlinks (Unsplash / Pexels) are the practical default `src` for realistic, use-case-varied imagery. But those requests are made by the **user's browser** and are routinely blocked by corporate/network egress — and the block is invisible at build time. So **every `<img>` must carry a runtime `onError` handler** that swaps `src` to an **inline data-URI SVG** placeholder (zero-network, embedded bytes — nothing to fetch or block), so a blocked CDN degrades to a clean placeholder instead of a blank/broken image: `<img src={cdnUrl} onError={(e) => { e.currentTarget.src = DATA_URI_SVG_PLACEHOLDER; }} alt="…" />`. When you actually have real images to ship, bundle them with the app (`client/public/…` or a Vite `import`) — served same-origin behind the OAuth gate, they render anywhere with no egress.
+- **No decorative controls that silently no-op.** Every visible interactive control (filter, tab, date/guest picker, search box) must either function against the mock data OR be visibly marked as a later-phase placeholder (disabled, or a "coming soon" affordance). A control that looks live but does nothing reads as a broken app.
 
 ### UI Components
 
@@ -372,7 +406,7 @@ Common runtime surprises that cause bugs or confusion:
 | `getByText`/`getByRole` matches multiple elements (Playwright strict mode) | Use `data-testid` selectors; add `data-testid` attributes to key elements during page creation |
 | Escaped quotes in JSX attributes (`placeholder='I\'m...'`) crash Vite/rolldown parser | Use double-quoted attributes or JSX expressions: `placeholder={"I'm..."}` |
 | AppKit AST-grep linter blocks `as any` and `as unknown as T` | Avoid type assertions; use proper type imports or leave parameters untyped for inference. `databricks apps validate` runs these rules but `npm run build` does not |
-| Select "all/any" option sets a truthy string that passes boolean checks | Use `value=""` for "all/any" options. `if (filterValue)` correctly skips empty string but passes `"any"` as a literal match. |
+| Radix `<Select.Item>`/`<SelectItem>` throws at runtime if `value` is an empty string | **Never** use `value=""` for an "all/any" option (it crashes the component when the menu opens). Use a non-empty sentinel and filter explicitly: `<SelectItem value="all">` + `if (filter !== "all") { … }`. |
 | `<Card onClick={...}>` without keyboard handlers | Wrap navigable cards in `<Link>` or add `role="link"`, `tabIndex={0}`, `onKeyDown`. Required for WCAG 2.1 AA. |
 
 ---

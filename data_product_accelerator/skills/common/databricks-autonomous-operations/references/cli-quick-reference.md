@@ -2,6 +2,14 @@
 
 Side-by-side reference for common operations using CLI and Python SDK.
 
+> **⚠️ Scope of the SDK column.** The SDK equivalents below are for **reading, triggering, and polling
+> already-deployed resources** (status, events, outputs, run-now, cancel). They are **NOT** a creation channel
+> and **NOT** a substitute for a blocked `bundle deploy`/`run`. Note the deliberate `N/A`s: `bundle deploy`,
+> `bundle destroy`, and resource *creation* have no SDK row — by design (authoring discipline / RULE_10). If a
+> `bundle deploy`/`run` is **blocked** on Genie Code, the fix is to open the **bundle editor** on
+> `dp_bundle_root` and retry — never `w.jobs.create()` / `POST /api/2.1/jobs/create` / `CREATE TABLE`. See the
+> SKILL §2 carve-out and `genie-code-environment` §3/§8.
+
 | Scenario | CLI | SDK |
 |----------|-----|-----|
 | Check job status | `databricks jobs get-run <ID> --output json \| jq '.state'` | `w.jobs.get_run(run_id=ID).state` |

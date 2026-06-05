@@ -2,6 +2,11 @@
 name: 02-merge-patterns
 description: Provides production-grade patterns for Gold layer MERGE operations from Silver to Gold tables. Covers column mapping, schema evolution, SCD Type 1/2 patterns, fact table aggregation, and preventing variable naming conflicts with PySpark functions. Use when creating Gold layer MERGE operations, handling column name differences between Silver and Gold, implementing SCD Type 1/2 dimensions, aggregating fact tables, or troubleshooting MERGE errors. Triggers on "Gold merge", "MERGE operation", "upsert Gold", "SCD Type 1", "SCD Type 2", "fact table merge", "Silver to Gold", "column mapping", "schema evolution".
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Pattern consumed by the Gold merge jobs (notebook_task); deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code). MERGE src view must .select() every Gold column with lit(None) placeholders for YAML-only columns."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

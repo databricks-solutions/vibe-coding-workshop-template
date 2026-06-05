@@ -4,6 +4,8 @@ Use this reference when wiring an AppKit Databricks App (frontend) to a separate
 
 **When to read this:** Reading [../SKILL.md](../SKILL.md) and reached Step 2 (proxy handler). Stop and read this file first.
 
+> **Client routing:** the OBO-forwarding proxy code here is **server-side and client-agnostic** — it runs identically whether the app was deployed from an IDE or Genie Code. No command substitutions apply to the code itself; only the surrounding deploy/verify toolchain differs (see [`../SKILL.md`](../SKILL.md) routing table).
+
 **Do NOT use this pattern for:**
 
 - **Model Serving / Agent Serving endpoints** — use the AppKit `serving()` plugin's `.asUser(req)` helper. See [apps_lakebase/skills/06-appkit-serving-wiring/SKILL.md](../../06-appkit-serving-wiring/SKILL.md).

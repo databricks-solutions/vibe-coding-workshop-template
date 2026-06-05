@@ -29,6 +29,10 @@ variables:
     # Alternative: hardcode ID (less portable)
     # default: "<warehouse_id>"
 
+  user_prefix:
+    description: Per-user identifier for shared workspaces (keeps every participant's artifacts isolated)
+    default: ${workspace.current_user.short_name}
+
 targets:
   dev:
     mode: development
@@ -111,3 +115,15 @@ include:
 #       tags:
 #         environment: ${bundle.target}
 #         layer: <layer>
+#
+# Example: Genie Space Resource (RULE_8 Tier 1 — PREFERRED)
+# enable when `bundle validate` accepts genie_spaces (DABs support landing ~this month; re-run the GO/NO-GO)
+# Until then use Tier 2 (provisioning job) — see SKILL.md "Genie Spaces — three deploy tiers (RULE_8)".
+#
+# resources:
+#   genie_spaces:
+#     <space_key>:
+#       title: "[${var.user_prefix}] <Space Display Name>"   # title carries the per-user prefix
+#       warehouse_id: ${var.warehouse_id}                     # MUST be a Serverless SQL Warehouse
+#       table_identifiers:
+#         - ${var.catalog}.${var.gold_schema}.<table>         # fully-qualified under the prefixed schema

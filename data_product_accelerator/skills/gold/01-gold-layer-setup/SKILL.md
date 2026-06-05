@@ -2,6 +2,11 @@
 name: gold-layer-setup
 description: End-to-end orchestrator for implementing Gold layer tables, merge scripts, FK constraints, and Asset Bundle jobs from YAML schema definitions. Guides users through Silver contract validation, YAML-driven table creation, Silver-to-Gold MERGE operations (SCD Type 1/2 dimensions, aggregated/transaction facts, accumulating snapshots, factless facts, periodic snapshots, junk dimensions), foreign key constraint application, Asset Bundle job configuration, and post-deployment validation. Orchestrates pipeline-workers (01-yaml-table-setup, 02-merge-patterns, 03-deduplication, 04-grain-validation, 05-schema-validation) and common skills (databricks-asset-bundles, databricks-table-properties, databricks-python-imports, schema-management-patterns, unity-catalog-constraints, databricks-expert-agent). Use when implementing Gold layer from YAML designs, creating table setup scripts, writing merge scripts, deploying Gold layer jobs, or troubleshooting Gold layer implementation errors.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Gold tables + Silver-to-Gold MERGE jobs + FK constraints deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code). Strip DEFAULT clauses from DDL (SCD2 cols set in INSERT/MERGE); printSchema() before MERGE. On Genie Code, write generated table/merge scripts under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`, e.g. `src/`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0.0"
@@ -142,6 +147,8 @@ See [Merge Script Patterns](references/merge-script-patterns.md) for the complet
 - [ ] YAML files synced in `databricks.yml`
 
 ### Deployment Commands (run when ready — NOT auto-executed by this skill)
+
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page; generated files anchor to `{REPO_ROOT}`). See `skills/genie-code-environment`.
 
 ```bash
 # 1. Deploy setup job (creates tables from YAML)
@@ -356,7 +363,7 @@ See `scripts/merge_gold_tables_template.py` for starter template.
 
 **MANDATORY: Read this skill using the Read tool BEFORE creating job YAML files:**
 
-1. `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` — Job YAML patterns, serverless config, `notebook_task` vs `python_task`, `base_parameters`, sync
+1. `skills/databricks-asset-bundles/SKILL.md` — Job YAML patterns, serverless config, `notebook_task` vs `python_task`, `base_parameters`, sync
 
 **Activities:**
 1. Add YAML sync to `databricks.yml` — `gold_layer_design/yaml/**/*.yaml`

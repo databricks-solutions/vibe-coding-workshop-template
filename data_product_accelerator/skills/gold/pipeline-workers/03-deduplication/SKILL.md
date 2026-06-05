@@ -1,6 +1,11 @@
 ---
 name: 03-deduplication
 description: Delta MERGE deduplication pattern for Gold layer to prevent duplicate source key errors. Use when merging from Silver to Gold tables where Silver may contain duplicate business keys due to incremental DLT streaming, CDC patterns, SCD Type 2 tracking, or multiple batch loads. Prevents DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE errors by deduplicating before merge.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Pattern consumed by the Gold merge jobs (notebook_task); deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0"

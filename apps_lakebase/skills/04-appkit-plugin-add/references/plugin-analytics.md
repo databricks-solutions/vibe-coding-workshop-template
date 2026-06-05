@@ -4,6 +4,8 @@
 Also consult the live AppKit docs: `npx @databricks/appkit docs "analytics"`
 The information below may be outdated. Prefer upstream when available.
 
+> **Client routing:** commands below are for the **IDE/CLI** path. On **Genie Code**: add packages to `package.json` instead of `npm install` (platform installs server-side on deploy); run `databricks …` via `runDatabricksCli` and **omit `--profile`**; `npx … docs` → WebFetch the docs site. See the routing table in [`../SKILL.md`](../SKILL.md) and `skills/genie-code-environment`.
+
 SQL query execution against Databricks SQL Warehouses with file-based queries, automatic type generation, and built-in caching.
 
 **Capabilities:** File-based SQL queries, parameterized queries with type-safe helpers, JSON and Arrow format support, caching, retry logic, SSE streaming.
@@ -27,7 +29,8 @@ await createApp({
 You need a SQL Warehouse ID. Discover it with:
 
 ```bash
-databricks experimental aitools tools get-default-warehouse --profile <PROFILE>
+databricks aitools tools get-default-warehouse --profile <PROFILE>
+# fallback if aitools is unavailable: databricks warehouses list --output json | jq -r '.[0].id'
 ```
 
 Add to `.env`:

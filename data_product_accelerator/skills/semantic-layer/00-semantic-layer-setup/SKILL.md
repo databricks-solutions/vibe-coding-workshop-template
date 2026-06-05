@@ -11,6 +11,11 @@ description: >
   Use when building the semantic layer end-to-end, creating Metric Views and TVFs for Genie,
   or setting up Genie Spaces. For Genie optimization, use genie-optimization-orchestrator directly.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Combined semantic_layer_job (Metric Views -> TVFs -> Genie) deployed via `bundle deploy --target dev` from the bundle-folder page; Genie Spaces follow the RULE_8 tier model (see 04-genie-space-export-import-api). On Genie Code the deploy verb runs through runDatabricksCli. Write generated metric-view YAML / TVF SQL under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"
@@ -109,9 +114,9 @@ The previous "stop before deployment for any non-Gold workshop draft" guardrail 
 
 | Phase | MUST Read Skill (use Read tool on SKILL.md) | What It Provides |
 |-------|---------------------------------------------|------------------|
-| All phases | `common/databricks-expert-agent` | Core extraction principle: extract names from source, never hardcode |
+| All phases | `skills/databricks-expert-agent` | Core extraction principle: extract names from source, never hardcode |
 | Metric Views | `common/databricks-python-imports` | Pure Python module patterns for helpers |
-| Deployment | `common/databricks-asset-bundles` | Job YAML, deployment patterns |
+| Deployment | `skills/databricks-asset-bundles` | Job YAML, deployment patterns |
 | All phases | `common/naming-tagging-standards` | Dual-purpose COMMENTs, v3.0 TVF comments, enterprise naming |
 | Troubleshooting | `common/databricks-autonomous-operations` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs fail |
 
@@ -163,7 +168,7 @@ This orchestrator spans 7 phases (0–6). To maintain coherence without context 
 - **Phase 1:** Read `01-metric-views-patterns/SKILL.md` → work → persist notes → **discard skill from working memory**
 - **Phase 2:** Read `02-databricks-table-valued-functions/SKILL.md` → work → persist notes → **discard**
 - **Phase 3:** Read `03-genie-space-patterns/SKILL.md` + `04-genie-space-export-import-api/SKILL.md` → work → persist notes → **discard**
-- **Phase 4-6:** Read `common/databricks-asset-bundles/SKILL.md` → work → done
+- **Phase 4-6:** Read `skills/databricks-asset-bundles/SKILL.md` → work → done
 
 Each worker skill ends with a "**Notes to Carry Forward**" section that tells you exactly what to persist for downstream phases. Use those notes — not the full skill content — as your handoff.
 
@@ -468,7 +473,7 @@ print("✅ Phase 0.5 pre-flight passed — safe to proceed to Phase 1.")
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Extract-don't-generate principle |
+| 1 | `skills/databricks-expert-agent/SKILL.md` | Extract-don't-generate principle |
 | 2 | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | CM-02 dual-purpose COMMENT format for Metric Views |
 | 3 | `data_product_accelerator/skills/common/databricks-python-imports/SKILL.md` | sys.path setup for creation script in Asset Bundle |
 | 4 | `data_product_accelerator/skills/semantic-layer/01-metric-views-patterns/SKILL.md` | YAML syntax, validation, joins, composability, format types |
@@ -480,7 +485,7 @@ print("✅ Phase 0.5 pre-flight passed — safe to proceed to Phase 1.")
 2. For each entry, use the manifest's `source_table`, `dimensions`, and `measures` — cross-reference every column against `gold_inventory` (Phase 0)
 3. **Validation gate:** For each YAML, apply ALL three validations:
    - **Column existence:** Verify every `dimensions[].column` and `measures[].column` exists in `gold_inventory[source_table]["columns"]`. Fail with explicit error listing unresolved references.
-   - **Transitive join detection:** Inspect all join `on` clauses. If ANY join's `on` references a join alias instead of `source`, flag as transitive join error. Fix: restructure as nested joins (snowflake schema, DBR 17.1+) or use denormalized columns.
+   - **Transitive join detection:** Inspect all join `on` clauses. If ANY join's `on` references a join alias instead of `source`, flag as transitive join error. Fix (preferred on the workshop runtime, DBR 17.1+ with 1:1 keys): restructure as **nested joins** (snowflake schema); or use denormalized columns (Fix 1). Use the subquery-source pattern only as the fallback for DBR < 17.1 or non-unique intermediate keys (see `01-metric-views-patterns` decision ladder).
    - **Format type validation:** Verify all measure `format.type` values are one of: `byte`, `currency`, `date`, `date_time`, `number`, `percentage`. Common mistakes: `percent` (use `percentage`), `decimal` (use `number`).
 4. Create `create_metric_views.py` with sys.path setup from `databricks-python-imports`
 5. Test each Metric View with sample queries
@@ -502,7 +507,7 @@ Bulk creation without checkpoints causes cascading failures. A 2-minute pause ca
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Extract TVF names/columns from `gold_inventory` |
+| 1 | `skills/databricks-expert-agent/SKILL.md` | Extract TVF names/columns from `gold_inventory` |
 | 2 | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | CM-04 v3.0 structured TVF COMMENTs |
 | 3 | `data_product_accelerator/skills/semantic-layer/02-databricks-table-valued-functions/SKILL.md` | STRING params, null safety, Genie compat, notebook_task deployment |
 
@@ -533,7 +538,7 @@ Bulk creation without checkpoints causes cascading failures. A 2-minute pause ca
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Extract asset references from `gold_inventory` |
+| 1 | `skills/databricks-expert-agent/SKILL.md` | Extract asset references from `gold_inventory` |
 | 2 | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | Table/column COMMENTs required by Genie |
 | 3 | `data_product_accelerator/skills/semantic-layer/03-genie-space-patterns/SKILL.md` | 8-section deliverable, agent instructions, SQL expressions, benchmark questions |
 | 4 | `data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/SKILL.md` | JSON schema, array sorting, ID generation, idempotent deployment |
@@ -582,7 +587,7 @@ Bulk creation without checkpoints causes cascading failures. A 2-minute pause ca
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` | Job YAML patterns, serverless config, `notebook_task` vs `sql_task`, `base_parameters` |
+| 1 | `skills/databricks-asset-bundles/SKILL.md` | Job YAML patterns, serverless config, `notebook_task` vs `sql_task`, `base_parameters` |
 
 **Activities:**
 1. Copy `semantic-layer-job-template.yml` from `data_product_accelerator/skills/semantic-layer/00-semantic-layer-setup/assets/templates/` to `resources/semantic/semantic_layer_job.yml` — customize paths and variables
@@ -738,8 +743,8 @@ Databricks enforces the `depends_on` chain: Metric Views are created first, then
 | `genie-space-patterns` | **Mandatory** — Genie Space setup | `semantic-layer/03-genie-space-patterns/SKILL.md` |
 | `genie-space-export-import-api` | **Mandatory** — JSON config + API deployment | `semantic-layer/04-genie-space-export-import-api/SKILL.md` |
 | `genie-optimization-orchestrator` | **External** — Run separately after deployment | `semantic-layer/05-genie-optimization-orchestrator/SKILL.md` |
-| `databricks-expert-agent` | **Mandatory** — Extraction principle | `common/databricks-expert-agent/SKILL.md` |
-| `databricks-asset-bundles` | **Mandatory** — Deployment | `common/databricks-asset-bundles/SKILL.md` |
+| `databricks-expert-agent` | **Mandatory** — Extraction principle | `skills/databricks-expert-agent/SKILL.md` |
+| `databricks-asset-bundles` | **Mandatory** — Deployment | `skills/databricks-asset-bundles/SKILL.md` |
 | `databricks-python-imports` | **Mandatory** — Python patterns | `common/databricks-python-imports/SKILL.md` |
 | `naming-tagging-standards` | **Mandatory** — COMMENTs, naming, tags | `common/naming-tagging-standards/SKILL.md` |
 | `databricks-autonomous-operations` | **Mandatory** — Deploy/diagnose/fix loop | `common/databricks-autonomous-operations/SKILL.md` |

@@ -1,6 +1,11 @@
 ---
 name: silver-layer-setup
 description: End-to-end orchestrator for creating Silver layer pipelines using Spark Declarative Pipelines (SDP, formerly DLT) with Delta table-based data quality rules, quarantine patterns, and monitoring views. Orchestrates mandatory dependencies on common skills (databricks-table-properties, databricks-python-imports, databricks-asset-bundles, schema-management-patterns, unity-catalog-constraints, databricks-expert-agent) and Silver-domain skills (dlt-expectations-patterns, dqx-patterns). Use when creating a Silver layer from scratch, setting up Bronze-to-Silver pipelines, or implementing Silver SDP/DLT with streaming ingestion and runtime-updateable DQ rules.
+clients: [ide_cli, genie_code]
+bundle_resource: pipelines
+deploy_verb: bundle_deploy
+deploy_note: "Silver SDP/DLT pipeline + DQ-rules setup job deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code) — the bundle is the execution mechanism; NEVER create Silver schemas/tables or load data directly via executeCode/spark.sql, they are the pipeline/job body. The DQ-rules job runs before the pipeline; DLT updates use full_refresh=True; no DEFAULT clauses in serverless table DDL. Write the generated bundle (databricks.yml, src/, resources/) under `dp_bundle_root` (= `<artifact_root>/<use_case_slug>_dab` from `skills/vibecoding-state`) — a self-contained DAB project dir shared across the DP pipeline, NOT the bare clone root. On Genie Code `dp_bundle_root` is also the `bundle deploy` page-context root: be on that folder's page to deploy (see `skills/genie-code-environment` \u00a78)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"
@@ -59,7 +64,7 @@ End-to-end workflow for creating production-grade Silver layer pipelines using S
 | Creating a Silver layer from scratch? | **Use this skill** - it orchestrates everything |
 | Only need DLT expectations patterns? | Read `silver/01-dlt-expectations-patterns/SKILL.md` directly |
 | Need advanced DQX validation? | Read `silver/02-dqx-patterns/SKILL.md` directly |
-| Need Asset Bundle configuration? | Read `common/databricks-asset-bundles/SKILL.md` directly |
+| Need Asset Bundle configuration? | Read `skills/databricks-asset-bundles/SKILL.md` directly |
 | Need table properties reference? | Read `common/databricks-table-properties/SKILL.md` directly |
 | Need pure Python import patterns? | Read `common/databricks-python-imports/SKILL.md` directly |
 
@@ -71,13 +76,13 @@ End-to-end workflow for creating production-grade Silver layer pipelines using S
 
 | Phase | MUST Read Skill (use Read tool on SKILL.md) | What It Provides |
 |-------|---------------------------------------------|------------------|
-| All phases | `common/databricks-expert-agent` | Core extraction principle: extract names from source, never hardcode |
+| All phases | `skills/databricks-expert-agent` | Core extraction principle: extract names from source, never hardcode |
 | Schema setup | `common/schema-management-patterns` | CREATE SCHEMA DDL with governance metadata |
 | DQ rules table | `common/databricks-table-properties` | TBLPROPERTIES for the dq_rules metadata table |
 | DQ rules table | `common/unity-catalog-constraints` | PRIMARY KEY constraint syntax |
 | Rules loader | `common/databricks-python-imports` | Pure Python module patterns (NO notebook header) |
 | DLT notebooks | `common/databricks-table-properties` | Silver-layer TBLPROPERTIES (CDF, row tracking, auto-optimize) |
-| Pipeline config | `common/databricks-asset-bundles` | DLT pipeline YAML, job YAML, serverless config, multi-user `user_prefix` pattern |
+| Pipeline config | `skills/databricks-asset-bundles` | DLT pipeline YAML, job YAML, serverless config, multi-user `user_prefix` pattern |
 | Pipeline config | `common/naming-tagging-standards` | Enterprise naming, COMMENTs, tags, PII classifications for every DDL and resource |
 | Deployment (if user-triggered) | `common/databricks-autonomous-operations` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs/pipelines fail |
 
@@ -240,7 +245,7 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
 ### Phase 1: Requirements & Schema Setup (30 min)
 
 **Pre-Condition - MUST read these skills first:**
-1. Read `common/databricks-expert-agent/SKILL.md` - Apply extraction principle throughout
+1. Read `skills/databricks-expert-agent/SKILL.md` - Apply extraction principle throughout
 2. Read `common/schema-management-patterns/SKILL.md` - Use for Silver schema DDL
 
 **Steps:**
@@ -250,7 +255,7 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
    - Identify quarantine candidates
    - Skipping this step consistently leads to incomplete DQ coverage and ad-hoc quarantine patterns
 2. Create Silver schema using pattern from `schema-management-patterns`
-3. Verify Bronze tables exist — run SQL, do NOT infer from local files:
+3. Verify Bronze tables exist AND pin each table's column inventory — run SQL, do NOT infer from local files:
    ```bash
    databricks api post /api/2.0/sql/statements -p $PROFILE --json '{
      "warehouse_id": "<WAREHOUSE_ID>",
@@ -260,6 +265,8 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
    }'
    ```
    If the Bronze schema doesn't exist or has zero tables, STOP and report — the Bronze layer must be completed first. Reading a clone script or inferring from the schema CSV is NOT runtime verification.
+
+   Then, for EVERY Bronze table you will read, run `DESCRIBE TABLE <CATALOG>.<BRONZE_SCHEMA>.<table>` and capture the column names into a `{table: [columns]}` map held in working memory (the **pinned column inventory**). Every DQ rule's `constraint_sql`, every Silver column reference, and every `get_bronze_table()` column authored in Phases 2-4 MUST use a name from this pinned inventory — a reference to a column absent from the live `DESCRIBE` is a hard error, not a "close enough" guess. PRD/CSV names (e.g. `price`, `latitude`) routinely differ from live prefixed names (e.g. `base_price`, `property_latitude`); pinning the inventory first prevents authoring rules against names that do not exist.
 
 ---
 
@@ -334,7 +341,7 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
 ### Phase 6: Pipeline & Job Configuration (15 min)
 
 **Pre-Condition - MUST read these skills first:**
-1. Read `common/databricks-asset-bundles/SKILL.md` - DLT pipeline YAML, job YAML patterns
+1. Read `skills/databricks-asset-bundles/SKILL.md` - DLT pipeline YAML, job YAML patterns
 
 **Steps:**
 1. Create `resources/silver_dlt_pipeline.yml` using patterns from `databricks-asset-bundles`
@@ -342,7 +349,7 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
 3. Set DLT Direct Publishing Mode: `catalog` + `schema` fields (NOT `target`)
 4. Pass configuration: `catalog`, `bronze_schema`, `silver_schema`
 5. Set: `serverless: true`, `edition: ADVANCED`, `photon: true`
-6. **Multi-user safety:** In shared workspaces, include `${var.user_prefix}` in every pipeline/job `name:` field. See `common/databricks-asset-bundles` → "Shared Workspace Naming" section for the exact pattern. Without it, the second user to deploy hits a `pipeline name is already used` error — and `--force` does NOT fix it (see `common/databricks-asset-bundles/references/common-errors.md` Error 17).
+6. **Multi-user safety:** In shared workspaces, include `${var.user_prefix}` in every pipeline/job `name:` field. See `skills/databricks-asset-bundles` → "Shared Workspace Naming" section for the exact pattern. Without it, the second user to deploy hits a `pipeline name is already used` error — and `--force` does NOT fix it (see `skills/databricks-asset-bundles/references/common-errors.md` Error 17).
 
 **See:** `references/pipeline-configuration.md` for Silver-specific examples
 
@@ -352,11 +359,16 @@ This orchestrator spans 6 phases (deployment and Phase 7 are user-triggered). To
 
 **Phases 1–6 are complete.** All files (DQ rules table script, rules loader, DLT notebooks, monitoring views, pipeline/job YAMLs) have been created. **Do NOT proceed to deployment or Phase 7 unless the user explicitly requests it.**
 
+**Contract test before any deploy (read-only).** Before reporting completion, validate the authored files against the live schema so column/DDL bugs surface now, not in a failed job run: (1) dry-import `dq_rules_loader.py` — it must import cleanly and stay pure Python (no notebook header); (2) for every rule, run its `constraint_sql` read-only as `SELECT <constraint_sql> FROM <catalog>.<bronze_schema>.<table> LIMIT 1` and confirm each referenced column is in the Phase 1 pinned column inventory — an `UNRESOLVED_COLUMN`/parse error here is the exact failure that otherwise only appears as a failed DQ-setup/pipeline run; (3) confirm the loader's expected `dq_rules` row shape matches `setup_dq_rules_table.py`'s INSERT columns, and that no DDL uses a `DEFAULT` clause or an invented column. Fix and re-run until clean before deploying.
+
 Report what was created and ask the user if they want to deploy and run.
 
 ---
 
 **Deployment Order (USER-TRIGGERED ONLY — do not auto-execute):**
+
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli`. Generated bundle files anchor to `dp_bundle_root` (= `<artifact_root>/<use_case_slug>_dab`), and on Genie Code that folder is also the `bundle deploy` page-context root — **be on the `dp_bundle_root` page to deploy.** The pipeline/job is the only mechanism that creates Silver tables; never run the DDL/ingest directly. See `skills/genie-code-environment`.
+
 ```bash
 # 1. Deploy everything
 databricks bundle deploy -t dev
@@ -576,10 +588,10 @@ Before considering the Silver layer complete, verify each item and confirm its s
 | `dlt-expectations-patterns` | **Mandatory** - DQ rules, loader, decorators | `silver/01-dlt-expectations-patterns/SKILL.md` |
 | `dqx-patterns` | **Optional** - Advanced validation | `silver/02-dqx-patterns/SKILL.md` |
 | `anomaly-detection` | **Mandatory** - Schema freshness/completeness monitoring | `monitoring/04-anomaly-detection/SKILL.md` |
-| `databricks-expert-agent` | **Mandatory** - Extraction principle | `common/databricks-expert-agent/SKILL.md` |
+| `databricks-expert-agent` | **Mandatory** - Extraction principle | `skills/databricks-expert-agent/SKILL.md` |
 | `databricks-table-properties` | **Mandatory** - Silver TBLPROPERTIES | `common/databricks-table-properties/SKILL.md` |
 | `databricks-python-imports` | **Mandatory** - Pure Python loader | `common/databricks-python-imports/SKILL.md` |
-| `databricks-asset-bundles` | **Mandatory** - Pipeline/job YAML | `common/databricks-asset-bundles/SKILL.md` |
+| `databricks-asset-bundles` | **Mandatory** - Pipeline/job YAML | `skills/databricks-asset-bundles/SKILL.md` |
 | `schema-management-patterns` | **Mandatory** - Schema DDL | `common/schema-management-patterns/SKILL.md` |
 | `unity-catalog-constraints` | **Mandatory** - PK constraint | `common/unity-catalog-constraints/SKILL.md` |
 

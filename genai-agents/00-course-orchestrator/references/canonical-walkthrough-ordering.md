@@ -71,7 +71,7 @@ python3 -c "import sys; assert sys.version_info >= (3,11)" 2>/dev/null && echo "
 If starting from a fresh workspace, set up these resources before beginning:
 
 ```bash
-databricks auth login --host https://your-workspace.cloud.databricks.com
+# Authenticate — IDE/CLI only (see PRE-REQUISITES §11); Genie Code is pre-authenticated (run these via runDatabricksCli)
 
 databricks unity-catalog schemas create \
   --catalog-name main \

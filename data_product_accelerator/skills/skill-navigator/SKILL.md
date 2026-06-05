@@ -1,12 +1,17 @@
 ---
 name: skill-navigator
 description: Intelligent skill navigation system with tiered loading and orchestrator-first routing for context-efficient agent operation. Routes tasks to the correct domain skill based on keyword detection with orchestrator priority. Each skill uses progressive disclosure with references/, scripts/, and assets/ directories. Use this skill as the entry point for any Databricks-related task to determine which specialized skills to load.
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Routing/navigator meta-skill — selects which domain skills to load; no deployed resource and no deploy verb. Client-agnostic routing. Client-awareness layer present (M06): `client_context` is detected/gated by `skills/vibecoding-state` and `skills/genie-code-environment` is loaded on demand — see the Tier-1-thin note under Context Budget Management."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "3.0"
   domain: meta
   role: navigator
-  last_verified: "2026-02-21"
+  last_verified: "2026-06-02"
   volatility: low
   upstream_sources: []  # Internal routing
 ---
@@ -178,6 +183,8 @@ domain-folder/
 | **Tier 3: SKILL.md** | Loaded on specific task | ~1-2K each | Individual skill overview |
 | **Tier 4: References** | Loaded on demand | ~2-8K each | Detailed patterns & guides |
 
+> **Client awareness (Tier-1-thin).** This navigator routes the same way for every client. `skills/vibecoding-state` detects and gates `client_context`; load `skills/genie-code-environment` **on demand** (Tier 4) only when running on the in-workspace agent and a routed skill flags a client caveat (its `deploy_note` / `coverage`). Routed prompts open with a client-specific RULE_0 preamble — follow it. Keep this routing layer thin; behavior detail stays in `genie-code-environment`.
+
 ---
 
 ## Task Detection & Skill Routing Table
@@ -228,7 +235,7 @@ domain-folder/
 | "dashboard", "AI/BI" | Monitor | `monitoring/02-databricks-aibi-dashboards` |
 | "alert", "SQL alert" | Monitor | `monitoring/03-sql-alerting-patterns` |
 | "anomaly detection", "freshness", "completeness", "stale tables", "unhealthy tables" | Monitor | `monitoring/04-anomaly-detection` |
-| "deploy", "Asset Bundle" | Infra | `common/databricks-asset-bundles` |
+| "deploy", "Asset Bundle" | Infra | `skills/databricks-asset-bundles` |
 | "schema", "CREATE SCHEMA" | Infra | `common/schema-management-patterns` |
 | "table properties" | Infra | `common/databricks-table-properties` |
 | "constraints", "PK/FK" | Infra | `common/unity-catalog-constraints` |

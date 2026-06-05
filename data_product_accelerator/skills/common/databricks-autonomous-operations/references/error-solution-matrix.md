@@ -138,7 +138,8 @@ WHERE drift_type = 'CONSECUTIVE'   -- REQUIRED for period-over-period
 
 | Error Pattern | Root Cause | Fix |
 |--------------|------------|-----|
-| `Invalid access token (403)` | Token expired | Re-authenticate: `databricks auth login --host <workspace-url> --profile <name>` |
+| `bundle deploy`/`run` "blocked by safety guardrails" / "not in the allow-list" / "`databricks.yml` not found" (**Genie Code**) | **Page context — NOT a code/YAML defect and NOT a job failure.** The verb is gated to the bundle-folder page. | Open the **bundle editor** on `dp_bundle_root` (the affordance next to `databricks.yml`) and retry; pass `--target dev`. Do **NOT** enter the diagnose-fix loop and do **NOT** create the resource via SDK/REST/`CREATE` as a substitute (RULE_10). Escape hatch only on explicit operator authorization. See SKILL §2. |
+| `Invalid access token (403)` | Token expired (IDE only — Genie Code is pre-authenticated) | IDE: re-authenticate `databricks auth login --host <workspace-url> --profile <name>`. Genie Code: re-check you are on the correct workspace's bundle-editor page. |
 | `python_task` not recognized | Invalid task type | Change to `notebook_task` with `notebook_path`. NEVER use `python_task` with `python_file`. |
 | Parameter not found / required | CLI-style parameters in YAML | Change `parameters: ["--catalog=X"]` to `base_parameters: {catalog: X}` |
 | Path resolution error | Wrong relative depth from YAML | From `resources/*.yml` → `../src/`. From `resources/<layer>/*.yml` → `../../src/`. From `resources/<layer>/<sub>/*.yml` → `../../../src/`. |

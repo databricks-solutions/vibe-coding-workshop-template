@@ -10,6 +10,9 @@
 # syntax checks but requires the following to actually execute end-to-end):
 #   - Both AppKit App and Agent App deployed and RUNNING.
 #   - `databricks` CLI authenticated for $PROFILE; `jq` and `curl` on PATH.
+#     CLIENT NOTE (Genie Code): there is no $PROFILE — it is pre-authenticated. Drive
+#     the script's `databricks`/`curl` calls via runDatabricksCli/executeCode and omit
+#     `--profile`. The browser check (SKILL.md Step 6c) is the simplest manual verify.
 #   - The AppKit App's service principal must have CAN_USE on the Agent App
 #     (resource binding approval granted in the Apps UI).
 #   - Probe 4 additionally requires:

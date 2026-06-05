@@ -9,6 +9,11 @@ description: >
   guardrails, and end-to-end external MCP examples. Foundation Step 3.
   Consumed by all agent tracks (A, B, C).
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Agent tools + managed/external MCP servers + UC resource grants — code + grants, no bundle resource. Tooling resolves identically on both clients; on Genie Code use its built-in tool surface and run grant CLI steps through runDatabricksCli. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

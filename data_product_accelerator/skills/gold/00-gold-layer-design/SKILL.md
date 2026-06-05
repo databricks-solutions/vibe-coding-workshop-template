@@ -2,6 +2,11 @@
 name: gold-layer-design
 description: End-to-end orchestrator for designing complete Gold layer schemas with ERDs, YAML files, lineage tracking, and comprehensive business documentation. Guides users through dimensional modeling, ERD creation (master/domain/summary based on table count), YAML schema generation, column-level lineage documentation, business onboarding guide creation, source table mapping, and design validation. Orchestrates design-workers (05-erd-diagrams, 06-table-documentation, 01-grain-definition, 07-design-validation, 02-dimension-patterns, 03-fact-table-patterns, 04-conformed-dimensions). Use when designing a Gold layer from scratch, creating dimensional models, documenting business processes, or preparing for Gold layer implementation.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "Design-only: produces ERDs/YAML schemas/lineage/docs consumed by gold-layer-setup; no deployed resource of its own. Downstream artifacts deploy via `bundle deploy --target dev`. On Genie Code, this skill and its design-workers must write all generated design files under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`, e.g. `gold_layer_design/`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "3.0.0"
@@ -149,7 +154,7 @@ This orchestrator spans 9 phases over 4-8 hours. To maintain coherence without c
 
 | Phase | Worker/reference skills to read at the start of this phase |
 |---|---|
-| 0 | `common/databricks-expert-agent`, `common/naming-tagging-standards`, `design-workers/00-schema-intake` |
+| 0 | `skills/databricks-expert-agent`, `common/naming-tagging-standards`, `design-workers/00-schema-intake` |
 | 1 | `design-workers/01-business-onboarding` |
 | 2 | `design-workers/02-dimension-patterns`, `design-workers/03-fact-patterns`, `references/dimensional-modeling-guide.md` |
 | 3 | `design-workers/04-erd-patterns`, `references/erd-organization-strategy.md` |
@@ -169,7 +174,7 @@ This orchestrator spans 9 phases over 4-8 hours. To maintain coherence without c
 
 Before parsing the schema, read these two common skills. They set enterprise-wide constraints that every downstream phase depends on. Skipping them is the most common root cause of format divergence across YAML files.
 
-1. `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` — Retain: "Extract, Don't Generate" (all table/column names come from the YAML or source schema, never from memory), `CLUSTER BY AUTO`, CDF + Row Tracking, comments + tags on every object.
+1. `skills/databricks-expert-agent/SKILL.md` — Retain: "Extract, Don't Generate" (all table/column names come from the YAML or source schema, never from memory), `CLUSTER BY AUTO`, CDF + Row Tracking, comments + tags on every object.
 2. `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` — Retain: snake_case everywhere, `dim_`/`fact_`/`bridge_` prefixes, dual-purpose description pattern `<Definition>. Business: <context>. Technical: <details>.` (the angle brackets are placeholders — do NOT write literal `<` or `[` characters into descriptions), mandatory tags (`layer`, `domain`, `PII`).
 
 These rules are the authoritative source whenever a domain-specific skill below paraphrases them.
@@ -194,6 +199,7 @@ These rules are the authoritative source whenever a domain-specific skill below 
      - **fact**: 2+ FK columns AND numeric measures, OR 2+ timestamps AND 2+ FKs
      - **dimension**: everything else
    - Also identifies: PK candidates, FK columns, measures, timestamps per table
+   - **This classification is a HEURISTIC, not ground truth.** It mis-classifies tables whose numeric columns are descriptive attributes rather than additive measures (geographic coordinates, prices, physical counts), and tables with no numeric columns or only one FK. After running it, **print the full classification, then explicitly document every override you make and WHY** (e.g. "`properties` reclassified dimension→… : `base_price`/`latitude`/`bedrooms` are attributes, not measures"). **Never silently correct a classification** — an undocumented override becomes invisible technical debt if a later step reads the raw classification instead of `DESIGN_DECISIONS.md`.
 
 3. **Identify FK relationships from column comments and naming patterns:**
 
@@ -452,7 +458,7 @@ The file MUST contain these six sections:
 4. Validate PRIMARY KEY definitions match grain type
 5. Validate FOREIGN KEY references point to valid tables/columns
 6. Run lineage validation script
-7. **Upstream cross-reference (conditional):** If upstream source tables already exist (check via `spark.catalog.tableExists()`), run `cross_reference_silver_at_design_time()` from `references/schema-intake-patterns.md` to validate YAML lineage `silver_column` values against actual source table schemas. Fix any mismatches found. If source tables do not exist yet, note that this validation will be enforced as a hard gate during Phase 0 of `01-gold-layer-setup`.
+7. **Upstream cross-reference (MANDATORY when Silver exists):** Check whether upstream source tables exist (via `spark.catalog.tableExists()`). If they do, you MUST run `cross_reference_silver_at_design_time()` from `references/schema-intake-patterns.md` to validate YAML lineage `silver_column` values against the actual source-table schemas, fix any mismatches found, and **record the resulting mismatch count (target: 0) as an explicit line in the validation report** — running it silently does not satisfy this check. This is the only validation that confirms the artifacts agree with *reality* rather than just with each other (the YAML/ERD/lineage consistency checks are self-referential — all three are generated from the same session data, so a systematic column error would pass them while failing here). Only when source tables do not exist yet is this deferred — in that case note that it will be enforced as a hard gate during Phase 0 of `01-gold-layer-setup`.
 
 **Outputs:**
 - Validation report (pass/fail for each category)

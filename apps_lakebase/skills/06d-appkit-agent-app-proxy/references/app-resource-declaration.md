@@ -4,6 +4,8 @@ How to bind an Agent App as a backend resource for an AppKit App, both via Datab
 
 **When to read this:** Reading [../SKILL.md](../SKILL.md) and reached Step 1. Stop and read this file first.
 
+> **Client routing:** the `databricks.yml` / `app.yaml` edits are client-agnostic. On **Genie Code**, run `databricks bundle validate` via `runDatabricksCli` (**omit `--profile`**; if a targetless validate is guardrail-blocked, pass `--target dev`); the Apps-UI form is browser-based and works on both clients. See [`../SKILL.md`](../SKILL.md) routing table and `skills/genie-code-environment`.
+
 ---
 
 ## Why `app`, Not `serving_endpoint`

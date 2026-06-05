@@ -9,7 +9,7 @@ description: >
   "run job", "run pipeline", "make it work", "job failed", "troubleshoot", "fix and redeploy".
 metadata:
   author: prashanth subrahmanyam
-  version: "3.1"
+  version: "3.2"
   domain: operations
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -57,8 +57,12 @@ metadata:
     - "PERMISSION_DENIED"
     - "self-heal"
     - "autonomous"
-  last_verified: "2026-02-20"
+  last_verified: "2026-06-02"
   volatility: medium
+  clients: [ide_cli, genie_code]   # CLI surface accessed via local shell (IDE) or runDatabricksCli (Genie Code)
+  deploy_verb: "bundle deploy --target dev"   # deploy mechanics owned by databricks-asset-bundles (the spine)
+  deploy_note: "operations/CLI reference — on Genie Code every databricks command routes via runDatabricksCli FROM THE BUNDLE EDITOR (dp_bundle_root); a blocked bundle deploy/run is a page-context signal, NEVER substitute SDK/REST creation (RULE_10); see genie-code-environment"
+  coverage: all_stages
   upstream_sources:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
@@ -108,11 +112,55 @@ This skill is both an **SDK/CLI/Connect reference** and an **autonomous operatio
 
 ## 2. Environment & Authentication
 
+> **Client routing (RULE_1/2/4 — read once, applies to every command in this skill).** This skill is the
+> CLI/SDK operations surface; the same operations run on both clients via different channels — **deploy
+> mechanics are owned by `databricks-asset-bundles` (the spine); reference it rather than re-deriving them.**
+> - **IDE (Cursor):** the local `databricks` CLI; auth via `databricks auth login` / `~/.databrickscfg`;
+>   `databricks-connect` is available for local Spark.
+> - **Genie Code has *three* execution paths — try them in order; "blocked on one path ≠ impossible":**
+>   1. **`runDatabricksCli`** — the allow-listed, pre-authenticated CLI path (no `auth login`). The path
+>      for `bundle validate` / `summary` / `deploy --target dev` and read verbs. `--version`/`help`/
+>      `auth token`/`aitools`/`apps validate`/`apps manifest` are hard-blocked; `apps deploy` is
+>      **unreliable here** (page-dependent + CWD-defeated). Use a `bundle validate` behavior probe instead
+>      of a numeric `--version` compare.
+>   2. **Python SDK** (`WorkspaceClient` via `executeCode`) — the **most capable** path: it **bypasses the
+>      CLI allow-list** and is the reliable way to `w.apps.deploy(...)`, retrieve `w.config.token`, and poll
+>      deployment/run state. **Caveat:** the SDK has **no bundle-deploy equivalent** (`bundle deploy` is a
+>      composite client-side operation) — keep `bundle deploy` on `runDatabricksCli`.
+>   3. **Native tools** (`createAsset`/`readTable`/…) for governed asset operations.
+>
+>   No local Spark on Genie Code (use workspace **serverless**; `databricks-connect` is IDE-only). Full
+>   allow-list / CWD / FUSE / escape-hatch detail is in the **`genie-code-environment`** skill — load it on
+>   demand. The CLI command examples below run via path 1 on Genie Code (local shell on the IDE); where a
+>   verb is CLI-blocked, reach for the SDK (path 2).
+>
+> **⛔ The carve-out the "fall to the SDK" rule does NOT cover — `bundle deploy`/`run` and resource creation.**
+> "Blocked ≠ impossible, try the SDK" is for **read-only / ad-hoc** ops (polling, inspecting schemas, lineage,
+> token retrieval, `apps deploy`). It is **NOT** a license to substitute the SDK/REST for the bundle. When
+> `bundle deploy`/`run` is blocked, that is a **page-context signal, not a dead end**: the verb is gated to the
+> **bundle-folder page**, which on Genie Code you reach by opening the **"Open in bundle editor"** affordance on
+> the `dp_bundle_root` folder (the bundle editor's CWD *is* the bundle root, where `validate`/`deploy`/`run` are
+> pre-approved). **FIELD-CONFIRMED:** the same `bundle deploy` that returned "blocked by safety guardrails" /
+> "`databricks.yml` not found" from a file/notebook page returned "Deployment complete!" and `bundle run …
+> SUCCESS` from the bundle editor. So the fix is **navigate to the bundle editor**, never `w.jobs.create()` /
+> `POST /api/2.1/jobs/create` / `POST /api/2.0/pipelines` / `CREATE TABLE` via `executeCode`. Creating
+> jobs/pipelines/tables directly is the **RULE_10 authoring-discipline violation** — it produces live,
+> un-versioned state that diverges from the bundle and is the exact regression this spine prevents. If
+> `bundle deploy`/`run` **still** fails *from the bundle editor*, STOP and report the blocker — the SDK/REST
+> creation route is an **escape hatch only on explicit operator authorization.** Surface a clickable
+> bundle-editor link: `file_id = w.workspace.get_status("<dp_bundle_root>/databricks.yml").object_id`,
+> `folder_id = w.workspace.get_status("<dp_bundle_root>").object_id`, link =
+> `{w.config.host}/editor/files/{file_id}?o={w.get_workspace_id()}&contextId=folder%3A{folder_id}`. Detail in
+> `genie-code-environment` §3/§8.
+
 ### Setup
 
-- SDK: `uv pip install databricks-sdk`; Connect: `uv pip install databricks-connect`
-- CLI version: **>= 0.278.0** (`databricks --version`)
-- Config: `~/.databrickscfg` or env vars `DATABRICKS_HOST`, `DATABRICKS_TOKEN`
+- SDK: `uv pip install databricks-sdk`; **Connect (IDE-only):** `uv pip install databricks-connect` —
+  not used on Genie Code (serverless; no local Spark)
+- CLI version: **>= 0.278.0** on the IDE (`databricks --version`); on Genie Code the version is not
+  introspectable (use a `bundle validate` behavior probe)
+- Config (IDE): `~/.databrickscfg` or env vars `DATABRICKS_HOST`, `DATABRICKS_TOKEN`; Genie Code is
+  pre-authenticated in-session
 
 ### Quick Auth
 
@@ -122,7 +170,8 @@ w = WorkspaceClient()                    # Auto-detect (env, config file, or not
 w = WorkspaceClient(profile="MY_PROFILE") # Named profile
 ```
 
-- **Token expired?** `databricks auth login --host <url> --profile <name>`
+- **Token expired? (IDE path)** `databricks auth login --host <url> --profile <name>` — N/A on Genie Code
+  (pre-authenticated)
 - **Profile-based CLI:** `DATABRICKS_CONFIG_PROFILE=<name> databricks <command>`
 - **Full auth patterns** (Azure SP, AccountClient, etc.): see `references/sdk-api-reference.md`
 
@@ -178,7 +227,7 @@ w = WorkspaceClient(profile="MY_PROFILE") # Named profile
 | **Clusters** | `databricks clusters get <CLUSTER_ID> --output json` | Get cluster status |
 | **Clusters** | `databricks clusters events <CLUSTER_ID> --output json` | Get cluster events |
 | **Warehouses** | `databricks warehouses get <WH_ID> --output json` | Get warehouse status |
-| **Auth** | `databricks auth login --host <url> --profile <name>` | Re-authenticate |
+| **Auth** (IDE only) | `databricks auth login --host <url> --profile <name>` | Re-authenticate (Genie Code is pre-authenticated) |
 | **Workspace** | `databricks workspace export <path> --format SOURCE` | Export notebook |
 | **Apps** | `databricks apps logs <app-name>` | App deployment/runtime logs |
 
@@ -235,13 +284,24 @@ Before ANY deployment, confirm you are targeting the correct workspace:
 
 ### Step 1: Validate & Deploy
 
+> **Client note:** IDE runs these in a terminal. **Genie Code runs `databricks bundle …` via `runDatabricksCli`
+> from the bundle editor** — open the **"Open in bundle editor"** affordance on the `dp_bundle_root` folder
+> (the icon that appears next to `databricks.yml`) *before* deploying; the bundle editor's CWD is the bundle
+> root, where `validate`/`deploy`/`run` are pre-approved. Surface the clickable editor link for the operator
+> (see §2 carve-out). See `skills/genie-code-environment` §3.
+
 ```bash
 databricks bundle validate -t <target>   # Pre-flight — catches ~80% of errors
 databricks bundle deploy -t <target>     # Deploy all resources
 ```
 
-**If validate fails:** Read the error, fix the YAML (see Section 6 + `common/databricks-asset-bundles` skill), re-validate.
-**If deploy fails:** Common causes: auth expired (403), path resolution errors, invalid task types. See Section 6.
+**If validate fails:** Read the error, fix the YAML (see Section 6 + `skills/databricks-asset-bundles` skill), re-validate.
+**If deploy is BLOCKED (≠ failed — Genie Code):** symptoms are "blocked by safety guardrails," "not in the
+allow-list," or "`databricks.yml` not found." This is a **page-context** signal, not a YAML/code defect and not
+a job failure. **Do not** enter the diagnose-fix loop and **do not** create resources via SDK/REST/`CREATE` as a
+substitute (RULE_10 violation). Navigate to the **bundle editor** on `dp_bundle_root` and retry. Only on explicit
+operator authorization is the escape hatch (§2) permitted.
+**If deploy FAILS (executes, returns an error):** Common causes: auth expired (403), path resolution errors, invalid task types. See Section 6.
 **`--force` clarification:** `--force` handles **Terraform state drift** only (e.g., resource deleted outside bundle). It does NOT fix API name-uniqueness conflicts. For "pipeline name already used" or "resource already exists": list and delete the conflicting resource, then redeploy without `--force`.
 
 ### Step 2: Run
@@ -323,7 +383,7 @@ Match the error against **Section 6** (decision tree) and `references/error-solu
 
 1. **Read** the source file(s) identified from the stack trace or error message
 2. **Apply fix** using editor tools (StrReplace, Write)
-3. If YAML/config issue → fix the DAB YAML (consult `common/databricks-asset-bundles` skill)
+3. If YAML/config issue → fix the DAB YAML (consult `skills/databricks-asset-bundles` skill)
 4. If dependency issue → deploy upstream assets first (see Section 6 ordering)
 5. **Same-class fix rule:** Before redeploying, grep ALL files from the same generation batch for the same error pattern. If the bug was in one notebook, check sibling notebooks for identical issues. Fix all instances in one pass.
 
@@ -388,13 +448,14 @@ After every resolved failure (or escalation), trigger `admin/self-improvement`:
 | `ModuleNotFoundError` | Add to `%pip install` or DAB environment spec |
 | `TABLE_OR_VIEW_NOT_FOUND` | Run setup job first; check 3-part catalog.schema.table path |
 | `DELTA_MULTIPLE_SOURCE_ROW_MATCHING` | Deduplicate source before MERGE |
-| `Invalid access token (403)` | `databricks auth login --host <url> --profile <name>` |
+| `Invalid access token (403)` | IDE: `databricks auth login --host <url> --profile <name>` (Genie Code is pre-authenticated — re-check the page/profile) |
 | `ResourceAlreadyExists` | Delete + recreate (monitors, alerts) |
 | `python_task not recognized` | Use `notebook_task` with `notebook_path` |
 | `PARSE_SYNTAX_ERROR` | Read failing SQL file, fix syntax, redeploy |
 | `Parameter not found` | Use `base_parameters` dict, not CLI-style `parameters` |
 | `run_job_task` vs `job_task` | Use `run_job_task` (not `job_task`) |
 | Genie `INTERNAL_ERROR` | Deploy semantic layer (TVFs + Metric Views) first |
+| `bundle deploy` "blocked by safety guardrails" / "`databricks.yml` not found" (Genie Code) | **Page context, not a code bug** — open the **bundle editor** on `dp_bundle_root` and retry; never substitute SDK/REST job creation (RULE_10) |
 
 ---
 
@@ -497,7 +558,7 @@ Post-Troubleshooting Self-Improvement:
 **Skill priority for updates** (search in this order):
 1. `references/error-solution-matrix.md` — error-to-fix mapping
 2. `common/databricks-autonomous-operations` — troubleshooting decision tree
-3. `common/databricks-asset-bundles` — if deployment-related
+3. `skills/databricks-asset-bundles` — if deployment-related
 4. Domain-specific skill (e.g., `gold/pipeline-workers/02-merge-patterns` for MERGE errors)
 5. New skill — only if all above are irrelevant (see `admin/self-improvement` justification checklist)
 
@@ -508,6 +569,19 @@ Without explicit user confirmation, NEVER retry:
 - `DROP TABLE` / `DROP SCHEMA`
 - `w.quality_monitors.delete()`
 - `w.alerts_v2.delete_alert()`
+
+### Safety: Never Substitute Direct Creation for a Blocked Bundle Deploy (RULE_10)
+
+A **blocked** `bundle deploy`/`run` (Genie Code "safety guardrails" / "not in allow-list" / "`databricks.yml`
+not found") is a **page-context** signal, never a license to create the deliverable another way. NEVER, as a
+workaround for a blocked deploy:
+- `w.jobs.create()` / `POST /api/2.1/jobs/create`
+- `w.pipelines.create()` / `POST /api/2.0/pipelines` / `createAsset(pipeline)`
+- `w.schemas.create()` / `CREATE SCHEMA` / `CREATE VOLUME` / `CREATE TABLE` to provision the deliverable
+
+The fix is **navigate to the bundle editor** on `dp_bundle_root` and redeploy. The SDK/REST creation route is an
+**escape hatch only on explicit operator authorization.** Likewise, a **failed** *job* is fixed by editing the
+bundle source file under `dp_bundle_root` and **redeploying** — never by patching the live job via API/UI.
 
 ---
 

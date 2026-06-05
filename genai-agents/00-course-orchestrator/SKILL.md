@@ -7,21 +7,26 @@ description: >
   tasks to the correct specialized skill. Uses tiered loading and keyword
   routing so agents read only the skills needed for the current task.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Course navigator/router — selects which genai-agents skills to load; no deployed resource and no deploy verb. Client-agnostic routing. Client-awareness layer present (M06): `client_context` is detected/gated by `skills/vibecoding-state`; `skills/genie-code-environment` referenced by the Runtime Contract and the A7 deploy route. No inline behavior detail."
+coverage: full
 metadata:
   author: "prashanth-subrahmanyam"
   version: "5.0.0"
   domain: "genai-agents"
   role: "navigator"
   scope: "strictly genai-agents/; alternate tracks only linked as optional accelerator mirrors"
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: low
   upstream_sources: []
   references:
     - "references/canonical-walkthrough-ordering.md"
     - "references/skyloyalty-variants.md"
     - "references/alternate-methods-catalog.md"
-    - "../vibecoding-state/references/state-template.md"
-    - "../vibecoding-state/references/retrospective-template.md"
+    - "../../skills/vibecoding-state/references/state-template.md"
+    - "../../skills/vibecoding-state/references/retrospective-template.md"
 ---
 
 # GenAI Agent Skill Navigator
@@ -47,7 +52,7 @@ tables, load [`references/canonical-walkthrough-ordering.md`](references/canonic
 | User intent | Route |
 |---|---|
 | "Start/resume the GenAI agent course", "what skill do I need?", "navigate genai-agents" | This navigator |
-| Running a prompt from `Instructions.md` or `example/<use_case>/WALKTHROUGH.md` | `../vibecoding-state/SKILL.md` first, then the routed skill |
+| Running a prompt from `Instructions.md` or `example/<use_case>/WALKTHROUGH.md` | `../../skills/vibecoding-state/SKILL.md` first, then the routed skill |
 | Creating UC schemas, volumes, MLflow setup, tracing, tools, KA, AI Gateway | Foundation route below |
 | Building the canonical Python agent on Databricks Apps | Track A route below |
 | Prompt registry, eval datasets, scorers, eval runs, registration, deployment, monitoring, feedback, prompt iteration | SDLC route below |
@@ -62,7 +67,7 @@ and deployed on Databricks Apps.
 
 | Stage | Name | Skill(s) | Key deliverables |
 |---|---|---|---|
-| 0 | Runtime contract | `../vibecoding-state/SKILL.md` | State file, applicability gates, retrospective log |
+| 0 | Runtime contract | `../../skills/vibecoding-state/SKILL.md` | State file, applicability gates, retrospective log |
 | 1 | Foundation | `../foundation/00-uc-resources-foundation` -> `../foundation/05-knowledge-assistant` | UC schemas/volumes, MLflow, tracing, tools/data, KA |
 | 2 | Agent Build | `../tracks/A-custom-agent-apps/01-clone-and-run` -> `../tracks/A-custom-agent-apps/07-deploy-and-query` | Working Track A agent, Databricks Apps deployment, `predict_fn` |
 | 3 | SDLC | `../sdlc/01-prompt-registry` -> `../sdlc/07-production-monitoring` + `../sdlc/04c-end-user-feedback` | Versioned prompts, evals, sign-off, registration, deploy, monitor, feedback |
@@ -76,17 +81,30 @@ Canonical ordering and time estimates are in
 
 ## Runtime Contract
 
-For vibecoding workshops, always load `../vibecoding-state/SKILL.md` before
+For vibecoding workshops, always load `../../skills/vibecoding-state/SKILL.md` before
 acting on a prompt. That sibling skill owns bootstrap, `enter`, `exit`,
 applicability checks, state-file updates, and retrospectives. This navigator
 only routes to the correct domain skill.
+
+**Client awareness (by reference).** `vibecoding-state` also detects and gates
+`client_context`. The course routes the same for every client; only deploy/run
+mechanics differ. On the in-workspace agent, load `../../skills/genie-code-environment/SKILL.md`
+(pre-auth, serverless, page-context CLI, clone-rooted files) — local dev servers
+and CLI/profile authentication do not apply there (see PRE-REQUISITES §11 for the
+IDE/CLI auth path). Routed prompts open with a client-specific RULE_0 preamble;
+follow it as written.
+
+**Genie Code first-run.** Clone the whole repo into
+`/Users/<your-username>/.assistant/skills/vibe-coding-workshop`, then **start a NEW
+Agent-mode chat thread** so the skills load. Full block: [repo-root AGENTS.md](../../AGENTS.md)
+("Genie Code" section) / [PRE-REQUISITES.md](../../PRE-REQUISITES.md).
 
 Live state files are gitignored. Templates live in:
 
 | Template | Purpose |
 |---|---|
-| `../vibecoding-state/references/state-template.md` | Canonical state-file schema |
-| `../vibecoding-state/references/retrospective-template.md` | Per-prompt and rollup retrospective prompts |
+| `../../skills/vibecoding-state/references/state-template.md` | Canonical state-file schema |
+| `../../skills/vibecoding-state/references/retrospective-template.md` | Per-prompt and rollup retrospective prompts |
 
 ---
 
@@ -95,7 +113,7 @@ Live state files are gitignored. Templates live in:
 ```text
 1. Receive the user request.
 2. If this is an Instructions.md / WALKTHROUGH.md workshop prompt, load
-   ../vibecoding-state/SKILL.md first.
+   ../../skills/vibecoding-state/SKILL.md first.
 3. Detect the task family using the tables below.
 4. If the task is end-to-end, route to the first skill in that stage and let
    each skill's Next Step / Notes to Carry Forward section advance the flow.
@@ -110,7 +128,7 @@ Live state files are gitignored. Templates live in:
 | Pattern | Meaning |
 |---|---|
 | `00-course-orchestrator/` | This navigator; route first, do not implement here |
-| `vibecoding-state/` | Runtime contract for prompt-driven workshops |
+| `../../skills/vibecoding-state/` | Runtime contract for prompt-driven workshops (repo-root, client-agnostic) |
 | `foundation/00-*` | Foundation setup starts here |
 | `foundation/01-*`, `02-*`, ... | Ordered foundation worker skills |
 | `tracks/A-custom-agent-apps/01-*`, ... | Canonical Track A worker skills |
@@ -152,7 +170,7 @@ Live state files are gitignored. Templates live in:
 
 | Task keywords | Route to | Notes |
 |---|---|---|
-| "workshop prompt", "Instructions.md", "WALKTHROUGH", "state file", "applicability matrix", "retrospective", "gate" | `../vibecoding-state/SKILL.md` | Load before the task skill |
+| "workshop prompt", "Instructions.md", "WALKTHROUGH", "state file", "applicability matrix", "retrospective", "gate" | `../../skills/vibecoding-state/SKILL.md` | Load before the task skill |
 | "start from scratch", "new agent course", "bootstrap resources", "UC schemas", "volumes" | `../foundation/00-uc-resources-foundation/SKILL.md` | Canonical first setup step |
 | "course order", "canonical walkthrough", "time estimate", "Module 1", "Module 2", "Module 3" | `references/canonical-walkthrough-ordering.md` | Sidecar narrative, not implementation |
 | "SkyLoyalty variant", "variant 1", "variant 5", "which walkthrough" | `references/skyloyalty-variants.md` | Variant chooser only |
@@ -181,7 +199,7 @@ Live state files are gitignored. Templates live in:
 | "agent auth", "OBO", "service principal", "App Authorization", "User Authorization", "permissions" | `../tracks/A-custom-agent-apps/04-authentication/SKILL.md` | A4 |
 | "Lakebase memory", "conversation memory", "AsyncDatabricksSession", "DatabricksStore", "thread_id" | `../tracks/A-custom-agent-apps/05-lakebase-memory/SKILL.md` | A5 |
 | "agent-evaluate", "pre-deploy eval", "smoke test", "built-in judges" | `../tracks/A-custom-agent-apps/06-evaluation/SKILL.md` | A6 |
-| "deploy to Databricks Apps", "databricks apps deploy", "query deployed app", "OAuth token", "app URL" | `../tracks/A-custom-agent-apps/07-deploy-and-query/SKILL.md` | A7 |
+| "deploy to Databricks Apps", "databricks apps deploy", "query deployed app", "OAuth token", "app URL" | `../tracks/A-custom-agent-apps/07-deploy-and-query/SKILL.md` | A7 — deploy verb is client-agnostic; the local dev server / CLI-auth steps are IDE-only (see A7 + `../../skills/genie-code-environment/SKILL.md`) |
 | "debug app", "deployment failed", "runtime error", "auth failure", "resource permission", "Lakebase failure" | `../tracks/A-custom-agent-apps/08-debugging/SKILL.md` | A8 |
 
 ### SDLC Routes
@@ -242,7 +260,7 @@ genai-agents/
 │       ├── canonical-walkthrough-ordering.md             # Canonical course narrative and timing
 │       ├── skyloyalty-variants.md                        # SkyLoyalty V1-V5 chooser
 │       └── alternate-methods-catalog.md                  # Optional non-canonical paths, outside main scope
-├── vibecoding-state/SKILL.md                             # Runtime contract: state, gates, retrospectives
+│   (vibecoding-state relocated to repo-root skills/vibecoding-state/  # Runtime contract: state, gates, retrospectives)
 ├── foundation/
 │   ├── 00-uc-resources-foundation/SKILL.md               # F0: UC schemas and managed volumes
 │   ├── 00b-agent-spec-and-tool-plan/SKILL.md            # F0b: PRD -> Agent Spec -> Tool Plan
@@ -306,7 +324,7 @@ When adding or moving a `genai-agents/` skill:
 3. Add a routing row in the correct Task Detection table above.
 4. Add one line in the Complete Skill Directory Map.
 5. If the skill changes canonical order or timing, update `references/canonical-walkthrough-ordering.md`.
-6. If the skill affects workshop state/gates, update `../vibecoding-state/SKILL.md` or its references.
+6. If the skill affects workshop state/gates, update `../../skills/vibecoding-state/SKILL.md` or its references.
 7. Verify every linked `SKILL.md` exists.
 
 ---
@@ -318,9 +336,9 @@ When adding or moving a `genai-agents/` skill:
 - [`references/canonical-walkthrough-ordering.md`](references/canonical-walkthrough-ordering.md)
 - [`references/skyloyalty-variants.md`](references/skyloyalty-variants.md)
 - [`references/alternate-methods-catalog.md`](references/alternate-methods-catalog.md)
-- [`../vibecoding-state/SKILL.md`](../vibecoding-state/SKILL.md)
-- [`../vibecoding-state/references/state-template.md`](../vibecoding-state/references/state-template.md)
-- [`../vibecoding-state/references/retrospective-template.md`](../vibecoding-state/references/retrospective-template.md)
+- [`../../skills/vibecoding-state/SKILL.md`](../../skills/vibecoding-state/SKILL.md)
+- [`../../skills/vibecoding-state/references/state-template.md`](../../skills/vibecoding-state/references/state-template.md)
+- [`../../skills/vibecoding-state/references/retrospective-template.md`](../../skills/vibecoding-state/references/retrospective-template.md)
 
 ### Official documentation
 

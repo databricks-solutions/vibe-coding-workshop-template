@@ -402,7 +402,16 @@ bootstrap_preflight:
                                                    #   "unauthenticated"    |
                                                    #   "wrong_host"
   databricks_cli_version:                 string   # `databricks --version`
-                                                   #   output, normalized
+                                                   #   output, normalized — OR
+                                                   #   the sentinel
+                                                   #   "unknown_on_genie_code"
+                                                   #   when client_context ==
+                                                   #   genie_code (no local CLI
+                                                   #   binary; --version is
+                                                   #   hard-blocked, Gap-1).
+                                                   #   The numeric gate is then
+                                                   #   skipped in favor of the
+                                                   #   `bundle validate` probe.
   databricks_cli_min_version:             string   # minimum version this repo
                                                    #   requires; merged from
                                                    #   workshop config (default
@@ -462,7 +471,10 @@ of the following are true:
 
 - `workspace_url_was_placeholder == true`.
 - `workspace_host_auth_status != "authenticated"`.
-- `databricks_cli_version` is older than `databricks_cli_min_version`.
+- `databricks_cli_version` is older than `databricks_cli_min_version` **and**
+  `databricks_cli_version != "unknown_on_genie_code"` (the Genie Code sentinel
+  skips the version halt — Gap-1; eligibility is decided by the `bundle
+  validate` behavior probe instead).
 - `apps_quota.free_slots < 1` and the run will eventually call
   `databricks apps create` (Pathways A/B/C).
 
@@ -478,8 +490,8 @@ unprefixed variable.
 
 Pathway C runs that combine an AppKit app with a separately authored agent (and
 some Pathway D variants that read AppKit context) keep state in **two** files:
-the AppKit app's `apps_lakebase/$APP_NAME/.vibecoding-state.md` and the agent's
-`agents/$AGENT_NAME/.vibecoding-state.md`. Any prompt that needs to read both
+the AppKit app's `<app_root>/.vibecoding-state.md` (= `<artifact_root>/<app_name>/.vibecoding-state.md`, the top-level app dir) and the Track A agent app's
+`<agent_app_root>/.vibecoding-state.md` (= `<artifact_root>/<agent_app_name>/.vibecoding-state.md`, the top-level agent app dir). Any prompt that needs to read both
 declares `state_file_set` so `enter` knows which file is authoritative for which
 canonical field, and `enter` can fail fast on conflicts.
 
@@ -487,13 +499,22 @@ Pathways A, B, and pure-D runs that touch only one file omit `state_file_set`
 (or set `secondary: null`). The block is required only when a prompt MUST read
 both files in the same step.
 
+A **data-product / lakehouse** run (Bronze→Silver→Gold→semantic, no app/agent app)
+keeps its single canonical live file at `<dp_bundle_root>/.vibecoding-state.md`
+(= `<artifact_root>/{user_schema_prefix}_<use_case_slug>_dab/.vibecoding-state.md`),
+the data-product analog of `<app_root>` / `<agent_app_root>`. It is **bootstrap-created
+by the FIRST lakehouse prompt (Bronze)** if absent — DP-track state must never be left
+in the temporary `example/<use_case_slug>/.vibecoding-state.md` bootstrap path (doing so
+was the "state survived only in chat summary" defect). `enter` resolves it via the
+`dp_bundle_root` branch in step 1; `exit` appends every DP step's Per-Step Log entry to it.
+
 ```yaml
 state_file_set:
   primary:
-    path:                  string                  # e.g. "apps_lakebase/$APP_NAME/.vibecoding-state.md"
+    path:                  string                  # e.g. "<app_root>/.vibecoding-state.md" (top-level app dir)
     owner:                 string                  # enum: appkit | agent | root | example
   secondary:
-    path:                  string                  # e.g. "agents/$AGENT_NAME/.vibecoding-state.md"
+    path:                  string                  # e.g. "<agent_app_root>/.vibecoding-state.md" (top-level agent app dir)
     owner:                 string                  # enum: appkit | agent | root | example
     required_for_prompts:  [string]                # prompt_ids that must read secondary
   lookup_order:            [string]                # e.g. ["primary", "secondary"]
@@ -981,9 +1002,11 @@ preflight_check_registry:
 
 ### Seeds
 
-The nine canonical seeds are populated by `bootstrap` and MUST be present on
+The canonical seeds are populated by `bootstrap` and MUST be present on
 every live state file. Workshops MAY append additional checks but MUST NOT
-remove these.
+remove these. (The last seed, `genie_code_manifest_loaded`, is
+**client-conditional** — inert on `ide_cli`; see § *State-field mapping* and
+the *Genie Code manifest-load gate (normative)* rule below.)
 
 ```yaml
 preflight_check_registry:
@@ -1017,7 +1040,15 @@ preflight_check_registry:
   system_prompt_review_complete:
     owner: first_scored_eval
     blocks_prompt_roles: [first_scored_eval]
+  genie_code_manifest_loaded:                    # G3 — client-conditional
+    owner: skills/genie-code-environment
+    blocks_prompt_roles: [deploy_app, appkit_agent_proxy]
 ```
+
+The `genie_code_manifest_loaded` seed's `owner` (`skills/genie-code-environment`)
+is a **real repo-root skill path** (promoted to `skills/` in Milestone 06 batch
+6a), so `state_contract_audit` resolves it like any other skill owner — it is
+**not** a forward-reference and carries no land-later carve-out.
 
 **Forward-reference handling (Phase 1.7 → Phase 2/4 sequencing) — RESOLVED.**
 The registry was seeded in Phase 1.7 ahead of its producer phases. Each producer
@@ -1062,7 +1093,7 @@ decide whether the check has passed. The mapping is:
 |------------|------------------|----------------|-------|
 | `workspace_url_not_placeholder` | `bootstrap_preflight.workspace_url_was_placeholder` | `== false` | Populated by `bootstrap` step 1 (workspace URL normalization). |
 | `workspace_profile_matches_host` | `bootstrap_preflight.workspace_host_auth_status` | `== 'authenticated'` | Populated by `bootstrap` step 2 (profile selection & host match). |
-| `databricks_cli_min_version` | `bootstrap_preflight.databricks_cli_version` vs `bootstrap_preflight.databricks_cli_min_version` | installed `>=` minimum | Populated by `bootstrap` step 3 (CLI version preflight). |
+| `databricks_cli_min_version` | `bootstrap_preflight.databricks_cli_version` vs `bootstrap_preflight.databricks_cli_min_version` | installed `>=` minimum — **OR** `databricks_cli_version == "unknown_on_genie_code"` (sentinel auto-satisfies; the numeric compare is undefined on Genie Code, so the `deploy_app` / `appkit_agent_proxy` deploy is gated by the `bundle validate` behavior probe instead — Gap-1) | Populated by `bootstrap` step 3 (CLI version preflight, client-branched). |
 | `databricks_apps_capacity` | `bootstrap_preflight.apps_quota.free_slots` | `>= 1` | Populated by `bootstrap` step 4 (apps quota preflight). The `apps_quota.free_slots` field is declared `integer` in § *Bootstrap Preflight*. |
 | `mlflow_tracing_sql_warehouse_id_present` | `MLFLOW_TRACING_SQL_WAREHOUSE_ID` (canonical env var per `canonical_names.env_vars`) | non-empty | Produced by F2 (experiment tracing foundation). |
 | `predict_fn_signature_matches_runner` | `evaluation_runs_preflight.predict_fn_signature_matches_runner` | `== true` | Produced by SDLC Skill 04 (Evaluation Runs). See § *Evaluation Runs Preflight*. The Skill 04 eval-telemetry contract captures `mlflow_eval_predict_fn_signature` per run; the boolean is set true once a run completes whose captured signature matches the runner-expected `(inputs: dict) -> str` or `(inputs: dict) -> dict` shape. |
@@ -1070,6 +1101,7 @@ decide whether the check has passed. The mapping is:
 | `f2_grants_complete` | `f2_grants_complete` | `== true` | Bare top-level boolean produced by F2 (`genai-agents/foundation/02-experiment-tracing-and-uc-storage/SKILL.md`). Bare-on-purpose (similar to `agent_runtime_consumes_registered_prompt`); not an ad-hoc-naming artifact. Overlaps with `deferred_actions[]` seed `f2_grants_complete` — see *Overlap with `deferred_actions[]`* above. |
 | `lakebase_cold_start_retry_policy_present` | `lakebase_cold_start_retry_policy.max_attempts` AND `lakebase_cold_start_retry_policy.retry_on` | `max_attempts >= 3` AND `retry_on` includes `'AdminShutdown'` | Produced by Track A 02 (`tracks/A-custom-agent-apps/02-agent-framework/SKILL.md`) — canonical retry-class allowlist is `[AdminShutdown, psycopg_pool.PoolClosed]`. Phase 4.4 contract; AppKit 07 consumes the same field. |
 | `system_prompt_review_complete` | `system_prompt_review` block | All three preflight checks in `## System Prompt Review` § *enter rule* pass. | See § *System Prompt Review* for the canonical evaluation rule (the registry entry is the registry-side enforcement; the H2 § *enter rule* is the canonical evaluation logic). |
+| `genie_code_manifest_loaded` | `environment_capabilities.client_context` **and** `environment_capabilities.genie_code_manifest_loaded` | `client_context != 'genie_code'` (inert — auto-pass) **OR** `genie_code_manifest_loaded == true` | **Client-conditional (G3).** Owned by `skills/genie-code-environment`; seeded by `bootstrap` step 0 (`n/a` on `ide_cli`, `false` on `genie_code`). The owning manifest flips it `true` when read in the current thread. See § *Genie Code manifest-load gate (normative)* below. |
 
 ### Reflection LM large-context probe (normative)
 
@@ -1084,6 +1116,41 @@ and `long_context_ok`. This preserves the proven Prompt 20g v2 preflight pattern
 while removing GEPA from the flow. `enter` halts the listed
 `blocks_prompt_roles[]` until both `long_context_ok == true` AND
 `accepted_min_context_chars >= 80000` are recorded for the bound endpoint.
+
+### Genie Code manifest-load gate (normative)
+
+The `genie_code_manifest_loaded` check (G3) is the **only client-conditional**
+entry in the registry: it is **inert on `ide_cli`** (the behavioral manifest is
+optional there — the IDE path is the default and the skill bodies already read
+client-agnostic) and **fail-closed on `genie_code`**. Its purpose is the
+self-sufficiency hedge (decision #9 / regression I8): before a Genie Code agent
+runs its first client-divergent operation — the **first deploy** (`deploy_app`,
+`appkit_agent_proxy`) — it MUST have loaded the `skills/genie-code-environment`
+behavioral manifest, so the `runDatabricksCli` allow-list tiers, the
+bundle-deploy CWD pin + FUSE create-then-validate gap, the App-scaffold
+output-dir rule, and the deployed-app OAuth-session pattern are in context.
+
+- **Evaluation.** When the current prompt's role is in `blocks_prompt_roles[]`,
+  `enter` reads `environment_capabilities.client_context`. If it is **not**
+  `genie_code`, the check is **inert** (auto-pass — no field is consulted). If
+  it is `genie_code`, the check passes only when
+  `environment_capabilities.genie_code_manifest_loaded == true`; otherwise
+  (`false` / `<pending>` / `n/a`) `enter` **halts** with a remediation hint
+  pointing at `owner` (`skills/genie-code-environment`): *"read the
+  genie-code-environment manifest, then set
+  `environment_capabilities.genie_code_manifest_loaded: true`."*
+- **Producer.** The owning manifest `skills/genie-code-environment` is
+  responsible for flipping the field `true` when it is read in the current
+  thread (it carries the matching instruction). `bootstrap` step 0 seeds the
+  field (`n/a` on `ide_cli`, `false` on `genie_code`).
+- **"This thread" intent.** The flag records a load **in the current Agent
+  thread**. On a fresh Genie Code thread the manifest is no longer in context,
+  so the agent re-reads it and re-affirms the flag; if `genie_code_manifest_loaded`
+  was carried over `true` from a prior thread but the manifest is not in the
+  current context, treat it as unread and re-load (degrade-don't-trust). The
+  usual escape hatch applies — a `state_override` with
+  `gate_type: preflight_check` and `affected_state_field:
+  environment_capabilities.genie_code_manifest_loaded`.
 
 ### `enter` rule (normative)
 
@@ -1100,6 +1167,11 @@ while removing GEPA from the flow. `enter` halts the listed
   `llm_role_endpoints.reflection_lm.endpoint`. A passing
   `endpoint_guardrail_audit` entry from bootstrap is NOT sufficient on its own
   — the `accepted_min_context_chars >= 80000` floor MUST be present.
+- For `genie_code_manifest_loaded`: `enter` evaluates the check **only when
+  `environment_capabilities.client_context == 'genie_code'`** (inert otherwise —
+  the sole client-conditional check). On `genie_code` it halts the listed deploy
+  roles until `environment_capabilities.genie_code_manifest_loaded == true`. See
+  § *Genie Code manifest-load gate (normative)* above.
 
 ### `state_contract_audit` rule (normative)
 
@@ -1315,7 +1387,7 @@ helper (e.g. `agent_server/long_term_memory.py` for the missing
 | `bundle_resource_schema` | `databricks bundle validate --output json` accepts the field set without load-bearing warnings | Prompt 17: `genie_space` needs `name` + `space_id` (not bare `id`); `apps` resource needs `experiment.id` vs `experiment.experiment_id`. |
 | `api_field_path` | Read against the endpoint returns non-null at the JSON path | KA serving Responses API `input` vs Chat Completions `messages`. |
 | `cli_field_path` | jq path against `databricks <cmd> --output json` returns non-null | `apps get .status.state` vs `.app_status.state` (cross-checks `canonical_names.jq_paths`). |
-| `cli_version_dependent_schema` | Installed CLI `>= min_cli_version` AND validate accepts the field without stripping | Prompt 18: v0.297.1's `AppResourceApp` schema silently strips fields; v0.298.0 forwards them. |
+| `cli_version_dependent_schema` | Installed CLI `>= min_cli_version` AND validate accepts the field without stripping. **On Genie Code (`databricks_cli_version == "unknown_on_genie_code"`)** the version term drops out and the candidate is eligible iff the `databricks bundle validate` probe alone accepts the field (Gap-1). | Prompt 18: v0.297.1's `AppResourceApp` schema silently strips fields; v0.298.0 forwards them. |
 | `inline_template_fallback` | n/a — selected only when every other candidate failed | Prompt 15: `databricks_openai.LongTermMemory` does not exist; ship a reference module from the template. |
 
 ### Consumer contract

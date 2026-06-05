@@ -7,6 +7,11 @@ description: >
   tracing. Track A Step 2. Produces a customized, MLflow-compatible agent
   class ready for tools and deployment.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Agent code (OpenAI Agents SDK + MLflow ResponsesAgent) — no deployed resource of its own; deployed later by Track A 07. Authored identically on both clients. On Genie Code write the agent source under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`); see `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

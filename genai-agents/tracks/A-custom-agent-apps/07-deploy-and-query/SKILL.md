@@ -7,6 +7,11 @@ description: >
   workflow. Track A Step 7. Consumes evaluation results from Step 6.
   Produces a running deployed agent on Databricks Apps.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: "The Track A deploy step — create/sync/deploy the agent to the Databricks Apps runtime, then query the endpoint via OAuth. On Genie Code run the create/sync/deploy CLI through runDatabricksCli (pre-authenticated); on IDE via the local CLI. The deployed app + endpoint carry the per-user prefix. See `skills/genie-code-environment` for the resolved deploy verbs."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high
@@ -86,6 +91,8 @@ use the CLI workflow below.
 ---
 
 ## Path B: Deploy via CLI
+
+> **Genie Code:** run the create / sync / deploy CLI through `runDatabricksCli` (pre-authenticated) and be on the app's page; the enhanced CLI build flow is page/CWD-dependent, so the SDK `w.apps.deploy(...)` SNAPSHOT path is the reliable fallback, and verify the deployed app via the OAuth session. See `skills/genie-code-environment` §3–§4, §7.
 
 ### Step 7b-1: Create the App
 
@@ -173,8 +180,7 @@ are **not supported**.
 Generate an OAuth token:
 
 ```bash
-# Authenticate (one-time per session)
-databricks auth login --host https://<workspace>.cloud.databricks.com
+# Authenticate once — IDE/CLI only (see PRE-REQUISITES §11). Genie Code: pre-authenticated, run via runDatabricksCli.
 
 # Get a fresh token
 databricks auth token --host https://<workspace>.cloud.databricks.com

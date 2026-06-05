@@ -7,8 +7,12 @@ metadata:
   domain: infrastructure
   role: shared
   used_by_stages: [1, 2, 3, 4]
-  last_verified: "2026-02-07"
+  last_verified: "2026-06-02"
   volatility: medium
+  clients: [ide_cli, genie_code]   # deploy via databricks-asset-bundles (the spine); Genie detail via genie-code-environment
+  deploy_verb: "bundle deploy --target dev"
+  deploy_note: "CREATE/ALTER SCHEMA run inside a bundle setup job at deploy time (RULE_10: deploy-time body, retained)"
+  coverage: all_stages
   upstream_sources:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
@@ -26,6 +30,15 @@ metadata:
 **The `resources/schemas.yml` pattern is NO LONGER USED in this project.**
 
 Schemas are now created programmatically in setup scripts using `CREATE SCHEMA IF NOT EXISTS` statements. This provides more flexibility and control over schema creation and properties.
+
+> **Spine reconciliation (M2 closeout — accepted residual).** Keeping schema creation programmatic is an
+> **intentional project choice** and does **not** break the bundle-first authoring discipline: these
+> idempotent statements run **during** `bundle deploy` (inside a deploy-time setup task), so the single
+> creation event is still the deploy (decision #1 / RULE_10 holds), and they resolve the
+> **per-user-prefixed** `schema` variable the bundle passes in (decision #7). The declarative
+> schema-resource alternative is deliberately not used here. For the canonical deploy mechanics see the
+> `databricks-asset-bundles` spine. The `INSESSION_CREATE` audit flags in this file are therefore
+> **legitimate deploy-time bodies**, recorded as accepted residual.
 
 ## Current Pattern: Programmatic Schema Creation
 

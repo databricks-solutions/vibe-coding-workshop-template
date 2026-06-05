@@ -1,6 +1,11 @@
 ---
 name: databricks-aibi-dashboards
 description: Production-grade patterns for Databricks AI/BI (Lakeview) dashboards. Prevents visualization errors, deployment failures, and maintenance issues through widget-query alignment, number formatting, parameter configuration, monitoring table patterns, chart scale properties, and automated deployment workflows. Includes pivot tables with hierarchy drill-down and ratio metrics, point/choropleth maps, sankey diagrams, waterfall and histogram charts, cross-filtering and drill-through patterns, filter defaultSelection/disallowAll configuration, disaggregated vs aggregated query modes, and complete JSON templates for all widget types.
+clients: [ide_cli, genie_code]
+bundle_resource: dashboards
+deploy_verb: bundle_deploy
+deploy_note: "AI/BI (Lakeview) dashboards deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code); .lvdash.json content MUST be base64(ascii) on import (B6) and every widget fieldName must match a SQL alias. On Genie Code, write the generated .lvdash.json under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`, e.g. `resources/`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "4.1"
@@ -93,7 +98,7 @@ Use this skill when:
 | Monitoring / system table queries | **MUST READ** `monitoring/01-lakehouse-monitoring-comprehensive/SKILL.md` | Dashboard includes monitoring widgets |
 
 **Always load these common skills first (per AGENTS.md):**
-- `common/databricks-expert-agent/SKILL.md` — "Extract Don't Generate" principle, core SA behavior
+- `skills/databricks-expert-agent/SKILL.md` — "Extract Don't Generate" principle, core SA behavior
 - `common/naming-tagging-standards/SKILL.md` — naming conventions for dashboards and datasets
 
 > **Plan addendum filename:** Dashboards are always planned in `plans/phase1-addendum-1.5-aibi-dashboards.md`. See [`planning/00-project-planning/assets/addendum-numbering.md`](../../planning/00-project-planning/assets/addendum-numbering.md) for the canonical numbering table. The legacy name `phase1-addendum-1.1-dashboards.md` is forbidden — if you see it anywhere, replace it with `1.5-aibi-dashboards.md`.

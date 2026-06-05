@@ -54,8 +54,18 @@ def classify_tables(schema: dict) -> dict:
         fk_columns = [c for c in cols if c.endswith("_id") and c != f"{table_name.rstrip('s')}_id"]
         pk_candidates = [c for c in cols if c == f"{table_name.rstrip('s')}_id" or c == f"{table_name}_id"]
         measure_types = {"FLOAT", "DOUBLE", "DECIMAL", "LONG", "INT"}
+        # Numeric columns that are descriptive ATTRIBUTES, not additive measures.
+        # Geographic coordinates, physical counts, and prices belong on dimensions
+        # (e.g. properties.base_price / latitude / bedrooms), so excluding them here
+        # stops dimensions from being mis-classified as facts.
+        attribute_patterns = ("latitude", "longitude", "lat", "lon", "lng",
+                              "bedroom", "bathroom", "price", "zip", "postal",
+                              "rating", "score", "age", "year", "rank")
+        def _is_attribute(col: str) -> bool:
+            cl = col.lower()
+            return any(p in cl for p in attribute_patterns)
         measures = [c for c in cols if col_types.get(c, "").upper().split("(")[0] in measure_types 
-                    and not c.endswith("_id")]
+                    and not c.endswith("_id") and not _is_attribute(c)]
         timestamps = [c for c in cols if col_types.get(c, "").upper() in {"TIMESTAMP", "DATE"}]
         
         if len(info["columns"]) <= 3 and len(fk_columns) >= 2:

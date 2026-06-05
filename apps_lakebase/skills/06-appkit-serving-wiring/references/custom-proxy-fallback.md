@@ -4,6 +4,8 @@ Use this reference when the AppKit `serving()` plugin is **not** exported by you
 
 > **Read this only when the Step 1b verification in `04-appkit-plugin-add/SKILL.md` returns `typeof serving === "undefined"`.** If the plugin is available, use `serving()` directly as documented in `06-appkit-serving-wiring/SKILL.md` Step 3 — do not build a custom proxy.
 
+> **Client routing:** the proxy code below is server-side and **client-agnostic** (runs identically on IDE and Genie Code). Only the surrounding toolchain differs — on Genie Code skip the local `npm run build` (server-side build on deploy), run `databricks …` via `runDatabricksCli` (omit `--profile`), and verify the deployed app via browser / OAuth-session. See [`../SKILL.md`](../SKILL.md) routing table and `skills/genie-code-environment`.
+
 ---
 
 ## When to Build a Custom Proxy

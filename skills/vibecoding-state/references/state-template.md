@@ -7,7 +7,7 @@ skill to any project that adopts this course.
 
 WORKFLOW:
   1. At the start of the workshop, the agent reads this template directly
-     from `genai-agents/vibecoding-state/references/state-template.md`
+     from `skills/vibecoding-state/references/state-template.md`
      and copies it to the bootstrap live path:
        example/<use_case_slug>/.vibecoding-state.md
      (there is NO intermediate per-use-case template — one copy, not two.)
@@ -26,20 +26,25 @@ WORKFLOW:
      ## Bootstrap Preflight is written by the bootstrap operation BEFORE the spec is resolved; it sits above ## Per-Step Log so its values are visible to every prompt that reads state.
      ## State File Set and ## Canonical Names also sit above ## Per-Step Log: ## State File Set is filled in (or left at defaults) by `bootstrap` and consulted by `enter` whenever a prompt must read both an AppKit and an agent state file; ## Canonical Names is the registry of pinned spellings (env vars, headers, jq paths, prompts:/ scheme, eval dataset columns) and is read by every prompt and by `state_contract_audit`.
      ## State Overrides, ## Deferred Actions, ## MLflow Eval Known Quality Issues, ## Gate Load Bearing Checks, ## Productized Debts, ## Preflight Check Registry, ## System Prompt Review, and ## Skill Helper Resolutions also sit above ## Per-Step Log: they are the fail-closed contract `enter` (and `audit_debts`, `skill_helper_resolution`) consults on every prompt. State overrides are the only way past a failed gate / hard_assert / preflight / pathway-applicability check (cross-session continuity is recorded here, not in prose). Deferred actions are the canonical baseline of cross-prompt dependencies that block downstream prompts until their `divergence_check` returns true. Known quality issues block the listed `target_prompt_roles_blocked[]` until status flips off `open`. Gate load-bearing checks back the verify-job `warning_policy: block_if_load_bearing` rule. Productized debts record workarounds the workshop deliberately ships with — `audit_debts` evaluates each `remove_when` predicate and flips `debt_lifted: true` when the workaround can be removed. The preflight check registry is the canonical map of named preflight checks (owner skill/prompt + `blocks_prompt_roles[]`); `enter` halts every listed prompt role until the matching state field records the check as passing. The system-prompt review records the pre-eval worked-example audit of `agent.must_do` / `agent.must_not_do` (defaults: `complete: false`, both example arrays empty); `enter` halts the first scored eval prompt until each rule has at least one worked example and the operator has signed off. Skill helper resolutions record the concrete shape selected for every skill-prescribed helper contract probed at runtime (defaults: empty list); consuming skills cite resolved helpers via `skill_helper_resolutions[contract_name='<name>'].selected_value`.
-  4. Once $APP_NAME is known (Module 1 for Pathways A/B/C) or $AGENT_NAME is
-     known (Module 4 for Pathway D), the state file is migrated to its
-     canonical live path:
-       - Pathways A / B / C:  apps_lakebase/$APP_NAME/.vibecoding-state.md
-       - Pathway D (agent only): agents/$AGENT_NAME/.vibecoding-state.md
-  5. Every subsequent prompt READS the entire file first, then APPENDS a new
-     `## Prompt <N>` (or `## Phase <N.M>` / `## Module <N>`) section.
-  6. Never edit prior step sections — treat them as an append-only log.
+  4. The state file is migrated (or, for a data-product run, bootstrap-created) at
+     its canonical live path as soon as the owning root is resolved:
+       - Pathways A / B / C:  <app_root>/.vibecoding-state.md  (= <artifact_root>/<app_name>/.vibecoding-state.md, the top-level app dir — NOT apps_lakebase/<app_name>/), once $APP_NAME is known (Module 1).
+       - Track A agent app (Pathways C / D): <agent_app_root>/.vibecoding-state.md  (= <artifact_root>/<agent_app_name>/.vibecoding-state.md, the top-level agent app dir — NOT apps_lakebase/<agent_app_name>/), once $AGENT_APP_NAME is known (Track A clone / Module 4).
+       - Data-product / lakehouse track (Bronze→Silver→Gold→semantic, no app/agent app): <dp_bundle_root>/.vibecoding-state.md  (= <artifact_root>/{user_schema_prefix}_<use_case_slug>_dab/.vibecoding-state.md, the data-product bundle root). The FIRST lakehouse prompt (Bronze) bootstrap-creates it from this template if absent — DP-track state must NOT be left in the temporary example/ path (that omission was the "state survived only in chat summary" defect). This is the data-product analog of <app_root>/<agent_app_root>.
+  5. Every subsequent prompt READS the entire file first, then writes its
+     `## Prompt <N>` (or `## Phase <N.M>` / `## Module <N>`) section. The write is
+     IDEMPOTENT by prompt id: if a `## Prompt <N>` section already exists (a
+     re-run after a retry / context reset), REPLACE it in place; only APPEND when
+     no section for that id exists. Never create a second section for the same id
+     (duplicate entries were a live regression).
+  6. Never edit a DIFFERENT prior step's section — treat other steps as an
+     append-only log; only a step's own re-run may replace its own section.
   7. Live state files are gitignored. Only this template (inside the skill)
      is committed.
 
 DOWNSTREAM:
   - Retrospective entries accumulate in `example/<use_case>/retrospective.md`
-    using `genai-agents/vibecoding-state/references/retrospective-template.md`.
+    using `skills/vibecoding-state/references/retrospective-template.md`.
 
 SCHEMA VERSION:
   - This template corresponds to schema v2.0. `vibecoding-state.enter` will
@@ -50,6 +55,89 @@ SCHEMA VERSION:
 **Workshop:** <USE_CASE_SLUG>
 **Started:** <ISO timestamp>
 **Last updated:** <ISO timestamp>
+
+---
+
+## Environment Capabilities
+
+<!--
+Section 0. Written by `vibecoding-state.bootstrap` step 0 BEFORE anything else, and read by
+`enter` / `exit` and every prompt. This is the RULE_0 (navigation preamble) / RULE_1 (deploy
+verb) source of truth: the skill/prompt BODY stays one content set across clients — only the
+navigation preamble and the CLI channel vary by `client_context`.
+
+Detection (bootstrap step 0) — [inference, pending the live Genie Code probe]:
+  - `runDatabricksCli` tool / Genie serverless markers present  ⇒  client_context: genie_code
+      cli_channel: runDatabricksCli ; bundle_deploy.page_context_required: true
+      state_file_root: <git-folder workspace path>
+      artifact_root:  <git-folder workspace path>   # clone root, e.g. /Workspace/Users/<email>/.assistant/skills/<repo>
+      skill_ref_root: skills/<clone-folder>          # readSkillFile prefix, = "skills/" + basename(artifact_root), e.g. skills/vibe-coding-workshop
+  - otherwise                                                    ⇒  client_context: ide_cli
+      cli_channel: local_shell ; bundle_deploy.page_context_required: false
+      state_file_root: <local repo path>
+      artifact_root:  <local repo path>
+      skill_ref_root: ""                             # empty — repo-relative skill paths / @-mentions resolve as-is
+
+`artifact_root` is where RELATIVE artifact paths in prompt bodies resolve (`<ARTIFACT_ROOT>/docs/design_prd.md`).
+It defaults equal to `state_file_root` (the clone / git-folder root) and is kept as a distinct field so an
+app/agent subdir can later diverge without overloading `state_file_root`. Bare relative paths are unsafe on
+genie_code because its CWD is page-type-dependent — see `skills/genie-code-environment` §8.
+`skill_ref_root` is the read-side sibling: the prefix that makes a repo-relative SKILL path loadable on
+genie_code via `readSkillFile` (`<skill_ref_root>/data_product_accelerator/skills/.../SKILL.md`). Empty on
+ide_cli (paths/@-mentions resolve from the workspace root). See `skills/genie-code-environment` §8.
+`dp_bundle_root` is the write-side anchor for the data-product pipeline: a SELF-CONTAINED Databricks Asset
+Bundle project directory `<artifact_root>/{user_schema_prefix}_<use_case_slug>_dab` (e.g.
+`…/vibe-coding-workshop/prashanth_s_booking_app_dab`) shared by every DP stage (bronze→silver→gold→semantic).
+The `{user_schema_prefix}_` prefix is the SAME username-derived prefix used for the `{user_schema_prefix}_bronze`
+/ `_silver` / `_gold` schemas (companion app supplies it on genie_code; on ide_cli it derives from the
+authenticated user, e.g. `prashanth_s`); prefixing the folder disambiguates concurrent users in a shared
+workspace. The bundle `name:` inside `databricks.yml` MUST match this folder name
+(`bundle: { name: {user_schema_prefix}_<use_case_slug>_dab }`) for the same reason. Generated `databricks.yml` /
+`src/` / `resources/` live UNDER it — never at the bare clone root (mixing generated artifacts into the framework
+clone is the "one level too high" bug) and never inside a read-only framework dir (`data_product_accelerator/` etc.).
+On genie_code it is also the **`bundle deploy` page-context root** (be on this folder's page to deploy). It is
+derived once `use_case_slug` is known (bootstrap), so `resolve_root` (pre-bootstrap) does not produce it.
+`app_root` is the write-side anchor for the AppKit application track (Pathways A/B/C) — the exact analog of
+`dp_bundle_root`: a SELF-CONTAINED app project directory `<artifact_root>/<app_name>` (e.g.
+`…/vibe-coding-workshop/prashanth-s-booking`), a TOP-LEVEL sibling of `{user_schema_prefix}_<use_case_slug>_dab` — NOT nested under
+`apps_lakebase/` and NOT the bare clone root. The scaffolded app (`app.yaml`, `databricks.yml`, `server/`,
+`client/`, and `<app_root>/.vibecoding-state.md`) lives UNDER it on BOTH clients, so the app's root folder has
+parity regardless of coding agent. On genie_code it is the `apps init --output-dir` target. It is derived once
+`APP_NAME` is known (Module 1 / prompt 04); `<pending>` until then. The app deploys via `apps deploy` (RULE_9
+exception), not `bundle deploy`, so there is no `bundle`-style page-context pin.
+`agent_app_root` is the write-side anchor for the Track A custom-agent application (Pathways C/D) — the exact
+analog of `app_root`: a SELF-CONTAINED agent project directory `<artifact_root>/<agent_app_name>` (e.g.
+`…/vibe-coding-workshop/booking-support-agent`), a TOP-LEVEL sibling of `<app_name>` and `{user_schema_prefix}_<use_case_slug>_dab`
+— NOT nested under `apps_lakebase/` and NOT the bare clone root. The cloned agent framework (`app.yaml`,
+`pyproject.toml`, `databricks.yml`, `server/`, and `<agent_app_root>/.vibecoding-state.md`) lives UNDER it on
+BOTH clients, so the agent app's root folder has parity regardless of coding agent. On genie_code it is the
+`apps init --output-dir` target and the `uv`-based FastAPI server builds server-side via `apps deploy`
+(`mode=SNAPSHOT`) — there is no local `uv run dev` loop. It is derived once `AGENT_APP_NAME` is known (Track A
+clone / prompt 43); `<pending>` until then. Like `app_root`, the agent app deploys via `bundle deploy` (for the
+agent's bundle resources) plus `apps deploy` (for the host), not a bare-shell `databricks` call. `n/a` for
+Pathways A/B (no agent app).
+Client-invariant fields (same for both clients):
+  bundle_deploy.verb = "bundle deploy --target dev"   (never a bare-shell `databricks` call)
+  app_deploy         = { verb: "apps deploy", gated: true }   (RULE_9 exception)
+  destructive_ops    = confirm_required
+-->
+
+```yaml
+environment_capabilities:
+  client_context: <ide_cli | genie_code>        # detected at bootstrap step 0
+  cli_channel: <local_shell | runDatabricksCli>
+  bundle_deploy: { verb: "bundle deploy --target dev", page_context_required: <true | false> }
+  app_deploy:    { verb: "apps deploy", gated: true }
+  destructive_ops: confirm_required
+  state_file_root: <local repo path | git-folder workspace path>
+  artifact_root: <local repo path | git-folder workspace path>   # relative artifact paths resolve here (<ARTIFACT_ROOT>/<relpath>); defaults to state_file_root
+  skill_ref_root: <"" | "skills/<clone-folder>">   # readSkillFile prefix for repo-relative SKILL paths on genie_code (= "skills/" + basename(artifact_root)); empty on ide_cli
+  dp_bundle_root: <artifact_root>/{user_schema_prefix}_<use_case_slug>_dab   # self-contained DAB project dir for the data-product pipeline; username-prefixed (same {user_schema_prefix}_ as the _bronze/_silver/_gold schemas) so concurrent users never collide. The bundle name: in databricks.yml MUST match this folder name. Generated databricks.yml/src/resources live here, and on genie_code it is the `bundle deploy` page-context root. Derived at bootstrap (needs use_case_slug + user_schema_prefix); <pending> until then.
+  app_root: <artifact_root>/<app_name>   # self-contained AppKit app project dir (Pathways A/B/C); top-level sibling of dp_bundle_root, NOT under apps_lakebase/ and NOT the bare clone root. app.yaml/databricks.yml/server/client and app_root/.vibecoding-state.md live here on BOTH clients (root-folder parity). On genie_code it is the `apps init --output-dir` target. Derived once APP_NAME is known (Module 1 / prompt 04); <pending> until then. n/a for Pathway D (agent-only).
+  agent_app_root: <artifact_root>/<agent_app_name>   # self-contained Track A custom-agent project dir (Pathways C/D); top-level sibling of app_root and dp_bundle_root, NOT under apps_lakebase/ and NOT the bare clone root. app.yaml/pyproject.toml/databricks.yml/server and agent_app_root/.vibecoding-state.md live here on BOTH clients (root-folder parity). On genie_code it is the `apps init --output-dir` target and builds the uv/FastAPI server server-side via `apps deploy` (mode=SNAPSHOT) — no local `uv run dev`. Derived once AGENT_APP_NAME is known (Track A clone / prompt 43); <pending> until then. n/a for Pathways A/B.
+  genie_code_manifest_loaded: <n/a | false | true>   # G3 — seeded by bootstrap step 0: `n/a` on ide_cli (check is inert), `false` on genie_code. On genie_code the owning skill `skills/genie-code-environment` MUST flip this to `true` once it is read in the current thread; the first deploy/divergent prompt's `enter` halts while it is `false`/`<pending>`.
+  # detected_via: <runDatabricksCli | genie_serverless_marker | no_managed_cli_channel>
+```
 
 ---
 
@@ -70,6 +158,7 @@ SCHEMA VERSION:
   - Track C = Model Serving (standalone endpoint)
 - **dabs_bundle_path:** `<path, e.g. example/<use_case>/ | n/a>`
 - **llm_endpoint:** `<e.g. databricks-claude-sonnet-4-6>`
+- **enable_lakebase_cdf:** `<true | false>`  <!-- default false; Pathways B/C only. Gates the `sync_from_lakebase` genie-code fork (input_id 931): false = one-time CLONE of the Lakebase tables into the lakehouse user-scoped schema; true = attempt Lakebase Change Data Feed, with automatic announced fallback to clone when the workspace cannot host CDF (default-storage catalog / preview off). Surfaced to prompts as the `{enable_lakebase_cdf}` placeholder. -->
 
 ---
 
@@ -231,7 +320,7 @@ llm_role_endpoints:
 
 <!--
 Populated by `vibecoding-state.endpoint_guardrail_audit`, which shells out to
-`genai-agents/vibecoding-state/scripts/probe_endpoints.py`. One entry per
+`skills/vibecoding-state/scripts/probe_endpoints.py`. One entry per
 endpoint considered (every candidate across every role, deduplicated). See
 `spec-schema.md` § *Endpoint Guardrail Audit* for the field definitions.
 -->
@@ -263,7 +352,7 @@ bootstrap_preflight:
   workspace_url_was_placeholder: <pending>
   workspace_profile: <pending>
   workspace_host_auth_status: <pending>          # authenticated | unauthenticated | wrong_host
-  databricks_cli_version: <pending>
+  databricks_cli_version: <pending>             # ide_cli: `databricks --version`; genie_code: "unknown_on_genie_code" (--version hard-blocked, Gap-1 → version gate skipped, bundle-validate probe instead)
   databricks_cli_min_version: "0.295.0"
   apps_quota:
     current_count: <pending>
@@ -285,9 +374,9 @@ bootstrap_preflight:
 
 <!--
 Declared when a prompt must read BOTH an AppKit state file
-(apps_lakebase/$APP_NAME/.vibecoding-state.md) and an agent state file
-(agents/$AGENT_NAME/.vibecoding-state.md) in the same step. Pathways A, B, and
-pure-D runs leave `secondary` at <pending> / null and never trip the
+(<app_root>/.vibecoding-state.md, the top-level app dir) and an agent state file
+(<agent_app_root>/.vibecoding-state.md, the top-level agent app dir) in the same
+step. Pathways A, B, and pure-D runs leave `secondary` at <pending> / null and never trip the
 multi-file path. `enter` consults `lookup_order` for non-conflicting reads and
 applies `conflict_policy` when the same canonical field appears in both files
 with different values. See `spec-schema.md` § *State File Set* for the
@@ -531,10 +620,11 @@ Canonical map of every named preflight check the workshop knows about. Each
 entry maps a check name to its `owner` (the skill or prompt that owns the
 check) and `blocks_prompt_roles[]` (the prompt roles whose `enter` MUST halt
 while the check has not been recorded as passing). Bootstrap pre-populates
-the nine seeds below; workshops MAY append additional checks but MUST NOT
+the canonical seeds below; workshops MAY append additional checks but MUST NOT
 remove the seeds. See `spec-schema.md` § *Preflight Check Registry* for the
-state-field mapping table, the synchronous reflection-LM probe rule, and the
-normative `enter` / `state_contract_audit` consumption rules.
+state-field mapping table, the synchronous reflection-LM probe rule, the
+client-conditional `genie_code_manifest_loaded` rule, and the normative
+`enter` / `state_contract_audit` consumption rules.
 -->
 
 ```yaml
@@ -569,6 +659,9 @@ preflight_check_registry:
   system_prompt_review_complete:
     owner: first_scored_eval
     blocks_prompt_roles: [first_scored_eval]
+  genie_code_manifest_loaded:                    # G3 — client-conditional (inert on ide_cli)
+    owner: skills/genie-code-environment
+    blocks_prompt_roles: [deploy_app, appkit_agent_proxy]
 ```
 
 ---
@@ -669,7 +762,10 @@ skill_helper_resolutions: []
 ## Per-Step Log
 
 <!--
-Every completed prompt appends a section below using this template.
+Every completed prompt writes a section below using this template. The write is
+idempotent by prompt id: if a `## Prompt <id>` section already exists (re-run
+after a retry/reset), REPLACE it in place; only APPEND when none exists. Never
+log the same prompt id twice.
 
 For prompts that do NOT apply to the chosen pathway, the agent still writes a
 section with Outcome = `Skipped (N/A for pathway <X>)` so the log is complete
@@ -765,7 +861,7 @@ from the LLM output (after validation). Do NOT fill them in by hand.
       prd_sha256:       "..."
       llm_endpoint:     "..."
 
-See `genai-agents/vibecoding-state/references/spec-schema.md` for the full
+See `skills/vibecoding-state/references/spec-schema.md` for the full
 field list and validation rules.
 -->
 

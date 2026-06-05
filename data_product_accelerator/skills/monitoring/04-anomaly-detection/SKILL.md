@@ -1,6 +1,11 @@
 ---
 name: anomaly-detection
 description: Schema-level anomaly detection for Databricks Unity Catalog using the Data Quality API (Public Preview). Automatically monitors table freshness and completeness using ML models. Use when setting up schema-wide data reliability monitoring, detecting stale or incomplete tables, configuring anomaly detection alerts, or querying the system results table. **Auto-triggered by Silver and Gold layer setup workflows** to ensure every new schema has baseline freshness/completeness monitoring from day one.
+clients: [ide_cli, genie_code]
+bundle_resource: monitors
+deploy_verb: bundle_deploy
+deploy_note: "Schema-level anomaly detection (Data Quality API) on the per-user prefixed schema; deployed via `bundle deploy --target dev` (runDatabricksCli on Genie Code)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.1"

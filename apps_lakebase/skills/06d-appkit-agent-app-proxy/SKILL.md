@@ -27,13 +27,25 @@ fields_read:
   - agent.backend_url
   - agent.stream_format
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  The proxy handler + OBO header forwarding (`x-forwarded-access-token`, `x-app-user-email`) is server-side
+  code — **client-agnostic**, runs identically on both clients. IDE: `databricks apps get/bundle validate
+  --profile $PROFILE`, `npm run build`, then `databricks apps deploy --profile $PROFILE`. Genie Code: run
+  `apps get` / `bundle validate` via `runDatabricksCli` (omit `--profile`; a targetless `bundle validate`
+  may need `--target dev`); local `npm run build` is an IDE convenience (server-side build on deploy);
+  deploy per `03-appkit-deploy`. Verify via browser + `apps logs` or the OAuth-session test — `auth token` +
+  raw Bearer `curl` to `/invocations` is hard-blocked on Genie Code.
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.1.0"
   domain: apps
   role: serving-wiring
   standalone: false
-  last_verified: "2026-04-30"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources:
     - name: "databricks-agent-skills/databricks-model-serving"
@@ -132,7 +144,7 @@ The Sonnet endpoints used in the workshop are subject to an AI-Gateway output gu
 Operator obligations:
 
 - The synthesized-SSE branch MUST be tagged `debt: workspace_sse_guardrail` in `Globals.productized_debts[]`, with a `remove_when` predicate referencing `endpoint_guardrail_audit[llm_role_endpoints.agent_chat.endpoint].streaming_ok == true`.
-- Do **not** assume the workaround is invisible just because no admin ticket is filed. `audit_debts` (see [`vibecoding-state` SKILL.md](../../../genai-agents/vibecoding-state/SKILL.md)) re-evaluates `remove_when` on every audit run; once the upstream guardrail flips, the debt's `debt_lifted` evaluation flips and the synthesis branch must be removed.
+- Do **not** assume the workaround is invisible just because no admin ticket is filed. `audit_debts` (see [`vibecoding-state` SKILL.md](../../../skills/vibecoding-state/SKILL.md)) re-evaluates `remove_when` on every audit run; once the upstream guardrail flips, the debt's `debt_lifted` evaluation flips and the synthesis branch must be removed.
 - Ship a one-line revert path gated on `debt_lifted` (e.g. `return upstream.body` instead of synthesizing) so the proxy reverts to true streaming without further engineering when the policy changes.
 
 Without this discipline, the proxy productizes the workaround forever — Track A users get non-streaming UX even after the underlying policy is fixed, because no operator will know to delete the synthesized-SSE branch.
@@ -211,6 +223,22 @@ See [`references/dual-format-streaming.md`](references/dual-format-streaming.md)
    node --version      # v22.x or higher
    databricks --version  # >= 0.295.0
    ```
+
+### Working in Genie Code (client routing)
+
+The proxy handler and OBO forwarding (Step 2) are **server-side code — identical on both clients**. Only the toolchain commands and the deployed-app probes differ. `$AGENT_APP_NAME` / `$APPKIT_APP_NAME` / `$PROFILE` / `$AGENT_APP_URL` resolve from `.vibecoding-state.md` when a prior phase wrote them (don't re-derive). Apply these substitutions:
+
+| IDE/CLI (as written) | Genie Code substitution |
+|----------------------|--------------------------|
+| `databricks apps get … --profile $PROFILE` (Prereqs 1–2) | run via `runDatabricksCli` (read-tier), **omit `--profile`** |
+| `databricks auth token` + `curl … /invocations -H "Authorization: Bearer …"` (Prereq 3) | `auth token` is hard-blocked and raw Bearer is rejected — confirm reachability from the **deployed AppKit proxy** (Step 6) or via the OAuth-session test in `03-appkit-deploy`; for a quick SP-only check use the SDK `executeCode` (`w.config` + `requests`) |
+| `databricks bundle validate --profile $PROFILE` (Step 1d) | run via `runDatabricksCli` (omit `--profile`); if a targetless validate is guardrail-blocked, pass `--target dev` |
+| `npm run build` gates (Steps 2, 3, 4, 5) | **IDE-only** convenience — no local Node toolchain. Skip; the platform builds **server-side** on deploy, errors surface in `databricks apps logs <name>` |
+| `npm run dev` | not available — verify on the deployed app |
+| `databricks apps deploy …` (Step 6a) | see the `03-appkit-deploy` deploy-routing contract (`runDatabricksCli`, else SDK `w.apps.deploy(... SNAPSHOT)`) |
+| `test-agent-app-proxy.sh` four-probe E2E (Step 6b) | runs against **deployed** apps; on Genie Code drive its `databricks`/`curl` calls via `runDatabricksCli` / `executeCode` (omit `--profile`). The browser check (Step 6c) is the simplest manual verify. |
+
+Paths are relative to `apps_lakebase/$APP_NAME` — under your `.assistant/skills` repo clone on Genie Code, never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ---
 

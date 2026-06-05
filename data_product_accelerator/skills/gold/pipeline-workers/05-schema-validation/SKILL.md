@@ -2,6 +2,11 @@
 name: 05-schema-validation
 description: Runtime schema validation patterns for Gold layer merge scripts. Use when creating merge scripts to ensure DataFrame columns match target DDL schemas, validate column mappings before MERGE operations, and catch schema issues before deployment. Includes the DDL-first workflow, validate_merge_schema() helper, explicit column mapping, DDL schema reader, and pre-deployment validation script. Addresses the "three sources of truth" problem by enforcing DDL as runtime truth.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Pattern consumed by the Gold merge jobs (notebook_task); deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

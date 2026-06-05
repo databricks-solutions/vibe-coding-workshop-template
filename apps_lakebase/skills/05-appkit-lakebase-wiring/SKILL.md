@@ -12,13 +12,24 @@ description: >
 license: Apache-2.0
 compatibility: Requires Lakebase plugin registered via 04-appkit-plugin-add, Node.js v22+, Databricks CLI >= 0.295.0
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  Wiring is source editing (server.ts DDL/routes, hooks) — client-agnostic. DDL runs **server-side** on
+  first deploy under the app's Service Principal (Deploy-First Pattern), so the SP owns the schema/tables on
+  both clients — never run DDL locally. IDE: `npm run build` gates locally, then `databricks apps deploy
+  --profile $PROFILE`. Genie Code: local `npm run build` gates are an IDE convenience (no local npm) — skip
+  them and let the platform build server-side; deploy via `runDatabricksCli` (omit `--profile`) or the SDK
+  fallback in `03-appkit-deploy`. Verify via browser `ConnectionStatus` / `apps logs` or the OAuth-session test.
+coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.1.0"
   domain: apps
   role: lakebase-wiring
   standalone: false
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources:
     - name: "databricks-agent-skills/databricks-lakebase"
@@ -71,6 +82,20 @@ npx @databricks/appkit docs "lakebase"
 ```
 
 > **Build system note:** AppKit uses `tsdown` with `unbundle: true` for server compilation. Each `.ts` file in `server/` gets its own `.js` output, and relative imports between them are preserved. You can safely split `server/server.ts` into multiple files (e.g., `server/mock-data.ts`, `server/mappers.ts`) — they will resolve correctly at runtime. The entry point remains `server/server.ts`.
+
+### Working in Genie Code (client routing)
+
+All the **code** in this skill — DDL, routes, hooks, mappers — is written into the project the same way on both clients. The DDL is intentionally executed **server-side on first deploy** (the "Deploy-First Pattern" in Step 1d), so it is already client-agnostic. Only the **local build/test gates** differ:
+
+| IDE/CLI (as written) | Genie Code substitution |
+|----------------------|--------------------------|
+| `npm run build` gates (Steps 2g, 3c2, 4a, 4b) — "**You MUST run `npm run build`**" | **IDE-only** convenience — there is no local Node toolchain on Genie Code. Skip them; the platform runs the same build **server-side** on deploy, and TypeScript/import errors surface in `databricks apps logs <name>`. Wire the code, then deploy and read the logs. |
+| `npm run dev` | not available on Genie Code (and blocked pre-deploy anyway — `lakebase()` needs platform-injected env) — verify on the deployed app instead |
+| `npx @databricks/appkit docs "lakebase"` | npx absent (P9) — WebFetch https://databricks.github.io/appkit/docs/plugins/lakebase |
+| `databricks … --profile $PROFILE` | run via `runDatabricksCli`, **omit `--profile`** (pre-authenticated) |
+| local `curl … -H "Authorization: Bearer …"` health test | browser `ConnectionStatus` + `apps logs`, **or** the 3-hop OAuth `requests.Session()` test (see Quick Reference note and `03-appkit-deploy`) |
+
+Paths are relative to `apps_lakebase/$APP_NAME` — on Genie Code that lives under your `.assistant/skills` repo clone, never `/tmp`. The `apps validate` skip and the health-test routing are already flagged inline at Steps 4a2 and Quick Reference. See `skills/genie-code-environment` for the full manifest.
 
 ---
 
@@ -136,7 +161,7 @@ All DDL runs on every app startup. It must be safe to execute repeatedly.
 
 ```typescript
 const AppKit = await createApp({
-  plugins: [server({ autoStart: false }), lakebase()],
+  plugins: [server(), lakebase()],
 });
 
 const DB_SCHEMA = process.env.DB_SCHEMA || "app";
@@ -216,29 +241,30 @@ AppKit Lakebase is **server-side only** — there are no frontend hooks like `us
 
 ### 2a. Server Setup Pattern
 
-When using `server.extend()`, pass `autoStart: false` to the `server()` plugin and call `AppKit.server.start()` manually after registering all routes:
+Register custom routes inside the `onPluginsReady` callback. It runs after the plugins initialize but **before** the `server()` plugin starts listening — exactly the window where `appkit.server.extend()` must attach Express routes. Move the Step 1 DDL and the Step 1e seed inside this same callback (before the `extend` call) so the schema exists before the server accepts traffic. Do **NOT** pass `autoStart: false` and do **NOT** call `AppKit.server.start()` yourself:
 
 ```typescript
 import { createApp, server, lakebase } from "@databricks/appkit";
 
-const AppKit = await createApp({
-  plugins: [server({ autoStart: false }), lakebase()],
-});
-
 const DB_SCHEMA = process.env.DB_SCHEMA || "app";
 
-// DDL + seed (from Step 1) ...
+await createApp({
+  plugins: [server(), lakebase()],
+  async onPluginsReady(appkit) {
+    // DDL + seed (from Step 1) — run before the server accepts traffic
+    await appkit.lakebase.query(`CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA}`);
+    // ... CREATE TABLE / INDEX + count-check seed ...
 
-AppKit.server.extend((app) => {
-  // Register routes here (Steps 2b-2d)
+    appkit.server.extend((app) => {
+      // Register routes here (Steps 2b-2d)
+    });
+  },
 });
-
-await AppKit.server.start();
 ```
 
 > **`npm run dev` will NOT work until after the first deploy.** The `lakebase()` plugin throws `ConfigurationError` during `createApp()` when `LAKEBASE_ENDPOINT` and `PGHOST` are not set. These env vars are injected by the platform after the Lakebase project is provisioned (first deploy). Use **`npm run build` only** for local validation at this step — it type-checks and bundles without executing the code. Runtime testing with `npm run dev` is available after deployment creates the Lakebase project and you populate `.env` with connection details (see the **Deploy and E2E Test** step, Step 7).
 
-> **Gotcha — `autoStart: false` is required.** Without it, the server starts before `extend()` runs and routes are never registered. Always pass `server({ autoStart: false })` and call `AppKit.server.start()` after all routes are defined.
+> **Gotcha — register routes in `onPluginsReady`, never call `server.start()` manually.** The `server()` plugin owns the HTTP listener. Passing `autoStart: false` and then calling `AppKit.server.start()` yourself is the stale pattern — it double-`listen()`s (the plugin still binds the port) and the app crashes on boot (`EADDRINUSE`). The supported shape is the `onPluginsReady(appkit)` hook on `createApp`: it fires after plugins init but before the listener binds, so `appkit.server.extend(...)` routes are attached in time. The `server()` plugin also auto-adds `/health` — do not register it yourself. Reference: [developer docs — AppKit `createApp` (`onPluginsReady` hook)](https://developers.databricks.com/appkit).
 
 > **Gotcha — Do NOT annotate `app` with `: any` or `: Express`.** AppKit's AST-grep linter blocks `any` annotations (`no-as-any` rule), and importing `Express` from the `express` module causes TS2345 (type mismatch with AppKit's internal type). Leave `app` untyped in `server.extend((app) => { ... })` — TypeScript infers the correct type from the callback signature. For route handler parameters, import and use `Request` and `Response` types from `express`.
 
@@ -441,6 +467,8 @@ databricks apps validate --profile $PROFILE
 
 If the smoke test fails because of default selectors ("Minimal Databricks App", "hello world"), update `tests/smoke.spec.ts` heading and text assertions to match your app's actual content. See [testing.md](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-apps/references/testing.md).
 
+> **Client note — Genie Code:** `databricks apps validate` is **hard-blocked** via `runDatabricksCli`. Skip it and rely on the **server-side build logs** after deploy; see `03-appkit-deploy` Step 1 (Client note).
+
 ### 4b. Local Validation (Build Only)
 
 > **Do NOT run `npm run dev` at this step.** The `lakebase()` plugin throws `ConfigurationError` when `LAKEBASE_ENDPOINT` and `PGHOST` are not set. These env vars are provisioned by the platform on first deploy. `npm run build` is sufficient — it validates all TypeScript, imports, and bundling without executing the code.
@@ -471,7 +499,7 @@ Detailed callouts are embedded inline at the relevant step. This table is a comp
 |--------|-----|------|
 | `ON CONFLICT DO NOTHING` with identity PKs | Count-check seed pattern | 1e |
 | `import express` / `require("express")` | Use `server.extend((app))` + inline parser | 2e |
-| Missing `autoStart: false` | Pass to `server()` plugin | 2a |
+| Manual `AppKit.server.start()` / `autoStart: false` | Register routes in `onPluginsReady(appkit)` + `appkit.server.extend(...)`; let `server()` own the listener (manual start double-binds → `EADDRINUSE`) | 2a |
 | `lakebase()` crashes without env vars (`LAKEBASE_ENDPOINT`, `PGHOST`) | Expected before first deploy. Use `npm run build` only; `npm run dev` works after deploy + `.env` setup | 2a |
 | DECIMAL columns → strings | `Number()` in mappers | 3d |
 | DATE columns → Date objects | `.toISOString().slice(0,10)` | 3d |
@@ -491,7 +519,9 @@ Detailed callouts are embedded inline at the relevant step. This table is a comp
 | Check live Lakebase docs | `npx @databricks/appkit docs "lakebase"` |
 | Derive schema name | `DB_SCHEMA=$(echo "$APP_NAME" \| tr '-' '_')` |
 | Build gate | `npm run build` (must pass with zero errors) |
-| Test health endpoint (after deploy) | `curl -s "$APP_URL/api/health/lakebase" -H "Authorization: Bearer $TOKEN" \| jq .` |
+| Test health endpoint (after deploy) | `curl -s "$APP_URL/api/health/lakebase" -H "Authorization: Bearer $TOKEN" \| jq .` (IDE only — see note) |
+
+> **Client note — Genie Code:** a plain `curl … -H "Authorization: Bearer $TOKEN"` does **not** work (`auth token` hard-blocked; raw Bearer rejected by AppKit's OAuth gate → 401). Two working paths: **(1) browser** — open the app URL and read the `ConnectionStatus` indicator (live/mock), plus `databricks apps logs <name>` for `[Lakebase]` query lines; **(2) programmatic** — hit `/api/health/lakebase` via the **3-hop OAuth `requests.Session()` pattern** in `03-appkit-deploy` "Testing Deployed App APIs" (Client note).
 
 ---
 

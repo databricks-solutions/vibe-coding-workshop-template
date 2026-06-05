@@ -60,7 +60,7 @@ DO NOT read all worker skills at the start. Read each skill ONLY when you enter 
   Phase 1: Read 01-metric-views-patterns → work → persist notes → DISCARD
   Phase 2: Read 02-databricks-table-valued-functions → work → persist notes → DISCARD
   Phase 3: Read 03-genie-space-patterns + 04-genie-space-export-import-api → work → persist notes → DISCARD
-  Phase 4-6: Read common/databricks-asset-bundles → work → done
+  Phase 4-6: Read skills/databricks-asset-bundles → work → done
 ```
 
 Each worker skill ends with a "**Notes to Carry Forward**" section that tells the agent exactly what to persist for downstream phases. The agent uses those notes — not the full skill content — as the bridge between phases.
@@ -485,7 +485,7 @@ After all phases complete, the orchestrator requires the agent to output a **Ski
 | # | Phase | Skill / Reference Read | Type | What It Was Used For |
 |---|-------|----------------------|------|---------------------|
 | 1 | Phase 0 | `planning/00-project-planning` (manifest) | Consumed | Load semantic layer manifest |
-| 2 | Phase 1 | `common/databricks-expert-agent/SKILL.md` | Common | Extract-don't-generate principle |
+| 2 | Phase 1 | `skills/databricks-expert-agent/SKILL.md` | Common | Extract-don't-generate principle |
 | 3 | Phase 1 | `semantic-layer/01-metric-views-patterns/SKILL.md` | Worker | YAML syntax, validation, joins |
 | ... | ... | ... | ... | ... |
 

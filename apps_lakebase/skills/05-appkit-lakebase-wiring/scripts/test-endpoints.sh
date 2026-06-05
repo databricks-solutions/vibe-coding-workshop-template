@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Tests AppKit Lakebase API endpoints and validates response shape.
 #
+# SCOPE: IDE/local-dev convenience only (NON-CANONICAL). It curls a local dev server
+#   at http://localhost:8000 and is not part of the deploy contract. There is no local
+#   dev server on Genie Code — the canonical cross-client verification is the deployed-app
+#   path: browser ConnectionStatus + `databricks apps logs <name>`, or the 3-hop OAuth
+#   `requests.Session()` test documented in 03-appkit-deploy. Lakebase provisioning is owned
+#   by databricks.yml bundle resources + server-side DDL, not this script.
+#
 # Usage: bash scripts/test-endpoints.sh [OPTIONS]
 #
 # Output: JSON array to stdout, diagnostics to stderr.

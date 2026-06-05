@@ -7,6 +7,11 @@ description: >
   permissions, and Lakebase memory. Track A Step 8. Consumes a deployed app
   from Step 7. Produces a resolved, healthy agent deployment.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Debugging workflow for a deployed Apps agent — no deployed resource. On Genie Code inspect logs/state via the workspace + runDatabricksCli (pre-authenticated); the local-dev-server portion is the IDE/local branch. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: medium
@@ -121,6 +126,8 @@ Configuration errors in `databricks.yml` and `app.yaml` are the most common
 source of deployment failures.
 
 ### Validate before deploying
+
+> **Client note:** IDE runs this in a terminal; Genie Code runs the `databricks bundle …` command via `runDatabricksCli` (be on the bundle's page). See `skills/genie-code-environment`.
 
 ```bash
 databricks bundle validate

@@ -3,6 +3,8 @@
 > **Upstream (always check for latest):** https://databricks.github.io/appkit/docs/development/llm-guide
 >
 > Run `npx @databricks/appkit docs "llm guide"` for the live version. This file is a fallback.
+>
+> **Client note (IDE & Genie Code).** These are **code-authoring rules** — they apply identically on both clients. On Genie Code `npx` is absent: WebFetch the upstream link above instead of the `npx … docs` command, and note that any `databricks apps validate` mention is IDE-only (skipped on Genie Code; rely on `bundle validate` + server-side build logs).
 
 ---
 
@@ -18,6 +20,10 @@
 8. **Never use `require()`.** Use ESM `import`/`export` only. `package.json` must have `"type": "module"`.
 9. **Never import Express directly.** Express is bundled inside `@databricks/appkit`. Access it only via `server.extend((app) => { ... })`. Importing Express directly may work locally due to `node_modules` hoisting but fails in production builds where only declared dependencies are bundled.
 10. **Chart `data` props require index signatures.** If passing a named TypeScript interface to chart component `data` props, the interface must include `[key: string]: unknown` because `ChartData` expects `Record<string, unknown>[]`.
+11. **Import appkit-ui components from `@databricks/appkit-ui/react`.** Always `import { … } from "@databricks/appkit-ui/react"` — **never** the bare `@databricks/appkit-ui`, which has no React export and fails to resolve at build time.
+12. **Import the appkit-ui stylesheet as `@databricks/appkit-ui/styles.css`.** In `client/src/index.css` use `@import "@databricks/appkit-ui/styles.css";` — **never** the extension-less `@import "@databricks/appkit-ui/styles";` (only the `.css` path is exported; the extension-less form is unresolvable). Both are exactly what the scaffold ships — preserve them rather than hand-authoring `App.tsx`/`index.css` from memory.
+13. **Import only symbols you reference in the same file.** The scaffold's `tsconfig` has `noUnusedLocals: true` and `noUnusedParameters: true`, so an unused import, variable, or function parameter is a **hard build failure** (`error TS6133`), not a warning. Do not pre-import symbols for features you haven't implemented yet; add the import when you add the usage.
+14. **A `<Select.Item>`/`<SelectItem>` `value` must be a non-empty string.** Radix throws at runtime if `value=""`. For an "all/any" catch-all option use a sentinel like `value="all"` and filter explicitly (`if (filter !== "all") { … }`) — never an empty string.
 
 ---
 
@@ -74,6 +80,11 @@ Failure to do this causes build errors in strict TypeScript setups.
 - [ ] Loading/error/empty states are explicit on every data component
 - [ ] Charts use props, NOT Recharts children
 - [ ] `import type` used for type-only imports
+- [ ] appkit-ui components imported from `@databricks/appkit-ui/react` (never bare `@databricks/appkit-ui`)
+- [ ] `client/src/index.css` uses `@import "@databricks/appkit-ui/styles.css";` (never extension-less `…/styles`)
+- [ ] Scaffold `App.tsx` / `index.css` edited incrementally (not regenerated); `ErrorBoundary.tsx` kept
+- [ ] No unused imports/vars/params (scaffold's `noUnusedLocals`/`noUnusedParameters` make these a hard `TS6133` build failure)
+- [ ] Every `<SelectItem>` has a non-empty `value` (use a sentinel like `"all"` for catch-all, never `value=""`)
 
 ### Never Do
 - [ ] Don't build SQL strings manually

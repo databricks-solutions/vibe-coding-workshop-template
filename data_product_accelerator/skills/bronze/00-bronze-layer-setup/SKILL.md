@@ -1,6 +1,11 @@
 ---
 name: bronze-layer-setup
 description: End-to-end Bronze layer creation for testing and demos. Creates table DDLs, generates fake data with Faker, copies from existing sources, and configures Asset Bundle jobs. Covers Unity Catalog compliance, Change Data Feed, automatic liquid clustering, and governance metadata. Use when setting up Bronze layer tables, creating test/demo data, rapid prototyping Medallion Architecture, or bootstrapping a new Databricks project. For Faker-specific patterns (corruption rates, function signatures, provider examples), load the faker-data-generation skill.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Bronze schema/tables + Faker/clone data load deploy as a bundle job via `bundle deploy --target dev` (runDatabricksCli on Genie Code) — the bundle job IS the execution mechanism; NEVER run the CREATE/CLONE/ALTER/load statements directly via executeCode/spark.sql, they are the job's body. Job notebooks start with %pip install databricks-sdk + restartPython; use TBLPROPERTIES 'layer'='bronze', never the reserved 'table_type'. Write the generated bundle (databricks.yml, src/, resources/) under `dp_bundle_root` (= `<artifact_root>/<use_case_slug>_dab` from `skills/vibecoding-state`, e.g. `…/booking_app_dab/src/`) — a self-contained DAB project dir, NOT the bare clone root and NOT a bare relative path. On Genie Code `dp_bundle_root` is also the `bundle deploy` page-context root: be on that folder's page to deploy (see `skills/genie-code-environment` \u00a78)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"
@@ -105,6 +110,9 @@ tasks:
 4. `bronze_setup_job.yml` + `bronze_data_generator_job.yml` - Asset Bundle jobs
 
 **Deployment Commands (run when ready — NOT auto-executed by this skill):**
+
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli`. Generated bundle files anchor to `dp_bundle_root` (= `<artifact_root>/<use_case_slug>_dab`), and on Genie Code that folder is also the `bundle deploy` page-context root — **be on the `dp_bundle_root` page to deploy.** The bundle job is the only mechanism that creates tables; never run the DDL/clone directly. See `skills/genie-code-environment`.
+
 ```bash
 # 1. Deploy setup job
 databricks bundle deploy -t dev
@@ -305,12 +313,12 @@ TBLPROPERTIES (
 
 | Step | Read Skill (MANDATORY) | What It Provides |
 |------|------------------------|------------------|
-| All steps | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Core extraction principle: extract names from source, never hardcode |
+| All steps | `skills/databricks-expert-agent/SKILL.md` | Core extraction principle: extract names from source, never hardcode |
 | Step 1, Step 3 | `data_product_accelerator/skills/common/naming-tagging-standards/SKILL.md` | Table naming prefixes (`bronze_`), schema COMMENTs, PII governed tags, workflow tags |
 | Step 3 (DDLs) | `data_product_accelerator/skills/common/databricks-table-properties/SKILL.md` | Bronze TBLPROPERTIES, `CLUSTER BY AUTO`, governance metadata |
 | Step 3 (DDLs) | `data_product_accelerator/skills/common/schema-management-patterns/SKILL.md` | `CREATE SCHEMA IF NOT EXISTS`, Predictive Optimization |
 | Step 4 (Data) | `data_product_accelerator/skills/bronze/01-faker-data-generation/SKILL.md` | Faker corruption patterns, function signatures, provider examples |
-| Step 5 (Jobs) | `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` | Serverless job YAML, Environments V4, `notebook_task`, `base_parameters` |
+| Step 5 (Jobs) | `skills/databricks-asset-bundles/SKILL.md` | Serverless job YAML, Environments V4, `notebook_task`, `base_parameters` |
 | Step 5 (Jobs) | `data_product_accelerator/skills/common/databricks-python-imports/SKILL.md` | Pure Python import patterns for notebook code sharing |
 | Step 6 (if user-triggered) | `data_product_accelerator/skills/common/databricks-autonomous-operations/SKILL.md` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs fail |
 

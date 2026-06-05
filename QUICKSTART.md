@@ -14,8 +14,7 @@ Build a full-stack TypeScript app on Databricks AppKit, guided by 10 agent skill
 # 1. Clone template
 git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git my-project && cd my-project
 
-# 2. Authenticate
-databricks auth login --host https://your-workspace.cloud.databricks.com
+# 2. Authenticate — IDE/CLI client only (see PRE-REQUISITES.md §11); Genie Code is pre-authenticated, skip this
 
 # 3. Open your AI coding assistant and prompt:
 ```
@@ -120,8 +119,7 @@ Use @genai-agents/PROMPT-GUIDE.md for the canonical Track A + AppKit 2-Apps walk
 # Check CLI version (must be >= 0.295.0)
 databricks --version
 
-# Reconfigure auth
-databricks auth login --host https://your-workspace.cloud.databricks.com
+# Reconfigure auth — IDE/CLI only (see PRE-REQUISITES.md §11); Genie Code is pre-authenticated
 
 # Verify connection
 databricks current-user me

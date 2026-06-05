@@ -7,8 +7,12 @@ metadata:
   domain: infrastructure
   role: shared
   used_by_stages: [1, 2, 3, 4]
-  last_verified: "2026-04-16"
+  last_verified: "2026-06-02"
   volatility: medium
+  clients: [ide_cli, genie_code]   # deploy via databricks-asset-bundles (the spine); Genie detail via genie-code-environment
+  deploy_verb: "bundle deploy --target dev"
+  deploy_note: "TBLPROPERTIES/CREATE TABLE are deploy-time bundle-resource bodies (RULE_10: run during bundle deploy, retained)"
+  coverage: all_stages
   upstream_sources:
     - name: "ai-dev-kit"
       repo: "databricks-solutions/ai-dev-kit"
@@ -266,6 +270,7 @@ COMMENT 'LLM: Bronze layer dimension table containing retail store location deta
 - **Templates in worker skills may be incomplete.** The `copy_from_source.py` template and `data-source-approaches.md` examples in the Bronze skill contain only performance properties (CDF, auto-optimize). After copying from ANY template, cross-check every table against the required property list for its layer in THIS skill. Anti-pattern: assuming the template has all properties.
 - **DEEP CLONE preserves some properties but not all.** DEEP CLONE preserves CDF settings, CLUSTER BY AUTO, column COMMENTs, PK constraints, and row tracking metadata. It does NOT automatically set governance properties (`domain`, `entity_type`, `contains_pii`, `data_classification`, `business_owner`, `technical_owner`). After every DEEP CLONE, apply the remaining enterprise TBLPROPERTIES with `ALTER TABLE ... SET TBLPROPERTIES`. See `assets/templates/table-properties.sql` for the post-clone template.
 - **Skipping requirements collection makes correct properties impossible.** If per-table metadata (`entity_type`, `contains_pii`, `data_classification`) is never collected from the user or schema CSV, the agent cannot set the right values. Always resolve these before writing DDL.
+- **Never use `DEFAULT` column clauses in DDL.** A `DEFAULT <expr>` clause (e.g. `is_active BOOLEAN NOT NULL DEFAULT true`) requires the `delta.feature.allowColumnDefaults` table feature, which is OFF by default — the `CREATE TABLE` fails. Do NOT enable the feature flag; declare the column without `DEFAULT` and supply the value at INSERT time. Also do not add columns the template/design never specified. See `unity-catalog-constraints` → "Never Use `DEFAULT` Column Clauses in DDL".
 
 ## References
 

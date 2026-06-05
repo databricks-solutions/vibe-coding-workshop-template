@@ -11,6 +11,11 @@ description: >
   Use when setting up observability end-to-end, creating Lakehouse Monitors, enabling anomaly
   detection, building dashboards, or configuring SQL alerts.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: monitors
+deploy_verb: bundle_deploy
+deploy_note: "Orchestrates Lakehouse monitors + anomaly detection + AI/BI dashboards + SQL-alert jobs, all deployed via `bundle deploy --target dev` (runDatabricksCli on Genie Code). On Genie Code, write generated monitor/alert configs and dashboard JSON under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"
@@ -81,9 +86,9 @@ End-to-end workflow for setting up Databricks observability — Lakehouse Monito
 
 | Phase | MUST Read Skill (use Read tool on SKILL.md) | What It Provides |
 |-------|---------------------------------------------|------------------|
-| All phases | `common/databricks-expert-agent` | Core extraction principle: extract names from source, never hardcode |
+| All phases | `skills/databricks-expert-agent` | Core extraction principle: extract names from source, never hardcode |
 | Monitor scripts | `common/databricks-python-imports` | Pure Python module patterns for helpers |
-| Job deployment | `common/databricks-asset-bundles` | Job YAML, deployment patterns |
+| Job deployment | `skills/databricks-asset-bundles` | Job YAML, deployment patterns |
 | Troubleshooting | `common/databricks-autonomous-operations` | Deploy → Poll → Diagnose → Fix → Redeploy loop when jobs fail |
 
 ### Monitoring-Domain Dependencies
@@ -197,7 +202,7 @@ assert len(alerts) == int(summary.get('total_alerts', len(alerts))), \
 
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
-| 1 | `data_product_accelerator/skills/common/databricks-expert-agent/SKILL.md` | Extract-don't-generate principle |
+| 1 | `skills/databricks-expert-agent/SKILL.md` | Extract-don't-generate principle |
 | 2 | `data_product_accelerator/skills/monitoring/01-lakehouse-monitoring-comprehensive/SKILL.md` | Monitor setup, custom metrics |
 
 **Input:** `manifest['lakehouse_monitors']` — iterate over the manifest's monitor list. Each entry defines `table_name`, `monitor_type`, `custom_metrics`, and `slicing_exprs`. Do NOT add monitors for tables not listed in the manifest.
@@ -274,7 +279,7 @@ assert len(alerts) == int(summary.get('total_alerts', len(alerts))), \
 | # | Skill Path | What It Provides |
 |---|------------|------------------|
 | 1 | `data_product_accelerator/skills/monitoring/03-sql-alerting-patterns/SKILL.md` | Config-driven alerts, SDK deployment |
-| 2 | `data_product_accelerator/skills/common/databricks-asset-bundles/SKILL.md` | Job YAML for alert deployment |
+| 2 | `skills/databricks-asset-bundles/SKILL.md` | Job YAML for alert deployment |
 
 **Input:** `manifest['alerts']` — iterate over the manifest's alert list. Each entry defines `alert_id`, `severity`, `query`, `threshold`, `schedule`, and `notification_destination`. Do NOT create alerts not listed in the manifest.
 
@@ -340,8 +345,8 @@ assert len(alerts) == int(summary.get('total_alerts', len(alerts))), \
 | `anomaly-detection` | **Mandatory** — Schema-level freshness/completeness | `monitoring/04-anomaly-detection/SKILL.md` |
 | `databricks-aibi-dashboards` | **Mandatory** — Dashboard patterns | `monitoring/02-databricks-aibi-dashboards/SKILL.md` |
 | `sql-alerting-patterns` | **Mandatory** — Alert framework | `monitoring/03-sql-alerting-patterns/SKILL.md` |
-| `databricks-expert-agent` | **Mandatory** — Extraction principle | `common/databricks-expert-agent/SKILL.md` |
-| `databricks-asset-bundles` | **Mandatory** — Deployment | `common/databricks-asset-bundles/SKILL.md` |
+| `databricks-expert-agent` | **Mandatory** — Extraction principle | `skills/databricks-expert-agent/SKILL.md` |
+| `databricks-asset-bundles` | **Mandatory** — Deployment | `skills/databricks-asset-bundles/SKILL.md` |
 | `databricks-python-imports` | **Mandatory** — Python patterns | `common/databricks-python-imports/SKILL.md` |
 
 ## Post-Completion: Skill Usage Summary (MANDATORY)

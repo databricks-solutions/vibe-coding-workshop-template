@@ -569,7 +569,7 @@ Phase 2: 02-merge-patterns (consumed simultaneously with 03, 04, 05)
      - Any column mapping issues
           │
           ▼
-Phase 3: common/databricks-asset-bundles
+Phase 3: skills/databricks-asset-bundles
   └─ Job YAML, databricks.yml sync, serverless config
           │
           ▼
@@ -629,7 +629,7 @@ Every arrow represents an extraction operation — the agent reads YAML metadata
 | 8 | Phase 2 | `pipeline-workers/04-grain-validation/SKILL.md` | Worker | PK-based grain validation |
 | 9 | Phase 2 | `pipeline-workers/05-schema-validation/SKILL.md` | Worker | DataFrame↔DDL schema checks |
 | 10 | Phase 2 | `common/databricks-python-imports/SKILL.md` | Common | Pure Python modules, no sys.path |
-| 11 | Phase 3 | `common/databricks-asset-bundles/SKILL.md` | Common | Job YAML, serverless, notebook_task |
+| 11 | Phase 3 | `skills/databricks-asset-bundles/SKILL.md` | Common | Job YAML, serverless, notebook_task |
 | ... | ... | ... | ... | ... |
 
 ---

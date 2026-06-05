@@ -12,13 +12,25 @@ description: >
 license: Apache-2.0
 compatibility: Requires Serving plugin registered via 04-appkit-plugin-add, Node.js v22+, Databricks CLI >= 0.295.0
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  Serving wiring is source editing (server.ts plugin config, React hooks, optional proxy routes) —
+  client-agnostic. IDE: `databricks serving-endpoints get/query --profile $PROFILE` for verification,
+  `npm run build` gates locally, then `databricks apps deploy --profile $PROFILE`. Genie Code: run
+  `serving-endpoints get/query` via `runDatabricksCli` (read-tier, omit `--profile`); local `npm run build`
+  gates are an IDE convenience (skip — platform builds server-side); deploy per `03-appkit-deploy`
+  (`runDatabricksCli` or SDK fallback). Verify the deployed app via browser or the OAuth-session test —
+  `auth token` + raw Bearer `curl` is hard-blocked on Genie Code.
+coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.0"
+  version: "1.1.0"
   domain: apps
   role: serving-wiring
   standalone: false
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources:
     - name: "databricks-agent-skills/databricks-model-serving"
@@ -72,6 +84,21 @@ npx @databricks/appkit docs "serving"
 ```
 
 > **Key architectural difference from Lakebase wiring:** The Serving plugin auto-registers HTTP routes (`/api/serving/:alias/invoke` and `/api/serving/:alias/stream`) via the plugin lifecycle — like the Genie plugin. You do NOT need `server.extend()` to create routes for basic invoke/stream calls. Use `server.extend()` only when you need a custom server-side proxy route that post-processes the agent's response (Step 6).
+
+### Working in Genie Code (client routing)
+
+All the **code** in this skill — plugin config, hooks, proxy routes — is written the same way on both clients. Only the toolchain commands and the deployed-app verification differ. `$APP_NAME` / `$PROFILE` / endpoint name resolve from `.vibecoding-state.md` when a prior phase wrote it (don't re-derive). Apply these substitutions:
+
+| IDE/CLI (as written) | Genie Code substitution |
+|----------------------|--------------------------|
+| `databricks serving-endpoints get/query … --profile $PROFILE` (Step 1) | run via `runDatabricksCli` (read-tier, pre-approved), **omit `--profile`** |
+| `npm run build` gates (Steps 3, 8) — "**You MUST run `npm run build`**" | **IDE-only** convenience — no local Node toolchain. Skip; the platform builds **server-side** on deploy and surfaces errors in `databricks apps logs <name>` |
+| `npm run dev` | not available (and blocked pre-deploy: `serving()` needs platform-injected env) — verify on the deployed app |
+| `npx @databricks/appkit docs "serving"` | npx absent (P9) — WebFetch https://databricks.github.io/appkit/docs/plugins/serving |
+| `databricks auth token` + `curl -H "Authorization: Bearer …"` (Steps 9b/9c) | hard-blocked / raw Bearer rejected by the Apps OAuth gate → use **browser** (open the app URL, test chat) **or** the 3-hop OAuth `requests.Session()` test in `03-appkit-deploy` |
+| `databricks apps deploy …` (Step 9a) | see the `03-appkit-deploy` deploy-routing contract (`runDatabricksCli`, else SDK `w.apps.deploy(... SNAPSHOT)`) |
+
+Paths are relative to `apps_lakebase/$APP_NAME` — under your `.assistant/skills` repo clone on Genie Code, never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ---
 
@@ -518,6 +545,8 @@ curl -s -X POST "${APP_URL}/api/serving/invoke" \
 ```
 
 For named aliases, use `/api/serving/<alias>/invoke` instead.
+
+> **Client note — Genie Code:** this `auth token` + raw Bearer `curl` does not work (`auth token` hard-blocked; AppKit's OAuth gate rejects raw Bearer → 401). Verify instead via **browser** (open the app URL and test the chat UI) or the **3-hop OAuth `requests.Session()`** pattern in `03-appkit-deploy` "Testing Deployed App APIs", then assert on `databricks apps logs <name>`.
 
 ### 9c. Automated Test
 

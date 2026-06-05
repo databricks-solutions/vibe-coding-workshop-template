@@ -5,6 +5,11 @@ description: >
   tools, DatabricksMCPClient connections, and MCPServerSse for MCP servers.
   Track A Step 3. Builds on shared concepts from F3 (Tools and Data Access).
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Tool + MCP wiring (local function tools, DatabricksMCPClient, MCPServerSse) — code, no bundle resource. Resolves identically on both clients; on Genie Code use its built-in tool surface for ad-hoc calls and runDatabricksCli for grants. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high
@@ -453,6 +458,8 @@ Model grants are derived from `docs/agent_tool_plan.yaml.runtime_config.llm`.
 - When `provider == "ai_gateway"`, do not create or configure Gateway. Verify the pre-provisioned endpoint and required permissions are documented, then leave provisioning to the optional Gateway hardening step.
 
 Verify the bundle schema accepts each kind your agent needs before deploying:
+
+> **Client note:** IDE runs this in a terminal; Genie Code runs the `databricks bundle …` command via `runDatabricksCli`. See `skills/genie-code-environment`.
 
 ```bash
 # Generic "does this kind exist in my CLI's schema?"

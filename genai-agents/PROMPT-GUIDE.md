@@ -20,7 +20,7 @@ and implements the step for you.
 
 **How to use this guide:**
 
-1. Complete the prerequisites in Section 0.
+1. Complete the prerequisites in Section 0. **Genie Code users:** do the **Set Up Project** clone first — see the client fork just before Section 0.
 2. Fill in the `{placeholders}` in each prompt with your values.
 3. Paste the prompt into your IDE. The agent does the rest.
 4. Check off the **Expected Output** items to confirm the step is done.
@@ -78,6 +78,10 @@ P0 Workspace
 ```
 
 ---
+
+> **Client fork — pick your path before Section 0.**
+> - **IDE/CLI (Cursor, Claude Code, VS Code, Codex):** complete the Databricks CLI auth + prerequisite checks in Section 0 below.
+> - **Genie Code (in-workspace):** Genie Code is pre-authenticated and serverless — skip the CLI auth steps. First, **Set Up Project**: clone the whole repo into `/Users/<your-username>/.assistant/skills/vibe-coding-workshop`, then **start a NEW Agent-mode chat thread** (hard-refresh if skills don't appear) so the skills load, and load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context` and gates each prompt. See [repo-root AGENTS.md](../AGENTS.md) ("Genie Code" section) / [PRE-REQUISITES.md](../PRE-REQUISITES.md). Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 ## Section 0: Workspace Setup
 

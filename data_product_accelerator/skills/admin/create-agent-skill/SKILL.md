@@ -2,6 +2,11 @@
 name: create-agent-skill
 description: Guides the creation of new Agent Skills following the AgentSkills.io specification. Covers required frontmatter (name, description), optional metadata, directory structure (SKILL.md, references/, scripts/, assets/), progressive disclosure principles, and naming conventions. Use when creating a new skill from scratch, adding project-specific agent knowledge, defining reusable patterns for AI coding assistants, or structuring domain expertise as a skill. Triggers on "create skill", "new skill", "add skill", "write a skill", "skill template", "SKILL.md", "agent skill".
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Authoring meta-skill — guides SKILL.md creation; no deployed resource and no deploy verb. Client-agnostic. On Genie Code, write the new skill folder under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path — relative paths resolve against the page CWD (see `skills/genie-code-environment` §8)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

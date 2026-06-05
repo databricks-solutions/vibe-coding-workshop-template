@@ -1,26 +1,40 @@
 # Databricks Asset Bundle resource — agent deploy job (serverless).
 #
-# Loaded by SKILL.md Step 2 when no interactive cluster is available (workshop
-# or restricted workspaces). Pair with references/agent-deploy-notebook.py.
+# This is the CANONICAL deploy mechanism for the agent: the endpoint is created
+# by RUNNING this bundle job, exactly like Bronze/Silver/Gold — never by an
+# ad-hoc `agents.deploy()` in a loose notebook and never by `jobs submit`. The
+# job's notebook task (references/agent-deploy-notebook.py) runs Steps 2–5 plus
+# the Step 5b auto-grant and the Step 5c checkpoint. The UC agent schema is
+# created by the notebook via direct SQL (`CREATE SCHEMA IF NOT EXISTS`) — the
+# deliberate schema exception, NOT a bundle `schemas:` resource.
 #
-# Copy into your bundle as resources/agent_deploy_job.yml and wire the
-# following variables in databricks.yml:
+# Copy into your bundle as resources/agent_deploy_job.yml. Keep agent.py,
+# agent-config.yaml, and deploy_agent.py inside the bundle so `bundle deploy`
+# syncs them to the workspace; point agents_folder_ws_path at their deployed
+# location. Wire the following variables in databricks.yml:
 #
 #   variables:
 #     project_name:          { default: "booking_app" }
 #     catalog:               { default: "my_catalog" }
 #     agent_schema:          { default: "booking_app_agents" }
 #     agent_model_name:      { default: "booking-genie-agent" }
+#     agent_endpoint_name:   { default: "booking-genie-agent" }  # explicit, stable, <=63 chars
 #     gold_schema:           { default: "booking_app_gold" }
 #     semantic_warehouse_id: { default: "<warehouse-id>" }
 #     genie_space_id:        { default: "<space-id>" }
-#     agents_folder_ws_path: { default: "/Workspace/Users/${workspace.current_user.userName}/${var.project_name}/agents" }
+#     agents_folder_ws_path: { default: "${workspace.file_path}/agents" }
 #
 # Deploy & run:
 #
-#   databricks sync . "/Workspace/Users/${USER}/${var.project_name}" --profile $PROFILE
-#   databricks bundle deploy -t dev --profile $PROFILE
-#   databricks bundle run -t dev agent_deploy_job --profile $PROFILE
+#   IDE + CLI:
+#     databricks bundle deploy -t dev --profile $PROFILE
+#     databricks bundle run    -t dev agent_deploy_job --profile $PROFILE
+#
+#   Genie Code (via runDatabricksCli, from the bundle-editor page — no
+#   `databricks sync`: bundle deploy syncs the source; no `--profile`:
+#   pre-authenticated):
+#     databricks bundle deploy -t dev
+#     databricks bundle run    -t dev agent_deploy_job
 
 resources:
   jobs:
@@ -43,6 +57,7 @@ resources:
               uc_gold_schema: "${var.gold_schema}"
               warehouse_id: "${var.semantic_warehouse_id}"
               genie_space_id: "${var.genie_space_id}"
+              agent_endpoint_name: "${var.agent_endpoint_name}"
               agent_folder_ws_path: "${var.agents_folder_ws_path}"
       environments:
         - environment_key: default
@@ -58,4 +73,6 @@ resources:
               - "mlflow[databricks]"
               - mcp
               - nest_asyncio
+              - databricks-ai-bridge   # REQUIRED for OBO (ModelServingUserCredentials)
+              - databricks-sdk
               - uv

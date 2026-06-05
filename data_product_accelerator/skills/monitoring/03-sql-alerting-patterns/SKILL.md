@@ -1,6 +1,11 @@
 ---
 name: sql-alerting-patterns
 description: Comprehensive guide for Databricks SQL Alerts V2 - config-driven alerting framework with SDK deployment, hierarchical job architecture (5 atomic + 1 composite), proactive EXPLAIN-based query validation, and partial success patterns. Use when setting up SQL alerts, creating alert configuration tables, deploying alerts via Databricks SDK (V2 dict-based or typed classes), or troubleshooting alert failures. Includes config-driven patterns, fully qualified table names (no parameters), severity-based routing, alert ID conventions, SQL query patterns (threshold, percentage change, anomaly detection), DataFrame-based config seeding, DAB job configuration, custom notification templates, Quartz cron schedules, and troubleshooting patterns.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "SQL Alerts V2 config-driven; alert-deployment jobs (5 atomic + 1 composite) deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code); alert config tables live in the per-user prefixed schema."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"
@@ -894,6 +899,8 @@ ws.alerts_v2.update_alert(
 ## Workflow Summary
 
 ### Initial Setup (Hierarchical)
+
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page). See `skills/genie-code-environment`.
 
 ```bash
 # 1. Deploy all alerting infrastructure (composite orchestrator)

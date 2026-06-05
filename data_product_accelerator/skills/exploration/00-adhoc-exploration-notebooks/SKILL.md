@@ -1,6 +1,11 @@
 ---
 name: adhoc-exploration-notebooks
 description: Create dual-format ad-hoc exploration notebooks for Databricks workspace (.py) and local Jupyter (.ipynb) with Databricks Connect. Use when building data exploration tools, debugging data quality issues, or creating interactive analysis notebooks. Supports widget fallback patterns, helper functions for table discovery, and proper Spark session initialization for both environments.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "The local-Jupyter path (Databricks Connect + profile-based CLI auth) is the IDE/local branch only. On Genie Code there is no local toolchain: explore directly in the workspace on serverless compute (pre-authenticated — no profile setup, no local Connect session), and deploy the exploration job via `bundle deploy --target dev` + `bundle run` through runDatabricksCli (see `skills/genie-code-environment`). On Genie Code, write generated notebooks under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path — relative paths resolve against the page CWD (§8)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"
@@ -48,12 +53,13 @@ compare_tables(catalog, "silver_schema", "silver_transactions",
 # 1. Install requirements
 pip install -r requirements.txt
 
-# 2. Configure Databricks Connect
-databricks configure --profile my_profile
+# 2. Configure Databricks Connect — authenticate per PRE-REQUISITES §11 (IDE/CLI only; Genie Code skips this path — see callout below)
 
 # 3. Launch Jupyter and open adhoc_exploration.ipynb
 jupyter lab
 ```
+
+> **Genie Code:** there is no local toolchain — skip the Jupyter / Databricks Connect path and explore directly in the workspace on serverless compute (pre-authenticated). Write generated notebooks under the cloned repo root (`{REPO_ROOT}`), never `/tmp`. See `skills/genie-code-environment` §8–§9.
 
 **Key Differences:**
 - **Databricks (.py):** Uses magic commands (`%pip`, `%sql`), `dbutils.widgets.text()` for params
@@ -180,6 +186,8 @@ notebook_task:
     catalog: ${var.catalog}
 ```
 
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page; generated files anchor to `{REPO_ROOT}`). See `skills/genie-code-environment`.
+
 ```bash
 # Deploy and run
 databricks bundle deploy -t dev
@@ -295,7 +303,7 @@ pip install -r requirements.txt
 - [Databricks SDK for Python](https://databricks-sdk-py.readthedocs.io/)
 
 ### Related Patterns
-- [Databricks Asset Bundles](../common/databricks-asset-bundles/SKILL.md) — Deployment patterns
+- [Databricks Asset Bundles](skills/databricks-asset-bundles/SKILL.md) — Deployment patterns
 - [Python File Imports](../common/databricks-python-imports/SKILL.md) — Sharing code between notebooks
 - [DLT Expectations](../silver/dlt-expectations-patterns/SKILL.md) — DQ rules and validation
 - [Metric Views](../semantic-layer/metric-views-patterns/SKILL.md) — Metric View testing patterns

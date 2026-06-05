@@ -6,6 +6,8 @@
 > - https://databricks.github.io/appkit/docs/configuration
 > - `databricks apps deploy --help`
 
+> **Client routing:** commands below are written for the **IDE/CLI** path with `--profile $PROFILE`. On **Genie Code**, run each `databricks …` command via `runDatabricksCli` and **omit `--profile`** (pre-authenticated); a targetless `databricks bundle deploy` needs `--target dev`. See the deploy-routing table in [`../SKILL.md`](../SKILL.md) and the behavioral manifest in `skills/genie-code-environment`.
+
 ## app.yaml Configuration
 
 The `app.yaml` file configures the app's runtime environment in Databricks Apps.
@@ -128,12 +130,13 @@ databricks apps logs my-app --follow --timeout 5m --profile <PROFILE>
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry collector endpoint |
 | `OTEL_SERVICE_NAME` | Service name for traces |
 
-## Local Development Authentication
+## Local Development Authentication (IDE/local-dev only)
 
-**Option 1 — Databricks CLI (recommended):**
+> **Genie Code: not applicable.** There is no local dev server on Genie Code — the App is built and run server-side on the Databricks Apps runtime (pre-authenticated). This whole section applies only when running `npm run dev` on a laptop. The auth literals below are IDE/local-dev residual by design.
+
+**Option 1 — Databricks CLI (recommended):** authenticate the CLI once per **[PRE-REQUISITES §11](../../../../PRE-REQUISITES.md)**, then:
 
 ```bash
-databricks auth login --host <HOST> --profile <PROFILE>
 npm run dev                                    # uses DEFAULT profile
 DATABRICKS_CONFIG_PROFILE=my-profile npm run dev  # specific profile
 ```

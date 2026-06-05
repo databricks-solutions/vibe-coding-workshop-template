@@ -4,6 +4,8 @@
 Also consult the live AppKit docs: `npx @databricks/appkit docs "lakebase"`
 The information below may be outdated. Prefer upstream when available.
 
+> **Client routing:** commands below are for the **IDE/CLI** path. On **Genie Code**: add packages to `package.json` instead of `npm install` (platform installs server-side on deploy); run `databricks …` via `runDatabricksCli` and **omit `--profile`** (a targetless `bundle deploy` needs `--target dev`); both phases of the two-phase setup run from the **same project page**. `npx … docs` → WebFetch the docs site. See the routing table in [`../SKILL.md`](../SKILL.md) and `skills/genie-code-environment`.
+
 PostgreSQL connection pool for Databricks Lakebase Autoscaling with automatic OAuth token refresh.
 
 **Capabilities:** Standard `pg.Pool`, automatic OAuth token refresh (1-hour tokens, 2-minute buffer), token caching, OpenTelemetry instrumentation.
@@ -15,6 +17,8 @@ PostgreSQL connection pool for Databricks Lakebase Autoscaling with automatic OA
 ```bash
 npm install @databricks/lakebase
 ```
+
+> **Client note — Genie Code:** skip the local `npm install` — add `"@databricks/lakebase"` to `package.json` `dependencies` (match the version of your installed `@databricks/appkit`). The platform installs it **server-side** during the deploy build; there is no local `node_modules` on Genie Code.
 
 ### 2. Register the Plugin
 

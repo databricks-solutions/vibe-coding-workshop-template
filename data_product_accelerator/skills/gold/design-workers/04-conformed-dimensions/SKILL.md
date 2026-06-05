@@ -2,6 +2,11 @@
 name: 04-conformed-dimensions
 description: Enterprise integration patterns for Gold layer dimensional models. Covers conformed dimensions, the enterprise data warehouse bus matrix, shrunken/rollup dimensions, conformed facts, and drill-across query patterns. Use when planning dimensions shared across multiple fact tables, creating a bus matrix for enterprise integration, designing rollup dimensions, or enabling cross-process analytics. Triggers on "conformed dimension", "bus matrix", "drill-across", "shrunken dimension", "rollup", "enterprise integration", "cross-process".
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "Design-phase pattern; output feeds the Gold design/setup artifacts deployed downstream via `bundle deploy --target dev`. No standalone resource."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

@@ -247,6 +247,11 @@ When you deploy a model version to an endpoint:
 - The system SP **may not appear** in the workspace admin console SP list.
 - Use the serving endpoint's metadata to verify resource access.
 - Audit logs show the system SP's actions with a synthetic identity.
+- **`SHOW GRANTS \`<sp-uuid>\` ON SCHEMA …` is NOT a valid check** — it returns
+  empty for system SPs (they're invisible to SCIM) even after a `GRANT …
+  SUCCEEDED`. The SP also **rotates** across deploys, so a grant to an older
+  UUID is dead. Verify access end-to-end (query the endpoint), not via
+  `SHOW GRANTS`. Prefer OBO so no system-SP UC grant is needed at all.
 
 ---
 
@@ -265,12 +270,13 @@ def build_auth_policy():
     system_resources = build_resources()  # from above
     system_policy = SystemAuthPolicy(resources=system_resources)
 
-    # User policy: API scopes for OBO
+    # User policy: API scopes for OBO.
+    # For the Managed MCP Genie path (McpServerToolkit, /api/2.0/mcp/genie/{id})
+    # the scope is "mcp.genie" — "dashboards.genie" (the Conversation API scope)
+    # returns 403 on the MCP endpoint. "sql" covers warehouse + statement exec.
     user_policy = UserAuthPolicy(api_scopes=[
-        "dashboards.genie",
-        "sql.warehouses",
-        "sql.statement-execution",
-        "serving.serving-endpoints",
+        "mcp.genie",
+        "sql",
     ])
 
     return AuthPolicy(

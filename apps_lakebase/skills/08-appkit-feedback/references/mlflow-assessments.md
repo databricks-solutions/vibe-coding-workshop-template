@@ -3,6 +3,8 @@
 Reference for logging user feedback as MLflow assessments using AppKit-native
 authentication.
 
+> **Client note (IDE & Genie Code).** The assessment POST/PATCH calls are **server-side code** authenticated from the app's execution context (`config.authenticate()`), so they run identically on both clients — there is no `--profile` or client-specific routing here. Any `curl` example is an illustration of the REST shape; exercise the live route on the **deployed** app, not localhost, when working in Genie Code.
+
 ## Overview
 
 MLflow Assessments link user judgments to specific agent traces. When a user clicks

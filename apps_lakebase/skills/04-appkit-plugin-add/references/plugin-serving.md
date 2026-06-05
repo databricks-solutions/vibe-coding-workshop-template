@@ -4,6 +4,8 @@
 Also consult the live AppKit docs: `npx @databricks/appkit docs "serving"`
 The information below may be outdated. Prefer upstream when available.
 
+> **Client routing:** commands below are for the **IDE/CLI** path. On **Genie Code**: add packages to `package.json` instead of `npm install` (platform installs server-side on deploy); run `databricks …` via `runDatabricksCli` and **omit `--profile`**; `npx … docs` → WebFetch the docs site. Deep serving wiring + verification (browser / OAuth-session) is in [`../../06-appkit-serving-wiring/SKILL.md`](../../06-appkit-serving-wiring/SKILL.md). See `skills/genie-code-environment`.
+
 Provides an authenticated proxy to Databricks Model Serving endpoints, with invoke and streaming support. Use this plugin to connect to Agent endpoints, LLM serving endpoints, or any Model Serving endpoint.
 
 **Capabilities:** Named endpoint aliases for multiple serving endpoints, non-streaming (`invoke`) and SSE streaming (`stream`) invocation, automatic OpenAPI type generation for request/response schemas, request body filtering based on endpoint schema, on-behalf-of (OBO) user execution.

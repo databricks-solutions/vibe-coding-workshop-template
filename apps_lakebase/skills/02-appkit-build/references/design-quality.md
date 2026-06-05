@@ -118,6 +118,6 @@ Match code complexity to the design vision:
 Non-negotiable regardless of aesthetic direction:
 
 - **Interactive cards:** If a `<Card>` has `onClick`, wrap in `<Link>` (navigation) or add `role="link"`, `tabIndex={0}`, and `onKeyDown` (Enter/Space triggers click).
-- **Images:** All `<img>` tags have descriptive `alt` text. Decorative images use `alt=""`.
+- **Images:** All `<img>` tags have descriptive `alt` text. Decorative images use `alt=""`. Prefer external CDN hotlinks (Unsplash/Pexels) for realistic imagery, but every `<img>` MUST have a runtime `onError` handler that falls back to an inline data-URI SVG placeholder — external image domains are commonly blocked by corporate/network egress, and the block is invisible at build time. Use same-origin bundled assets (`client/public/…`) only when you have real images to ship.
 - **Form fields:** Every `<Input>` has an associated `<label>` element or `aria-label`.
 - **Color contrast:** Text on brand-colored backgrounds must meet WCAG AA ratio (4.5:1 normal, 3:1 large text).

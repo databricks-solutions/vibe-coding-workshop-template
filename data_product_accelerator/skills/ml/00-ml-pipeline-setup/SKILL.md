@@ -1,6 +1,11 @@
 ---
 name: ml-pipeline-setup
 description: MLflow and ML Model patterns for Databricks including experiment creation, model training, batch inference, and Unity Catalog integration. Use when implementing ML pipelines, training models with Feature Store, or deploying batch inference jobs. Includes 19 non-negotiable rules covering experiment paths, dataset logging, UC model registration, NaN handling, label binarization, feature engineering workflows, and signature-driven preprocessing.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Feature/training/batch-inference jobs deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code); UC model registration in the per-user prefixed catalog/schema. On Genie Code, write generated training/inference .py under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`, e.g. `src/{project}_ml/...`), not a bare relative path \u2014 relative paths resolve against the page CWD (see `skills/genie-code-environment` \u00a78)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"
@@ -93,6 +98,9 @@ else:
 4. Asset Bundle jobs for orchestration
 
 **Fast Track:**
+
+> **Client note:** IDE runs these in a terminal; Genie Code runs the `databricks bundle …` commands via `runDatabricksCli` (be on the bundle's page; generated files anchor to `{REPO_ROOT}`). See `skills/genie-code-environment`.
+
 ```bash
 # 1. Create Feature Tables
 databricks bundle run ml_feature_pipeline_job -t dev

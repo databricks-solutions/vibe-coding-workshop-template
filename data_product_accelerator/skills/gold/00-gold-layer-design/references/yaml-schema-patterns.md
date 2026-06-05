@@ -435,12 +435,17 @@ table_properties:
 
 ## Date Dimension YAML Template
 
+**`population_strategy` (required for every table).** Each YAML declares how the Gold pipeline populates the table:
+- `population_strategy: merge_from_silver` — the default for any Silver-sourced table; the Gold pipeline MERGEs from the Silver source named in lineage.
+- `population_strategy: generate_sequence` — for generated dimensions with no Silver source (`dim_date`, and `dim_time` if present); the Gold pipeline INSERTs from a generated sequence instead of attempting a MERGE. Omitting this on a generated dimension causes the Gold pipeline to fail trying to read a non-existent Silver source.
+
 **File: `gold_layer_design/yaml/time/dim_date.yaml`**
 
 ```yaml
 table_name: dim_date
 domain: time
 bronze_source: generated
+population_strategy: generate_sequence  # No Silver source — Gold pipeline INSERTs from a generated date sequence, never MERGEs from Silver
 
 description: >
   Gold layer date dimension with calendar attributes.

@@ -6,7 +6,16 @@
 # This script is a convenience fallback when the repo cannot be reached
 # directly from an IDE-native command.
 #
-# Strategy:
+# CLIENT NOTE — the default flow is IDE/CLI ONLY. It assumes a local Databricks
+# CLI (`databricks --version`) and the `aitools install` verb, both of which are
+# HARD-BLOCKED on Genie Code. On Genie Code the Databricks skills are already
+# loaded in-session, so the default flow is not used; instead the Genie Code path
+# is a per-user whole-repo git-clone kickstart into
+# `/Users/<your-username>/.assistant/skills/` (Genie Code recurses to discover
+# every skill). Run `bash install-agent-skills.sh --genie-code` to print it; it is
+# also documented in the repo-root AGENTS.md "Genie Code" section.
+#
+# Strategy (IDE/CLI):
 #   1. Always clone into .agents/skills/ (agentskills.io standard, works in all IDEs)
 #   2. Optionally run IDE-native install for deeper integration
 set -euo pipefail
@@ -75,7 +84,7 @@ install_project_level() {
 install_ide_extra() {
   if [ -n "${CLAUDE_CODE:-}" ] || [ -d "$HOME/.claude" ]; then
     echo "Claude Code detected — also installing to ~/.claude/skills/ ..."
-    databricks experimental aitools skills install 2>/dev/null || echo "  (IDE-native install skipped — project-level clone is sufficient)"
+    databricks aitools install 2>/dev/null || echo "  (IDE-native install skipped — project-level clone is sufficient)"
   elif [ -n "${CURSOR_TRACE_ID:-}" ] || [ -d "$HOME/.cursor" ]; then
     echo ""
     echo "Cursor detected — optionally also run in Cursor chat:"
@@ -87,14 +96,36 @@ install_ide_extra() {
 # --- Main ---
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-  echo "Usage: bash scripts/install-agent-skills.sh"
+  echo "Usage: bash scripts/install-agent-skills.sh [--genie-code]"
   echo ""
   echo "Installs Databricks Agent Skills for AI coding assistants."
   echo "  - Clones skills into .agents/skills/databricks-skills (all IDEs)"
   echo "  - Optionally runs IDE-native install for Cursor/Claude Code"
   echo ""
-  echo "Prerequisites: git, Databricks CLI >= 0.295.0, Node.js v22+"
+  echo "  --genie-code   Print the Genie Code whole-repo clone kickstart and exit"
+  echo "                 (no local CLI/Node/auth — Genie Code is pre-authenticated)"
+  echo ""
+  echo "Prerequisites (default IDE/CLI flow): git, Databricks CLI >= 0.295.0, Node.js v22+"
   echo "Idempotent: safe to run multiple times."
+  exit 0
+fi
+
+# Genie Code path: no local CLI/Node/auth (pre-authenticated, in-workspace).
+# Genie Code discovers skills by recursing into a clone of THIS repo under the
+# per-user skills folder — so the kickstart is a one-time whole-repo clone.
+if [[ "${1:-}" == "--genie-code" ]]; then
+  cat <<'EOF'
+Genie Code path — pre-authenticated, in-workspace, serverless (no local CLI/Node).
+Genie Code discovers skills by recursing into a clone of THIS repo under your
+per-user skills folder. Run this once (first-run kickstart):
+
+  git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git \
+    /Users/<your-username>/.assistant/skills/vibe-coding-workshop
+
+Then load skills/genie-code-environment (the behavior manifest). The default
+IDE/CLI flow below is NOT used on Genie Code (its CLI checks are hard-blocked).
+See the repo-root AGENTS.md "Genie Code" section and PRE-REQUISITES.md.
+EOF
   exit 0
 fi
 
@@ -111,6 +142,6 @@ install_ide_extra
 
 echo ""
 echo "Verification — CLI tools should be available:"
-echo "  databricks experimental aitools tools --help"
+echo "  databricks aitools tools --help"
 echo ""
 echo "Done."

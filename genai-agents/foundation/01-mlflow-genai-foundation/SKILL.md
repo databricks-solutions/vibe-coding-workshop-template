@@ -6,6 +6,11 @@ description: >
   understand model signatures, detect runtime environment. Foundation Step 1.
   Produces the configured MLflow environment consumed by all subsequent skills.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "MLflow 3.x GenAI environment setup — no deployed resource; configured via the MLflow SDK identically on both clients. On Genie Code the runtime is serverless workspace compute (pre-authenticated); see `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

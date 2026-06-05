@@ -3,6 +3,8 @@
 Database schema for chat persistence in Lakebase, modeled on
 [e2e-chatbot-app-next's Drizzle schema](https://github.com/databricks/app-templates/blob/main/e2e-chatbot-app-next/packages/db/src/schema.ts).
 
+> **Client note (IDE & Genie Code).** This is design reference. The schema-creation statements shown here run **server-side on app startup** under the app's Service Principal (the inline-DDL approach in the SKILL Step 1) — there is no client-side schema step on either client, and the behaviour is identical whether deployed from an IDE or Genie Code. The Drizzle migration path below is an IDE/local convenience; on Genie Code there is no local Node toolchain, so prefer the inline-DDL approach (which is the default anyway).
+
 ## ER Diagram
 
 ```

@@ -4,6 +4,15 @@ Concise reference for all Databricks Python SDK APIs. For runnable examples, see
 
 **SDK Docs:** https://databricks-sdk-py.readthedocs.io/en/latest/
 
+> **⚠️ Reference scope — not a creation channel for the data-product spine.** The `*.create()` /
+> `create_and_wait()` calls below are a **general SDK reference** (and are legitimate for ad-hoc compute like a
+> scratch cluster/warehouse). They are **NOT** the path for workshop deliverables. Data-product resources —
+> **jobs, pipelines, schemas, volumes, tables, Genie Spaces** — are defined in the bundle and created by
+> `bundle deploy` (App via `apps deploy`), never by SDK `.create()` / `CREATE …` in-session (authoring
+> discipline / RULE_10). Use the SDK for **reading, triggering, and polling** already-deployed resources. A
+> **blocked** `bundle deploy`/`run` on Genie Code is a page-context signal → open the **bundle editor** on
+> `dp_bundle_root`; it is never a reason to switch to SDK creation. See the SKILL §2 carve-out.
+
 ---
 
 ## Authentication

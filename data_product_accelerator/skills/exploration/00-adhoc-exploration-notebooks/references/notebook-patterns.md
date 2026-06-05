@@ -234,9 +234,8 @@ This notebook provides helper functions for exploring Bronze, Silver, and Gold l
    pip install -r requirements.txt
    ```
 
-2. Configure Databricks connection:
-   - Set up Databricks profile: `databricks configure --profile <profile-name>`
-   - Or set environment variables: `DATABRICKS_HOST`, `DATABRICKS_TOKEN`
+2. Configure Databricks connection (IDE/local-dev only — Genie Code is pre-authenticated):
+   - Authenticate per PRE-REQUISITES §11, or set environment variables: `DATABRICKS_HOST`, `DATABRICKS_TOKEN`
 
 3. Update configuration variables below
 ```

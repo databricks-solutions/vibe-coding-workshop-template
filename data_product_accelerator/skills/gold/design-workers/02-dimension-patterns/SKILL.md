@@ -2,6 +2,11 @@
 name: 02-dimension-patterns
 description: Dimension design patterns for Gold layer modeling. Covers role-playing dimensions, degenerate dimensions, junk dimensions, mini-dimensions, outrigger dimensions, denormalized hierarchies, null handling, and flags as textual attributes. Use when designing dimension tables, choosing between dimension patterns, handling NULLs in dimensions, or flattening hierarchies. Triggers on "dimension pattern", "role-playing", "junk dimension", "degenerate dimension", "mini-dimension", "hierarchy", "NULL handling".
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "Design-phase pattern; output feeds the Gold design/setup artifacts deployed downstream via `bundle deploy --target dev`. No standalone resource."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

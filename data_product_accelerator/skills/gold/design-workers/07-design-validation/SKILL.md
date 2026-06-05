@@ -2,6 +2,11 @@
 name: 07-design-validation
 description: Cross-validation of Gold layer design artifacts during the design phase. Use when validating that YAML schemas, ERDs, lineage CSVs, and PK/FK references are internally consistent before handing off to implementation. Catches design-time inconsistencies (e.g., column in ERD but not in YAML, FK referencing non-existent table) that would otherwise surface as runtime bugs.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "Design-phase pattern; output feeds the Gold design/setup artifacts deployed downstream via `bundle deploy --target dev`. No standalone resource."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

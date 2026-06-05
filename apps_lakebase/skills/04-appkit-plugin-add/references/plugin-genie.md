@@ -4,6 +4,8 @@
 Also consult the live AppKit docs: `npx @databricks/appkit docs "genie"`
 The information below may be outdated. Prefer upstream when available.
 
+> **Client routing:** commands below are for the **IDE/CLI** path. On **Genie Code**: add packages to `package.json` instead of `npm install` (platform installs server-side on deploy); run `databricks …` via `runDatabricksCli` and **omit `--profile`**; `npx … docs` → WebFetch the docs site. See the routing table in [`../SKILL.md`](../SKILL.md) and `skills/genie-code-environment`.
+
 Integrates Databricks AI/BI Genie spaces for natural language data queries via a conversational interface.
 
 **Capabilities:** Named space aliases for multiple Genie spaces, SSE streaming with status updates, conversation history replay, query result attachment fetching, on-behalf-of user execution.

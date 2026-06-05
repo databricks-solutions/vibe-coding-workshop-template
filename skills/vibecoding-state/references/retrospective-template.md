@@ -2,11 +2,29 @@
 
 This template lives inside the `vibecoding-state` skill so it travels with the runtime contract to any project that adopts the Instructions.md workshop.
 
-Use it **once per prompt** executed during the workshop (count depends on pathway + track recorded in the live state file — `apps_lakebase/$APP_NAME/.vibecoding-state.md` for Pathways A/B/C, `agents/$AGENT_NAME/.vibecoding-state.md` for Pathway D). Run retrospectives **async after the full workshop completes** — do not interleave them with active prompts.
+Use it **once per prompt** executed during the workshop (count depends on pathway + track recorded in the live state file — `<app_root>/.vibecoding-state.md` for Pathways A/B/C, `<agent_app_root>/.vibecoding-state.md` for the Track A agent app on Pathways C/D, `<dp_bundle_root>/.vibecoding-state.md` for a pure data-product / lakehouse run). Run retrospectives **async after the full workshop completes** — do not interleave them with active prompts.
 
 Paste the block below into a fresh Agent thread, replacing `<N>` and `<title>` with the prompt/module identifier and title you are reviewing. Point the agent at the state file, the retrospective file, and [`Instructions.md`](../../../Instructions.md) so it has the full context.
 
 The output format is fixed so individual retros can be aggregated by the rollup prompt into a prioritized edit backlog.
+
+---
+
+## Handoff invariant (every summary, context-compaction, or thread handoff MUST record this)
+
+The live `.vibecoding-state.md` file — NOT the chat summary — is the state store. Whenever a run is summarized, compacted, or handed to a fresh thread, the handoff MUST carry these five fields verbatim so the next thread can re-open the durable state instead of trusting prose:
+
+| Field | Source |
+|---|---|
+| `state_file_path` | the canonical live file for this track: `<dp_bundle_root>/.vibecoding-state.md` (data-product), `<app_root>/.vibecoding-state.md` (apps), or `<agent_app_root>/.vibecoding-state.md` (agents) — never the temporary `example/…` path |
+| `last_completed_prompt` | the `prompt_id` of the most recent `exit` that was confirmed by re-read |
+| `last_gate` | the exact Gate string that `exit` recorded |
+| `environment_capabilities` | the `## Environment Capabilities` block (incl. `lakehouse_default_catalog`, `client_context`) |
+| `state file updated: yes/no` | whether the last step's `exit` actually appended to the live file and the write was verified by re-read |
+
+If `state file updated: no`, the next thread MUST treat the run as **unverified** and re-run the last `exit` before advancing. A handoff that omits these fields is non-conformant.
+
+**State supersedes summary (drift defense).** Generate the summary FROM the live state file's Per-Step Log, not from recollection. When the summary and the state file disagree, the state file wins: a prompt logged with its gate PASSED is DONE even if a summary says "NOT DONE" / "IN PROGRESS." A mid-execution summary snapshot must NEVER cause a completed, gated step to be re-run. The `exit` write is idempotent by `prompt_id` (replace-in-place, never a duplicate section), so a re-run after a reset updates the existing entry rather than appending a second one.
 
 ---
 
@@ -18,7 +36,7 @@ The output format is fixed so individual retros can be aggregated by the rollup 
 >
 > **Inputs available to you:**
 > - The walkthrough prompt text at `Instructions.md`, Prompt `<N>`.
-> - The state file at `apps_lakebase/$APP_NAME/.vibecoding-state.md` (Pathways A/B/C) or `agents/$AGENT_NAME/.vibecoding-state.md` (Pathway D) — specifically the `## Prompt <N>` section plus any prior sections it depended on.
+> - The state file at `<app_root>/.vibecoding-state.md` (Pathways A/B/C) or `<agent_app_root>/.vibecoding-state.md` (Track A agent app, Pathways C/D) — specifically the `## Prompt <N>` section plus any prior sections it depended on.
 > - The `Workshop Choices` and `Pathway Applicability Matrix` in the same state file — these tell you whether this prompt should have executed at all for the chosen pathway/track.
 > - The agent transcript for this step if provided; otherwise reconstruct from the state file's "Resolved issues / workarounds" and "Verification" notes.
 >
@@ -68,6 +86,9 @@ The output format is fixed so individual retros can be aggregated by the rollup 
 > - **Values the next prompt needs:** <list>
 > - **All present in state file?** yes | no
 > - **If no, which are missing and how should they be captured:** <list>
+> - **state_file_path:** <canonical live file path for this track>
+> - **last_completed_prompt / last_gate:** <prompt_id> / <gate string>
+> - **state file updated (exit appended + verified by re-read)?** yes | no
 >
 > ### Top 3 concrete improvements
 > 1. <proposed new wording or structural change — be specific>
@@ -97,7 +118,7 @@ The output format is fixed so individual retros can be aggregated by the rollup 
 > 5. **Top disambiguation gaps** — any values that multiple prompts had to guess or ask the user for. These are the highest-leverage state-schema fixes.
 > 6. **Gate violations** — any step where the gate was not respected. List per prompt with the specific premature-advance trigger.
 > 7. **Spec drift (hard fail, must be section 7; HALT the rollup if any entry here is non-empty — do not proceed to sections 1–6 until drift is resolved):**
->    Run this check **before** any other section. The live state file conforms to schema v2.0 (see [`references/spec-schema.md`](spec-schema.md)). The producer (`resolve_spec`) emits six YAML blocks under `## Variant`, `## Resources`, `## UI`, `## Agent`, `## Governance`, `## Spec Provenance`. Every consumer skill declares which of those fields it reads via a machine-parseable `fields_read:` list in its frontmatter (dotted-path strings — see `vibecoding-state/SKILL.md` § *Field Consumer Contract*). Do:
+>    Run this check **before** any other section. The live state file conforms to schema v2.0 (see [`references/spec-schema.md`](spec-schema.md)). The producer (`resolve_spec`) emits six YAML blocks under `## Variant`, `## Resources`, `## UI`, `## Agent`, `## Governance`, `## Spec Provenance`. Every consumer skill declares which of those fields it reads via a machine-parseable `fields_read:` list in its frontmatter (dotted-path strings — see `skills/vibecoding-state/SKILL.md` § *Field Consumer Contract*). Do:
 >    a. **PRD drift.** Compute `sha256` of the file at `## Workshop Choices → prd_path`; compare with `## Spec Provenance → prd_sha256`. Mismatch → list the old and new hashes. HALT.
 >    b. **Schema version drift.** Read `## Spec Provenance → schema_version`. If ≠ `"2.0"`, emit: `"State file schema_version=<X> ≠ 2.0 — run scripts/migrate-spec-v1-to-v2.py before re-running rollup."` HALT.
 >    c. **Producer / consumer contract drift.** Enumerate every dotted-path leaf under the four content sections (`resources`, `ui`, `agent`, `governance`) in the live state file — call this set `produced`. For every consumer skill in the repo (find them with `rg -l '^fields_read:' genai-agents/ apps_lakebase/skills/`), parse its frontmatter `fields_read:` list (expand wildcards like `ui.*` and `agent.tools[].*` to all matching leaves in the state file). Union these into `consumed`. Report:

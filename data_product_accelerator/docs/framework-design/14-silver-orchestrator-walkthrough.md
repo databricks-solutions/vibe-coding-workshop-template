@@ -4,7 +4,7 @@ How the `00-silver-layer-setup` orchestrator progressively loads 2 worker skills
 
 > **Related skills:** [`00-silver-layer-setup`](../../skills/silver/00-silver-layer-setup/SKILL.md), [`01-dlt-expectations-patterns`](../../skills/silver/01-dlt-expectations-patterns/SKILL.md), [`02-dqx-patterns`](../../skills/silver/02-dqx-patterns/SKILL.md)
 >
-> **Common skills used:** [`databricks-expert-agent`](../../skills/common/databricks-expert-agent/SKILL.md), [`databricks-table-properties`](../../skills/common/databricks-table-properties/SKILL.md), [`databricks-python-imports`](../../skills/common/databricks-python-imports/SKILL.md), [`databricks-asset-bundles`](../../skills/common/databricks-asset-bundles/SKILL.md), [`schema-management-patterns`](../../skills/common/schema-management-patterns/SKILL.md), [`unity-catalog-constraints`](../../skills/common/unity-catalog-constraints/SKILL.md)
+> **Common skills used:** [`databricks-expert-agent`](skills/databricks-expert-agent/SKILL.md), [`databricks-table-properties`](../../skills/common/databricks-table-properties/SKILL.md), [`databricks-python-imports`](../../skills/common/databricks-python-imports/SKILL.md), [`databricks-asset-bundles`](skills/databricks-asset-bundles/SKILL.md), [`schema-management-patterns`](../../skills/common/schema-management-patterns/SKILL.md), [`unity-catalog-constraints`](../../skills/common/unity-catalog-constraints/SKILL.md)
 
 ---
 
@@ -30,7 +30,7 @@ Keywords "Silver layer", "SDP", "DLT", "data quality rules" match the user's int
 | Creating a Silver layer from scratch? | **Use this skill** — it orchestrates everything |
 | Only need DLT expectations patterns? | Read `silver/01-dlt-expectations-patterns/SKILL.md` directly |
 | Need advanced DQX validation? | Read `silver/02-dqx-patterns/SKILL.md` directly |
-| Need Asset Bundle configuration? | Read `common/databricks-asset-bundles/SKILL.md` directly |
+| Need Asset Bundle configuration? | Read `skills/databricks-asset-bundles/SKILL.md` directly |
 | Need table properties reference? | Read `common/databricks-table-properties/SKILL.md` directly |
 
 ### Step 2: The Guard Rails Lock In
@@ -497,7 +497,7 @@ Unlike the semantic layer's linear chain, the Silver orchestrator's dependencies
 
 | # | Phase | Skill / Reference Read | Type | What It Was Used For |
 |---|-------|----------------------|------|---------------------|
-| 1 | Phase 1 | `common/databricks-expert-agent/SKILL.md` | Common | Extraction principle for Bronze schema names |
+| 1 | Phase 1 | `skills/databricks-expert-agent/SKILL.md` | Common | Extraction principle for Bronze schema names |
 | 2 | Phase 1 | `common/schema-management-patterns/SKILL.md` | Common | CREATE SCHEMA DDL with governance metadata |
 | 3 | Phase 2 | `silver/01-dlt-expectations-patterns/SKILL.md` | Worker | DQ rules table DDL, rule population |
 | 4 | Phase 2 | `common/databricks-table-properties/SKILL.md` | Common | Metadata table TBLPROPERTIES |
@@ -505,7 +505,7 @@ Unlike the semantic layer's linear chain, the Silver orchestrator's dependencies
 | 6 | Phase 3 | `common/databricks-python-imports/SKILL.md` | Common | Pure Python loader (no notebook header) |
 | 7 | Phase 4 | `silver/01-dlt-expectations-patterns/SKILL.md` | Worker | DLT decorator patterns (re-read) |
 | 8 | Phase 4 | `common/databricks-table-properties/SKILL.md` | Common | Silver TBLPROPERTIES (re-read) |
-| 9 | Phase 6 | `common/databricks-asset-bundles/SKILL.md` | Common | Pipeline YAML, job YAML, serverless config |
+| 9 | Phase 6 | `skills/databricks-asset-bundles/SKILL.md` | Common | Pipeline YAML, job YAML, serverless config |
 | ... | ... | ... | ... | ... |
 
 ---

@@ -257,7 +257,7 @@ Maps every skill to the official documentation URLs used to verify its patterns 
 
 ## Infrastructure/Common Domain (Medium Volatility)
 
-### `common/databricks-asset-bundles`
+### `skills/databricks-asset-bundles`
 | URL | Check For |
 |---|---|
 | https://docs.databricks.com/dev-tools/bundles/ | Bundle YAML schema, task types |
@@ -308,7 +308,7 @@ These skills are self-contained and don't reference external APIs that change:
 | `admin/documentation-organization` | Internal convention |
 | `admin/skill-freshness-audit` | This skill (self-referential) |
 | `skill-navigator` | Internal routing |
-| `common/databricks-expert-agent` | Philosophy/principles, not API-dependent |
+| `skills/databricks-expert-agent` | Philosophy/principles, not API-dependent |
 | `common/databricks-python-imports` | Stable Python import patterns |
 | `common/naming-tagging-standards` | Internal convention |
 | `gold/pipeline-workers/02-merge-patterns` | Stable MERGE SQL patterns |

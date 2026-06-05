@@ -1,6 +1,11 @@
 ---
 name: dlt-expectations-patterns
 description: Spark Declarative Pipeline (SDP, formerly DLT) expectations patterns for data quality with Unity Catalog Delta table storage. Use when implementing Silver layer SDP/DLT pipelines, creating portable data quality rules, or needing runtime-updateable expectations without code deployment. Supports severity-based filtering (critical vs warning) and quarantine patterns. Uses `import dlt` (legacy API) because `@dlt.expect_all_or_drop()` decorators are not yet available in the modern `dp` API (`from pyspark import pipelines as dp`).
+clients: [ide_cli, genie_code]
+bundle_resource: pipelines
+deploy_verb: bundle_deploy
+deploy_note: "DLT expectations run inside the Silver pipeline; deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0"
@@ -231,15 +236,21 @@ def get_rules(table_name: str, severity: str) -> dict:
 
 ## Core Patterns
 
-### Sourcing Enum Values from Data (Extract, Don't Generate)
+### Sourcing Column Names AND Enum Values from Data (Extract, Don't Generate)
 
-Before authoring `col IN (...)` rules, extract the actual values from Bronze rather than reading them from schema CSV comments:
+**First pin the column names, then the values.** Before authoring ANY rule, run `DESCRIBE TABLE` on each Bronze table and keep the column list in memory — every column referenced in a `constraint_sql` MUST exist in that `DESCRIBE` output. A rule that names a column absent from the live schema is a **hard error**, not a near-miss to "fix later" (the live failure: rules written for `price`/`latitude` when the schema had `base_price`/`property_latitude`). PRD/CSV names describe *intent*; only `DESCRIBE` gives the real column names.
+
+```sql
+DESCRIBE TABLE {catalog}.{bronze_schema}.{bronze_table};   -- pin column names FIRST
+```
+
+Then, before authoring `col IN (...)` rules, extract the actual values from Bronze rather than reading them from schema CSV comments:
 
 ```sql
 SELECT DISTINCT col_name FROM {catalog}.{bronze_schema}.{bronze_table} WHERE col_name IS NOT NULL;
 ```
 
-CSV column comments describe *intent*; production data may include extra values, typos, or legacy states. This follows the "Extract, Don't Generate" principle from `common/databricks-expert-agent` — applied to constraint value literals, not just names.
+CSV column comments describe *intent*; production data may include extra values, typos, or legacy states. This follows the "Extract, Don't Generate" principle from `skills/databricks-expert-agent` — applied to both constraint **column names** and value literals.
 
 ### Pattern 1: Create DQ Rules Delta Table
 
@@ -257,6 +268,8 @@ CREATE OR REPLACE TABLE {catalog}.{schema}.dq_rules (
 USING DELTA
 CLUSTER BY AUTO
 ```
+
+🔴 **Author this `dq_rules` table EXACTLY as shown.** Do NOT add columns the template does not list (no `is_active`, no status flags) and do NOT add a `DEFAULT` clause to any column. A `DEFAULT <expr>` (e.g. `is_active BOOLEAN NOT NULL DEFAULT true`) requires the `delta.feature.allowColumnDefaults` table feature — it is OFF by default and the DDL fails. If you genuinely need an active flag, declare the column without `DEFAULT` and set its value in the INSERT, never in the DDL (see `common/unity-catalog-constraints` → "Never Use `DEFAULT` Column Clauses in DDL"). This is a real regression: an invented `is_active ... DEFAULT true` column failed the DQ-setup job.
 
 **See:** `references/expectation-patterns.md` for complete schema and population examples
 

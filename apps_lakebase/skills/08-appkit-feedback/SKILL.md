@@ -12,13 +12,26 @@ description: >
 license: Apache-2.0
 compatibility: Requires 07-appkit-chat-history complete (Vote table + traceId column), Node.js v22+, Databricks CLI >= 0.295.0
 allowed-tools: Bash(databricks:*) Bash(npm:*) Bash(curl:*) Bash(node:*) Read
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: >
+  Feedback wiring is source editing (feedback routes, MLflow REST calls via
+  `config.authenticate()`, UI buttons) — client-agnostic. There is **no own DDL**: the `Vote` table is created
+  by `07-appkit-chat-history` Step 1 (server-side startup, SP-owned, RULE_10), and the feedback `INSERT`/`UPSERT`
+  is runtime data, not schema. MLflow assessments POST/PATCH over OAuth from the SP execution context — same on
+  both clients. IDE: `databricks experiments create --profile $PROFILE`, local `npm`/`curl` checks, then deploy
+  per `03-appkit-deploy`. Genie Code: `experiments create` via `runDatabricksCli` (omit `--profile`); local `npm`
+  gates are an IDE convenience (server-side build on deploy); exercise feedback routes on the deployed app
+  (browser / OAuth-session), not localhost. Verify assessments in the MLflow experiment UI.
+coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0.1"
+  version: "1.1.0"
   domain: apps
   role: feedback
   standalone: false
-  last_verified: "2026-04-30"
+  last_verified: "2026-06-02"
   volatility: medium
   upstream_sources:
     - name: "databricks-agent-skills/databricks-apps"
@@ -61,6 +74,21 @@ so there's no dependency on `process.env.DATABRICKS_TOKEN` or manual header pars
 - An MLflow experiment configured (optional — feedback still works without it, it just
   doesn't log to MLflow)
 - MLflow tracing enabled on the deployed agent endpoint (see Gotchas at end)
+
+### Working in Genie Code (client routing)
+
+This skill is **source editing + server-side code** (feedback routes, MLflow assessment calls, UI). There is **no own DDL** — the `Vote` table comes from `07-appkit-chat-history` (server-side startup, SP-owned). The MLflow REST calls authenticate from the SP execution context, so they run identically on both clients. Only the CLI/local checks differ:
+
+| IDE/CLI (as written) | Genie Code substitution |
+|----------------------|--------------------------|
+| `databricks experiments create --name … --profile <PROFILE>` (Step 1) | run via `runDatabricksCli` (**omit `--profile`** — Genie Code injects the workspace + OAuth) |
+| `npm run build` gates | **IDE-only** convenience — no local Node toolchain; the platform builds **server-side** on deploy. Errors surface in `databricks apps logs <name>` |
+| local `curl http://localhost:8000/api/feedback …` tests (Step 4) | no local dev server — POST/GET the feedback routes on the **deployed** app via browser or the OAuth-session `requests.Session()` test in `03-appkit-deploy` |
+| `rg -n '(DATABRICKS_TOKEN\|…)' server/` (Step 4) | runs on both — Grep/`rg` over the cloned repo, no client difference |
+| `app.yaml` / `databricks.yml` `MLFLOW_EXPERIMENT_ID` edits (Step 1) | source edits — identical on both clients |
+| `databricks apps deploy …` | see the `03-appkit-deploy` deploy-routing contract (`runDatabricksCli`, else SDK `w.apps.deploy(... SNAPSHOT)`) |
+
+Paths are relative to `apps_lakebase/$APP_NAME` — under your `.assistant/skills` repo clone on Genie Code, never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ---
 
@@ -132,7 +160,7 @@ variables:
 
 The feedback experiment MUST be pinned to the same user-and-use-case identity that backs `APP_NAME` so concurrent workshop attendees on a shared workspace never collide on a single experiment, and the MLflow UI never lists a generic `Default` / `Tracing` / `my-app-feedback` entry.
 
-**Naming rule (REQUIRED):** `/Users/<user_email>/mlflow/<APP_NAME>-feedback` — e.g. `/Users/jane.doe@example.com/mlflow/jane-d-stayfinder-feedback`. The leaf carries the same `${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}` shape that derives `APP_NAME` (see `apps_lakebase/Instructions.md`). When running on top of `vibecoding-state`, this value is already pinned at `state://Resources.mlflow_feedback_experiment_path` by [`vibecoding-state.migrate_canonical`](../../../genai-agents/vibecoding-state/SKILL.md#operation-migrate_canonical) — read it from state instead of inventing a new path.
+**Naming rule (REQUIRED):** `/Users/<user_email>/mlflow/<APP_NAME>-feedback` — e.g. `/Users/jane.doe@example.com/mlflow/jane-d-stayfinder-feedback`. The leaf carries the same `${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}` shape that derives `APP_NAME` (see `apps_lakebase/Instructions.md`). When running on top of `vibecoding-state`, this value is already pinned at `state://Resources.mlflow_feedback_experiment_path` by [`vibecoding-state.migrate_canonical`](../../../skills/vibecoding-state/SKILL.md#operation-migrate_canonical) — read it from state instead of inventing a new path.
 
 If you don't have an experiment yet, create one:
 
@@ -144,7 +172,7 @@ databricks experiments create \
   --profile <PROFILE>
 ```
 
-Forbidden names (HARD STOP if encountered): `/Shared/my-app-feedback`, `/Shared/feedback`, `/Shared/Default`, or any path whose leaf is not `<APP_NAME>-feedback`.
+> **Client note — Genie Code:** run this through `runDatabricksCli` and **omit `--profile`** (the workspace + OAuth are injected). Capture the `experiment_id` from the JSON output the same way.
 
 Note the `experiment_id` from the output and set it in your environment.
 

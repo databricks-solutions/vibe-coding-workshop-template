@@ -12,6 +12,11 @@ description: >
   quality gap is tool/retrieval-shaped.
 license: Apache-2.0
 compatibility: "Requires Databricks workspace with MLflow >= 3.10.1 and Unity Catalog Prompt Registry. No GEPA / `optimize_prompts` dependency."
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Hand-authored prompt revisions re-registered + alias-gated in the UC Prompt Registry via the MLflow SDK; full-dataset re-eval on serverless. No bundle resource. Identical on both clients. See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: medium

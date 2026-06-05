@@ -13,9 +13,18 @@ This guide walks you through building a complete Databricks data platform — fr
 - AI coding assistant with file reference support (Cursor, Claude Code, Windsurf, Copilot, Codex, etc.)
 - A Databricks workspace with Unity Catalog
 - A schema CSV exported from the customer's source system
-- Databricks CLI v0.200+ installed and authenticated (`databricks auth login`)
+- Databricks CLI v0.200+ installed and authenticated — **IDE/CLI client only** (see PRE-REQUISITES §11); Genie Code is pre-authenticated
 
 > **File references:** The prompts below use `@` to reference files (supported by Cursor, Windsurf, and others). If your IDE doesn't support `@`, ask the agent to "read the file at [path]" instead.
+
+> **Genie Code (in-workspace) — Set Up Project first.** Genie Code discovers skills by recursing into a repo cloned in your per-user skills folder. Clone the **whole** workshop repo once, then start a fresh thread so the skills load:
+>
+> ```bash
+> git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git \
+>   /Users/<your-username>/.assistant/skills/vibe-coding-workshop
+> ```
+>
+> After cloning, **start a NEW Agent-mode chat thread** (hard-refresh the page if skills don't appear), then load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context` and gates each prompt. Genie Code is pre-authenticated — skip the CLI auth prerequisite above. Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 ---
 
@@ -209,7 +218,7 @@ This will involve the following steps:
 - **Apply fixes and redeploy** — fix source files, redeploy, and re-run (max 3 iterations per job before escalation)
 ```
 
-> **Prerequisite:** Ensure Databricks CLI is installed and authenticated (`databricks auth login`).
+> **Prerequisite:** Databricks CLI installed and authenticated — IDE/CLI only (see PRE-REQUISITES §11); Genie Code is pre-authenticated.
 
 ---
 
@@ -312,7 +321,7 @@ This will involve the following steps:
 - **Apply fixes and redeploy** — fix source files, redeploy, and re-run (max 3 iterations before escalation)
 ```
 
-> **Prerequisite:** Ensure Databricks CLI is installed and authenticated (`databricks auth login`).
+> **Prerequisite:** Databricks CLI installed and authenticated — IDE/CLI only (see PRE-REQUISITES §11); Genie Code is pre-authenticated.
 
 ---
 
@@ -366,7 +375,7 @@ This will involve the following steps:
 - **Apply fixes and redeploy** — fix source files, redeploy, and re-run (max 3 iterations before escalation)
 ```
 
-> **Prerequisite:** Ensure Databricks CLI is installed and authenticated (`databricks auth login`).
+> **Prerequisite:** Databricks CLI installed and authenticated — IDE/CLI only (see PRE-REQUISITES §11); Genie Code is pre-authenticated.
 
 ---
 

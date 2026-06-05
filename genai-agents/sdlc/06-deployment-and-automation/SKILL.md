@@ -9,6 +9,11 @@ description: >
   linking. SDLC Step 6.
 license: Apache-2.0
 compatibility: "Requires Databricks workspace with MLflow 3.10+ and Unity Catalog. Scripts use uv."
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: "The production deploy skill — bundle resources via the `bundle deploy --target dev` spine plus the App deploy step. On Genie Code run every deploy CLI through runDatabricksCli (pre-authenticated); on IDE via the local CLI. CI/CD automation is the same bundle/spine on both clients. See `skills/genie-code-environment` for the deploy verbs."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high
@@ -113,6 +118,8 @@ If the gate raises, the entire promote step exits non-zero and CI surfaces the f
 ---
 
 ## Databricks Asset Bundles (DAB)
+
+> **Genie Code:** run every deploy command through `runDatabricksCli` (pre-authenticated), and be on the bundle's page so the CWD resolves to the bundle root. The CI/CD spine is identical on both clients. See `skills/genie-code-environment` §3–§4.
 
 Define jobs, apps, and variables in `databricks.yml`, then deploy and run by target.
 
@@ -420,7 +427,7 @@ Optional: manual approval step between promote and deploy for regulated environm
 
 | Issue | Fix |
 |-------|-----|
-| Bundle auth error | `databricks auth login` / token validity for target host |
+| Bundle auth error | IDE/CLI: re-auth per PRE-REQUISITES §11; Genie Code: pre-authenticated — verify the target host/`--target` instead |
 | App errors at runtime | `databricks apps logs <app-name>` |
 | Permission denied on UC / warehouse / endpoint | SP grants + `databricks permissions` / SQL `GRANT` |
 | Chat/UI unreachable | Confirm app running: `databricks apps get <app-name>` |

@@ -4,6 +4,8 @@
 Also consult the live AppKit docs: `npx @databricks/appkit docs "files"`
 The information below may be outdated. Prefer upstream when available.
 
+> **Client routing:** commands below are for the **IDE/CLI** path. On **Genie Code**: add packages to `package.json` instead of `npm install` (platform installs server-side on deploy); run `databricks …` via `runDatabricksCli` and **omit `--profile`**; `npx … docs` → WebFetch the docs site. See the routing table in [`../SKILL.md`](../SKILL.md) and `skills/genie-code-environment`.
+
 File operations against Databricks Unity Catalog Volumes with multi-volume support, streaming, and built-in caching.
 
 **Capabilities:** List, read, download, upload, delete, and preview files. Multi-volume named aliases, streaming downloads, content-type resolution, XSS-safe inline serving, upload size limits, automatic cache invalidation, OBO user execution.

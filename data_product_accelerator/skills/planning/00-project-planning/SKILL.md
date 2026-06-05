@@ -5,13 +5,16 @@ description: >-
   with Agent Domain Framework and Agent Layer Architecture. Includes interactive
   Quick Start with key decisions, industry-specific domain patterns, complete
   phase document templates (Use Cases, Agents, Frontend), Genie Space integration
-  patterns, deployment order requirements, and worked examples. Default
-  acceleration mode plans on top of a completed Gold layer. Workshop mode can
-  also plan from the best available layer (deployed Gold, Gold design YAML,
-  deployed Silver, deployed Bronze, or source schema CSV) and produces a
-  workshop-draft contract for downstream stages. Use when planning any
-  Databricks solution after Gold layer is complete, or in workshop mode after
-  Bronze, Silver, or Gold-design is available.
+  patterns, deployment order requirements, and worked examples. Supports both
+  acceleration mode (plan on a completed Gold layer) and workshop mode
+  (`planning_mode: workshop`) that plans from the best available layer with hard
+  artifact caps. Use when planning any Databricks solution post-Gold layer —
+  observability, analytics, agent-based frameworks, or multi-artifact projects.
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "Design-phase skill: produces multi-phase plans, manifests, and addendums; it has no deployed resource of its own — downstream artifacts deploy later via `bundle deploy --target dev` (runDatabricksCli on Genie Code). B12: the Gold-gap STOP gate writes `plans/gold-gap-remediation.md` and halts before generating plans; workshop mode (`planning_mode: workshop`) applies hard artifact caps. On Genie Code, write all generated plans/manifests under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`, e.g. `plans/`), not a bare relative path — relative paths resolve against the page CWD (see `skills/genie-code-environment` §8)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"

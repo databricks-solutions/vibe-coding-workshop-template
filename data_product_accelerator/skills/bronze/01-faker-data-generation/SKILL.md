@@ -1,6 +1,11 @@
 ---
 name: faker-data-generation
 description: Generate synthetic data with Faker for Bronze layer testing with configurable data corruption. Use when creating test data for data quality validation, testing DLT expectations, or simulating production-like datasets. Supports realistic data generation with intentional corruption patterns mapped to specific DQ expectations.
+clients: [ide_cli, genie_code]
+bundle_resource: jobs
+deploy_verb: bundle_deploy
+deploy_note: "Synthetic data generation runs inside the Bronze load job (notebook_task); deploy via `bundle deploy --target dev` (runDatabricksCli on Genie Code)."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"

@@ -37,9 +37,18 @@ Complete the pre-requisites checklist before beginning: [PRE-REQUISITES.md](../P
 Key requirements:
 - Databricks workspace with Apps and Lakebase enabled
 - AI-powered IDE (Cursor recommended) with Claude Sonnet 4.5+
-- Databricks CLI installed and authenticated
+- Databricks CLI installed and authenticated — **IDE/CLI client only**; Genie Code is pre-authenticated (see the Genie Code block below)
 - Node.js v22+ installed
 - A PRD document at `docs/design_prd.md` describing the application to build
+
+> **Genie Code (in-workspace) — Set Up Project first.** Genie Code discovers skills by recursing into a repo cloned in your per-user skills folder, and it runs pre-authenticated and serverless (skip the CLI auth requirement above). Clone the **whole** workshop repo once, then start a fresh thread so the skills load:
+>
+> ```bash
+> git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git \
+>   /Users/<your-username>/.assistant/skills/vibe-coding-workshop
+> ```
+>
+> After cloning, **start a NEW Agent-mode chat thread** (hard-refresh the page if skills don't appear), then load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context` and gates each step. The local dev server / E2E-test steps in this guide are IDE/CLI-only — on Genie Code, verify against the deployed app instead. Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 ---
 
@@ -147,8 +156,7 @@ All file paths below are relative to `apps_lakebase/$APP_NAME/` unless explicitl
 #### Step 1.1: Authenticate and Set Up Variables
 
 ```bash
-# Authenticate to Databricks
-databricks auth login --host {workspace_url}
+# Authenticate to Databricks — IDE/CLI only (see PRE-REQUISITES §11); Genie Code is pre-authenticated, skip this line
 
 # Derive app name from your username + use case
 USER_JSON=$(databricks current-user me --output json)
@@ -495,8 +503,8 @@ PROFILE=$(databricks auth profiles --output json 2>/dev/null \
     '[.profiles[] | select(.host == $host)] | .[0].name // empty')
 
 if [ -z "$PROFILE" ]; then
-  echo "No profile found for $TARGET_HOST — creating one..."
-  databricks auth login --host "$TARGET_HOST"
+  # IDE/CLI: create a profile per PRE-REQUISITES §11; Genie Code: skip — pre-authenticated, no profiles (omit --profile).
+  echo "No profile found for $TARGET_HOST — IDE/CLI only: see PRE-REQUISITES §11."
   PROFILE=$(databricks auth profiles --output json 2>/dev/null \
     | jq -r --arg host "$TARGET_HOST" \
       '[.profiles[] | select(.host == $host)] | .[0].name // empty')
@@ -1234,8 +1242,8 @@ PROFILE=$(databricks auth profiles --output json 2>/dev/null \
     '[.profiles[] | select(.host == $host)] | .[0].name // empty')
 
 if [ -z "$PROFILE" ]; then
-  echo "No profile found for $TARGET_HOST — creating one..."
-  databricks auth login --host "$TARGET_HOST"
+  # IDE/CLI: create a profile per PRE-REQUISITES §11; Genie Code: skip — pre-authenticated, no profiles (omit --profile).
+  echo "No profile found for $TARGET_HOST — IDE/CLI only: see PRE-REQUISITES §11."
   PROFILE=$(databricks auth profiles --output json 2>/dev/null \
     | jq -r --arg host "$TARGET_HOST" \
       '[.profiles[] | select(.host == $host)] | .[0].name // empty')

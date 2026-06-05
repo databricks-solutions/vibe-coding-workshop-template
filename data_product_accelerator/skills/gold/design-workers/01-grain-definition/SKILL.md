@@ -2,6 +2,11 @@
 name: 01-grain-definition
 description: Grain definition patterns for fact tables during the Gold layer design phase. Use when choosing grain types (transaction, aggregated, snapshot), documenting grain in YAML schemas, and applying the PK-grain decision tree to determine whether a fact table needs aggregation. Prevents costly table rewrites by catching grain ambiguity before implementation.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: bundle_deploy
+deploy_note: "Design-phase pattern; output feeds the Gold design/setup artifacts deployed downstream via `bundle deploy --target dev`. No standalone resource."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0.0"

@@ -7,8 +7,12 @@ metadata:
   domain: common
   role: shared
   used_by_stages: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-  last_verified: "2026-04-16"
+  last_verified: "2026-06-02"   # M2 closeout re-verify: principles skill; 1 INSESSION_CREATE = legit DDL example
   volatility: low
+  clients: [ide_cli, genie_code]   # client-agnostic; Genie-Code behavior via genie-code-environment
+  deploy_verb: "bundle deploy --target dev"   # mechanics owned by databricks-asset-bundles (the spine)
+  deploy_note: "philosophy/principles skill — authors no resources directly; references the spine"
+  coverage: all_stages
   upstream_sources: []  # Internal philosophy/principles, not API-dependent
 ---
 # Databricks Expert Agent
@@ -50,6 +54,21 @@ Use when working on Databricks projects requiring:
 - Schema extraction from source files (preventing hallucinations)
 - DLT expectations, Predictive Optimization, and modern platform features
 - UC Metric Views, Genie TVFs, and Serverless Workflows
+
+## Working in Genie Code (reference → `genie-code-environment`)
+
+When the client is **Genie Code** (detected by `skills/vibecoding-state`), two behaviors govern everything
+— the full behavioral catalog lives in the **`genie-code-environment`** skill (load it on demand):
+
+- **Tools are surface-scoped.** Genie Code adapts its available tools to the page/asset you are on. The
+  same request can succeed on one surface and be "not in the allow-list" on another. If a capability seems
+  missing, **navigate to the right surface first** — don't conclude it's impossible.
+- **Three execution paths, in order:** `runDatabricksCli` → Python SDK (`WorkspaceClient` via
+  `executeCode`) → native tools (`createAsset`/`readTable`/…). **Blocked ≠ impossible — try the next
+  path.** Every operation hard-blocked on one path in testing had a working alternative on another.
+
+Deploy mechanics are **not** restated here — see `databricks-asset-bundles` (the deploy contract) and
+`genie-code-environment` (the environment detail).
 
 ## Critical Rules
 
@@ -139,7 +158,7 @@ If Gold YAML doesn't exist yet (initial design phase):
 These patterns caused P0/Critical failures across 14 pipeline executions:
 
 1. **Prompt Sufficiency Illusion** — A detailed user prompt does NOT substitute for reading skills or extracting from source files. Prompt completeness masks the need to verify against existing artifacts.
-2. **Hardcoding YAML-Extractable Values** — Silver table names, column renames, dedup keys, and constraint values MUST come from Gold YAML or live catalog, never from memory.
+2. **Hardcoding YAML-Extractable Values** — Silver table names, column renames, dedup keys, and constraint values MUST come from Gold YAML or live catalog, never from memory. **Before referencing any column, enumerate the live schema with `DESCRIBE TABLE` and treat that output as the only valid column namespace — a name absent from `DESCRIBE` is a hard error, not a "close enough" guess** (the recurring failure: DQ rules / Silver transforms authored against PRD names like `price`/`latitude` when the live schema had `base_price`/`property_latitude`).
 3. **Manifest-as-Truth** — Plans, manifests, and design docs describe *intended* state. Always verify against live catalog (`SHOW TABLES`, `DESCRIBE TABLE`, `information_schema`) before generating code.
 4. **Domain Knowledge Injection** — Never reference business concepts (enums, status values, fee types) not present in source data. If a concept isn't in the YAML or catalog, flag it as an extension requiring user confirmation.
 

@@ -3,6 +3,8 @@
 How to extract MLflow trace IDs from Databricks serving endpoint responses, enabling
 the feedback → MLflow assessment link.
 
+> **Client note (IDE & Genie Code).** This is pure **server-side parser code** — it runs at request time on the deployed app and is identical on both clients. There are no client-specific commands here.
+
 This helper is shared between [07-appkit-chat-history](../../07-appkit-chat-history/SKILL.md)
 (which captures `trace_id` during streaming and persists it on `chat.Message`) and
 [08-appkit-feedback](../SKILL.md) (which reads it back to log MLflow assessments).

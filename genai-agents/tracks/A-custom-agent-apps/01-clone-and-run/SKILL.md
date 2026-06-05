@@ -6,6 +6,11 @@ description: >
   verify the built-in chat UI. Track A Step 1. Produces a running local agent
   project ready for customization.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: apps
+deploy_verb: apps_deploy
+deploy_note: "Clone the agent template and run it. The local dev server (quickstart) is the IDE/local branch; on Genie Code there is no local dev server — deploy to the Databricks Apps runtime and test the deployed app (run the deploy CLI through runDatabricksCli, pre-authenticated). On Genie Code clone the template under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`), not a bare relative path — relative paths resolve against the page CWD (see `skills/genie-code-environment` §8)."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: medium
@@ -71,8 +76,7 @@ python3 -c "import sys; assert sys.version_info >= (3,11)" && echo "Python: OK"
 node --version  # Should be v20+
 ```
 
-All four must pass. If `databricks auth token` fails, run `databricks configure`
-first and set up a profile for your workspace.
+All four must pass. If `databricks auth token` fails: **IDE/CLI** — set up a profile per PRE-REQUISITES §11; **Genie Code** — not applicable (pre-authenticated; `uv`/`node` checks also differ — see `skills/genie-code-environment`).
 
 ---
 
@@ -198,6 +202,8 @@ cat .env
 ---
 
 ## Step 1c: Start the Local Dev Server
+
+> **Genie Code:** there is no local dev server — this local-quickstart path is IDE-only. Instead deploy to the Databricks Apps runtime and test the deployed app (the platform builds it server-side). See `skills/genie-code-environment` §4.
 
 ```bash
 uv run start-app

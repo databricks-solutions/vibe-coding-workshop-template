@@ -6,6 +6,11 @@ description: >
   SDK), long-term preferences via DatabricksStore, graceful degradation, and
   thread_id resolution. Track A Step 5. Consumes authenticated client from Step 4.
 license: Apache-2.0
+clients: [ide_cli, genie_code]
+bundle_resource: none
+deploy_verb: none
+deploy_note: "Conversation memory backed by a Lakebase instance (provisioned via the Databricks SDK/CLI, not a DAB resource kind in this workshop) + AsyncDatabricksSession. Same on both clients; on Genie Code run any provisioning CLI through runDatabricksCli (pre-authenticated). See `skills/genie-code-environment`."
+coverage: full
 metadata:
   last_verified: "2026-04-15"
   volatility: high

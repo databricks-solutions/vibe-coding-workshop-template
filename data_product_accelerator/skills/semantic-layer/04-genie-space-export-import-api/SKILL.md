@@ -1,6 +1,11 @@
 ---
 name: genie-space-export-import-api
 description: Comprehensive patterns for Databricks Genie Space Export/Import API - JSON schema, serialization format, and programmatic deployment. Use when programmatically creating, exporting, or importing Genie Spaces via REST API, troubleshooting API deployment errors, or implementing CI/CD for Genie Spaces. Includes complete GenieSpaceExport schema, API endpoints (List, Get, Create, Update, Delete), JSON format requirements, ID generation, variable substitution, inventory-driven generation patterns, and production deployment checklists.
+clients: [ide_cli, genie_code]
+bundle_resource: genie
+deploy_verb: bundle_deploy
+deploy_note: "RULE_8 tiers: T1 native `genie_spaces` bundle entry (preferred; verify CLI support via `bundle validate`) -> T2 provisioning notebook job (active fallback) -> T3 `createAsset`+PATCH dev-authoring loop (Genie-Code only: create a shell with `createAsset(assetType=genie)`, populate the FULL `serialized_space` via `PATCH /api/2.0/genie/spaces/{id}`, then PERSIST that JSON into the bundle and run T1/T2 once in dev for the version-controlled deploy). T3 is sanctioned for fast dev iteration ONLY when the JSON is persisted in the bundle and a job reproduces it; an orphan space with no persisted JSON is the regression. IDE (ide_cli) stays on T1/T2 (bundle) and never uses `createAsset`. Space name + table_identifiers carry the per-user prefix. semantic_warehouse_id is baked at deploy time, never a runtime --var."
+coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "1.0"
@@ -305,7 +310,7 @@ That means it must be a concrete 16+ character hex warehouse id at the moment `d
 | `${warehouse_id}` (shell-style placeholder) | ❌ Same failure mode. |
 | Empty string / missing field | ❌ API rejects with `INVALID_PARAMETER_VALUE`. |
 
-**Rule:** Resolve `warehouse_id` at `databricks bundle deploy` time (deploy-time baking — see `common/databricks-asset-bundles/SKILL.md` §Pitfall: `--var` at run time does NOT override deploy-time-baked values) and pass the resolved value into the notebook task via `base_parameters.warehouse_id`. The `deploy_space` helper in `assets/templates/deploy_genie_spaces.py` stamps this value into `serialized_space.config.semantic_warehouse_id` automatically, so you only need to ensure the value reaching the notebook widget is concrete.
+**Rule:** Resolve `warehouse_id` at `databricks bundle deploy` time (deploy-time baking — see `skills/databricks-asset-bundles/SKILL.md` §Pitfall: `--var` at run time does NOT override deploy-time-baked values) and pass the resolved value into the notebook task via `base_parameters.warehouse_id`. The `deploy_space` helper in `assets/templates/deploy_genie_spaces.py` stamps this value into `serialized_space.config.semantic_warehouse_id` automatically, so you only need to ensure the value reaching the notebook widget is concrete.
 
 **Validation:** `_assert_sql_arrays` enforces a hex-only `semantic_warehouse_id` on every POST/PATCH. If you see `config.semantic_warehouse_id must be a concrete deploy-time warehouse id` in a pre-flight error, the root cause is always that `warehouse_id` reached the notebook as a template placeholder — fix it in the bundle YAML, not in the Genie config.
 
@@ -686,6 +691,9 @@ cp data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-a
    ```
 
 2. **Validate SQL Queries** (if benchmarks present)
+
+   > **Client note:** IDE runs this in a terminal; Genie Code runs the `databricks bundle …` command via `runDatabricksCli` (be on the bundle's page). See `skills/genie-code-environment`.
+
    ```bash
    databricks bundle run -t dev genie_benchmark_validation_job
    ```
