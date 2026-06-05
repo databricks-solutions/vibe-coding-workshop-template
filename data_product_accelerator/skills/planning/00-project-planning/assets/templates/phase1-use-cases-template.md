@@ -3,7 +3,10 @@
 ## Overview
 
 **Status:** {status}
-**Dependencies:** Prerequisites (Gold Layer) ✅ Complete
+**Planning Mode:** {acceleration | workshop}
+**Selected Planning Source:** `{deployed_gold | gold_design | deployed_silver | deployed_bronze | source_csv}`
+**Implementation Readiness:** `{gold_ready | gold_design_only | workshop_deployable | workshop_draft}`
+**Dependencies:** Prerequisites (mode-aware) — see [prerequisites.md](./prerequisites.md). Acceleration requires Gold; workshop requires the layer recorded in `planning_source.selected_layer`.
 **Estimated Effort:** {weeks}
 
 ---
@@ -16,9 +19,9 @@
 
 ## Agent Domain Framework
 
-| Domain | Icon | Focus Area | Primary Tables |
-|--------|------|------------|----------------|
-| {Domain 1} | {emoji} | {focus} | {tables} |
+| Domain | Icon | Focus Area | Primary Planning Assets |
+|--------|------|------------|-------------------------|
+| {Domain 1} | {emoji} | {focus} | {tables from selected planning source} |
 
 ---
 

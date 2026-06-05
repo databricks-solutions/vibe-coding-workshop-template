@@ -443,19 +443,22 @@ def substitute_variables(data: dict, variables: dict) -> dict:
 
 **Step 0 — Verify assets exist before referencing them:**
 
+The schema(s) to inspect come from the planning manifest, not a hard-coded `gold_schema`. Production spaces inspect Gold; some manifests also expose `semantic_schema` (Metric Views/TVFs may be deployed there). When a manifest provides `unified_genie_space.assets` or `domains[].genie_spaces[].assets`, treat those identifiers as the **allowlist** — only verify schemas that contain those allowlisted assets.
+
 ```sql
--- Run this BEFORE creating or editing any Genie Space JSON
+-- Run this BEFORE creating or editing any Genie Space JSON.
+-- {schema} is one of: ${gold_schema}, ${semantic_schema} (from manifest).
 SELECT table_name, table_type
 FROM {catalog}.information_schema.tables
-WHERE table_schema = '{gold_schema}'
+WHERE table_schema = '{schema}'
 ORDER BY table_type, table_name;
 
 SELECT routine_name
 FROM {catalog}.information_schema.routines
-WHERE routine_schema = '{gold_schema}';
+WHERE routine_schema = '{schema}';
 ```
 
-**Only include assets that appear in these results.** A Genie Space that references a non-existent table fails with `Table '...' does not exist` during space creation. This is the #1 cause of deployment failures. Do NOT trust a pre-generated manifest as ground truth — query the live catalog.
+**Only include assets that appear in these results AND are listed in the manifest's `assets` allowlist.** A Genie Space that references a non-existent table fails with `Table '...' does not exist` during space creation. This is the #1 cause of deployment failures. Do NOT trust a pre-generated manifest as ground truth — query the live catalog using the schemas declared by `planning_source` (`gold_schema` for production / Gold-based runs, or `silver_schema` / `bronze_schema` for workshop deployments). The semantic-layer orchestrator only stops before this skill runs when `planning_source.selected_layer = source_csv` (no live tables exist).
 
 **NEVER manually edit `data_sources`.** Generate from verified inventory:
 

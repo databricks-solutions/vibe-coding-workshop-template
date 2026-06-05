@@ -93,10 +93,11 @@ route you correctly.
 
 | Step | Skill | Purpose | Time |
 |------|-------|---------|------|
+| F0b | [Agent Spec and Tool Plan](./foundation/00b-agent-spec-and-tool-plan/SKILL.md) | `docs/design_prd.md` to `docs/agent_spec.yaml` and `docs/agent_tool_plan.yaml`; supports MCP web research and dynamic SQL MCP catalog/schema | 45 min |
 | F1 | [MLflow GenAI Foundation](./foundation/01-mlflow-genai-foundation/SKILL.md) | MLflow 3.x, autolog, ResponsesAgent rules, env detection | 30 min |
 | F2 | [Experiment Tracing & UC OTEL](./foundation/02-experiment-tracing-and-uc-storage/SKILL.md) | Experiment paths, tracing, UC OTEL Delta tables | 1 hr |
 | F3 | [Tools and Data Access](./foundation/03-tools-and-data-access/SKILL.md) | Managed MCP, UC functions, Genie, Vector Search | 1 hr |
-| F4 | [AI Gateway](./foundation/04-ai-gateway/SKILL.md) | Rate limits, PII, fallbacks on serving endpoints | 30 min |
+| F4 (optional hardening) | [AI Gateway](./foundation/04-ai-gateway/SKILL.md) | Rate limits, PII, fallbacks on serving endpoints; only with pre-provisioned Gateway or public admin APIs | 30 min |
 | F5 (optional) | [Knowledge Assistant Lifecycle](./foundation/05-knowledge-assistant/SKILL.md) | Managed document-Q&A endpoint; emits `ka_endpoint_name` and `knowledge_assistant_id` | 30 min |
 
 ## Module 2: Agent Creation (pick one)
@@ -183,8 +184,16 @@ It doesn't care how the agent was built — only that it accepts a dict and retu
 
 ## Artifact Flow
 
+The core Track A path is AI-Gateway-ready but not AI-Gateway-dependent: the agent reads its model route from configuration, so a pre-provisioned Gateway can be introduced later without changing agent logic.
+
+Sequence: Agent Spec -> Tool Plan -> UC resources -> MLflow tracing -> optional KA -> Track A clone/framework -> tools -> auth/memory -> eval/deploy -> AppKit proxy -> feedback
+
 ```
+Design:
+  design_prd.md -> agent_spec.yaml -> agent_tool_plan.yaml
+
 Foundation:
+  F0b → agent_spec.yaml, agent_tool_plan.yaml (Track A only)
   F1 → mlflow_environment
   F2 → experiment_paths, uc_otel_tables
 

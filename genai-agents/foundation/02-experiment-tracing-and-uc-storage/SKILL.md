@@ -81,41 +81,67 @@ For the full **20+ supported autolog integrations** (LLM SDKs, orchestrators, ag
 
 ## Experiment path organization
 
-### Path template
+### CRITICAL: consume the experiment path from state — do not invent one
 
-The project defines a single template for experiment paths:
+The workshop pins MLflow experiment paths to the **same user-and-use-case identity** that backs `APP_NAME` (e.g. `prashanth-s-stayfinder`) so concurrent attendees on a shared workspace cannot collide on a single experiment, and so the leaf in the MLflow UI is never a generic word like `Tracing`, `traces`, `Default`, or `my-agent`.
+
+The canonical derivation lives in [`vibecoding-state` `migrate_canonical`](../../vibecoding-state/SKILL.md#operation-migrate_canonical) and is captured in state at the prompt that first resolves `$APP_NAME` / `$AGENT_NAME`:
+
+| State field | Derivation | Example |
+|---|---|---|
+| `mlflow_experiment_path` | `/Users/<user_email>/mlflow/<APP_NAME or AGENT_NAME>-agent` | `/Users/jane.doe@example.com/mlflow/jane-d-stayfinder-agent` |
+| `mlflow_feedback_experiment_path` | `/Users/<user_email>/mlflow/<APP_NAME>-feedback` | `/Users/jane.doe@example.com/mlflow/jane-d-stayfinder-feedback` |
+
+This skill **consumes** those values from `state://Resources.mlflow_experiment_path` rather than constructing its own. If state shows `<pending>` for the path, halt and route back to `vibecoding-state` `migrate_canonical` — do not paper over it with a hand-rolled `/Shared/...` default.
+
+### Path template (for projects that do not run on top of `vibecoding-state`)
+
+If your project does not use the `vibecoding-state` skill, define a template that still pins identity onto the leaf:
 
 ```text
-EXPERIMENT_PATH_TEMPLATE = "/Shared/genie-space-optimizer/{{ space_id }}/{{ domain }}"
+EXPERIMENT_PATH_TEMPLATE = "/Users/{{ user_email }}/mlflow/{{ app_name }}-{{ stage }}"
 ```
 
-Define an experiment path template for your project. Use f-strings or a config value to build the path:
+Where `app_name` is the user-prefixed, use-case-suffixed identity (e.g. `prashanth-s-stayfinder`) and `stage` ∈ {`agent`, `eval`, `feedback`, `deploy`}.
 
 ### Three-experiment lifecycle pattern
 
-For multi-stage pipelines, use **separate experiments** (or distinct `domain` segments under the same space) for:
+For multi-stage pipelines, use **separate experiments** (one leaf per stage under the same `app_name`):
 
-| Stage | Purpose |
-| --- | --- |
-| **dev** | Interactive debugging, short runs, permissive logging |
-| **eval** | Benchmarks, `mlflow.genai.evaluate`, regression gates |
-| **deploy** | Production or promotion runs, stricter tags and retention |
+| Stage | Leaf | Purpose |
+| --- | --- | --- |
+| **agent / dev** | `<app_name>-agent` | Interactive debugging, short runs, permissive logging — the default tracing destination |
+| **eval** | `<app_name>-eval` | Benchmarks, `mlflow.genai.evaluate`, regression gates |
+| **feedback** | `<app_name>-feedback` | End-user thumbs / human assessments persisted from the AppKit feedback skill |
+| **deploy** | `<app_name>-deploy` | Production or promotion runs, stricter tags and retention |
 
-Map each stage to a `domain` value (for example `dev`, `eval`, `deploy`) or extend the template if your org uses a fourth path segment.
+The leaf must always carry `<app_name>` so that browsing MLflow experiments lists `prashanth-s-stayfinder-agent`, `prashanth-s-stayfinder-eval`, etc. — never a bare `agent` / `eval` / `Tracing`.
 
-### Setting the experiment from the template
+### Setting the experiment
 
-Build the experiment path from your project config:
+When running inside the workshop, read the path from state:
 
 ```python
 import mlflow
 
-agent_name = "my-data-agent"
-experiment_path = f"/Shared/{agent_name}/traces"
+# state://Resources.mlflow_experiment_path is already pinned to
+# /Users/<user_email>/mlflow/<APP_NAME>-agent by vibecoding-state.migrate_canonical.
+experiment_path = state["Resources"]["mlflow_experiment_path"]
 mlflow.set_experiment(experiment_path)
 ```
 
-Set the experiment early in your entrypoint — before enabling autolog and making any LLM calls.
+Stand-alone projects build the path from the same identity inputs:
+
+```python
+import mlflow
+
+user_email = "jane.doe@example.com"
+app_name = "jane-d-stayfinder"  # ${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}
+experiment_path = f"/Users/{user_email}/mlflow/{app_name}-agent"
+mlflow.set_experiment(experiment_path)
+```
+
+Set the experiment early in your entrypoint — before enabling autolog and making any LLM calls. **Never** use a literal leaf like `traces`, `Tracing`, or `my-agent`; the leaf is the only thing surfacing in the MLflow UI search column and a generic value defeats per-attendee isolation.
 
 For complete experiment organization patterns including `ExperimentManager`, search, cleanup, and decision tables, see: [`references/experiment-organization.md`](references/experiment-organization.md).
 
@@ -239,18 +265,30 @@ For connection pool tuning in high-throughput serving scenarios and async tracin
 
 ### Experiment organization
 
-**DO** — Use the template and `format_mlflow_template` for all experiment paths:
+**DO** — Pin the experiment leaf to the user-and-use-case identity, and prefer reading from `vibecoding-state`:
 
 ```python
-agent_name = "my-data-agent"
-experiment_path = f"/Shared/{agent_name}/traces"
+# In a workshop-managed project, read the pre-derived path from state.
+experiment_path = state["Resources"]["mlflow_experiment_path"]
+# e.g. "/Users/jane.doe@example.com/mlflow/jane-d-stayfinder-agent"
 mlflow.set_experiment(experiment_path)
 ```
 
-**DON'T** — Hard-code experiment paths that vary by environment:
+```python
+# Stand-alone project — build the path from the same identity inputs.
+user_email = "jane.doe@example.com"
+app_name = "jane-d-stayfinder"  # ${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}
+experiment_path = f"/Users/{user_email}/mlflow/{app_name}-agent"
+mlflow.set_experiment(experiment_path)
+```
+
+**DON'T** — Use a generic leaf, a hand-rolled `/Shared/...` default, or a hard-coded workspace path. The leaf is what shows up in the MLflow UI experiment list, and `traces` / `Tracing` / `my-agent` give every attendee on a shared workspace the same name:
 
 ```python
-# WRONG: hard-coded path that won't work across workspaces
+# WRONG: generic leaf — collides across attendees, useless in the UI
+mlflow.set_experiment("/Shared/my-agent/traces")
+
+# WRONG: hard-coded workspace path that won't work across workspaces
 mlflow.set_experiment("/Shared/my-specific-workspace-path/eval")
 ```
 
@@ -360,16 +398,19 @@ mlflow.set_tracking_uri("databricks")
 os.environ["MLFLOW_TRACING_SQL_WAREHOUSE_ID"] = "<SQL_WAREHOUSE_ID>"
 
 experiment = mlflow.set_experiment(
-    experiment_name="/Shared/my-agent/traces",
+    # Read from state — pinned to /Users/<user_email>/mlflow/<APP_NAME>-agent.
+    experiment_name=state["Resources"]["mlflow_experiment_path"],
     trace_location=UnityCatalog(
         catalog_name="main",
         schema_name="agent_traces",
+        # The prefix MUST mirror APP_NAME (underscored for table-name safety),
+        # e.g. "jane_d_stayfinder" — never a generic "my_agent".
         table_prefix="my_agent",
     ),
 )
 ```
 
-This creates **four Delta tables** in the specified UC schema:
+This creates **four Delta tables** in the specified UC schema (with `<table_prefix>` bound to the underscored `APP_NAME`):
 
 | Table | Content |
 |-------|---------|
@@ -448,11 +489,12 @@ import mlflow
 from mlflow.entities.trace_location import UnityCatalog
 
 experiment = mlflow.set_experiment(
-    experiment_name="/Shared/my-agent/traces",
+    # /Users/<user_email>/mlflow/<APP_NAME>-agent — read from state.
+    experiment_name=state["Resources"]["mlflow_experiment_path"],
     trace_location=UnityCatalog(
         catalog_name="main",
         schema_name="agent_traces",
-        table_prefix="my_agent",
+        table_prefix="my_agent",  # MUST mirror underscored APP_NAME in production
     ),
 )
 ```
@@ -465,7 +507,7 @@ from mlflow.entities.trace_location import UnityCatalog
 
 # WRONG: MLFLOW_TRACING_SQL_WAREHOUSE_ID not set — tables can't be written
 experiment = mlflow.set_experiment(
-    experiment_name="/Shared/my-agent/traces",
+    experiment_name=state["Resources"]["mlflow_experiment_path"],
     trace_location=UnityCatalog(
         catalog_name="main",
         schema_name="agent_traces",

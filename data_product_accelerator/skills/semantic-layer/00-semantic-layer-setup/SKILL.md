@@ -56,7 +56,17 @@ metadata:
 
 End-to-end workflow for building the Databricks semantic layer — Metric Views, Table-Valued Functions, and Genie Spaces — on top of a completed Gold layer.
 
-**Predecessor:** `gold-layer-setup` skill (Gold tables must exist before using this skill)
+**Predecessor (acceleration mode):** `gold-layer-setup` skill — Gold tables must exist before this orchestrator deploys production semantic assets.
+
+**Predecessor (workshop mode):** ANY of `bronze-layer-setup`, `silver-layer-setup`, `gold-layer-design`, or `gold-layer-setup`. Workshop mode builds Metric Views, TVFs, and Genie Spaces directly on top of whichever planning-source layer the manifest declares.
+
+**Layer-aware workshop deployment (NEW):** This orchestrator now honors `planning_source.selected_layer` from the planning manifest:
+
+- `deployed_gold` / `gold_design` — production path (existing behavior).
+- `deployed_silver` / `deployed_bronze` — **workshop deployment is allowed**. The orchestrator prints an advisory (Genie quality caveats, Gold promotion recommended for production) and continues to build the semantic layer against the Silver/Bronze schema.
+- `source_csv` — STOP. There are no live tables to query; the plan is a contract only.
+
+The previous "stop before deployment for any non-Gold workshop draft" guardrail has been replaced with this layer-aware behavior. Acceleration-mode strict Gold rules are unchanged.
 
 **Time Estimate:** 3-4 hours for initial setup, 1-2 hours per additional domain
 
@@ -221,6 +231,82 @@ if planning_mode == 'workshop':
     print("⚠️  Workshop mode active — creating ONLY the artifacts listed in the manifest")
 ```
 
+#### Phase 0 — Layer-Aware Manifest Read (NEW)
+
+Read the layer-aware fields written by Planning Phase 0. These are additive and **only change behavior when present**:
+
+```python
+planning_source = manifest.get("planning_source", {})
+selected_layer  = planning_source.get("selected_layer", "deployed_gold")
+readiness       = manifest.get("implementation_readiness", "gold_ready")
+requires_promo  = manifest.get("requires_gold_promotion", False)  # advisory only
+
+# Schema selection — preserves the existing gold_schema-only flow when
+# the manifest is Gold-based; differs only for non-Gold workshop runs.
+catalog          = manifest.get("catalog")
+gold_schema      = manifest.get("gold_schema")
+semantic_schema  = manifest.get("semantic_schema") or gold_schema
+silver_schema    = manifest.get("silver_schema")
+bronze_schema    = manifest.get("bronze_schema")
+
+# The schema we inspect for the inventory — Gold by default; for non-Gold
+# workshop runs we inspect the actual planning-source schema.
+SOURCE_SCHEMA_BY_LAYER = {
+    "deployed_gold":   gold_schema,
+    "gold_design":     gold_schema,         # YAML-driven; live schema may not exist
+    "deployed_silver": silver_schema,
+    "deployed_bronze": bronze_schema,
+    "source_csv":      None,                # no live schema
+}
+inventory_schema = SOURCE_SCHEMA_BY_LAYER.get(selected_layer, gold_schema)
+
+# --- Layer-aware policy ---
+# Acceleration must always be Gold-based (Phase 0 of the planning skill enforces this).
+if planning_mode == "acceleration" and selected_layer not in {"deployed_gold", "gold_design"}:
+    raise RuntimeError(
+        f"Acceleration mode received a non-Gold planning_source.selected_layer="
+        f"`{selected_layer}`. This is a planning-skill bug; re-run planning."
+    )
+
+# Workshop + source_csv has no live tables to query — STOP.
+if selected_layer == "source_csv":
+    raise RuntimeError(
+        "Semantic layer setup cannot run when planning_source.selected_layer is "
+        "`source_csv`. The plan is a planning contract only — there are no live "
+        "tables to build Metric Views, TVFs, or Genie Spaces against. "
+        "Either deploy the underlying tables (run bronze/silver/gold setup against "
+        "the source CSV first) and re-run planning, or run this orchestrator only "
+        "after at least one live layer exists."
+    )
+
+# Workshop + Silver/Bronze: ALLOWED. Print advisory and continue.
+if planning_mode == "workshop" and selected_layer in {"deployed_silver", "deployed_bronze"}:
+    print(
+        f"⚠ Workshop mode: building the semantic layer on top of `{selected_layer}` "
+        f"(`{inventory_schema}`).\n"
+        "  - Metric Views, TVFs, and Genie Space assets will reference this layer "
+        "directly.\n"
+        "  - Genie NL accuracy is typically lower than on Gold because raw "
+        "Bronze/Silver tables often lack curated COMMENTs, dimensional joins, "
+        "and pre-aggregated measures.\n"
+        "  - For production, re-run planning with `planning_source.selected_layer="
+        "deployed_gold` after promoting the relevant tables to Gold."
+    )
+
+if readiness == "gold_design_only":
+    print("ℹ Manifest is gold_design_only — Gold YAML present but live Gold may not "
+          "be deployed yet. Phase 0 inventory will use YAML; live-catalog checks "
+          "are advisory.")
+```
+
+**Compatibility rules for the rest of the orchestrator:**
+
+- For `selected_layer in {deployed_gold, gold_design}`: the existing YAML + live-catalog cross-reference flow runs unchanged.
+- For `selected_layer in {deployed_silver, deployed_bronze}`: skip the YAML step entirely; build the inventory purely from `information_schema.columns` for `inventory_schema`. The dict shape is identical so downstream phases consume it the same way.
+- `semantic_schema` (or per-artifact `target_schema`) is the deploy target for Metric Views and TVFs; `inventory_schema` is the **source** schema for queries. They may differ — never assume `inventory_schema == gold_schema`.
+- `unified_genie_space` (singular, top-level): the orchestrator MUST check this BEFORE iterating per-domain `genie_spaces[]`. If present, create that single space and skip per-domain spaces (matches the existing manifest template).
+- `requires_gold_promotion` is **advisory only** — it never gates deployment; it is a hint for production hardening.
+
 **Workshop mode error handling:** When `planning_mode: workshop`, creation scripts should log failures but exit 0 to allow downstream tasks to run:
 
 ```python
@@ -274,15 +360,29 @@ If any referenced files are missing, inform the user:
 
 Do NOT silently skip missing user-referenced files.
 
-#### Gold Schema Extraction (Anti-Hallucination — MANDATORY)
+#### Planning-Source Inventory Extraction (Anti-Hallucination — MANDATORY)
 
 **After the manifest check, build a verified `gold_inventory` dict before any artifact creation begins.** This dict is the ONLY source of table/column names for Phases 1-3. No artifact may reference a table or column not in this inventory.
 
-**Two-level extraction (defense in depth):**
+> **Layer-aware naming note:** the variable is named `gold_inventory` for backward compatibility. Conceptually it is a **planning-source inventory** keyed off whatever layer the manifest's `planning_source.selected_layer` declares.
 
-1. **Parse Gold YAML files** from `gold_layer_design/yaml/{domain}/*.yaml` — extract `table_name`, `columns[].name`, `columns[].type`, `primary_key`, `foreign_keys`
-2. **Query live catalog** — `SELECT table_name, column_name, full_data_type FROM {catalog}.information_schema.columns WHERE table_schema = '{gold_schema}'`
-3. **Cross-reference YAML vs catalog** — flag any discrepancies (tables in YAML not deployed, columns missing, type mismatches)
+**Extraction strategy by selected layer:**
+
+| `selected_layer` | YAML step | Live-catalog step | Cross-reference behavior |
+|---|---|---|---|
+| `deployed_gold` | Parse `gold_layer_design/yaml/{domain}/*.yaml` (table_name, columns, PK, FK) | Query `information_schema.columns` for `inventory_schema` (= `gold_schema`) | Mismatches are **fatal** (existing fail-loud behavior) |
+| `gold_design` | Parse Gold YAML — authoritative | Best-effort query of `inventory_schema`; may return zero rows | Mismatches are warnings (Gold may not be deployed yet) |
+| `deployed_silver` | **Skip YAML entirely** — Silver/Bronze do not have a curated YAML design library | Query `information_schema.columns` for `inventory_schema` (= `silver_schema`) | YAML step skipped; live catalog is the sole source of truth |
+| `deployed_bronze` | **Skip YAML entirely** | Query `information_schema.columns` for `inventory_schema` (= `bronze_schema`) | YAML step skipped; live catalog is the sole source of truth |
+| `source_csv` | (orchestrator stops earlier — never reaches this step) | — | — |
+
+**Common live-catalog query:**
+
+```sql
+SELECT table_name, column_name, full_data_type
+FROM {catalog}.information_schema.columns
+WHERE table_schema = '{inventory_schema}'
+```
 
 **Build the `gold_inventory` dict:**
 
@@ -301,7 +401,11 @@ gold_inventory = {
 }
 ```
 
-**Gate:** The `gold_inventory` dict MUST be non-empty and cross-referenced before proceeding to Phase 1. If the catalog query returns zero tables, STOP and verify Gold tables are deployed.
+**Gate:** The `gold_inventory` dict MUST be non-empty before proceeding to Phase 1.
+
+- `deployed_gold`: both YAML and live catalog must agree (existing fail-loud behavior).
+- `gold_design`: YAML alone may be the source of truth — warn-only when the live catalog is empty. If YAML is ALSO empty/missing, STOP.
+- `deployed_silver` / `deployed_bronze`: live catalog must return at least the manifest-declared tables. If the catalog query is empty, STOP — the workshop layer was not actually deployed.
 
 ---
 
@@ -439,13 +543,28 @@ Bulk creation without checkpoints causes cascading failures. A 2-minute pause ca
 | 3 | `data_product_accelerator/skills/semantic-layer/03-genie-space-patterns/SKILL.md` | 8-section deliverable, agent instructions, SQL expressions, benchmark questions |
 | 4 | `data_product_accelerator/skills/semantic-layer/04-genie-space-export-import-api/SKILL.md` | JSON schema, array sorting, ID generation, idempotent deployment |
 
-**Input:** For each domain in `manifest['domains']`, iterate over `domain['genie_spaces']`. Each entry defines `name`, `warehouse`, `assets` (metric_views, tvfs, tables), `benchmark_questions_count`, and `benchmark_questions`. Do NOT create Genie Spaces not listed in the manifest.
+**Input:** First check the **top-level** `manifest.unified_genie_space` (singular). If present, build that single cross-domain space and SKIP per-domain `genie_spaces[]` (matches the planning manifest template's `unified_genie_space` precedence rule). Otherwise, for each domain in `manifest['domains']`, iterate over `domain['genie_spaces']`. Each entry defines `name`, `warehouse`, `assets` (metric_views, tvfs, tables), `benchmark_questions_count`, and `benchmark_questions`. Do NOT create Genie Spaces not listed in the manifest.
+
+```python
+unified = manifest.get("unified_genie_space")
+if unified:
+    print(f"Using unified Genie Space: {unified.get('name')} "
+          f"(domains_covered={unified.get('domains_covered')}). "
+          f"Skipping per-domain genie_spaces[].")
+    spaces_to_create = [unified]
+else:
+    spaces_to_create = [
+        {"domain": d, **gs}
+        for d, dc in manifest.get("domains", {}).items()
+        for gs in dc.get("genie_spaces", [])
+    ]
+```
 
 **Context from prior phases:** Use Phase 1's MV notes to assign metric views to spaces. Use Phase 2's TVF notes to assign TVFs. Use `gold_inventory` for Gold table assignments.
 
 **Steps:**
 1. Verify all Gold tables have column comments (Genie depends on these)
-2. Read `manifest['domains'][domain]['genie_spaces']` — use the manifest's `assets` to assign data assets (Metric Views, TVFs, Gold Tables) to each space
+2. Read `manifest['unified_genie_space']` first; otherwise iterate `manifest['domains'][domain]['genie_spaces']` — use the manifest's `assets` to assign data assets (Metric Views, TVFs, Gold Tables) to each space
 3. Write General Instructions (≤20 lines)
 4. Create benchmark questions — use the manifest's `benchmark_questions` as the baseline; ensure minimum 10 per space with exact SQL answers
 5. **Validation gate:** Parse each benchmark question's expected SQL. Verify all table/column references exist in `gold_inventory`. Verify all TVF references match TVFs created in Phase 2. Verify all Metric View references match MVs created in Phase 1. Fail with explicit error listing hallucinated references.
@@ -533,8 +652,8 @@ Databricks enforces the `depends_on` chain: Metric Views are created first, then
 
 | Task | Verification SQL / API | Pass criterion | STOP rule on fail |
 |---|---|---|---|
-| `create_metric_views` | `SHOW VIEWS IN {catalog}.{gold_schema}` filtered to expected names; plus `DESCRIBE EXTENDED {catalog}.{gold_schema}.{mv_name}` returns YAML metric body non-empty. | Every manifest-declared Metric View present; `DESCRIBE EXTENDED` shows `METRICS LANGUAGE YAML`. | STOP — do NOT run TVFs. Re-run `create_metric_views` with the specific failing YAML fixed. |
-| `create_tvfs` | `SHOW FUNCTIONS IN {catalog}.{gold_schema} LIKE '*'` filtered to expected names; plus a sample `SELECT * FROM {catalog}.{gold_schema}.{tvf}(...) LIMIT 1` for each. | Every manifest-declared TVF present and callable with smoke input. | STOP — do NOT deploy Genie Spaces. |
+| `create_metric_views` | `SHOW VIEWS IN {catalog}.{semantic_schema}` filtered to expected names; plus `DESCRIBE EXTENDED {catalog}.{semantic_schema}.{mv_name}` returns YAML metric body non-empty. (`semantic_schema` defaults to `gold_schema` for Gold-based runs; in workshop runs it may be a separate schema or fall back to the planning-source schema.) | Every manifest-declared Metric View present; `DESCRIBE EXTENDED` shows `METRICS LANGUAGE YAML`. | STOP — do NOT run TVFs. Re-run `create_metric_views` with the specific failing YAML fixed. |
+| `create_tvfs` | `SHOW FUNCTIONS IN {catalog}.{semantic_schema} LIKE '*'` filtered to expected names; plus a sample `SELECT * FROM {catalog}.{semantic_schema}.{tvf}(...) LIMIT 1` for each. | Every manifest-declared TVF present and callable with smoke input. | STOP — do NOT deploy Genie Spaces. |
 | `deploy_genie_spaces` | GET `/api/2.0/genie/spaces/{id}?include_serialized_space=true` for every deployed space. | Response non-empty; `data_sources.tables` + `data_sources.metric_views` non-empty; `instructions.sql_functions[*].sql` all `List[str]`. | STOP — do NOT deploy dashboards that query Genie. |
 | `deploy_dashboards` | For every dashboard file: after `ws.workspace.import_`, `ws.workspace.get_status(target_path)` returns `object_type=FILE` and size > the pre-upload file size. | Every target path exists and is non-zero bytes. | STOP — re-upload failing files only; do NOT re-run the whole deploy. |
 | `databricks bundle run` (overall) | All task statuses = `SUCCESS` AND all per-task verifications above have passed. | No task stuck in `INTERNAL_ERROR` / `FAILED` / `SKIPPED`. | STOP — follow the `databricks-autonomous-operations` diagnose loop for the specific failing task. |
@@ -568,10 +687,14 @@ Databricks enforces the `depends_on` chain: Metric Views are created first, then
 - [ ] `plans/manifests/semantic-layer-manifest.yaml` was read at Phase 0 before any implementation
 - [ ] Every Metric View maps 1:1 to a `domains[domain].metric_views[]` entry in the manifest
 - [ ] Every TVF maps 1:1 to a `domains[domain].tvfs[]` entry in the manifest
-- [ ] Every Genie Space maps 1:1 to a `domains[domain].genie_spaces[]` entry in the manifest
+- [ ] Every Genie Space maps 1:1 to a `domains[domain].genie_spaces[]` entry in the manifest, OR the single space matches the top-level `unified_genie_space`
+- [ ] When `unified_genie_space` is present, per-domain `genie_spaces[]` were SKIPPED (no duplicate spaces created)
 - [ ] No artifacts were created via self-discovery (only manifest-driven)
 - [ ] If `planning_mode: workshop`, artifact counts do NOT exceed manifest totals
+- [ ] If `selected_layer = source_csv`, the orchestrator stopped at Phase 0 with the planning-contract-only message (no Phase 1+ artifacts created)
+- [ ] If `selected_layer in {deployed_silver, deployed_bronze}` (workshop), the orchestrator printed the workshop advisory and proceeded to build artifacts against `inventory_schema` / `semantic_schema`
 - [ ] Manifest `summary` counts match actual deployed artifact counts
+- [ ] `planning_source.selected_layer` was inspected before building the inventory; the inventory was sourced from the matching schema (Gold YAML for Gold sources; live `information_schema.columns` for Silver/Bronze)
 
 ### Anti-Hallucination Compliance
 - [ ] `gold_inventory` dict built from YAML + catalog in Phase 0

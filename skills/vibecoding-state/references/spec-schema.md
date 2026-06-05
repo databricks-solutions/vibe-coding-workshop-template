@@ -58,8 +58,26 @@ Derivation rules live in `resolver-prompt.md` § *Variant-ID Derivation Table*.
 
 ## Resources
 
+`resources.optional` (added in resolver_version 3.0) marks the entire block as
+optional when the workshop run never executes a Lakehouse / Data Intelligence
+track. The Agents Accelerator visible path (Pathway A starting at the Agent
+Spec design prompt) sets `optional: true` from `vibecoding-state.hydrate_from_files`
+when no prior `resolve_spec` populated `## Resources` and the PRD does not
+declare a Lakehouse section. Downstream consumers (Track A 03-tools-and-mcp,
+prompt 42 Knowledge Assistant branch C, prompt 44 tool wiring) MUST treat
+`state://DataSpec.*` reads as `<pending>` when `resources.optional == true`
+and fall back to the documented per-prompt sources (`docs/design_prd.md`,
+`docs/agent_spec.yaml.agent.capabilities`, `docs/agent_tool_plan.yaml`).
+
 ```yaml
 resources:
+  optional:                      bool   # true when no Lakehouse track ran;
+                                        #   downstream `state://DataSpec.*`
+                                        #   reads must fall back. Set by
+                                        #   `hydrate_from_files`.
+  mark_skipped:                  string # OPTIONAL — reason for the skip
+                                        #   (e.g. "no Lakehouse track").
+                                        #   Required when optional == true.
   tables:                        # list — unified warehouse + lakebase
     - full_name:        string   # e.g. "main.skyloyalty.loyalty_members"
       kind:             string   # enum: "warehouse" | "lakebase"
@@ -233,10 +251,25 @@ governance:
 ```yaml
 spec_provenance:
   resolved_at:          string   # ISO8601 UTC
-  resolver_version:     string   # "2.0"
+  resolver_version:     string   # "2.0" — set by LLM-driven `resolve_spec`
+                                 # "3.0" — set by `hydrate_from_files` (Agents
+                                 #         Accelerator visible path; reads
+                                 #         docs/agent_spec.yaml +
+                                 #         docs/agent_tool_plan.yaml +
+                                 #         docs/ui_design.md instead of
+                                 #         calling an LLM)
   schema_version:       string   # "2.0"
   prd_sha256:           string   # hash of the PRD file at resolve time
-  llm_endpoint:         string   # the llm_endpoint used to synthesize system_prompt
+  llm_endpoint:         string   # the llm_endpoint used to synthesize
+                                 # system_prompt; "n/a" when
+                                 # `resolver_version == "3.0"` because
+                                 # hydration does not call an LLM
+  hydrated_from_files:  bool     # true when populated by `hydrate_from_files`
+                                 # (resolver_version == "3.0"); false or
+                                 # absent when populated by `resolve_spec`
+                                 # (resolver_version == "2.0"). Consumers
+                                 # MAY use this flag to switch to file-based
+                                 # source-of-truth lookups when applicable.
 ```
 
 ---

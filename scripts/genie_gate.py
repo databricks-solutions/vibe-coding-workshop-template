@@ -14,7 +14,7 @@ retrospectives/plans/genie-code-integration/00-overview.md and reports PASS/FAIL
      Auto-skips if the (git-ignored, separate-repo) prompts tree is absent.
   3. Optional `databricks bundle validate` when --bundle is passed and databricks.yml exists.
 
-Baseline lives at genie_gate_baseline.json (repo root). Workflow:
+Baseline lives at scripts/genie_gate_baseline.json (beside this script). Workflow:
   python scripts/genie_gate.py --update-baseline      # lock current state as the reference
   python scripts/genie_gate.py                         # check (no regression?) -> exit 0/1
   python scripts/genie_gate.py --touched apps_lakebase # while sweeping that area
@@ -30,7 +30,7 @@ import sys
 from collections import Counter
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BASELINE_FILE = os.path.join(REPO_ROOT, "genie_gate_baseline.json")
+BASELINE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "genie_gate_baseline.json")
 ROOT_LABEL = "(root)"
 
 # Semantic-layer HYBRID forks: native-author + extract-back + bundle-persist. These

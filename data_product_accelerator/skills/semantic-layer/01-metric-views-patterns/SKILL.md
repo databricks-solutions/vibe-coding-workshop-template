@@ -87,10 +87,18 @@ Use this skill when:
 ## Prerequisites
 
 ⚠️ **MANDATORY:** Complete these before creating metric views:
-- [ ] Gold layer tables exist in Unity Catalog (use `gold-layer-design` + `gold-layer-setup` skills)
-- [ ] Gold layer YAML schemas exist in `gold_layer_design/yaml/` (for validation script)
+- [ ] Gold layer tables exist in Unity Catalog (use `gold-layer-design` + `gold-layer-setup` skills) — required for **production deployment**.
+- [ ] Gold layer YAML schemas exist in `gold_layer_design/yaml/` (for validation script). When invoked from a workshop-draft plan with `selected_layer = gold_design`, YAML alone is acceptable as the source of truth and the validation script's live-catalog probe is advisory.
 - [ ] Serverless SQL warehouse available (for metric view creation and querying)
 - [ ] SQL warehouse or compute resource on Databricks Runtime 17.3+ (current docs requirement for `CAN USE` permission to create or edit a metric view). YAML v1.1 features were introduced in DBR 17.2; some experimental features (snowflake schema joins, agent metadata, materialization) require DBR 17.3+.
+
+> **Layer-aware deployment (workshop mode):** The patterns in this skill (YAML, dimensions, measures, joins) are layer-neutral. The orchestrator (`semantic-layer/00-semantic-layer-setup`) decides which schema to deploy against based on `planning_source.selected_layer`:
+>
+> - `deployed_gold` / `gold_design` → reference Gold tables (production path).
+> - `deployed_silver` / `deployed_bronze` (workshop deployments) → reference Silver or Bronze tables directly. Metric View YAML is identical in shape; the `source` field points at the workshop layer's schema. The orchestrator prints a quality advisory because raw layers typically lack curated COMMENTs and dimensional joins.
+> - `source_csv` → not reached; the orchestrator stops because no live tables exist.
+>
+> Production Metric Views always reference Gold; workshop builds may reference Silver/Bronze and should be promoted to Gold for production hardening.
 
 ## MCP Tools (from upstream databricks-metric-views)
 

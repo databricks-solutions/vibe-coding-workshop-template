@@ -40,6 +40,19 @@ fields_read:
   - governance.scorer_suite.custom_scorer_rules
   - governance.llm_role_endpoints.llm_judge_default.endpoint
   - agent.tools[].writes_to
+  - docs.agent_tool_plan.selected_tools
+  - docs.agent_tool_plan.runtime_guardrails.tool_shaped_scorers
+inputs:
+  - name: agent_tool_plan_ref
+    required: false
+    description: >
+      Path to docs/agent_tool_plan.yaml. When set, the skill UNIONS the generic
+      scorer suite from governance.scorer_suite.* (Spec, use-case shaped) with
+      runtime_guardrails.tool_shaped_scorers[] (Plan, derived mechanically from
+      selected_tools[]). Tool-shaped scorers register conditionally:
+      RetrievalGroundedness only with KA or Vector Search selected;
+      ka_citation_present only with KA selected; genie_* only with Genie
+      selected; sql_* only with SQL MCP selected. The union is deduped.
 ---
 
 # Scorers and Judges

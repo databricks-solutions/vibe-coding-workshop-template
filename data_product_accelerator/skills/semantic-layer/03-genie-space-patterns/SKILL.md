@@ -556,7 +556,7 @@ See [Configuration Guide](references/configuration-guide.md#section-g-benchmark-
 **UI deployment steps:**
 1. Inspect all target table schemas (verify comments, column names, data types)
 2. Create Genie Space in Databricks UI with **Serverless SQL Warehouse**
-3. Add trusted assets in order (Metric Views → TVFs → Tables) -- **Gold layer ONLY**
+3. Add trusted assets in order (Metric Views → TVFs → Tables). **Production: Gold layer only.** **Workshop deployments** may reference Silver/Bronze directly — Genie will work, but accuracy is typically lower because raw layers usually lack curated COMMENTs and dimensional joins. Promote to Gold for production hardening.
 4. Set General Instructions (copy exactly, verify ≤20 lines)
 5. Test benchmark questions **programmatically** via Conversation API
 6. Validate routing, response quality, and follow-up context
@@ -817,7 +817,7 @@ If Metric View dimensions will be used in Lakeview choropleth map widgets, use f
 | Skipping table inspection | DESCRIBE TABLE EXTENDED before adding assets |
 | UI-only testing | Validate programmatically via Conversation API |
 | Reusing conversations across topics | New conversation per topic; `ask_genie_followup` only for related |
-| Silver/Bronze as trusted assets | Gold layer only; Silver/Bronze lack business semantics |
+| Silver/Bronze as trusted assets in **production** Genie Spaces | Gold layer only for production — Silver/Bronze typically lack curated COMMENTs and dimensional joins required for high-quality NL accuracy. **Workshop mode** may deploy Genie Spaces directly on Silver/Bronze with a quality advisory; this is allowed for enablement and prototyping, but promote to Gold before going to production. |
 | Unstructured instruction wall of text | Use the 13-section structure (PURPOSE through SQL EXPRESSIONS) |
 | Missing DISAMBIGUATION section | Ambiguous columns (e.g., zone_name vs zone_combination) cause wrong GROUP BY |
 | Replacing entire instruction block during optimization | Append new rules; replacement risks regression on validated benchmarks |

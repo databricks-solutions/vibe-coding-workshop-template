@@ -71,7 +71,18 @@ Rules:
 8. `spec_provenance.resolved_at` — use the current UTC time in ISO8601.
 9. `spec_provenance.prd_sha256` — use the provided `prd_sha256` parameter.
 10. `spec_provenance.schema_version` — always `"2.0"`.
-11. `spec_provenance.resolver_version` — always `"2.0"`.
+11. `spec_provenance.resolver_version` — set `"2.0"` when this prompt
+    runs (LLM-driven `resolve_spec`). If the live state file already
+    carries `"3.0"` (set by `vibecoding-state.hydrate_from_files` on the
+    Agents Accelerator visible path), do NOT overwrite it: that workshop
+    run treats the file-based design pair (`docs/agent_spec.yaml` +
+    `docs/agent_tool_plan.yaml`) as the source of truth, and
+    `resolve_spec` MUST be a no-op for `## Spec Provenance` and any
+    section the hydrator already populated. The caller halts with a
+    typed error if it would otherwise regress `"3.0"` to `"2.0"`.
+    `hydrate_from_files` and `resolve_spec` are mutually exclusive on
+    the same workshop run; see [`hydrator-prompt.md`](./hydrator-prompt.md)
+    § *Post-hydration Guards* (Provenance lock-in).
 12. `spec_provenance.llm_endpoint` — the endpoint that ran this prompt.
 13. `variant_id` — copy verbatim from the `variant_id` parameter provided by
     the caller. Do NOT re-derive it.

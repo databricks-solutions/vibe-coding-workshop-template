@@ -234,6 +234,32 @@ For deployment, see [`07-deploy-and-query`](../07-deploy-and-query/SKILL.md)
 with `target=databricks_apps`. For wiring the AppKit frontend, see
 [`06d-appkit-agent-app-proxy`](../../../../apps_lakebase/skills/06d-appkit-agent-app-proxy/SKILL.md).
 
+### Runtime model route from Tool Plan
+
+Track A agents consume `docs/agent_tool_plan.yaml.runtime_config.llm` through `ModelConfig`, never by hardcoding model names in Python.
+
+Minimum `config.yml` shape:
+
+```yaml
+llm_endpoint: "databricks-claude-sonnet-4-6"
+llm_api_base_url: null
+llm_api_mode: "databricks_openai_compatible"
+```
+
+Agent construction must read:
+
+```python
+config = ModelConfig(development_config="config.yml")
+
+agent = Agent(
+    name="loyalty-assistant",
+    instructions="...",
+    model=config.get("llm_endpoint"),
+)
+```
+
+If `llm_api_base_url` is non-null in a future Gateway route, the client factory may pass it to the OpenAI-compatible client. The core workshop does not require that path.
+
 ### Multi-agent variant
 
 For a triage / handoffs pattern, see the
@@ -581,6 +607,36 @@ agent = Agent(
 
 `ModelConfig` reads from the YAML file during development and from logged
 artifacts during serving. This is the prescribed way to parametrize agents.
+
+### Agent Spec Model Endpoint
+
+In the Agents Accelerator flow, the selected model endpoint comes from
+`docs/agent_spec.yaml.agent.model`.
+
+Implementation contract:
+
+1. Copy `agent.model` into `config.yml` as `llm_endpoint`.
+2. Load it with `ModelConfig(development_config="config.yml")`.
+3. Build the OpenAI Agents SDK agent with `model=config.get("llm_endpoint")`.
+4. Do not hardcode `databricks-claude-sonnet-4-6` in Python agent construction unless that exact value came from `agent.model`.
+
+```yaml
+# config.yml
+llm_endpoint: "databricks-claude-sonnet-4-6"
+```
+
+```python
+from mlflow.models import ModelConfig
+
+config = ModelConfig(development_config="config.yml")
+
+agent = Agent(
+    name=agent_name,
+    instructions=agent_instructions,
+    model=config.get("llm_endpoint"),
+    tools=tools,
+)
+```
 
 ### predict and predict_stream
 

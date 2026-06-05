@@ -137,7 +137,10 @@ def scan():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="genie_compat_audit.csv")
+    ap.add_argument(
+        "--out",
+        default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "genie_compat_audit.csv"),
+    )
     args = ap.parse_args()
     rows = scan()
     with open(args.out, "w", newline="", encoding="utf-8") as f:

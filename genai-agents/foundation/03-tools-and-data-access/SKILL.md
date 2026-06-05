@@ -255,6 +255,17 @@ response = await session.send_request(request, CallToolResult)
 For complete `_meta` examples per server type, see
 [`references/managed-mcp-servers.md`](references/managed-mcp-servers.md).
 
+### Dynamic SQL MCP From Agent Tool Plan
+
+When SQL MCP is selected through `docs/agent_tool_plan.yaml`, default to
+read-only schema-scoped access:
+
+- Pin `_meta.warehouse_id` from `selected_mcp_servers[].meta.warehouse_id`.
+- Restrict generated SQL to `SELECT`, `DESCRIBE`, and `EXPLAIN`.
+- Require fully qualified `catalog.schema.table` references.
+- Use `selected_mcp_servers[].scope.allowed_tables` when present.
+- Do not run DDL or DML unless the user explicitly changes `readonly` to false.
+
 ---
 
 ## External MCP Servers

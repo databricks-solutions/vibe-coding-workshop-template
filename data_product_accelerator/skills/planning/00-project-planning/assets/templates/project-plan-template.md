@@ -32,7 +32,7 @@ All artifacts MUST be organized by Agent Domain:
 #### {Artifact Name}
 
 **Type:** {TVF | Metric View | Dashboard | Alert | ML Model | Monitor | Genie Space}  
-**Gold Tables:** `fact_{entity}`, `dim_{entity}`  
+**Planning Assets:** `fact_{entity}`, `dim_{entity}`  *(or `silver_{entity}` / `bronze_{entity}` in workshop drafts)*
 **Business Questions:** "{Question}"  
 **Dependencies:** {List dependencies}  
 **Status:** 📋 Planned | 🚧 In Progress | ✅ Complete
@@ -63,8 +63,8 @@ COMMENT 'LLM: {Description of what it does, when to use it, example questions}'
 
 ## Summary Table
 
-| Artifact | Type | Domain | Gold Tables | Status | Dependencies |
-|----------|------|--------|-------------|--------|---------------|
+| Artifact | Type | Domain | Planning Assets | Status | Dependencies |
+|----------|------|--------|-----------------|--------|---------------|
 | {Name} | TVF | {Domain} | `fact_{entity}` | ✅ Complete | Gold layer |
 | {Name} | Metric View | {Domain} | `fact_{entity}` | 🚧 In Progress | Gold layer |
 
@@ -85,15 +85,15 @@ COMMENT 'LLM: {Description of what it does, when to use it, example questions}'
 |-----------|--------|--------|
 | All domains covered | {n} domains | ✅ |
 | Minimum artifact counts | {See standards} | 🚧 |
-| Gold layer references | 100% | ✅ |
+| Planning-source layer references | 100% | ✅ |
 | LLM-friendly comments | 100% | ✅ |
 | Testing complete | All artifacts | 🚧 |
 
 ## SQL Query Standards
 
-### Gold Layer Reference Pattern
+### Planning-Source Reference Pattern
 
-**ALWAYS use Gold layer tables, NEVER system tables directly.**
+**ALWAYS use the planning-source layer, NEVER `system.*` tables directly.** Acceleration uses Gold (`${catalog}.${gold_schema}`). Workshop deployments may reference Silver (`${silver_schema}`) or Bronze (`${bronze_schema}`) directly when `planning_source.selected_layer` declares them — those are the deploy targets. Gold promotion is recommended for production hardening (advisory `requires_gold_promotion`).
 
 ```sql
 -- ❌ WRONG: Direct system table reference

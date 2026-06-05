@@ -1,19 +1,43 @@
 # Experiment Organization — Complete Reference
 
-> **Skill:** 01-experiment-tracing-setup
+> **Skill:** 02-experiment-tracing-and-uc-storage
 > **Grounded in:** `src/genie_space_optimizer/common/config.py` —
 > `EXPERIMENT_PATH_TEMPLATE`, `format_mlflow_template()`
+
+> **Workshop callout.** When this reference is consulted from a workshop
+> running on top of `vibecoding-state`, the experiment path is **already
+> pinned** at `state://Resources.mlflow_experiment_path` to
+> `/Users/<user_email>/mlflow/<APP_NAME>-agent` by
+> [`vibecoding-state.migrate_canonical`](../../../vibecoding-state/SKILL.md#operation-migrate_canonical).
+> Read from state — do not run the template patterns below to invent a new
+> path. The template patterns exist for **stand-alone** projects (and the
+> Genie Space Optimizer reference codebase), not for workshop attendees.
 
 ---
 
 ## 1. Path Template Mechanics
 
-The project defines a single canonical template for all experiment paths:
+For stand-alone projects, define a canonical template that pins the leaf to
+the user-and-use-case identity (the same `${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}`
+shape that backs `APP_NAME` in the workshop):
+
+```python
+EXPERIMENT_PATH_TEMPLATE = "/Users/{{ user_email }}/mlflow/{{ app_name }}-{{ stage }}"
+```
+
+Where `app_name` is the user-prefixed, use-case-suffixed identity (e.g.
+`jane-d-stayfinder`) and `stage` ∈ {`agent`, `eval`, `feedback`, `deploy`}.
+
+The Genie Space Optimizer reference codebase uses an analogous template that
+pins identity to `space_id` instead of `app_name`:
 
 ```python
 # src/genie_space_optimizer/common/config.py  (section 13)
 EXPERIMENT_PATH_TEMPLATE = "/Shared/genie-space-optimizer/{{ space_id }}/{{ domain }}"
 ```
+
+In both cases the leaf MUST carry per-user / per-space identity so the MLflow
+UI experiment list never shows a generic `Tracing` / `traces` / `eval` entry.
 
 Placeholders use double-brace `{{ key }}` syntax — **not** Python `str.format()`
 — because `format_mlflow_template()` intentionally leaves missing keys intact
