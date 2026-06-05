@@ -311,7 +311,7 @@ def main() -> None:
     assert_contains(skill, "Runtime Model Route Rule", "00b-agent-spec-and-tool-plan")
 
     # Pass 3: vibecoding-state hydrate_from_files operation + provenance v3.0
-    state_skill = read(ROOT / "genai-agents" / "vibecoding-state" / "SKILL.md")
+    state_skill = read(ROOT / "skills" / "vibecoding-state" / "SKILL.md")
     assert_contains(state_skill, "hydrate_from_files", "vibecoding-state SKILL.md")
     assert_contains(state_skill, "Operation: `hydrate_from_files`", "vibecoding-state SKILL.md")
     assert_contains(state_skill, "agent_spec_yaml", "vibecoding-state SKILL.md")
@@ -327,7 +327,7 @@ def main() -> None:
         "vibecoding-state SKILL.md",
     )
 
-    spec_schema = read(ROOT / "genai-agents" / "vibecoding-state" / "references" / "spec-schema.md")
+    spec_schema = read(ROOT / "skills" / "vibecoding-state" / "references" / "spec-schema.md")
     assert_contains(spec_schema, "hydrated_from_files", "spec-schema.md")
     assert_contains(spec_schema, '"3.0"', "spec-schema.md")
     assert_contains(spec_schema, "resources.optional", "spec-schema.md")
@@ -337,7 +337,7 @@ def main() -> None:
     # foundation skill, and the captured state must record the hydration flags.
     assert_contains(
         uc_foundation,
-        "`genai-agents/vibecoding-state` op `hydrate_from_files`",
+        "`skills/vibecoding-state` op `hydrate_from_files`",
         "uc_resources_foundation",
     )
     assert_contains(
@@ -574,7 +574,7 @@ def main() -> None:
 
     # Pass 3.5: hydrator-prompt.md must exist and ground the LLM driver.
     hydrator_prompt = read(
-        ROOT / "genai-agents" / "vibecoding-state" / "references" / "hydrator-prompt.md"
+        ROOT / "skills" / "vibecoding-state" / "references" / "hydrator-prompt.md"
     )
     assert_contains(hydrator_prompt, "Hydrator Prompt", "hydrator-prompt.md")
     assert_contains(hydrator_prompt, "hydrate_from_files", "hydrator-prompt.md")
@@ -605,7 +605,7 @@ def main() -> None:
     # Pass 3.5: resolver-prompt.md must no longer claim resolver_version is
     # "always 2.0", and must forbid regressing 3.0 -> 2.0.
     resolver_prompt = read(
-        ROOT / "genai-agents" / "vibecoding-state" / "references" / "resolver-prompt.md"
+        ROOT / "skills" / "vibecoding-state" / "references" / "resolver-prompt.md"
     )
     assert_not_contains(
         resolver_prompt,
@@ -619,7 +619,7 @@ def main() -> None:
     # Pass 3.5: state-template.md must show the hydrated provenance + optional
     # resources example.
     state_template = read(
-        ROOT / "genai-agents" / "vibecoding-state" / "references" / "state-template.md"
+        ROOT / "skills" / "vibecoding-state" / "references" / "state-template.md"
     )
     assert_contains(state_template, "Hydrated example", "state-template.md")
     assert_contains(state_template, "hydrated_from_files: true", "state-template.md")
@@ -630,7 +630,7 @@ def main() -> None:
     # Pass 3.5: hydrated test fixture exists with the right shape.
     hydrated_fixture = read(
         ROOT
-        / "genai-agents"
+        / "skills"
         / "vibecoding-state"
         / "references"
         / "test-fixtures"

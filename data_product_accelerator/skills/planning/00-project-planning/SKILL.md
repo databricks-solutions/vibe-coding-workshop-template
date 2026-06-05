@@ -5,9 +5,11 @@ description: >-
   with Agent Domain Framework and Agent Layer Architecture. Includes interactive
   Quick Start with key decisions, industry-specific domain patterns, complete
   phase document templates (Use Cases, Agents, Frontend), Genie Space integration
-  patterns, deployment order requirements, and worked examples. Use when planning
-  any Databricks solution post-Gold layer — observability, analytics, agent-based
-  frameworks, or multi-artifact projects.
+  patterns, deployment order requirements, and worked examples. Supports both
+  acceleration mode (plan on a completed Gold layer) and workshop mode
+  (`planning_mode: workshop`) that plans from the best available layer with hard
+  artifact caps. Use when planning any Databricks solution post-Gold layer —
+  observability, analytics, agent-based frameworks, or multi-artifact projects.
 clients: [ide_cli, genie_code]
 bundle_resource: none
 deploy_verb: bundle_deploy

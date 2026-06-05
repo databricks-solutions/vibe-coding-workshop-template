@@ -160,7 +160,7 @@ variables:
 
 The feedback experiment MUST be pinned to the same user-and-use-case identity that backs `APP_NAME` so concurrent workshop attendees on a shared workspace never collide on a single experiment, and the MLflow UI never lists a generic `Default` / `Tracing` / `my-app-feedback` entry.
 
-**Naming rule (REQUIRED):** `/Users/<user_email>/mlflow/<APP_NAME>-feedback` — e.g. `/Users/jane.doe@example.com/mlflow/jane-d-stayfinder-feedback`. The leaf carries the same `${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}` shape that derives `APP_NAME` (see `apps_lakebase/Instructions.md`). When running on top of `vibecoding-state`, this value is already pinned at `state://Resources.mlflow_feedback_experiment_path` by [`vibecoding-state.migrate_canonical`](../../../genai-agents/vibecoding-state/SKILL.md#operation-migrate_canonical) — read it from state instead of inventing a new path.
+**Naming rule (REQUIRED):** `/Users/<user_email>/mlflow/<APP_NAME>-feedback` — e.g. `/Users/jane.doe@example.com/mlflow/jane-d-stayfinder-feedback`. The leaf carries the same `${FIRSTNAME}-${LASTINITIAL}-${use_case_slug}` shape that derives `APP_NAME` (see `apps_lakebase/Instructions.md`). When running on top of `vibecoding-state`, this value is already pinned at `state://Resources.mlflow_feedback_experiment_path` by [`vibecoding-state.migrate_canonical`](../../../skills/vibecoding-state/SKILL.md#operation-migrate_canonical) — read it from state instead of inventing a new path.
 
 If you don't have an experiment yet, create one:
 
