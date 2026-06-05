@@ -18,7 +18,7 @@ deploy_note: "Scaffolds a minimal MCP tool-calling agent and deploys it to Model
 coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.3.0"
+  version: "1.4.0"
   domain: genai-agents
   role: worker
   pipeline_stage: 9
@@ -91,7 +91,8 @@ agent.py                                                       │
 |---|---|---|
 | Agent framework | `MCPToolCallingAgent(ResponsesAgent)` per MCP notebook | — |
 | LLM client | `DatabricksOpenAI` (OpenAI SDK compatible) | — |
-| Genie access | `McpServerToolkit` with MCP server URLs | `05-multi-agent-genie-orchestration` for Conversation API |
+| Genie access | `McpServerToolkit` with MCP server URLs, built per-request | `05-multi-agent-genie-orchestration` for Conversation API |
+| Authentication | OBO-first (`auth_policy`: `mcp.genie`+`sql` scopes) with best-effort system-SP fallback | system-SP only (`resources=`) if no per-user access is needed |
 | Streaming | Yes (`predict_stream` + `output_to_responses_items_stream`) | — |
 | Memory | None (stateless) | `03-lakebase-memory-patterns` |
 | Evaluation | Skip | `02-mlflow-genai-evaluation` |
@@ -135,13 +136,15 @@ The template is the notebook's `MCPToolCallingAgent` class with one addition: `M
 
 | Method | Purpose |
 |---|---|
-| `__init__` | Creates `DatabricksOpenAI` client, connects `McpServerToolkit` servers, builds `tools_dict` |
+| `_obo_client()` | Module-level helper: returns an OBO `WorkspaceClient` in Model Serving (via `ModelServingUserCredentials`), else falls back to the default client (system SP). Called per request. |
+| `__init__` | Stores `llm_endpoint` + `genie_spaces`; creates the `DatabricksOpenAI` LLM client (system-SP, identity-stable) |
+| `_build_tools` | Builds the `McpServerToolkit`(s) **per request** with the OBO `WorkspaceClient` and assembles `tools_dict` |
 | `execute_tool` | Traced with `@mlflow.trace(span_type=SpanType.TOOL)` |
 | `call_llm` | Traced with `@mlflow.trace(span_type=SpanType.LLM)`, streams via `chat.completions.create` |
 | `handle_tool_call` | Parses arguments, executes tool, returns `ResponsesAgentStreamEvent` |
 | `call_and_run_tools` | Iterative tool-calling loop with `max_iter=10` |
 | `predict` | Non-streaming entry point, delegates to `predict_stream` |
-| `predict_stream` | Streaming entry point, converts `request.input` to messages |
+| `predict_stream` | Streaming entry point: builds the per-request OBO client + tools, then converts `request.input` to messages |
 
 At the bottom: `mlflow.openai.autolog()` enables automatic tracing and `mlflow.models.set_model(AGENT)` binds the model for logging.
 
@@ -151,6 +154,7 @@ At the bottom: `mlflow.openai.autolog()` enables automatic tracing and `mlflow.m
 - **Never pass a `signature` parameter** to `log_model()` — MLflow auto-infers it.
 - **Use `input` key, not `messages`** — `{"input": [{"role": "user", "content": "..."}]}`.
 - **`nest_asyncio` is required** — MCP servers use async internally; `nest_asyncio.apply()` avoids event loop conflicts in notebook environments.
+- **Build the `McpServerToolkit` per request, NOT at module load.** A toolkit built at import time hard-binds whatever identity existed then (the system SP) and defeats OBO. `predict_stream()` constructs `_obo_client()` and the toolkit on every call so the Genie MCP call runs as the invoking user. See `references/obo-authentication.md`.
 
 **Gate:** `agent.py` exists with all TODOs in `agent-config.yaml` resolved. No `TODO_REPLACE` strings remain.
 
@@ -213,33 +217,53 @@ Replace the test question with something your Genie Space can actually answer.
 
 ---
 
-## Step 3: Log with MLflow
+## Step 3: Log with MLflow (dual `auth_policy` — OBO-first)
 
-Log the agent as code. This captures the `agent.py` file, its dependencies, and resource declarations for automatic authentication passthrough.
+Log the agent as code. This captures the `agent.py` file, its dependencies, and a dual `auth_policy` so the deployed endpoint supports BOTH the system SP (for the LLM and evaluation) and On-Behalf-Of the calling user (for the Genie MCP call).
 
 ```python
 import mlflow
 from agent import LLM_ENDPOINT_NAME
-from mlflow.models.resources import DatabricksServingEndpoint, DatabricksGenieSpace
+from mlflow.models.auth_policy import AuthPolicy, SystemAuthPolicy, UserAuthPolicy
+from mlflow.models.resources import (
+    DatabricksGenieSpace,
+    DatabricksServingEndpoint,
+    DatabricksSQLWarehouse,
+)
 from pkg_resources import get_distribution
 
-# Declare all resources the agent accesses at runtime.
-# Auth passthrough provisions short-lived credentials automatically.
-resources = [
-    DatabricksServingEndpoint(endpoint_name=LLM_ENDPOINT_NAME),
-    DatabricksGenieSpace(genie_space_id="<GENIE_SPACE_ID>"),  # one per space
-]
+GENIE_SPACE_ID = "<GENIE_SPACE_ID>"
+WAREHOUSE_ID = "<WAREHOUSE_ID>"  # the warehouse the Genie Space runs its SQL on
+
+# Dual policy:
+#   SystemAuthPolicy.resources → system SP gets CAN_QUERY (LLM), Can Run (Genie),
+#       CAN USE (warehouse) automatically — used by the LLM call and by evaluation.
+#   UserAuthPolicy.api_scopes  → forwards the caller's token for OBO. The Managed
+#       MCP path needs "mcp.genie" (NOT "dashboards.genie", which is the
+#       Conversation API) plus "sql".
+auth_policy = AuthPolicy(
+    system_auth_policy=SystemAuthPolicy(
+        resources=[
+            DatabricksServingEndpoint(endpoint_name=LLM_ENDPOINT_NAME),
+            DatabricksGenieSpace(genie_space_id=GENIE_SPACE_ID),  # one per space
+            DatabricksSQLWarehouse(warehouse_id=WAREHOUSE_ID),    # MANDATORY for Genie
+        ]
+    ),
+    user_auth_policy=UserAuthPolicy(api_scopes=["mcp.genie", "sql"]),
+)
 
 with mlflow.start_run():
     logged_agent_info = mlflow.pyfunc.log_model(
         name="agent",
         python_model="agent.py",
         model_config="agent-config.yaml",  # REQUIRED — see note below
-        resources=resources,
+        auth_policy=auth_policy,
         pip_requirements=[
             f"mlflow[databricks]=={get_distribution('mlflow').version}",
             f"mcp=={get_distribution('mcp').version}",
             f"databricks-openai=={get_distribution('databricks-openai').version}",
+            "databricks-ai-bridge",  # REQUIRED for OBO (ModelServingUserCredentials)
+            "databricks-sdk",
         ],
     )
 ```
@@ -249,8 +273,12 @@ Key points:
 - **`python_model="agent.py"`** logs as "models from code" — MLflow loads the file, not a pickled object.
 - **`model_config="agent-config.yaml"`** is required — MLflow copies `agent.py` to a temp dir for validation where the yaml isn't present. Without this parameter you get `FileNotFoundError: Config file is not provided`. Fixing `__file__` / path tricks won't help; the parameter bypasses the file lookup.
 - **Use `mlflow[databricks]`, not bare `mlflow`.** On Azure the `[databricks]` extra ships `azure-core` and related storage SDKs required by `register_model()`. On AWS/GCP it adds harmless extras. Matches the `pip install` line in Prerequisites.
-- **`resources`** enables Automatic Auth Passthrough — the deployed endpoint gets short-lived credentials for each declared resource.
-- Add one `DatabricksGenieSpace(genie_space_id="...")` per Genie Space so auth passthrough covers them.
+- **`auth_policy` and `resources=` are mutually exclusive.** Use `auth_policy`; put every resource inside `SystemAuthPolicy.resources`. Passing both raises a parameter conflict.
+- **`DatabricksSQLWarehouse` is mandatory** — the Genie Space executes its SQL on that warehouse; omitting it is a common silent failure (Genie fails while the LLM works).
+- **`databricks-ai-bridge` MUST be in `pip_requirements`** — without it `ModelServingUserCredentials` cannot be imported in the serving container and OBO silently degrades to the system SP.
+- Add one `DatabricksGenieSpace(genie_space_id="...")` per Genie Space.
+
+> **Why OBO instead of granting the system SP?** A dual `auth_policy` deploys the endpoint as `EMBEDDED_AND_USER_CREDENTIALS`: the Genie MCP call runs as the **calling user**, so it respects their existing UC grants, row filters, and column masks with **zero** post-deploy grants. The system-SP fallback (Step 5b) is best-effort and only matters for true machine-to-machine callers. See `references/post-deploy-permissions.md` and `genai-agents/.../references/obo-authentication.md`.
 
 ### Pre-deployment validation
 
@@ -294,32 +322,50 @@ uc_registered_model_info = mlflow.register_model(
 ## Step 5: Deploy to Model Serving
 
 ```python
+import time
 from databricks import agents
+from databricks.sdk import WorkspaceClient
+
+w = WorkspaceClient()
+ENDPOINT_NAME = "<your-stable-endpoint-name>"  # explicit, <=63 chars
+
+# Idempotency: never deploy onto an endpoint that is mid-update (raises
+# ResourceConflict). If it exists, wait until NOT_UPDATING first.
+try:
+    while "NOT_UPDATING" not in str(w.serving_endpoints.get(ENDPOINT_NAME).state.config_update):
+        print("endpoint busy; waiting…")
+        time.sleep(20)
+except Exception:
+    pass  # endpoint doesn't exist yet — nothing to wait on
 
 agents.deploy(
     UC_MODEL_NAME,
     uc_registered_model_info.version,
+    endpoint_name=ENDPOINT_NAME,  # EXPLICIT — never rely on auto-naming
     tags={"endpointSource": "simple-agent-scaffold"},
 )
 ```
 
 This creates (or updates) a Model Serving endpoint with:
-- Automatic Auth Passthrough for declared resources
-- OBO authentication (runs with the caller's permissions)
+- `EMBEDDED_AND_USER_CREDENTIALS` from the dual `auth_policy` (system SP + OBO)
+- OBO authentication for the Genie MCP call (runs with the caller's permissions)
 - AI Playground integration
+
+> **Always pass `endpoint_name` explicitly.** `agents.deploy()` auto-naming prepends `agents_` and truncates to 63 characters, which silently mismatches anything downstream (AppKit wiring, the checkpoint). Pick a short, stable name and reuse it everywhere.
 
 ### Verify deployment
 
-```bash
-# Check endpoint status
-databricks serving-endpoints get <endpoint-name>
+```python
+# Check endpoint status + run a query via the SDK (no PAT needed — the call is
+# forwarded On-Behalf-Of you, exercising the OBO + Genie MCP path)
+print(w.serving_endpoints.get(ENDPOINT_NAME).state)
 
-# Test with a query
-databricks serving-endpoints query <endpoint-name> \
-  --input '{"input": [{"role": "user", "content": "What were total sales last month?"}]}'
+r = w.serving_endpoints.query(
+    name=ENDPOINT_NAME,
+    inputs={"input": [{"role": "user", "content": "What were total sales last month?"}]},
+)
+print(r.as_dict() if hasattr(r, "as_dict") else r)
 ```
-
-The endpoint name is derived from the UC model name (dots replaced with hyphens). Check the Serving UI if unsure.
 
 ### Step 5a — First data question hits `PERMISSION_DENIED`? Disambiguate first.
 
@@ -332,83 +378,80 @@ The endpoint name is derived from the UC model name (dots replaced with hyphens)
 | `databricks api get /api/2.0/genie/spaces/$SPACE_ID --profile $PROFILE \| jq '.serialized_space \| length'` | `> 0` (non-empty JSON string) | Space has content. |
 | Same | `0` / empty string | Space is empty — run the restore helper first. |
 
-ONLY after both probes pass should you proceed to grant UC on the endpoint system SP (Step 5b).
+ONLY after both probes pass should you proceed (Step 5b is best-effort; the gate is the OBO query in Step 5).
 
-### Step 5b — Grant the endpoint system SP what it needs (auto-discover, idempotent)
+### Step 5b — Best-effort system-SP grants (fallback only — NOT the gate)
 
-`agents.deploy()` creates a **system service principal** per endpoint. This SP:
+With the dual `auth_policy` from Step 3, the Genie MCP call runs **On-Behalf-Of the caller** — it needs **zero** SP grants. Step 5b only matters for true machine-to-machine callers that have no user token (an app SP token, a scheduled job) and therefore fall back to the endpoint system SP. Apply it as a best-effort top-up, never as a gate.
 
-- is **NOT** in workspace SCIM, so `databricks service-principals list` will NOT find it. Do not grep for a UUID in the error message — the `No access to table X` variant doesn't include one.
-- **IS** enforced by Unity Catalog, so `GRANT … TO \`<uuid>\`` works by UUID.
-- is an **implicit member** of the `users` group, so workspace ACLs (warehouse `CAN_USE`, Genie Space `CAN_RUN`) are typically already inherited — no explicit per-SP PATCH is needed. Calls to `PATCH /api/2.0/permissions/...` with `service_principal_name = <uuid>` return `200` but **silently drop** the entry because system SPs are not in SCIM.
+What probing established about this SP path:
 
-Auto-discover the UUID from the endpoint's creation events:
+- `agents.deploy()` creates a **system service principal** per endpoint, and it **rotates** — multiple distinct SPs can exist across deploys/config updates. Grant **all** of them.
+- System SPs are **NOT** in workspace SCIM, so `databricks service-principals list` will not find them and `PATCH /api/2.0/permissions/...` with `service_principal_name=<uuid>` returns `200` but silently drops.
+- `SHOW GRANTS \`<uuid>\` ON SCHEMA …` returns **empty** for system SPs even after a `GRANT … SUCCEEDED` — they are invisible to SCIM. **Do not use `SHOW GRANTS` to verify**; a `SUCCEEDED` statement is the best signal available, and the real proof is the OBO query in the gate.
+
+Discover **all** system SPs from the endpoint events (backticks stripped to avoid malformed SQL) and apply grants best-effort:
 
 ```python
 from databricks.sdk import WorkspaceClient
 
-def get_endpoint_sp(w: WorkspaceClient, endpoint_name: str) -> str:
-    """Return the system SP UUID created by agents.deploy() for this endpoint.
-
-    System SPs are not in SCIM — the reliable source is the endpoint's
-    event stream. Looks for: "System service principal creation with ID <uuid> succeeded".
-    """
+def discover_endpoint_sps(w: WorkspaceClient, endpoint_name: str) -> list[str]:
+    """Return ALL system SP UUIDs ever created for this endpoint (rotation-aware)."""
     resp = w.api_client.do(
-        "GET",
-        f"/api/2.0/serving-endpoints/{endpoint_name}/events",
-        query={"limit": 200},
+        "GET", f"/api/2.0/serving-endpoints/{endpoint_name}/events", query={"limit": 200}
     )
     marker = "System service principal creation with ID "
-    for e in resp.get("events", []):
-        msg = e.get("message", "")
-        if marker in msg:
-            return msg.split(marker, 1)[1].split(" ", 1)[0]
-    raise RuntimeError(
-        f"No system SP creation event on {endpoint_name}. "
-        f"Endpoint may still be provisioning — wait for READY and retry."
-    )
-```
+    sps = [
+        e["message"].split(marker, 1)[1].split(" ", 1)[0].strip().strip("`")
+        for e in resp.get("events", [])
+        if marker in e.get("message", "")
+    ]
+    return list(dict.fromkeys(sps))  # de-dup, preserve order
 
-Apply UC grants idempotently by UUID. `EXECUTE` is required if your Genie Space exposes TVFs as certified answers — without it, TVF calls fail with the same `PERMISSION_DENIED` symptom as a missing `SELECT`:
 
-```python
 w = WorkspaceClient()
-ENDPOINT_NAME = "<your agent endpoint>"     # dots in UC model name replaced with hyphens
+ENDPOINT_NAME = "<your-stable-endpoint-name>"
 CATALOG       = "<your catalog>"
 GOLD_SCHEMA   = "<your gold schema>"
-WAREHOUSE_ID  = "<your warehouse id>"        # the semantic warehouse the Genie Space uses
+WAREHOUSE_ID  = "<your warehouse id>"   # the semantic warehouse the Genie Space uses
 
-SP = get_endpoint_sp(w, ENDPOINT_NAME)
-print(f"Endpoint system SP: {SP}")
-
-for stmt in [
-    f"GRANT USE CATALOG ON CATALOG `{CATALOG}` TO `{SP}`",
-    f"GRANT USE SCHEMA, SELECT, EXECUTE ON SCHEMA `{CATALOG}`.`{GOLD_SCHEMA}` TO `{SP}`",
-]:
-    w.statement_execution.execute_statement(
-        warehouse_id=WAREHOUSE_ID,
-        statement=stmt,
-        wait_timeout="30s",
-    )
-    print(f"OK: {stmt}")
+for sp in discover_endpoint_sps(w, ENDPOINT_NAME):
+    for stmt in [
+        f"GRANT USE CATALOG ON CATALOG `{CATALOG}` TO `{sp}`",
+        f"GRANT USE SCHEMA, SELECT, EXECUTE ON SCHEMA `{CATALOG}`.`{GOLD_SCHEMA}` TO `{sp}`",
+    ]:
+        try:
+            w.statement_execution.execute_statement(
+                warehouse_id=WAREHOUSE_ID, statement=stmt, wait_timeout="30s"
+            )
+            print(f"best-effort OK: {stmt}")
+        except Exception as e:  # never fail the deploy on the fallback path
+            print(f"best-effort SKIP ({type(e).__name__}): {stmt}")
 ```
 
-Duplicate `GRANT` statements are idempotent — re-running this block on a subsequent deploy is a no-op.
+`EXECUTE` is required if your Genie Space exposes TVFs as certified answers. The grants are idempotent.
 
-Verify warehouse inheritance via the `users` group (one-time, per workspace). Do NOT grant the SP directly:
+For AppKit and any other user-facing caller, **forward the user token** (`x-forwarded-access-token`) so the app→agent hop stays OBO and never depends on this fallback. Full OBO-vs-SP matrix and the silent-drop traps: see [references/post-deploy-permissions.md](references/post-deploy-permissions.md).
 
-```bash
-WH_ID="<your warehouse id>"
-databricks api get /api/2.0/permissions/warehouses/$WH_ID --profile $PROFILE \
-  | jq '.access_control_list[] | select(.group_name=="users") | .all_permissions[].permission_level'
-# Expect: "CAN_USE". If missing, grant the GROUP (users) — NOT the SP — once, workspace-wide.
+### Step 5 verification gate — OBO query via the SDK (the real gate)
+
+A greeting in AI Playground does NOT verify the tool-calling path. Query the deployed endpoint with a **domain-specific data question** via the SDK — the call is forwarded On-Behalf-Of you, so it exercises the OBO + Genie MCP path end-to-end. No PAT, no `curl`, no `databricks auth token` (hard-blocked on Genie Code):
+
+```python
+r = w.serving_endpoints.query(
+    name=ENDPOINT_NAME,
+    inputs={"input": [{"role": "user", "content": "<domain-specific data question>"}]},
+)
+payload = r.as_dict() if hasattr(r, "as_dict") else r
+out = payload.get("output", [])
+assert any(o.get("type") == "function_call" for o in out), "no Genie tool call — greeting only"
+assert any(o.get("type") == "message" for o in out), "no message with data"
+print("PASS — OBO tool-calling path returned data")
 ```
 
-Full OBO-vs-SP matrix, anti-patterns, and the silent-drop trap: see [references/post-deploy-permissions.md](references/post-deploy-permissions.md).
+> **IDE convenience:** if you prefer a shell check on IDE, `curl + PAT` against `/invocations` works too (a PAT call is also forwarded OBO). It is NOT available on Genie Code (`databricks auth token` is hard-blocked) — use the SDK query above there.
 
-### Step 5 verification gate — `curl + PAT` with a domain-specific question
-
-A greeting in AI Playground does NOT verify the tool-calling path. For `EMBEDDED_CREDENTIALS` endpoints Playground routes MCP calls through the same system SP as every other caller — so a Playground greeting doesn't prove the SP can read Genie's tables. The required gate is a **domain-specific data question** hitting `/invocations` via `curl + PAT`:
+The original `curl + PAT` form (for reference on IDE):
 
 ```bash
 ENDPOINT="<your endpoint>"
@@ -423,15 +466,16 @@ curl -sS -X POST "$HOST/serving-endpoints/$ENDPOINT/invocations" \
 
 - **PASS** — at least one `function_call` to `<tool>__query_space_<space_id>` appears in `.output`, followed by a `message` with real numbers.
 - **FAIL (greeting only)** — no `function_call` means the tool wasn't exercised. Either the system prompt is too generic (add a domain nudge) or the Genie Space has no content (run Step 5a probes).
-- **FAIL (`PERMISSION_DENIED`)** — run Step 5a first; if the space is healthy, re-run Step 5b; if it still fails, the space's underlying tables need `SELECT` for the `users` group or for the SP UUID directly.
+- **FAIL (`PERMISSION_DENIED`)** — under OBO this means YOUR own UC grants are missing on the space's tables (the query runs as you). Run Step 5a first; if the space is healthy, grant yourself `SELECT`/`EXECUTE`. The system-SP grant (Step 5b) only affects M2M callers, not this OBO gate.
 
 **Gate:** ALL of the following:
 
-1. Endpoint reaches `READY` state.
+1. Endpoint reaches `READY` state (`EMBEDDED_AND_USER_CREDENTIALS`).
 2. Step 5a probes pass (space is healthy, `serialized_space` is non-empty).
-3. Step 5b auto-grant completed without errors; the SP UUID is printed.
-4. `curl + PAT` with a **domain-specific data question** returns at least one `function_call` in `.output` followed by a `message` with real data.
-5. Agent is visible in AI Playground (a smoke test, NOT the gate).
+3. The SDK OBO query with a **domain-specific data question** returns at least one `function_call` in `.output` followed by a `message` with real data.
+4. Agent is visible in AI Playground (a smoke test, NOT the gate).
+
+Step 5b (system-SP grant) is best-effort and explicitly **not** part of the gate — OBO does not require it.
 
 ### Step 5c — Emit `DEPLOY_CHECKPOINT.md` for Step 17 handoff
 
@@ -446,6 +490,8 @@ APP_NAME = "<your app>"                         # same as Step 17's $APP_NAME
 checkpoint_dir = pathlib.Path(f"apps_lakebase/{APP_NAME}/agents")
 checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
+SPS = discover_endpoint_sps(w, ENDPOINT_NAME)  # from Step 5b
+
 checkpoint = textwrap.dedent(f"""
     # Agent Deploy Checkpoint (Step 16)
 
@@ -454,36 +500,45 @@ checkpoint = textwrap.dedent(f"""
 
     | Field                        | Value |
     |---                           |---    |
-    | Endpoint name (full)         | `{ENDPOINT_NAME}` |
-    | Endpoint name (64-char)      | `{ENDPOINT_NAME[:64]}` |
-    | System SP UUID               | `{SP}` |
+    | Endpoint name                | `{ENDPOINT_NAME}` |
+    | Auth model                   | `EMBEDDED_AND_USER_CREDENTIALS` (OBO-first) |
     | UC model name                | `{UC_MODEL_NAME}` |
     | UC model version             | `{registered.version}` |
     | Genie Space ID               | `{GENIE_SPACE_ID}` |
     | Warehouse ID                 | `{WAREHOUSE_ID}` |
-    | Gold schema granted          | `{CATALOG}.{GOLD_SCHEMA}` |
+    | System SP(s) (best-effort)   | `{', '.join(SPS) or '(none discovered)'}` |
+    | Gold schema (best-effort)    | `{CATALOG}.{GOLD_SCHEMA}` |
 
-    ## Verified `curl` block (paste-ready)
+    ## How the agent authenticates to Genie
 
-    ```bash
-    ENDPOINT="{ENDPOINT_NAME}"
-    HOST="<your workspace host>"
-    TOKEN="<PAT>"
-    curl -sS -X POST "$HOST/serving-endpoints/$ENDPOINT/invocations" \\
-      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\
-      -d '{{"input":[{{"role":"user","content":"<domain-specific data question>"}}]}}' \\
-      | jq '.output[] | select(.type=="function_call" or .type=="message")'
+    - **Primary (proven):** On-Behalf-Of the caller (`UserAuthPolicy` scope
+      `mcp.genie`). Genie runs as the invoking user — zero SP grants needed.
+    - **Fallback (best-effort):** true M2M callers use the system SP, which needs
+      UC `SELECT`/`EXECUTE` on `{CATALOG}.{GOLD_SCHEMA}` (Step 5b, not guaranteed).
+    - **AppKit:** forward the user token (`x-forwarded-access-token`) to keep the
+      app→agent hop OBO.
+
+    ## Verify (SDK, no PAT)
+
+    ```python
+    from databricks.sdk import WorkspaceClient
+    w = WorkspaceClient()
+    r = w.serving_endpoints.query(
+        name="{ENDPOINT_NAME}",
+        inputs={{"input": [{{"role": "user", "content": "<domain-specific data question>"}}]}},
+    )
+    print(r.as_dict() if hasattr(r, "as_dict") else r)
     ```
 
-    PASS = at least one `function_call` to `<tool>__query_space_{GENIE_SPACE_ID}` in `.output`.
+    PASS = at least one `function_call` to `<tool>__query_space_{GENIE_SPACE_ID}` in `.output`, then a `message` with real numbers.
 """).strip()
 
 (checkpoint_dir / "DEPLOY_CHECKPOINT.md").write_text(checkpoint + "\n")
 ```
 
-The reference notebook [references/agent-deploy-notebook.py](references/agent-deploy-notebook.py) writes this file automatically at the end of Step 5b.
+The reference notebook [references/agent-deploy-notebook.py](references/agent-deploy-notebook.py) writes this file automatically at the end of the run.
 
-**Checkpoint gate:** `DEPLOY_CHECKPOINT.md` exists at `apps_lakebase/$APP_NAME/agents/DEPLOY_CHECKPOINT.md` with endpoint name, SP UUID, UC model name/version, Genie Space ID, warehouse ID, and the verified `curl` block. Step 17 reads this file on entry.
+**Checkpoint gate:** `DEPLOY_CHECKPOINT.md` exists at `apps_lakebase/$APP_NAME/agents/DEPLOY_CHECKPOINT.md` with endpoint name, auth model, UC model name/version, Genie Space ID, warehouse ID, best-effort SP(s), and the SDK verify snippet. Step 17 reads this file on entry.
 
 ---
 
@@ -501,7 +556,7 @@ The deployed endpoint from Step 5 is ready to be consumed by an AppKit applicati
 >
 > 1. **Payload:** send `{"input": [{"role":"user","content":"..."}]}` to the endpoint — **not** `{"messages": [...]}`. Sending `messages` produces `400: Model is missing inputs ['input']`.
 > 2. **Streaming chunks:** this agent emits the Databricks Responses API format — `{ type: "response.output_text.delta", delta: "..." }` — not OpenAI chat completion. Parsers that read only `chunk.choices[0].delta.content` will return empty strings.
-> 3. **SP grants matter:** permissions apply to API-token callers, including Apps-to-endpoint. AI Playground uses OBO, so it can succeed while the app's SP fails. If a domain question returns an empty greeting in the app but works in Playground, the SP lacks a tool grant — see [references/post-deploy-permissions.md](references/post-deploy-permissions.md).
+> 3. **Forward the user token (OBO):** this endpoint is `EMBEDDED_AND_USER_CREDENTIALS`, so the Genie MCP call runs On-Behalf-Of whoever's token reaches `/invocations`. Have the app forward `x-forwarded-access-token` so each user queries Genie as themselves — no system-SP grants needed. If the app instead calls with only its own SP token, it falls back to the endpoint system SP, which needs UC `SELECT`/`EXECUTE` (best-effort Step 5b) — see [references/post-deploy-permissions.md](references/post-deploy-permissions.md).
 >
 > If wiring via the AppKit `serving()` plugin, items 1 and 2 are handled automatically by the plugin. If building a custom proxy (plugin unavailable, older AppKit version), see [06-appkit-serving-wiring/references/custom-proxy-fallback.md](../../../../apps_lakebase/skills/06-appkit-serving-wiring/references/custom-proxy-fallback.md) and [06-appkit-serving-wiring/references/sse-format-patterns.md](../../../../apps_lakebase/skills/06-appkit-serving-wiring/references/sse-format-patterns.md) for the transformation + dual parser.
 
@@ -542,8 +597,8 @@ For the complete 9-phase implementation (foundation through monitoring), use `00
 | `ModuleNotFoundError: azure.core` during `register_model()` | Bare `mlflow` lacks the Azure storage SDK | Install `"mlflow[databricks]"` (also covers AWS/GCP) |
 | `PERMISSION_DENIED: ... not authorized to use this SQL Endpoint` post-deploy | Endpoint SP lacks `users`-group `CAN_USE` inheritance on warehouse | Verify with `jq '.access_control_list[] \| select(.group_name=="users")'` on `/permissions/warehouses/{id}`. If missing, grant the `users` group once. Do NOT PATCH `service_principal_name = <uuid>` — it returns `200` but silently drops. See Step 5b + [references/post-deploy-permissions.md](references/post-deploy-permissions.md). |
 | `NETWORK_CONFIGURATION_FAILURE` when submitting a job | Classic cluster can't reach control plane | Use serverless: `environment_key` + `environments` spec, not `new_cluster`. |
-| Agent answers greetings but fails on data questions | SP has endpoint access but not UC grants on the gold schema | Run Step 5b auto-grant (`get_endpoint_sp()` + `GRANT USE CATALOG/SCHEMA, SELECT, EXECUTE`). Playground false-confidence: `EMBEDDED_CREDENTIALS` endpoints route MCP calls through the system SP too — Playground is not an OBO bypass. |
-| `PERMISSION_DENIED: No access to table X` on a domain question, no UUID in the error | Either `serialized_space` is wiped OR the SP lacks UC grants | Run Step 5a disambiguation probes FIRST. Don't grep the error for a UUID — it won't have one. Discover the SP via `/serving-endpoints/{name}/events` (Step 5b `get_endpoint_sp`). |
+| Agent answers greetings but fails on data questions | Under OBO, YOUR UC grants are missing on the gold schema (the query runs as you); for M2M callers, the system SP lacks grants | OBO: grant yourself `SELECT`/`EXECUTE` on the gold schema. M2M: run best-effort Step 5b. The system prompt may also be too generic — add a domain nudge. |
+| `PERMISSION_DENIED: No access to table X` on a domain question, no UUID in the error | Under OBO, YOUR grants are missing; for M2M, `serialized_space` is wiped OR the SP lacks UC grants | Run Step 5a disambiguation probes FIRST. Don't grep the error for a UUID — it won't have one. For the M2M path, discover SPs via `/serving-endpoints/{name}/events` (Step 5b `discover_endpoint_sps`). |
 
 ---
 
@@ -592,8 +647,8 @@ When a run fails, check whether you're falling into one of these reasoning traps
 - **Classic cluster is not the default.** In restricted/workshop workspaces, serverless is the safe default. Check prior compute patterns in `.vibecoding-state.md` before picking a cluster type.
 - **`READY` endpoint ≠ working agent.** An endpoint that only answers greetings has never exercised the tool-calling path. Verify with a domain-specific data question.
 - **Same error class after retry ≠ try another variant — change approach.** If two path-style fixes produce the same framework-loader error, the category of fix is wrong. Step back and understand the framework's lifecycle.
-- **Playground greeting ≠ Step 5 gate.** For `EMBEDDED_CREDENTIALS` endpoints, Playground routes MCP tool calls through the system SP exactly like `curl + PAT` — a Playground greeting proves the LLM is live but does not prove the SP can read Genie's tables. Use the Step 5 verification gate (`curl + PAT` with a domain question + `jq` on `function_call`).
-- **`databricks service-principals list` ≠ SP discovery for `agents.deploy()` endpoints.** The endpoint's system SP is NOT in SCIM. Use `GET /api/2.0/serving-endpoints/{name}/events` with the marker `"System service principal creation with ID"`. See Step 5b `get_endpoint_sp()`.
+- **Playground greeting ≠ Step 5 gate.** A greeting proves the LLM is live but never exercises the Genie tool path. Use the Step 5 gate: an SDK `serving_endpoints.query(...)` with a domain question and assert a `function_call` + a `message` with data. (Playground and the SDK both forward the caller's identity OBO on an `EMBEDDED_AND_USER_CREDENTIALS` endpoint.)
+- **`databricks service-principals list` ≠ SP discovery for `agents.deploy()` endpoints.** The endpoint's system SP is NOT in SCIM (and rotates across deploys). Use `GET /api/2.0/serving-endpoints/{name}/events` with the marker `"System service principal creation with ID"` and grant ALL discovered SPs. See Step 5b `discover_endpoint_sps()`.
 - **`PATCH /permissions/warehouses/{id}` with `service_principal_name = <uuid>` ≠ granting a system SP.** Returns `200 OK` but silently drops the entry. Rely on `users`-group inheritance for workspace ACLs; grant UC privileges directly by UUID for the database layer.
 
 ### Do NOT PATCH `/api/2.0/data-rooms/{id}` with partial payloads
@@ -648,3 +703,4 @@ To change `run_as_type` today: rebuild the space via the Genie UI or re-run `dep
 | Apr 17, 2026 | 1.1.0 | Apply retro v2 actions 1-6: Genie Space verification in prereqs, `mlflow[databricks]`, `model_config` in `log_model`, uncommented `DatabricksGenieSpace`, Step 2 job-submission callout, Step 5 SP permissions, 3 new gotchas, Anti-Patterns block, `references/post-deploy-permissions.md` + `references/job-submission.md` |
 | Apr 17, 2026 | 1.2.0 | Apply retro v3 actions 1-6: 3-option Genie Space remediation, inlined serverless default (full JSON in Step 2) + preventive SP grant code + `mlflow[databricks]` in Step 3 `pip_requirements` + structured debugging decision tree + tightened Step 5 gate (numbered list) + 2 new gotchas (`NETWORK_CONFIGURATION_FAILURE`, greetings-vs-data) |
 | Apr 18, 2026 | 1.3.0 | Apply retro v3 actions S1–S10: auto-discover endpoint system SP via `/serving-endpoints/{name}/events` + idempotent UC grants including `EXECUTE` (Step 5b), `PERMISSION_DENIED` disambiguation probe tree (Step 5a), `curl + PAT` domain-question verification gate (Step 5), `DEPLOY_CHECKPOINT.md` handoff for Step 17 (Step 5c), rewritten `references/post-deploy-permissions.md` (3 factually-wrong sections fixed), new `references/restore-genie-space.py` recovery helper, new `references/agent_deploy_job.yml` + `references/agent-deploy-notebook.py` serverless templates with Step 5b baked in, `/api/2.0/data-rooms/{id}` destructive-PATCH anti-pattern block (mirrored in `semantic-layer/04-genie-space-export-import-api`), updated Gotchas + Anti-Patterns for system-SP invisibility and Playground false-confidence |
+| Jun 4, 2026 | 1.4.0 | OBO-first hardening (proven end-to-end on Managed MCP): `agent-template.py` builds the OBO `WorkspaceClient` + `McpServerToolkit` per request with a system-SP fallback; Step 3 logs a dual `auth_policy` (`SystemAuthPolicy` incl. `DatabricksSQLWarehouse` + `UserAuthPolicy(api_scopes=["mcp.genie","sql"])`) and pins `databricks-ai-bridge`; Step 5 passes an explicit `endpoint_name` + NOT_UPDATING idempotency poll; Step 5b reframed to a best-effort, rotation-aware, ungated discover-all-SPs grant (no `SHOW GRANTS` verification — invalid for system SPs); Step 5 gate switched to an SDK OBO `serving_endpoints.query(...)` (curl+PAT demoted to an IDE convenience); corrected the "Playground is not an OBO bypass" overstatement throughout |

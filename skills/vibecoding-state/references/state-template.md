@@ -153,6 +153,7 @@ environment_capabilities:
   - Track C = Model Serving (standalone endpoint)
 - **dabs_bundle_path:** `<path, e.g. example/<use_case>/ | n/a>`
 - **llm_endpoint:** `<e.g. databricks-claude-sonnet-4-6>`
+- **enable_lakebase_cdf:** `<true | false>`  <!-- default false; Pathways B/C only. Gates the `sync_from_lakebase` genie-code fork (input_id 931): false = one-time CLONE of the Lakebase tables into the lakehouse user-scoped schema; true = attempt Lakebase Change Data Feed, with automatic announced fallback to clone when the workspace cannot host CDF (default-storage catalog / preview off). Surfaced to prompts as the `{enable_lakebase_cdf}` placeholder. -->
 
 ---
 

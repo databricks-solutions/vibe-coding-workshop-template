@@ -381,7 +381,7 @@ print("✅ Phase 0.5 pre-flight passed — safe to proceed to Phase 1.")
 2. For each entry, use the manifest's `source_table`, `dimensions`, and `measures` — cross-reference every column against `gold_inventory` (Phase 0)
 3. **Validation gate:** For each YAML, apply ALL three validations:
    - **Column existence:** Verify every `dimensions[].column` and `measures[].column` exists in `gold_inventory[source_table]["columns"]`. Fail with explicit error listing unresolved references.
-   - **Transitive join detection:** Inspect all join `on` clauses. If ANY join's `on` references a join alias instead of `source`, flag as transitive join error. Fix: restructure as nested joins (snowflake schema, DBR 17.1+) or use denormalized columns.
+   - **Transitive join detection:** Inspect all join `on` clauses. If ANY join's `on` references a join alias instead of `source`, flag as transitive join error. Fix (preferred on the workshop runtime, DBR 17.1+ with 1:1 keys): restructure as **nested joins** (snowflake schema); or use denormalized columns (Fix 1). Use the subquery-source pattern only as the fallback for DBR < 17.1 or non-unique intermediate keys (see `01-metric-views-patterns` decision ladder).
    - **Format type validation:** Verify all measure `format.type` values are one of: `byte`, `currency`, `date`, `date_time`, `number`, `percentage`. Common mistakes: `percent` (use `percentage`), `decimal` (use `number`).
 4. Create `create_metric_views.py` with sys.path setup from `databricks-python-imports`
 5. Test each Metric View with sample queries

@@ -229,10 +229,13 @@ def log_agent():
         system_auth_policy=SystemAuthPolicy(resources=system_resources),
         user_auth_policy=UserAuthPolicy(
             api_scopes=[
+                # Genie scope depends on HOW you call Genie:
+                #   - Conversation API (client.genie.start_conversation, as below)
+                #       -> "dashboards.genie"
+                #   - Managed MCP path (McpServerToolkit, /api/2.0/mcp/genie/{id})
+                #       -> "mcp.genie"   (proven; "dashboards.genie" returns 403 there)
                 "dashboards.genie",
-                "sql.warehouses",
-                "sql.statement-execution",
-                "serving.serving-endpoints",
+                "sql",
             ]
         ),
     )
@@ -248,6 +251,43 @@ def log_agent():
         ],
     )
 ```
+
+---
+
+## OBO with the Managed MCP toolkit (Genie via `McpServerToolkit`)
+
+When the agent talks to Genie through the **Managed MCP** path (the
+`09-simple-agent-scaffold` pattern: `McpServerToolkit` against
+`{host}/api/2.0/mcp/genie/{space_id}`), two things differ from the Conversation
+API example above:
+
+1. **Scope is `mcp.genie`, not `dashboards.genie`.** The MCP endpoint rejects
+   `dashboards.genie` with `403 Forbidden`. Use
+   `UserAuthPolicy(api_scopes=["mcp.genie", "sql"])`.
+2. **Build the toolkit PER REQUEST with the OBO client.** `McpServerToolkit`
+   accepts a `workspace_client=` argument. Constructing it at module/`__init__`
+   time captures whatever identity existed then (the system SP) and defeats OBO.
+   Build it inside `predict()` / `predict_stream()`:
+
+```python
+def predict_stream(self, request):
+    ws = get_authenticated_client()          # OBO in serving; SP fallback for M2M
+    tools = {}
+    for sp in self.genie_spaces:
+        tk = McpServerToolkit(
+            url=f"{ws.config.host}/api/2.0/mcp/genie/{sp['space_id']}",
+            name=sp.get("name"),
+            workspace_client=ws,             # <-- per-request OBO identity
+        )
+        for ti in tk.get_tools():
+            tools[ti.name] = ti
+    # ... run the tool-calling loop with `tools` ...
+```
+
+Proven end-to-end: an `EMBEDDED_AND_USER_CREDENTIALS` endpoint querying Genie
+through MCP returns the calling user's data with **zero** system-SP grants. The
+system-SP fallback only applies to callers with no user token (see
+`model-serving-auth-passthrough.md` and `post-deploy-permissions.md`).
 
 ---
 

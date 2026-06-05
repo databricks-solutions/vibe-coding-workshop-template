@@ -39,6 +39,8 @@ TRACK = {
     "usecase_plan": LAKEHOUSE,
     # apps (AppKit)
     "cursor_copilot_ui_design": APPS,
+    "setup_lakebase": APPS,
+    "wire_ui_lakebase": APPS,
     "deploy_databricks_app": APPS,
     "appkit_agent_app_proxy_chat": APPS,
     "appkit_chat_feedback_mlflow": APPS,

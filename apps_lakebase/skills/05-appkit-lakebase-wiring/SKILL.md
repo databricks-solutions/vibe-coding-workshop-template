@@ -161,7 +161,7 @@ All DDL runs on every app startup. It must be safe to execute repeatedly.
 
 ```typescript
 const AppKit = await createApp({
-  plugins: [server({ autoStart: false }), lakebase()],
+  plugins: [server(), lakebase()],
 });
 
 const DB_SCHEMA = process.env.DB_SCHEMA || "app";
@@ -241,29 +241,30 @@ AppKit Lakebase is **server-side only** — there are no frontend hooks like `us
 
 ### 2a. Server Setup Pattern
 
-When using `server.extend()`, pass `autoStart: false` to the `server()` plugin and call `AppKit.server.start()` manually after registering all routes:
+Register custom routes inside the `onPluginsReady` callback. It runs after the plugins initialize but **before** the `server()` plugin starts listening — exactly the window where `appkit.server.extend()` must attach Express routes. Move the Step 1 DDL and the Step 1e seed inside this same callback (before the `extend` call) so the schema exists before the server accepts traffic. Do **NOT** pass `autoStart: false` and do **NOT** call `AppKit.server.start()` yourself:
 
 ```typescript
 import { createApp, server, lakebase } from "@databricks/appkit";
 
-const AppKit = await createApp({
-  plugins: [server({ autoStart: false }), lakebase()],
-});
-
 const DB_SCHEMA = process.env.DB_SCHEMA || "app";
 
-// DDL + seed (from Step 1) ...
+await createApp({
+  plugins: [server(), lakebase()],
+  async onPluginsReady(appkit) {
+    // DDL + seed (from Step 1) — run before the server accepts traffic
+    await appkit.lakebase.query(`CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA}`);
+    // ... CREATE TABLE / INDEX + count-check seed ...
 
-AppKit.server.extend((app) => {
-  // Register routes here (Steps 2b-2d)
+    appkit.server.extend((app) => {
+      // Register routes here (Steps 2b-2d)
+    });
+  },
 });
-
-await AppKit.server.start();
 ```
 
 > **`npm run dev` will NOT work until after the first deploy.** The `lakebase()` plugin throws `ConfigurationError` during `createApp()` when `LAKEBASE_ENDPOINT` and `PGHOST` are not set. These env vars are injected by the platform after the Lakebase project is provisioned (first deploy). Use **`npm run build` only** for local validation at this step — it type-checks and bundles without executing the code. Runtime testing with `npm run dev` is available after deployment creates the Lakebase project and you populate `.env` with connection details (see the **Deploy and E2E Test** step, Step 7).
 
-> **Gotcha — `autoStart: false` is required.** Without it, the server starts before `extend()` runs and routes are never registered. Always pass `server({ autoStart: false })` and call `AppKit.server.start()` after all routes are defined.
+> **Gotcha — register routes in `onPluginsReady`, never call `server.start()` manually.** The `server()` plugin owns the HTTP listener. Passing `autoStart: false` and then calling `AppKit.server.start()` yourself is the stale pattern — it double-`listen()`s (the plugin still binds the port) and the app crashes on boot (`EADDRINUSE`). The supported shape is the `onPluginsReady(appkit)` hook on `createApp`: it fires after plugins init but before the listener binds, so `appkit.server.extend(...)` routes are attached in time. The `server()` plugin also auto-adds `/health` — do not register it yourself. Reference: [developer docs — AppKit `createApp` (`onPluginsReady` hook)](https://developers.databricks.com/appkit).
 
 > **Gotcha — Do NOT annotate `app` with `: any` or `: Express`.** AppKit's AST-grep linter blocks `any` annotations (`no-as-any` rule), and importing `Express` from the `express` module causes TS2345 (type mismatch with AppKit's internal type). Leave `app` untyped in `server.extend((app) => { ... })` — TypeScript infers the correct type from the callback signature. For route handler parameters, import and use `Request` and `Response` types from `express`.
 
@@ -498,7 +499,7 @@ Detailed callouts are embedded inline at the relevant step. This table is a comp
 |--------|-----|------|
 | `ON CONFLICT DO NOTHING` with identity PKs | Count-check seed pattern | 1e |
 | `import express` / `require("express")` | Use `server.extend((app))` + inline parser | 2e |
-| Missing `autoStart: false` | Pass to `server()` plugin | 2a |
+| Manual `AppKit.server.start()` / `autoStart: false` | Register routes in `onPluginsReady(appkit)` + `appkit.server.extend(...)`; let `server()` own the listener (manual start double-binds → `EADDRINUSE`) | 2a |
 | `lakebase()` crashes without env vars (`LAKEBASE_ENDPOINT`, `PGHOST`) | Expected before first deploy. Use `npm run build` only; `npm run dev` works after deploy + `.env` setup | 2a |
 | DECIMAL columns → strings | `Number()` in mappers | 3d |
 | DATE columns → Date objects | `.toISOString().slice(0,10)` | 3d |

@@ -4,7 +4,7 @@ description: Comprehensive patterns for Databricks Genie Space Export/Import API
 clients: [ide_cli, genie_code]
 bundle_resource: genie
 deploy_verb: bundle_deploy
-deploy_note: "RULE_8 tiers: T1 native `genie_spaces` bundle entry (preferred; verify CLI support via `bundle validate`) -> T2 provisioning notebook job (active fallback) -> T3 `createAsset` escape hatch (Genie-Code-only, last resort, non-version-controlled). Space name + table_identifiers carry the per-user prefix. semantic_warehouse_id is baked at deploy time, never a runtime --var."
+deploy_note: "RULE_8 tiers: T1 native `genie_spaces` bundle entry (preferred; verify CLI support via `bundle validate`) -> T2 provisioning notebook job (active fallback) -> T3 `createAsset`+PATCH dev-authoring loop (Genie-Code only: create a shell with `createAsset(assetType=genie)`, populate the FULL `serialized_space` via `PATCH /api/2.0/genie/spaces/{id}`, then PERSIST that JSON into the bundle and run T1/T2 once in dev for the version-controlled deploy). T3 is sanctioned for fast dev iteration ONLY when the JSON is persisted in the bundle and a job reproduces it; an orphan space with no persisted JSON is the regression. IDE (ide_cli) stays on T1/T2 (bundle) and never uses `createAsset`. Space name + table_identifiers carry the per-user prefix. semantic_warehouse_id is baked at deploy time, never a runtime --var."
 coverage: full
 metadata:
   author: prashanth subrahmanyam

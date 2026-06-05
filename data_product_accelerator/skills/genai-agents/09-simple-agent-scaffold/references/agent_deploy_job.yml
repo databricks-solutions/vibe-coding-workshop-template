@@ -18,6 +18,7 @@
 #     catalog:               { default: "my_catalog" }
 #     agent_schema:          { default: "booking_app_agents" }
 #     agent_model_name:      { default: "booking-genie-agent" }
+#     agent_endpoint_name:   { default: "booking-genie-agent" }  # explicit, stable, <=63 chars
 #     gold_schema:           { default: "booking_app_gold" }
 #     semantic_warehouse_id: { default: "<warehouse-id>" }
 #     genie_space_id:        { default: "<space-id>" }
@@ -56,6 +57,7 @@ resources:
               uc_gold_schema: "${var.gold_schema}"
               warehouse_id: "${var.semantic_warehouse_id}"
               genie_space_id: "${var.genie_space_id}"
+              agent_endpoint_name: "${var.agent_endpoint_name}"
               agent_folder_ws_path: "${var.agents_folder_ws_path}"
       environments:
         - environment_key: default
@@ -71,4 +73,6 @@ resources:
               - "mlflow[databricks]"
               - mcp
               - nest_asyncio
+              - databricks-ai-bridge   # REQUIRED for OBO (ModelServingUserCredentials)
+              - databricks-sdk
               - uv

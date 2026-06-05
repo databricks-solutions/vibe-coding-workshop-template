@@ -332,15 +332,17 @@ dimensions:
     expr: dim_property_enriched.country
 ```
 
-**Why this is the recommended default:**
+**Why this is the robust FALLBACK (use only when nested joins are unavailable — DBR < 17.1 — or the intermediate key is not unique):**
 - Works on **every** DBR version (no 17.1 dependency).
 - The subquery makes uniqueness guarantees explicit — reviewers can see and test them.
 - Re-usable: wrap the subquery in a **Gold-layer VIEW** (`dim_property_enriched_v`) and reference it in every Metric View that needs the same enrichment — this also anchors the Gold dependency manifest (see `planning/00-project-planning/SKILL.md`).
 
+> **Default preference (do not over-engineer):** on the workshop runtime (serverless, DBR ≥ 17.1) with 1:1 intermediate keys, **nested joins (Fix 2) are the PREFERRED multi-hop solution** — simpler, no extra Gold view, native to the Metric View. Reach for the subquery-source pattern only as the fallback. Do NOT spend planning cycles designing a subquery workaround when nested joins resolve the path directly.
+
 **Decision ladder for any multi-hop requirement:**
 1. Can the intermediate dimension carry the needed attribute directly (denormalize)? → Use Fix 1 (flat join, no second hop).
-2. Is every intermediate key uniquely 1:1 and is DBR ≥ 17.1? → Use nested joins (Fix 2) and document the uniqueness check in a comment.
-3. Otherwise → use the **subquery-source pattern above**. Do NOT ship a transitive join and hope for an error.
+2. **PREFERRED on the workshop runtime.** Is every intermediate key uniquely 1:1 and is DBR ≥ 17.1? → Use nested joins (Fix 2) and document the uniqueness check in a comment.
+3. Only if DBR < 17.1 OR an intermediate key is non-unique → use the **subquery-source fallback above**. Do NOT ship a transitive join and hope for an error.
 
 **Anti-pattern detector — run before deploy:**
 

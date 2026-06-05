@@ -14,7 +14,7 @@ metadata:
     - "retrospectives/genie-code-field-guide.md (narrative)"
     - "probe Ledger P1–P18 (00-overview.md + genie-code-refactor-handoff.md)"
     - "probe Ledger P19–P23 (uv/pip toolchain; uv-FastAPI SNAPSHOT server-side build; agent-app /invocations OAuth; Knowledge-Assistant REST via api_client.do on SDK 0.67.0; mlflow.genai eval stack incl GEPA) — agents+mlflow track session 2026-06-03"
-    - "probe Ledger P24–P32 (AppKit hardening: import-specifier root-cause bisect; pristine scaffold defaults; build logs unreadable from compute; /logz human-readable; deploy ladder + ~50s cost; package-lock.json hard requirement; no-npm/local-typecheck-impossible + non-deterministic CLI allow-list; green-deploy != working app; don't-fabricate-state) — AppKit hardening session 2026-06-03"
+    - "probe Ledger P24–P33 (AppKit hardening: import-specifier root-cause bisect; pristine scaffold defaults; build logs unreadable from compute; /logz human-readable; deploy ladder + ~50s cost; package-lock.json hard requirement; no-npm/local-typecheck-impossible + non-deterministic CLI allow-list; green-deploy != working app; don't-fabricate-state; P33 round-2: residual static-but-uncaught classes — unused import TS6133, empty Radix value, escaped-quote, \\uXXXX artifact, harmful value='' skill advice, image egress) — AppKit hardening sessions 2026-06-03"
     - "coding_assistant='genie-code' fork lessons (03-prompt-section-chain.md §2a, Buckets A-rationale + C)"
 ---
 
@@ -173,6 +173,13 @@ The deploy contract is identical to the IDE — `bundle deploy --target dev`, ru
   dangling symlinks and `tsc` cannot resolve `@databricks/appkit-ui`/`vite/client` without `node_modules`,
   so the import-specifier failure is **not** catchable locally. Before a (~50s) deploy, scan
   `client/src/**` via `executeCode`+regex for the two bad specifiers and fix hits first. [TESTED P30]
+- **The static gate catches more than import paths; author with literal characters.** A round-2 run still
+  burned deploy cycles on classes the path-only gate missed, so the regex pre-flight now also **blocks** an
+  empty Radix `<SelectItem value="">` (runtime crash on menu open), an escaped single-quote in a JSX
+  attribute (Vite/rolldown parse crash), and a stray `\uXXXX` escape artifact, and **flags for review** any
+  unused named import (`noUnusedLocals` → hard `TS6133` build failure). Because you author `.tsx` through
+  Python `open().write(...)`, prefer **triple-quoted raw strings** and write the real `'`/`"` characters —
+  double-escaping is what produces the `\u0027`-style artifacts the gate flags. [TESTED P33]
 - **Build logs are unreadable from compute — escalate to `/logz` in a browser.** `deployment.status.message`
   + REST only say "check /logz"; `databricks apps logs <name>` → OAuth error; `/logz` over raw HTTP → 401.
   On `FAILED`, hand the operator `<app-url>/logz` (already authenticated) to read the exact `error TS…`
@@ -195,9 +202,23 @@ The deploy contract is identical to the IDE — `bundle deploy --target dev`, ru
 
 Use the **RULE_8 three tiers** from `databricks-asset-bundles` ("Genie Spaces — three deploy tiers"):
 Tier 1 native `genie_spaces` resource (preferred, landing ~this month), Tier 2 provisioning-job (active
-fallback, both clients), **Tier 3 `createAsset({assetType:"genie", …})`** — the Genie-Code-only,
-last-resort escape hatch that creates a live Space immediately and returns an ID. [TESTED P8] The Space
-title always carries the per-user prefix. Point to the spine for the canonical recipe; do not restate it.
+fallback, both clients), **Tier 3 `createAsset({assetType:"genie", …})` + REST `PATCH`** — the Genie-Code
+hybrid dev-authoring loop. [TESTED P8] `createAsset` returns a live Space ID but builds only a **shell**
+(tables registered; **0 instructions, 0 benchmarks, and metric views miscategorized under
+`data_sources.tables`**). Populate the FULL `serialized_space` with `PATCH /api/2.0/genie/spaces/{id}`,
+then PERSIST that JSON into the bundle so a job reproduces it — Tier 3 is sanctioned for dev iteration
+**only when the JSON is persisted** (an orphan Space with no file is the regression). The Space title
+always carries the per-user prefix. See §6c for the create→extract-back→persist mechanics. Point to the
+spine for the canonical recipe; do not restate it.
+
+> **Genie API gotchas (TESTED).** Find Spaces with `searchAssets(assetTypes=["datarooms"])`, but the ONLY
+> supported mutation is `PATCH /api/2.0/genie/spaces/{id}` with a full body — **NEVER `PATCH
+> /api/2.0/data-rooms/{id}`** (it silently wipes `serialized_space` to `{}`). Export config only via
+> `GET /api/2.0/genie/spaces/{id}?include_serialized_space=true` (there is **no `/export` endpoint** — it
+> 404s). `readAssetById(assetType="genie")` is unsupported — use the REST GET. Every text field in
+> `serialized_space` is `List[str]`; `data_sources.tables`/`metric_views` entries carry NO `id`; all IDs are
+> `uuid4().hex`. The canonical contract + `_assert_sql_arrays` validator live in
+> `semantic-layer/04-genie-space-export-import-api/SKILL.md`.
 
 ## 6b. Knowledge Assistants (Agent Bricks)
 
@@ -220,6 +241,28 @@ unnecessary). Verified contract (mirrors the newer SDK's `KnowledgeAssistantsAPI
 on the older `/api/2.0/...` prefix (the API is mid-migration) — **prefer `2.1`, fall back to `2.0` only if a
 `2.1` verb 404s.** Readiness polls via `serving-endpoints get` / `WorkspaceClient.serving_endpoints` (both
 available). [TESTED P22]
+
+## 6c. Semantic-layer authoring — native create + extract-back (TVF / Metric View / Dashboard)
+
+The semantic layer (TVFs, Metric Views, Genie Spaces, AI/BI Dashboards) uses a **hybrid** model distinct
+from the lakehouse table-DDL discipline in §8 (schemas/tables remain bundle-job-only): author the
+definition file FIRST, apply it natively for a fast dev loop, extract the live asset back and diff it
+against the file, then keep the Asset Bundle as the version-controlled source of truth and the non-dev
+deploy mechanism. The invariant: **persisted file + live matches file + bundle validates + job ran once in
+dev.** An orphan asset (no file) or drift (live ≠ file) is the regression.
+
+| Artifact | Create natively (dev) | Extract definition back | Persist to bundle | Notes / blocked |
+|---|---|---|---|---|
+| TVF | `executeCode` SQL `CREATE OR REPLACE FUNCTION … RETURNS TABLE(…)`; INVOKE-test `SELECT * FROM fn(…)` | `DESCRIBE FUNCTION EXTENDED` + `information_schema.routines.routine_definition` | `.sql` with `${catalog}`/`${gold_schema}` placeholders | `SHOW CREATE FUNCTION` blocked (PARSE_SYNTAX_ERROR) |
+| Metric View | `executeCode` SQL `CREATE OR REPLACE VIEW … WITH METRICS LANGUAGE YAML AS $$…$$`; validate with a `MEASURE()` query | `readTable → metadata.view_query_text` (or UC REST `GET /api/2.1/unity-catalog/tables/{full_name}.view_definition`) | `.yaml` with placeholders | `SHOW CREATE TABLE` blocked for METRIC_VIEW; appears in `information_schema.tables` (type METRIC_VIEW), NOT `.views` |
+| Genie Space | `createAsset(assetType="genie", tableIdentifiers=[…])` shell → `PATCH /api/2.0/genie/spaces/{id}` full `serialized_space` (run `_assert_sql_arrays` first) | `GET /api/2.0/genie/spaces/{id}?include_serialized_space=true` (assert non-zero instructions/benchmarks/sql_functions; MV under `metric_views`) | full `serialized_space` JSON | see §6 gotchas; never PATCH `/data-rooms/{id}` |
+| AI/BI Dashboard | `createAsset(assetType="dashboard")` then **AUTO-NAVIGATE** `openAsset(assetType="dashboard", assetId=<uuid>)` + print a clickable link; author widgets on the canvas | `readAssetById(assetType="dashboard", assetId=<uuid>)` → full `.lvdash.json` (UUID=published; treeNodeId=draft+path) | `.lvdash.json` | widget editing requires the canvas page; no remote widget edit |
+
+Native authoring competence: TVFs and Metric Views are FULLY native — use the native `using-metric-views`
+and `writing-sql` skills (more accurate than the workshop `01`/`02`, which are CI/validation references
+only). Genie Spaces need the workshop `04` (JSON schema + `_assert_sql_arrays` validator) — load it.
+Dashboards are authored by navigation, then the extracted `.lvdash.json` feeds the existing
+`deploy_dashboard.py` bundle job for persistence + cross-env redeploy.
 
 ## 7. Verifying a deployed app
 
@@ -371,10 +414,11 @@ The field guide flagged several items `[CONTESTED]`/`[INCOMPLETE]`. The session-
 | Does the Knowledge Assistant API work on Genie Code's SDK 0.67.0? (agents track) | **RESOLVED — REST yes, SDK wrapper no.** `w.knowledge_assistants` absent in 0.67.0; call `/api/2.1/knowledge-assistants` via `w.api_client.do` (no upgrade). [TESTED P22] |
 | Is the full `mlflow.genai` eval stack on the Genie runtime? | **RESOLVED — yes.** mlflow 3.8.1 has scorers, `evaluate`, and `optimize_prompts` (GEPA). [TESTED P23] |
 
-## AppKit hardening ledger (P24–P32)
+## AppKit hardening ledger (P24–P37)
 
-Live Genie-Code probes from the AppKit hardening session (2026-06-03), distilling an ~11-deploy booking-app
-failure into preventable causes. These extend the P1–P23 ledger; the §4 AppKit facts cite these rows.
+Live Genie-Code probes from the AppKit hardening sessions (2026-06-03), distilling an ~11-deploy booking-app
+failure (P24–P32) plus a round-2 deploy of the hardened skills (P33) and the Lakebase fork probes (P34–P37d)
+into preventable causes. These extend the P1–P23 ledger; the §4 AppKit facts cite these rows.
 
 | # | Finding | Result |
 |---|---|---|
@@ -387,6 +431,11 @@ failure into preventable causes. These extend the P1–P23 ledger; the §4 AppKi
 | P30 | No functional npm; local full typecheck impossible | `node` present; `npm`/`npx`/`corepack` dangling symlinks; `tsc` can't resolve appkit-ui/vite without `node_modules`. → grep/regex pre-flight is the only static gate. |
 | P31 | Green deploy ≠ working app | Server boot crash → `FAILED` (visible); client runtime crash → `SUCCEEDED`/`ACTIVE` but blank (invisible) → human render check required; keep `ErrorBoundary`. |
 | P32 | CLI allow-list non-deterministic; agent fabricated page-state | `apps init` blocked once then allowed on the same page type; agent reported an "Apps page" it never navigated to. SDK deploy bypasses the guardrail → reliable. Don't-fabricate-state. |
+| P33 | Round-2 run of the hardened skills — residual static-but-uncaught classes | Import-specifier gate + lockfile rule + human render gate all held. New misses: deploy #1 FAILED on an unused import (`TS6133`/`noUnusedLocals`); a green deploy then crashed at runtime on `<SelectItem value="">` (Radix needs a non-empty value) — the 02-build skill's own gotcha had prescribed `value=""`. Also external Unsplash hotlinks went blank (browser egress) and `\u0027` artifacts appeared from Python-written source. → extend the regex gate (empty value, escaped quote, `\uXXXX` blocking + unused-import review), fix the harmful gotcha, mandate an `onError` data-URI image fallback. |
+| P34 | Dependencies edit `package.json` directly (no local install) | Adding a dependency by editing `package.json` works — the server-side install at deploy reconciles it; the lockfile must stay in place (P29). The Lakebase setup fork edits `package.json` rather than shelling a local install. |
+| P35 | `databricks.yml` resources are inert on the SDK SNAPSHOT path | A `postgres_projects` declared in `databricks.yml` never materializes via the SNAPSHOT deploy (it is the Terraform spine, not applied here) → provision Lakebase over REST (`POST /api/2.0/postgres/projects`) + `PATCH /api/2.0/apps/{name}` to bind, instead of declaring bundle resources. |
+| P36 | `databricks apps validate` is blocked / page-dependent | Not reliably runnable from the agent on Genie Code → substitute a local YAML structural check (parse `app.yaml` + `package.json`, assert `valueFrom: postgres` + `DB_SCHEMA` + the dependency). |
+| P37b/d | Canonical Lakebase wiring boots straight to RUNNING when bound | The supported wiring shape is the `onPluginsReady(appkit)` hook on `createApp` + `appkit.server.extend(...)` — NOT `server({ autoStart: false })` + a manual `AppKit.server.start()` (the listener double-`listen()`s → boot crash; the earlier "autoStart:false broken" read was self-inflicted by omitting/duplicating `start()`). The `lakebase` **plugin** imports from the framework entrypoint (`@databricks/appkit`), not from the driver package (`@databricks/lakebase`). Binding the `postgres` resource BEFORE the first plugin-bearing deploy → RUNNING with no CRASHED hop; an unbound app carrying `valueFrom: postgres` boots CRASHED. |
 
 ## Reference files
 

@@ -33,6 +33,13 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASELINE_FILE = os.path.join(REPO_ROOT, "genie_gate_baseline.json")
 ROOT_LABEL = "(root)"
 
+# Semantic-layer HYBRID forks: native-author + extract-back + bundle-persist. These
+# intentionally SANCTION native executeCode/createAsset for the dev loop, so the bundle-only
+# DEPLOY_FORK_DISCIPLINE assertions ("body of the bundle job" / gate "not sufficient") are
+# reframed for them as the orphan/drift forbidden-list and the 3-part "FAILS the gate"
+# invariant. They get their own richer contract in check_hybrid_fork_discipline().
+HYBRID_SEMANTIC_TAGS = {"genie_space", "aibi_dashboard", "deploy_di_assets"}
+
 sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
 
 
@@ -155,7 +162,7 @@ def _tokens(text: str) -> set[str]:
 
 
 def _gate(text: str) -> str | None:
-    """The backtick-quoted gate name from a `**Gate:** \`...\`` line, if any."""
+    r"""The backtick-quoted gate name from a `**Gate:** \`...\`` line, if any."""
     import re
     m = re.search(r"\*\*Gate:\*\*\s*`([^`]+)`", text or "")
     return m.group(1).strip() if m else None
@@ -269,6 +276,7 @@ def check_deploy_fork_discipline() -> bool:
             continue
         checked += 1
         low = text.lower()
+        is_hybrid = f.get("section_tag") in HYBRID_SEMANTIC_TAGS
         prohibition = (re.search(r"never\b[^\n]*\b(executecode|spark\.sql)", low) is not None
                        or "body of the bundle job" in low
                        or "do not fall back to direct sql" in low)
@@ -276,6 +284,11 @@ def check_deploy_fork_discipline() -> bool:
         mechanism_gate = "not sufficient" in low
         bundle_editor = "bundle editor" in low or "bundle-editor" in low
         escape_hatch = "escape hatch" in low
+        if is_hybrid:
+            # Hybrid forks reframe the bundle-only prohibition + "not sufficient" gate as the
+            # orphan/drift forbidden-list and the 3-part "FAILS the gate" invariant.
+            prohibition = prohibition or ("orphan" in low and "drift" in low)
+            mechanism_gate = mechanism_gate or ("fails the gate" in low and "persisted" in low)
         if not prohibition:
             failures.append(f"{p.name}: missing no-direct-creation prohibition "
                             "(name DDL/CLONE as the bundle job's body; forbid executeCode/spark.sql).")
@@ -299,6 +312,88 @@ def check_deploy_fork_discipline() -> bool:
             print(f"  {f}")
         return False
     print("deploy-fork discipline gate: PASS")
+    return True
+
+
+def check_hybrid_fork_discipline() -> bool:
+    """HYBRID_FORK_DISCIPLINE (Semantic Layer): the semantic-layer hybrid forks
+    (genie_space, aibi_dashboard, deploy_di_assets) author each artifact's definition file
+    FIRST, apply it with native tools for a fast dev loop, extract it back and diff, then
+    keep the Asset Bundle as the version-controlled source of truth + non-dev deploy path.
+    Each must carry the hybrid invariant and the artifact-specific contract terms that keep
+    native authoring from drifting from the bundle:
+      - the 3-part invariant (persisted file + live matches file + reproducible) with the
+        orphan/drift framing,
+      - an extract-back verification step and a non-dev "deploy by bundle alone" rule,
+      - Genie-bearing forks: the `PATCH /data-rooms` anti-pattern, the `serialized_space`
+        contract, the metric-view-under-`data_sources.metric_views` rule, and a non-zero
+        benchmark/instruction assertion (no shell payloads),
+      - Dashboard-bearing forks: the mandatory canvas-navigation terms (openAsset / readAssetById).
+    Static content check; auto-skips if the prompts tree is absent."""
+    sections = os.path.join(REPO_ROOT, "apps_lakebase", "prompts", "sections")
+    print("\n=== hybrid-fork discipline gate ===")
+    if not os.path.isdir(sections):
+        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        return True
+    sys.path.insert(0, os.path.join(REPO_ROOT, "apps_lakebase", "prompts"))
+    try:
+        from sync_markdown_to_seed import parse_markdown
+    except Exception as e:  # pragma: no cover
+        print(f"SKIP — cannot import parse_markdown ({e}).")
+        return True
+    from pathlib import Path
+
+    genie_bearing = {"genie_space", "deploy_di_assets"}
+    dashboard_bearing = {"aibi_dashboard", "deploy_di_assets"}
+
+    failures, checked = [], 0
+    for stem in sorted(HYBRID_SEMANTIC_TAGS):
+        p = Path(sections) / f"99-{stem}.genie-code.md"
+        if not p.exists():
+            failures.append(f"99-{stem}.genie-code.md: expected hybrid fork is missing.")
+            continue
+        try:
+            f = parse_markdown(p)
+        except Exception as e:
+            print(f"  WARN: cannot parse {p.name}: {e}")
+            continue
+        text = (f.get("input_template", "") or "") + "\n" + (f.get("system_prompt", "") or "")
+        low = text.lower()
+        checked += 1
+        # 3-part invariant + drift/orphan framing
+        for term in ("persisted", "reproducible", "drift", "orphan"):
+            if term not in low:
+                failures.append(f"{p.name}: missing hybrid-invariant term '{term}'.")
+        if "live matches file" not in low and "matches file" not in low and "live ≠ file" not in low:
+            failures.append(f"{p.name}: missing the live-matches-file invariant.")
+        # extract-back loop + non-dev deploy-by-bundle-alone
+        if "extract-back" not in low and "extract back" not in low:
+            failures.append(f"{p.name}: missing the extract-back verification step.")
+        if "non-dev" not in low:
+            failures.append(f"{p.name}: missing the non-dev deploy-by-bundle-alone rule.")
+        # Genie-bearing: data-rooms anti-pattern + full serialized_space contract
+        if stem in genie_bearing:
+            if "data-rooms" not in low:
+                failures.append(f"{p.name}: missing the `PATCH /data-rooms` anti-pattern warning.")
+            if "serialized_space" not in low:
+                failures.append(f"{p.name}: missing the `serialized_space` contract term.")
+            if "metric_views" not in low:
+                failures.append(f"{p.name}: missing the metric-view-under-`data_sources.metric_views` rule.")
+            if "benchmark" not in low:
+                failures.append(f"{p.name}: missing the non-zero benchmark assertion (no shell payloads).")
+        # Dashboard-bearing: mandatory canvas navigation/extract terms
+        if stem in dashboard_bearing:
+            if "openasset" not in low and "readassetbyid" not in low:
+                failures.append(f"{p.name}: missing the canvas navigation/extract terms "
+                                "(openAsset / readAssetById).")
+
+    print(f"checked {checked} hybrid fork(s)")
+    if failures:
+        print("FAIL — hybrid-fork discipline violations:")
+        for f in failures:
+            print(f"  {f}")
+        return False
+    print("hybrid-fork discipline gate: PASS")
     return True
 
 
@@ -518,6 +613,8 @@ def main() -> int:
                     help="Skip the FORK_INTENT_PARITY check (M07 genie-code forks).")
     ap.add_argument("--skip-deploy-discipline", action="store_true",
                     help="Skip the DEPLOY_FORK_DISCIPLINE check (M07 genie-code deploy forks).")
+    ap.add_argument("--skip-hybrid-discipline", action="store_true",
+                    help="Skip the HYBRID_FORK_DISCIPLINE check (semantic-layer hybrid forks).")
     ap.add_argument("--skip-lakehouse-discipline", action="store_true",
                     help="Skip the LAKEHOUSE_FORK_DISCIPLINE check (WS5 genie-code lakehouse forks).")
     ap.add_argument("--skip-state-discipline", action="store_true",
@@ -539,6 +636,8 @@ def main() -> int:
         ok = check_fork_parity() and ok
     if not args.skip_deploy_discipline:
         ok = check_deploy_fork_discipline() and ok
+    if not args.skip_hybrid_discipline:
+        ok = check_hybrid_fork_discipline() and ok
     if not args.skip_lakehouse_discipline:
         ok = check_lakehouse_fork_discipline() and ok
     if not args.skip_state_discipline:
