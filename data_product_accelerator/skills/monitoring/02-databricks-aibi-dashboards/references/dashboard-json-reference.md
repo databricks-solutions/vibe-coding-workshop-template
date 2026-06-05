@@ -91,7 +91,7 @@ FROM ${catalog}.${feature_schema}.budget_forecaster_predictions
 **❌ NEVER Hardcode Schemas:**
 ```sql
 -- WRONG
-FROM prashanth_catalog.gold.fact_usage
+FROM jane_catalog.gold.fact_usage
 
 -- CORRECT
 FROM ${catalog}.${gold_schema}.fact_usage

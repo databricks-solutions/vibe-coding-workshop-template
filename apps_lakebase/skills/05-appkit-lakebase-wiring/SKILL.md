@@ -72,7 +72,7 @@ Design a database schema from a PRD, build Express API routes with mock fallback
 1. The Lakebase plugin is registered in `server/server.ts` (via `04-appkit-plugin-add`)
 2. Bundle resources (`postgres_project`/`postgres_branch`/`postgres_endpoint`) are declared in `databricks.yml`
 3. `app.yaml` has `LAKEBASE_ENDPOINT` with `valueFrom: postgres` and `DB_SCHEMA` as a static env var
-4. `DB_SCHEMA` is set to a user-scoped name derived from `$APP_NAME` (hyphens → underscores, e.g., `prashanth_s_booking_app`)
+4. `DB_SCHEMA` is set to a user-scoped name derived from `$APP_NAME` (hyphens → underscores, e.g., `jane_d_booking_app`)
 5. `npm run build` passes with the Lakebase plugin imported
 
 **Upstream docs (always check for latest):**

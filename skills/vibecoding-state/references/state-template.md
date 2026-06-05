@@ -87,10 +87,10 @@ genie_code via `readSkillFile` (`<skill_ref_root>/data_product_accelerator/skill
 ide_cli (paths/@-mentions resolve from the workspace root). See `skills/genie-code-environment` §8.
 `dp_bundle_root` is the write-side anchor for the data-product pipeline: a SELF-CONTAINED Databricks Asset
 Bundle project directory `<artifact_root>/{user_schema_prefix}_<use_case_slug>_dab` (e.g.
-`…/vibe-coding-workshop/prashanth_s_booking_app_dab`) shared by every DP stage (bronze→silver→gold→semantic).
+`…/vibe-coding-workshop/jane_d_booking_app_dab`) shared by every DP stage (bronze→silver→gold→semantic).
 The `{user_schema_prefix}_` prefix is the SAME username-derived prefix used for the `{user_schema_prefix}_bronze`
 / `_silver` / `_gold` schemas (companion app supplies it on genie_code; on ide_cli it derives from the
-authenticated user, e.g. `prashanth_s`); prefixing the folder disambiguates concurrent users in a shared
+authenticated user, e.g. `jane_d`); prefixing the folder disambiguates concurrent users in a shared
 workspace. The bundle `name:` inside `databricks.yml` MUST match this folder name
 (`bundle: { name: {user_schema_prefix}_<use_case_slug>_dab }`) for the same reason. Generated `databricks.yml` /
 `src/` / `resources/` live UNDER it — never at the bare clone root (mixing generated artifacts into the framework
@@ -99,7 +99,7 @@ On genie_code it is also the **`bundle deploy` page-context root** (be on this f
 derived once `use_case_slug` is known (bootstrap), so `resolve_root` (pre-bootstrap) does not produce it.
 `app_root` is the write-side anchor for the AppKit application track (Pathways A/B/C) — the exact analog of
 `dp_bundle_root`: a SELF-CONTAINED app project directory `<artifact_root>/<app_name>` (e.g.
-`…/vibe-coding-workshop/prashanth-s-booking`), a TOP-LEVEL sibling of `{user_schema_prefix}_<use_case_slug>_dab` — NOT nested under
+`…/vibe-coding-workshop/jane-d-booking`), a TOP-LEVEL sibling of `{user_schema_prefix}_<use_case_slug>_dab` — NOT nested under
 `apps_lakebase/` and NOT the bare clone root. The scaffolded app (`app.yaml`, `databricks.yml`, `server/`,
 `client/`, and `<app_root>/.vibecoding-state.md`) lives UNDER it on BOTH clients, so the app's root folder has
 parity regardless of coding agent. On genie_code it is the `apps init --output-dir` target. It is derived once
@@ -190,7 +190,7 @@ Legend: `req` = required, `opt` = optional, `—` = skip.
 
 - **APP_NAME:** `<pending>`  <!-- Pathways A/B/C; for D this is `n/a` -->
 - **AGENT_NAME:** `<pending>` <!-- Pathways C/D; for A/B this is `n/a` -->
-- **PROFILE:** `<pending>`  <!-- AUTHORITATIVE key — Databricks CLI profile, e.g. fevm-prashanth-pat. Do not also use `workspace_profile`. -->
+- **PROFILE:** `<pending>`  <!-- AUTHORITATIVE key — Databricks CLI profile, e.g. fevm-jane-doe-pat. Do not also use `workspace_profile`. -->
 - **Workspace URL:** `<pending>`
 - **Workspace host:** `<pending>`
 - **User email:** `<pending>`

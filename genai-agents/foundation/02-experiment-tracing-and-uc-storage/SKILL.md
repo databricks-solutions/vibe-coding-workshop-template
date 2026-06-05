@@ -83,7 +83,7 @@ For the full **20+ supported autolog integrations** (LLM SDKs, orchestrators, ag
 
 ### CRITICAL: consume the experiment path from state — do not invent one
 
-The workshop pins MLflow experiment paths to the **same user-and-use-case identity** that backs `APP_NAME` (e.g. `prashanth-s-stayfinder`) so concurrent attendees on a shared workspace cannot collide on a single experiment, and so the leaf in the MLflow UI is never a generic word like `Tracing`, `traces`, `Default`, or `my-agent`.
+The workshop pins MLflow experiment paths to the **same user-and-use-case identity** that backs `APP_NAME` (e.g. `jane-d-stayfinder`) so concurrent attendees on a shared workspace cannot collide on a single experiment, and so the leaf in the MLflow UI is never a generic word like `Tracing`, `traces`, `Default`, or `my-agent`.
 
 The canonical derivation lives in [`vibecoding-state` `migrate_canonical`](../../vibecoding-state/SKILL.md#operation-migrate_canonical) and is captured in state at the prompt that first resolves `$APP_NAME` / `$AGENT_NAME`:
 
@@ -102,7 +102,7 @@ If your project does not use the `vibecoding-state` skill, define a template tha
 EXPERIMENT_PATH_TEMPLATE = "/Users/{{ user_email }}/mlflow/{{ app_name }}-{{ stage }}"
 ```
 
-Where `app_name` is the user-prefixed, use-case-suffixed identity (e.g. `prashanth-s-stayfinder`) and `stage` ∈ {`agent`, `eval`, `feedback`, `deploy`}.
+Where `app_name` is the user-prefixed, use-case-suffixed identity (e.g. `jane-d-stayfinder`) and `stage` ∈ {`agent`, `eval`, `feedback`, `deploy`}.
 
 ### Three-experiment lifecycle pattern
 
@@ -115,7 +115,7 @@ For multi-stage pipelines, use **separate experiments** (one leaf per stage unde
 | **feedback** | `<app_name>-feedback` | End-user thumbs / human assessments persisted from the AppKit feedback skill |
 | **deploy** | `<app_name>-deploy` | Production or promotion runs, stricter tags and retention |
 
-The leaf must always carry `<app_name>` so that browsing MLflow experiments lists `prashanth-s-stayfinder-agent`, `prashanth-s-stayfinder-eval`, etc. — never a bare `agent` / `eval` / `Tracing`.
+The leaf must always carry `<app_name>` so that browsing MLflow experiments lists `jane-d-stayfinder-agent`, `jane-d-stayfinder-eval`, etc. — never a bare `agent` / `eval` / `Tracing`.
 
 ### Setting the experiment
 

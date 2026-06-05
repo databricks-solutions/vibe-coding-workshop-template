@@ -9,8 +9,8 @@ Usage:
 
 Example:
     python scripts/validate_schema.py \
-      prashanth_subrahmanyam_catalog \
-      dev_prashanth_subrahmanyam_system_gold
+      jane_doe_catalog \
+      dev_jane_doe_system_gold
 """
 
 import sys

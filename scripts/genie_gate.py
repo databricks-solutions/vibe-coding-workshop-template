@@ -622,7 +622,7 @@ def main() -> int:
     ap.add_argument("--bundle", action="store_true",
                     help="Also run `databricks bundle validate --target dev`.")
     ap.add_argument("--profile", default=None,
-                    help="Databricks CLI profile for --bundle (e.g. fevm-prashanth).")
+                    help="Databricks CLI profile for --bundle (e.g. fevm-jane-doe).")
     args = ap.parse_args()
 
     if args.update_baseline:

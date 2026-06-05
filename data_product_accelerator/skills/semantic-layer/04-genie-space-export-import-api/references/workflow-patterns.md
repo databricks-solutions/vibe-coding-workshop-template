@@ -672,7 +672,7 @@ api_body = json.dumps(payload)
 {
   "data_sources": {
     "tables": [
-      {"identifier": "prashanth_subrahmanyam_catalog.dev_prashanth_subrahmanyam_system_gold.dim_workspace"}
+      {"identifier": "jane_doe_catalog.dev_jane_doe_system_gold.dim_workspace"}
     ]
   }
 }
@@ -701,16 +701,16 @@ api_body = json.dumps(payload)
 variables:
   catalog:
     description: Unity Catalog name
-    default: prashanth_subrahmanyam_catalog
+    default: jane_doe_catalog
   gold_schema:
     description: Gold layer schema
-    default: dev_prashanth_subrahmanyam_system_gold
+    default: dev_jane_doe_system_gold
 
 targets:
   dev:
     variables:
-      catalog: prashanth_subrahmanyam_catalog
-      gold_schema: dev_prashanth_subrahmanyam_system_gold
+      catalog: jane_doe_catalog
+      gold_schema: dev_jane_doe_system_gold
   prod:
     variables:
       catalog: production_catalog
@@ -759,11 +759,11 @@ def substitute_variables(data: dict, variables: dict) -> dict:
 {
   "metadata": {
     "generated_at": "2026-01-14T12:00:00Z",
-    "catalog": "prashanth_subrahmanyam_catalog",
+    "catalog": "jane_doe_catalog",
     "schemas_queried": [
-      "dev_prashanth_subrahmanyam_system_gold",
-      "dev_prashanth_subrahmanyam_system_gold_ml",
-      "dev_prashanth_subrahmanyam_system_gold_monitoring"
+      "dev_jane_doe_system_gold",
+      "dev_jane_doe_system_gold_ml",
+      "dev_jane_doe_system_gold_monitoring"
     ]
   },
   "system_gold": {

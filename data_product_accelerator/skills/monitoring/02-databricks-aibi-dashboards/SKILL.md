@@ -1705,7 +1705,7 @@ FROM ${catalog}.${gold_schema}.fact_usage
 FROM ${catalog}.${gold_schema}_monitoring.fact_usage_profile_metrics
 
 -- ❌ WRONG
-FROM prashanth_catalog.gold.fact_usage
+FROM jane_catalog.gold.fact_usage
 ```
 
 **Substitution in Python:**

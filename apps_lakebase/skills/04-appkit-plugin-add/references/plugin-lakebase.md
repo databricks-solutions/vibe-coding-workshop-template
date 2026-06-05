@@ -198,7 +198,7 @@ This requires a pre-existing Lakebase project (created via CLI or UI) and manual
 
 ### 5. Using the Pool
 
-Use a schema name scoped to the user or app (e.g., `prashanth_s_booking_app`) to avoid collisions when multiple apps share a database. Avoid generic names like `app` or `public`. Pass the schema as a `DB_SCHEMA` environment variable.
+Use a schema name scoped to the user or app (e.g., `jane_d_booking_app`) to avoid collisions when multiple apps share a database. Avoid generic names like `app` or `public`. Pass the schema as a `DB_SCHEMA` environment variable.
 
 ```typescript
 const AppKit = await createApp({

@@ -83,8 +83,8 @@ Example:
 
 ```markdown
 ## Scaffold, Build & Test
-- APP_NAME: prashanth-s-stayfinder
-- Workspace: https://fevm-prashanth-subrahmanyam.cloud.databricks.com
+- APP_NAME: jane-d-stayfinder
+- Workspace: https://fevm-jane-doe.cloud.databricks.com
 - Note: Typegen TABLE_OR_VIEW_NOT_FOUND errors are expected (no live tables in this step)
 ```
 
@@ -1514,7 +1514,7 @@ CREATE EXTENSION IF NOT EXISTS databricks_auth;
 DO $$
 DECLARE
   subject TEXT := '<YOUR_EMAIL>';     -- Your Databricks email (e.g. name@company.com)
-  schema TEXT := '<DB_SCHEMA>';       -- From the Wire Lakebase Backend step, Step A0 (e.g. 'prashanth_s_booking_app')
+  schema TEXT := '<DB_SCHEMA>';       -- From the Wire Lakebase Backend step, Step A0 (e.g. 'jane_d_booking_app')
 BEGIN
   PERFORM databricks_create_role(subject, 'USER');
   EXECUTE format('GRANT CONNECT ON DATABASE "databricks_postgres" TO %I', subject);

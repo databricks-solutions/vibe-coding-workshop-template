@@ -14,8 +14,8 @@ Usage:
     python restore-genie-space.py \
         --space-id 01f13ae0d34b1941bf0c1bd2128dcbd6 \
         --config-path src/.../genie_configs/travel_stays_intelligence.json \
-        --catalog prashanth_subrahmanyam_catalog \
-        --gold-schema prashanth_s_booking_app_gold \
+        --catalog jane_doe_catalog \
+        --gold-schema jane_d_booking_app_gold \
         --warehouse-id 3b1be27d7a807e80 \
         --profile DEFAULT
 
