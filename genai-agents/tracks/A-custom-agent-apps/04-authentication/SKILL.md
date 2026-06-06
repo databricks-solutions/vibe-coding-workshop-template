@@ -12,7 +12,7 @@ deploy_verb: none
 deploy_note: "Agent permissions / OBO / resource grants — config + grants, no bundle resource. Same model on both clients; on Genie Code run grant CLI steps through runDatabricksCli (pre-authenticated). See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"
@@ -286,8 +286,9 @@ For complete OBO authentication patterns (environment detection, error handling,
 
   ```python
   ws = get_user_workspace_client(http_request)
-  vector_search_mcp = MCPServerSse(
-      url=f"https://{ws.config.host}/api/2.0/mcp/vector-search/prod/docs/idx",
+  ai_search_mcp = MCPServerSse(
+      # AI Search (formerly Vector Search); legacy /mcp/vector-search/ prefix still works
+      url=f"https://{ws.config.host}/api/2.0/mcp/ai-search/prod/docs/idx",
       headers={"Authorization": f"Bearer {ws.config.token}"},
   )
   ```

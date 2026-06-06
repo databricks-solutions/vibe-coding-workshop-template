@@ -14,7 +14,7 @@ deploy_verb: none
 deploy_note: "Agent logged to MLflow and registered in UC (with champion alias) via the MLflow SDK; the UC model lands under the per-user prefixed catalog/schema. No bundle resource. Identical on both clients; on Genie Code run any CLI step through runDatabricksCli. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"

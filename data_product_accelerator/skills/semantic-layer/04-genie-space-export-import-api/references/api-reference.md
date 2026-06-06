@@ -108,7 +108,8 @@ Content-Type: application/json
   "description": "Updated description",
   "warehouse_id": "abc123def456",
   "parent_path": "/Workspace/Users/user@company.com/Genie Spaces",
-  "serialized_space": "{...updated JSON string...}"
+  "serialized_space": "{...updated JSON string...}",
+  "etag": "<etag-from-prior-GET>"
 }
 ```
 
@@ -127,6 +128,9 @@ Content-Type: application/json
 - **PATCH is partial update** - Only include fields you want to change
 - **`serialized_space`** - If provided, completely replaces the space configuration
 - **`parent_path`** - Optional, allows moving the space to a different folder
+- **`etag`** - Optional optimistic-concurrency token returned by GET. When supplied, the PATCH returns
+  `409 Conflict` if the space changed since that GET, so you never blindly overwrite a concurrent edit.
+  Re-GET to obtain the new `etag` and retry. Omit for last-writer-wins.
 - **All fields optional** - Update title only, config only, or any combination
 
 **Use Case:** Incremental updates, configuration changes, adding benchmarks

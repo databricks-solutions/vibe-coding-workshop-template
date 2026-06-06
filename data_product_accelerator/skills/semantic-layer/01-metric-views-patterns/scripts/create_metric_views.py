@@ -203,23 +203,42 @@ def load_metric_views_multi_file(yaml_file, catalog, schema):
     return metric_views
 
 
+def _existing_view_type(spark, fully_qualified_name):
+    """Return the object's Type (e.g. 'METRIC_VIEW') if it exists, else None."""
+    try:
+        rows = spark.sql(f"DESCRIBE EXTENDED {fully_qualified_name}").collect()
+    except Exception:
+        return None
+    return next((r.data_type for r in rows if r.col_name == "Type"), None)
+
+
 def create_metric_view(spark, catalog, schema, view_name, metric_view):
     """
-    Create a single metric view using WITH METRICS LANGUAGE YAML syntax.
+    Create or update a single metric view using WITH METRICS LANGUAGE YAML syntax.
+
+    Grant-preserving update: if the target already exists as a METRIC_VIEW, the
+    definition is updated with ALTER VIEW, which preserves Unity Catalog grants
+    and cascading metadata. Drop+create is only used when the object is absent
+    or is a non-metric VIEW/TABLE that must be replaced.
 
     Critical: The 'name' field must NOT be in metric_view dict.
     It causes 'Unrecognized field "name"' error in Databricks v1.1.
     """
     fully_qualified_name = f"{catalog}.{schema}.{view_name}"
 
-    print(f"\nCreating metric view: {fully_qualified_name}")
+    print(f"\nDeploying metric view: {fully_qualified_name}")
 
-    # Drop existing table/view (might conflict with metric view)
-    try:
-        spark.sql(f"DROP VIEW IF EXISTS {fully_qualified_name}")
-        spark.sql(f"DROP TABLE IF EXISTS {fully_qualified_name}")
-    except Exception:
-        pass
+    # Decide ALTER (grant-preserving) vs drop+create based on the existing object.
+    existing_type = _existing_view_type(spark, fully_qualified_name)
+    use_alter = existing_type == "METRIC_VIEW"
+
+    if not use_alter:
+        # Drop conflicting non-metric objects so CREATE can succeed.
+        try:
+            spark.sql(f"DROP VIEW IF EXISTS {fully_qualified_name}")
+            spark.sql(f"DROP TABLE IF EXISTS {fully_qualified_name}")
+        except Exception:
+            pass
 
     # Safety: ensure no 'name' field in YAML content
     metric_view_clean = dict(metric_view)
@@ -237,8 +256,17 @@ def create_metric_view(spark, catalog, schema, view_name, metric_view):
     else:
         view_comment_escaped = str(view_comment).replace("'", "''").strip()
 
-    # ✅ CORRECT: WITH METRICS LANGUAGE YAML syntax
-    create_sql = f"""
+    # ✅ CORRECT: WITH METRICS LANGUAGE YAML syntax.
+    # ALTER preserves grants when the metric view already exists; CREATE otherwise.
+    if use_alter:
+        deploy_sql = f"""
+    ALTER VIEW {fully_qualified_name}
+    AS $$
+{yaml_str}
+    $$
+    """
+    else:
+        deploy_sql = f"""
     CREATE VIEW {fully_qualified_name}
     WITH METRICS
     LANGUAGE YAML
@@ -249,8 +277,9 @@ def create_metric_view(spark, catalog, schema, view_name, metric_view):
     """
 
     try:
-        spark.sql(create_sql)
-        print(f"  ✓ Created metric view: {view_name}")
+        spark.sql(deploy_sql)
+        action = "Updated (ALTER, grants preserved)" if use_alter else "Created"
+        print(f"  ✓ {action} metric view: {view_name}")
 
         # Verify it's a METRIC_VIEW (not just VIEW)
         result = spark.sql(

@@ -32,10 +32,14 @@ from mcp.client.session import ClientSession
 
 | MCP Server | URL Pattern | OAuth Scope |
 |---|---|---|
-| Vector Search | `{host}/api/2.0/mcp/vector-search/{catalog}/{schema}/{index_name}` | `vector-search` |
+| AI Search (formerly Vector Search) | `{host}/api/2.0/mcp/ai-search/{catalog}/{schema}/{index_name}` | `ai-search` |
 | Genie Space | `{host}/api/2.0/mcp/genie/{genie_space_id}` | `genie` |
+| Genie (cross-space) | `{host}/api/2.0/mcp/genie` | `genie` |
 | Databricks SQL | `{host}/api/2.0/mcp/sql` | `sql` |
 | UC Functions | `{host}/api/2.0/mcp/functions/{catalog}/{schema}/{function_name}` | `unity-catalog` |
+
+> The legacy `/api/2.0/mcp/vector-search/...` prefix and `vector-search` scope
+> remain valid for backward compatibility; `ai-search` is the current name.
 
 When using on-behalf-of user authentication, include the corresponding OAuth
 scope for each server your application needs. See
@@ -51,7 +55,7 @@ Databricks managed embeddings.
 ### Connect with `DatabricksMCPClient`
 
 ```python
-vs_url = f"{host}/api/2.0/mcp/vector-search/prod/docs/knowledge_index"
+vs_url = f"{host}/api/2.0/mcp/ai-search/prod/docs/knowledge_index"
 
 mcp_client = DatabricksMCPClient(
     server_url=vs_url,
@@ -76,8 +80,8 @@ underscores replacing dots.
 ```python
 from agents.mcp import MCPServerSse
 
-vector_search_mcp = MCPServerSse(
-    url=f"https://{host}/api/2.0/mcp/vector-search/prod/docs/knowledge_index",
+ai_search_mcp = MCPServerSse(
+    url=f"https://{host}/api/2.0/mcp/ai-search/prod/docs/knowledge_index",
     headers={"Authorization": f"Bearer {workspace_client.config.token}"},
 )
 ```
@@ -314,7 +318,7 @@ ws = WorkspaceClient()
 host = ws.config.host
 
 MANAGED_MCP_SERVER_URLS = [
-    f"{host}/api/2.0/mcp/vector-search/prod/docs/knowledge_index",
+    f"{host}/api/2.0/mcp/ai-search/prod/docs/knowledge_index",
     f"{host}/api/2.0/mcp/genie/{billing_space_id}",
     f"{host}/api/2.0/mcp/functions/prod/analytics/enrich_customer",
     f"{host}/api/2.0/mcp/sql",

@@ -16,7 +16,7 @@ metadata:
   called_by:
     - semantic-layer-setup
   standalone: true
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-06"
   volatility: high
   upstream_sources:
     - name: "ai-dev-kit"
@@ -29,31 +29,31 @@ metadata:
     - name: "databricks-docs-overview"
       url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
     - name: "databricks-docs-yaml-reference"
       url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/yaml-reference"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
     - name: "databricks-docs-basic-modeling"
       url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/basic-modeling"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
     - name: "databricks-docs-advanced-techniques"
       url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/advanced-techniques"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
     - name: "databricks-docs-create-sql"
       url: "https://docs.databricks.com/aws/en/metric-views/create/sql"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
     - name: "databricks-docs-manage"
       url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/manage"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
     - name: "databricks-docs-agent-metadata"
       url: "https://docs.databricks.com/aws/en/business-semantics/agent-metadata"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
 ---
 
 > **End-to-end semantic layer?** If you are creating Metric Views as part of a larger deployment that also includes TVFs and Genie Spaces, read `semantic-layer/00-semantic-layer-setup/SKILL.md` first — it orchestrates this skill with the others and mandates Gold schema validation before artifact creation.
@@ -149,6 +149,19 @@ $$
 
 **❌ WRONG:** Regular view with TBLPROPERTIES (creates regular VIEW, not METRIC_VIEW)
 
+### ⚠️ Modifying: prefer `ALTER VIEW` over `CREATE OR REPLACE`
+
+When **updating** an existing metric view, prefer `ALTER VIEW` — it preserves the view's Unity Catalog permissions (grants) and cascading metadata:
+
+```sql
+ALTER VIEW ${catalog}.${gold_schema}.<view_name>
+AS $$
+{updated_yaml}
+$$
+```
+
+`CREATE OR REPLACE` (and the drop+create the deploy script uses by default) **deletes the view and therefore its grants and cascading metadata**. Only use replace/drop+create when a CI/CD step re-applies permissions on every deploy (e.g. via the `grant` action). For incremental edits to a live, governed view, always `ALTER`.
+
 ### ⚠️ CRITICAL: v1.1 Unsupported Fields
 
 **These fields will cause errors and MUST NOT be used:**
@@ -157,7 +170,7 @@ $$
 |-------|-------|--------|
 | `name` | `Unrecognized field "name"` | ❌ NEVER include — name is in CREATE VIEW statement |
 | `time_dimension` | `Unrecognized field "time_dimension"` | ❌ Remove entirely |
-| `window_measures` | `Unrecognized field "window_measures"` | ❌ Remove top-level `window_measures:` array. Individual measure `window:` property is Experimental (v0.1 only, DBR 16.4-17.1). See `references/composability-patterns.md` for details. |
+| `window_measures` | `Unrecognized field "window_measures"` | ❌ Remove the top-level `window_measures:` array. The per-measure `window:` property IS supported in v1.1 (Experimental status; `offset` requires DBR 18.1+). See `references/composability-patterns.md`. |
 | `join_type` | Unsupported | ❌ Remove — defaults to LEFT OUTER JOIN |
 | `table` (in joins) | `Missing required creator property 'source'` | ✅ Use `source` instead |
 
@@ -215,7 +228,8 @@ This fails at plan-time with `UNRESOLVED_COLUMN` because `dim_property` is not v
 
 If `dim_property` already has `destination_name` and `destination_country`, reference them directly — no second join needed:
 ```yaml
-dimensions:
+# `fields:` is an alias for `dimensions:` introduced in DBR 18.1+; preserve whichever key the YAML already uses.
+fields:
   - name: destination_name
     expr: dim_property.destination_name  # ✅ Already in dim_property
   - name: destination_country
@@ -331,7 +345,7 @@ joins:
         WHERE p.is_current = true
       )
     'on': source.property_key = dim_property_enriched.property_key
-dimensions:
+fields:
   - name: property_name
     expr: dim_property_enriched.property_name
   - name: destination_name
@@ -446,8 +460,15 @@ joins:
   - name: <dim_table_alias>
     source: ${catalog}.${gold_schema}.<dim_table>
     'on': source.<fk> = <dim_table_alias>.<pk> AND <dim_table_alias>.is_current = true
+    rely:
+      at_most_one_match: true   # Optional. Many-to-one joins only — declares the join does not fan out, so the
+                                # analyzer plans more efficiently. NOT validated at runtime: if it fans out,
+                                # SUM/COUNT measures return wrong results. Omit if unsure.
 
-dimensions:
+# `fields:` is an alias for `dimensions:` (DBR 18.1+); preserve whichever key the YAML already uses.
+# A metric view is valid with only dimensions, only measures, or both — measures are NOT mandatory.
+# NOTE: the `materialization` block below still requires the `dimensions:` keyword.
+fields:
   - name: <dimension_name>
     expr: source.<column>
     comment: <Business description>
@@ -487,13 +508,33 @@ measures:
 - **Joined table columns:** Use join `name` as prefix (e.g., `dim_store.column_name`)
 - **Never reference table names directly:** Use `source.` or `{join_name}.`
 
+### Join Semantics
+
+- Metric view joins use **LEFT OUTER JOIN** semantics by default — `source` (the fact) is the left side, joined dimension tables are the right side.
+- Joins are **many-to-one by design**. If a join is actually many-to-many, the engine selects the **first matching row** from the dimension — silently wrong for aggregations. Keep joins many-to-one.
+- The engine only joins tables **needed for the query** (based on the selected dimensions/measures), so unused joins add no cost.
+- The optional `rely.at_most_one_match: true` hint lets the analyzer optimize filter pushdown for genuine many-to-one joins. It is **NOT validated at runtime** — if the join fans out, SUM/COUNT inflate. Verify cardinality before setting it (below).
+
+**Cardinality verification (gate for `rely.at_most_one_match: true` and any join):**
+
+```sql
+-- The join key MUST be unique in the dimension table (0 rows = safe many-to-one).
+SELECT <join_key>, COUNT(*) AS c
+FROM ${catalog}.${gold_schema}.<dim_table>
+WHERE is_current = true            -- include for SCD2 dimensions
+GROUP BY <join_key>
+HAVING c > 1;                       -- must return 0 rows
+```
+
+If this returns rows, the join can fan out: do not set `at_most_one_match`, filter to `is_current`, or pre-aggregate the dimension. A quick `COUNT(*)` before/after adding a join is the fastest fan-out smoke test — if the row count changes, you have a fan-out.
+
 ### Join Requirements
 
 - Each join **MUST have** `name`, `source`, and either `'on'` or `using`
-- `ON` clause: boolean expression using `source.` for main table, join name for joined table (quote the key: `'on'`)
-- `USING` clause: array of column names shared between source and join table
+- `ON` clause: boolean expression using `source.` for main table, join name for joined table (quote the key: `'on'`). If a reference in an `on` clause has no prefix, it defaults to the joined table.
+- `USING` clause: array of column names — use only when both tables share **identical** column names; use `on` for all other cases
 - Each first-level join must reference `source` (NOT another join alias — that's transitive)
-- For transitive relationships, use nested `joins:` (snowflake schema, DBR 17.1+) or denormalized columns
+- For transitive relationships, use nested `joins:` (snowflake schema, DBR 17.1+) or denormalized columns; reference nested columns as `parent_join.child_join.column`
 - SCD2 joins must include `AND {dim_table}.is_current = true`
 - **MAP type columns are NOT supported** in joined tables
 
@@ -525,7 +566,32 @@ measures:
 
 **Best practices:** Define atomic measures (SUM, COUNT, AVG) first; always use `MEASURE()` to reference other measures (never repeat the aggregation logic).
 
-See `references/composability-patterns.md` for full guide including conditional logic, window measures (Experimental), and complete examples.
+See `references/composability-patterns.md` for full guide including conditional logic, window measures (Experimental, supported in v1.1), and complete examples.
+
+### Level of Detail (Percent-of-Total, Cohorts, Peer Averages)
+
+Some metrics need an aggregate at a **different grain** than the query `GROUP BY` — percent-of-total, percent-of-category, cohort assignment, peer-average comparisons. A plain measure cannot do this because it always resolves at the query grain. Use a **Fixed LOD** (a dimension with `OVER (PARTITION BY ...)`, read with `ANY_VALUE()`) or an **Exclude LOD** (a window measure with `range: all`).
+
+> ⚠️ **Do NOT compute percent-of-total with `MEASURE() / MEASURE()`** — both sides resolve at the query grain, so the ratio is always `1.0`. Use a Fixed LOD + `ANY_VALUE()`:
+
+```yaml
+# ❌ WRONG — always 1.0 (both operands at the query GROUP BY level)
+- name: pct_wrong
+  expr: MEASURE(`revenue`) / MEASURE(`total_revenue`)
+
+# ✅ RIGHT — Fixed LOD dimension (global) + ANY_VALUE() in the measure
+fields:
+  - name: global_revenue
+    expr: SUM(source.net_revenue) OVER ()      # ignores query GROUP BY
+measures:
+  - name: revenue
+    expr: SUM(source.net_revenue)
+  - name: pct_of_total
+    expr: MEASURE(`revenue`) / ANY_VALUE(`global_revenue`)
+    format: { type: percentage, decimal_places: { type: exact, places: 1 } }
+```
+
+See `references/level-of-detail.md` for Fixed vs Exclude LOD, percent-of-category, cohort analysis, and constraints.
 
 ### Standardized Comment Format (v3.0)
 
@@ -578,7 +644,9 @@ See `scripts/create_metric_views.py` for the full working script and `references
 
 - **`references/yaml-reference.md`** — Complete YAML fields, syntax, format options
 - **`references/advanced-patterns.md`** — Dimension/measure patterns, joins, snowflake schema, worked examples
-- **`references/composability-patterns.md`** — MEASURE() function, FILTER clause, window measures (Experimental)
+- **`references/composability-patterns.md`** — MEASURE() function, FILTER clause, window measures (Experimental, v1.1)
+- **`references/level-of-detail.md`** — Fixed/Exclude LOD: percent-of-total, percent-of-category, cohort, peer-average
+- **`references/querying-metric-views.md`** — Query syntax: GROUP BY ALL, MEASURE(), HAVING-on-alias, Top-K, casting, agg()
 - **`references/validation-checklist.md`** — Pre-creation validation steps
 - **`references/requirements-template.md`** — Design template for dimensions, measures, joins
 - **`references/implementation-workflow.md`** — Step-by-step creation workflow
@@ -619,9 +687,13 @@ Requires serverless compute enabled. Currently experimental — use for high-que
 | `SELECT *` not supported | Must explicitly list dimensions and use `MEASURE()` for measures |
 | "Cannot resolve column" | Dimension/measure names with spaces need backtick quoting |
 | JOIN at query time fails | Joins must be in the YAML definition, not in the SELECT query |
-| `MEASURE()` required | All measure references must be wrapped: `MEASURE(\`name\`)` |
+| `MEASURE()` required | All measure references must be wrapped: `MEASURE(\`name\`)` (or `agg()` on DBR 18.1+) |
+| `HAVING` on a measure fails | Filter on the measure **alias**, not the `MEASURE()` expression |
+| Redeploy dropped UC grants | `CREATE OR REPLACE`/drop+create deletes permissions — use `ALTER VIEW` to preserve them (see Critical Rules) |
 | DBR version error | Compute must be on DBR 17.3+ to create or edit metric views (current docs requirement); YAML v1.1 features need 17.2+; legacy v0.1 needs 16.4+ |
 | Materialization not working | Requires serverless compute enabled; currently experimental |
+
+See `references/querying-metric-views.md` for the full query syntax guide (`GROUP BY ALL`, HAVING-on-alias, Top-K, casting, `agg()`).
 
 ## External References
 
@@ -643,6 +715,7 @@ Requires serverless compute enabled. Currently experimental — use for high-que
 
 ## Version History
 
+- **v5.2** (Jun 6, 2026) — Reconciled against the authoritative Databricks `using-metric-views` skill. Corrected window measures: they are supported in **v1.1** (Experimental), not "v0.1 only" — added `inclusive`/`exclusive` anchor modifiers and MTD example. Added `references/level-of-detail.md` (Fixed/Exclude LOD, percent-of-total via `ANY_VALUE()`, cohort) and `references/querying-metric-views.md` (`GROUP BY ALL`, HAVING-on-alias, Top-K, casting, `agg()` alias). Added join semantics (LEFT OUTER, many-to-one, first-matching-row), cardinality-verification query, and `ALTER VIEW` vs `CREATE OR REPLACE` governance (grant-preserving ALTER path in `create_metric_views.py`). Clarified `fields` is a DBR 18.1+ alias for `dimensions` and that measures are optional.
 - **v5.1** (Apr 27, 2026) — Refreshed prerequisites and Common Issues for the current docs requirement (DBR 17.3+ for `CAN USE` on metric view creation/edit). Migrated External Documentation links and `upstream_sources` URLs to the current `/business-semantics/metric-views/...` paths (overview, yaml-reference, basic-modeling, advanced-techniques, manage, agent-metadata).
 - **v5.0** (Feb 2026) — Expanded transitive joins with inline fixes; exhaustive format type table (6 types); composability (MEASURE function) patterns; FILTER clause; USING join clause; filter top-level field; window measures clarification (Experimental v0.1); materialization expansion; progressive disclosure restructure (Notes to Carry Forward + Next Step); 7 upstream_sources from official docs; new composability-patterns.md reference
 - **v4.0** (Feb 2026) — Merged prompt content: Quick Start, implementation workflow, requirements template, creation script, validation queries, worked examples, common mistakes with paired examples

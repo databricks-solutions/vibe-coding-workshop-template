@@ -103,16 +103,25 @@ This is equivalent to adding `WHERE order_date > DATE'2020-01-01'` to every quer
 
 ---
 
-## Window Measures (Experimental, v0.1 Only)
+## Window Measures (Experimental — supported in v1.1)
 
-Window measures enable windowed, cumulative, or semiadditive aggregations. **This feature is Experimental and requires YAML version 0.1 (DBR 16.4-17.1). It is NOT available in v1.1.**
+Window measures enable windowed, cumulative, or semiadditive aggregations (moving averages, period-over-period changes, running totals). The feature carries **Experimental** status but is **supported in `version: 1.1`** — use `version: "1.1"` in your YAML; you do NOT need to fall back to the legacy v0.1.
 
-If you are using v1.1 (which this skill targets), calculate windowed aggregations in SQL/Python outside the metric view. The information below is provided for reference if you need v0.1 capabilities.
+> The unsupported field is the top-level `window_measures:` *array* (see SKILL.md). The per-measure `window:` property below is the supported form.
+
+### Required and optional `window` fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `order` | yes | The dimension that orders the window. Must be a dimension defined in the same metric view. |
+| `range` | yes | Extent of the window: `current`, `cumulative`, `trailing N unit`, `leading N unit`, `all`. |
+| `semiadditive` | yes | Fallback aggregation (`first` / `last`) when `order` is not in the query's GROUP BY. |
+| `offset` | no | Shifts the window frame along `order` by a fixed interval (e.g. `-1 month`). DBR 18.1+. |
 
 ### Window Measure Syntax
 
 ```yaml
-version: "0.1"  # Required for window measures
+version: "1.1"
 measures:
   - name: trailing_7d_customers
     expr: COUNT(DISTINCT o_custkey)
@@ -126,11 +135,44 @@ measures:
 
 | Range | Description |
 |-------|-------------|
-| `trailing N unit` | Sliding window of N units back from current |
-| `cumulative` | Running total from start to current |
-| `current` | Current period only |
-| `leading N unit` | N units forward from current |
-| `all` | All rows regardless of window |
+| `trailing N unit` | N units before each point; **excludes** the anchor (current) row by default. Units: `day`, `week`, `month`, `year`. |
+| `cumulative` | Running total from the start of the dataset up to and including the current point |
+| `current` | Single point — no aggregation across the order dimension (used for semiadditive balances) |
+| `leading N unit` | N units after each point; **excludes** the anchor row by default |
+| `all` | Entire dataset regardless of window (used for Exclude LOD — see `level-of-detail.md`) |
+
+**Anchor-row modifiers (`inclusive` / `exclusive`):** `trailing` and `leading` exclude the anchor row by default. Append a modifier to change that:
+- `trailing 7 day inclusive` — includes the current date in the 7-day window
+- `leading 3 month exclusive` — explicitly excludes the current month
+
+### Window Offset (period-over-period; DBR 18.1+)
+
+The `offset` field shifts the window frame backward or forward along the `order` dimension by a fixed interval, enabling prior-period comparisons (MoM, YoY) without a second `current` measure.
+
+```yaml
+version: "1.1"
+measures:
+  - name: sales_same_month_last_year
+    expr: SUM(o_totalprice)
+    window:
+      - order: month
+        range: current
+        offset: -12 month   # shift the window back 12 months (DBR 18.1+)
+        semiadditive: last
+```
+
+Negative offsets look backward (prior periods); positive offsets look forward. The `offset` unit must match the grain of the `order` dimension (don't use `-1 day` when `order` is monthly). Confirm your runtime is DBR 18.1+ before using `offset`.
+
+**Month-to-Date (MTD):**
+```yaml
+measures:
+  - name: mtd_revenue
+    expr: SUM(o_totalprice)
+    window:
+      - order: date
+        range: trailing 1 month inclusive
+        semiadditive: last
+```
 
 ### Common Patterns
 

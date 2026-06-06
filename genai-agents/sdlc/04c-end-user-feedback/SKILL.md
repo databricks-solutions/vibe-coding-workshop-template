@@ -19,7 +19,7 @@ deploy_verb: none
 deploy_note: "End-user feedback logged as MLflow Assessments on the originating trace via `mlflow.log_feedback(...)`; no bundle resource. The wiring lives in the deployed app (Apps or Model Serving). Identical SDK pattern on both clients. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-30"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"

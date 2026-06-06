@@ -8,7 +8,8 @@ description: >
   docs/agent_spec.yaml plus docs/agent_tool_plan.yaml.
 license: Apache-2.0
 metadata:
-  last_verified: "2026-04-29"
+  last_verified: "2026-06-05"
+  upstream_sources: []
   volatility: high
   author: "prashanth-subrahmanyam"
   version: "1.0.0"

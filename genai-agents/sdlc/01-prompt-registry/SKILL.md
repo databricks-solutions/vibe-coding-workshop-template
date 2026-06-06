@@ -15,7 +15,7 @@ deploy_verb: none
 deploy_note: "Prompts registered/aliased in the UC Prompt Registry via the MLflow SDK; no bundle resource. Identical on both clients; on Genie Code run any CLI step through runDatabricksCli (pre-authenticated). See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"

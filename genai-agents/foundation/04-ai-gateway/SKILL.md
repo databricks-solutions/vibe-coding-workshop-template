@@ -17,7 +17,7 @@ deploy_verb: bundle_deploy
 deploy_note: "AI Gateway endpoint + inference/usage tables created via the Databricks SDK/REST (or CLI through runDatabricksCli on Genie Code); inference tables land in the per-user prefixed schema. Not modeled as a DAB resource kind in this workshop. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"

@@ -12,7 +12,7 @@ deploy_verb: none
 deploy_note: "Conversation memory backed by a Lakebase instance (provisioned via the Databricks SDK/CLI, not a DAB resource kind in this workshop) + AsyncDatabricksSession. Same on both clients; on Genie Code run any provisioning CLI through runDatabricksCli (pre-authenticated). See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"

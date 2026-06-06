@@ -105,7 +105,8 @@ def update_genie_space(
     description: Optional[str] = None,
     warehouse_id: Optional[str] = None,
     config: Optional[dict] = None,
-    parent_path: Optional[str] = None
+    parent_path: Optional[str] = None,
+    etag: Optional[str] = None
 ) -> dict:
     """Update an existing Genie Space using the REST API.
     
@@ -120,6 +121,9 @@ def update_genie_space(
         warehouse_id: Optional new warehouse ID
         config: Optional new GenieSpaceExport configuration (replaces entire config)
         parent_path: Optional new parent folder path
+        etag: Optional optimistic-concurrency token from a prior GET. When supplied, the
+            PATCH fails (409 Conflict) if the space changed underneath since that GET,
+            preventing a blind overwrite of a concurrent edit.
         
     Returns:
         Updated space metadata
@@ -142,6 +146,8 @@ def update_genie_space(
         payload["serialized_space"] = json.dumps(config)
     if parent_path is not None:
         payload["parent_path"] = parent_path
+    if etag is not None:
+        payload["etag"] = etag
     
     if not payload:
         print("⚠️  No fields to update. Provide at least one field to modify.", file=sys.stderr)

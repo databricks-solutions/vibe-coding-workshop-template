@@ -15,7 +15,7 @@ deploy_verb: none
 deploy_note: "Agent Bricks Knowledge Assistant created/synced via the Databricks SDK/REST; readiness polled identically on both clients. No bundle resource; on Genie Code run any CLI step through runDatabricksCli. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"

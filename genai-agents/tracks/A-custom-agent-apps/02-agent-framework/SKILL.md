@@ -13,7 +13,7 @@ deploy_verb: none
 deploy_note: "Agent code (OpenAI Agents SDK + MLflow ResponsesAgent) — no deployed resource of its own; deployed later by Track A 07. Authored identically on both clients. On Genie Code write the agent source under the cloned repo root (`{REPO_ROOT}` = `state_file_root` from `skills/vibecoding-state`); see `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"

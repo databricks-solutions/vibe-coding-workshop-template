@@ -16,7 +16,7 @@ metadata:
   called_by:
     - semantic-layer-setup
   standalone: true
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources:
     - name: "ai-dev-kit"
@@ -29,15 +29,19 @@ metadata:
     - name: "databricks-docs-genie-getspace"
       url: "https://docs.databricks.com/api/workspace/genie/getspace"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
     - name: "databricks-docs-genie-createspace"
       url: "https://docs.databricks.com/api/workspace/genie/createspace"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
     - name: "databricks-docs-genie-updatespace"
       url: "https://docs.databricks.com/api/workspace/genie/updatespace"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
+    - name: "databricks-docs-genie-conversation-api"
+      url: "https://docs.databricks.com/aws/en/genie/conversation-api"
+      relationship: "upstream"
+      last_synced: "2026-06-05"
 ---
 
 # Genie Space Export/Import API
@@ -326,9 +330,14 @@ That means it must be a concrete 16+ character hex warehouse id at the moment `d
 5. Get space to verify deployment
 
 **Incremental Updates:**
-1. Get current space configuration
+1. Get current space configuration (capture its `etag`)
 2. Modify specific sections (e.g., add benchmarks)
-3. Update space with PATCH (partial update)
+3. Update space with PATCH (partial update), passing the captured `etag`
+
+> **Optimistic concurrency (`etag`):** The GET response includes an `etag`. Pass it back on the PATCH
+> (`update_genie_space(..., etag=...)`) and the update fails safely with `409 Conflict` if the space
+> was edited by someone else since your GET — preventing a blind overwrite. Omit `etag` for a
+> last-writer-wins update. Re-GET to fetch the new `etag` and retry on conflict.
 
 **Migration/Backup:**
 1. Get space with `include_serialized_space=true`

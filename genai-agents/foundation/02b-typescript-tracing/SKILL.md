@@ -15,7 +15,7 @@ deploy_verb: none
 deploy_note: "Node/TypeScript tracing via the `mlflow-tracing`/`mlflow-openai` npm packages — no deployed resource; identical on both clients. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"

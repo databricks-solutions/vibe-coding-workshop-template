@@ -155,7 +155,7 @@ for both:
 ```python
 MANAGED_MCP_SERVER_URLS = [
     f"{host}/api/2.0/mcp/functions/system/ai",
-    f"{host}/api/2.0/mcp/vector-search/prod/docs/knowledge_index",
+    f"{host}/api/2.0/mcp/ai-search/prod/docs/knowledge_index",
     f"{host}/api/2.0/mcp/external/github_connection",
     f"{host}/api/2.0/mcp/external/glean_connection",
 ]

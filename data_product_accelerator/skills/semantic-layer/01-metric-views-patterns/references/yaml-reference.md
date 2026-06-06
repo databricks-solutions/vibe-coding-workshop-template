@@ -80,7 +80,7 @@ measures:
 |-------|-------|--------|
 | `name` | `Unrecognized field "name"` | ❌ NEVER include - name is in CREATE VIEW statement |
 | `time_dimension` | `Unrecognized field "time_dimension"` | ❌ Remove entirely - use regular dimension instead |
-| `window_measures` | `Unrecognized field "window_measures"` | ❌ Remove top-level `window_measures:` array. Individual measure `window:` property is Experimental (v0.1 only, DBR 16.4-17.1). For v1.1, calculate windowed aggregations in SQL/Python. |
+| `window_measures` | `Unrecognized field "window_measures"` | ❌ Remove the top-level `window_measures:` array. The per-measure `window:` property IS supported in v1.1 (Experimental; `offset` requires DBR 18.1+). See `composability-patterns.md`. |
 | `join_type` | Unsupported | ❌ Remove - defaults to LEFT OUTER JOIN |
 | `table` (in joins) | `Missing required creator property 'source'` | ✅ Use `source` instead |
 

@@ -13,7 +13,7 @@ deploy_verb: apps_deploy
 deploy_note: "The Track A deploy step — create/sync/deploy the agent to the Databricks Apps runtime, then query the endpoint via OAuth. On Genie Code run the create/sync/deploy CLI through runDatabricksCli (pre-authenticated); on IDE via the local CLI. The deployed app + endpoint carry the per-user prefix. See `skills/genie-code-environment` for the resolved deploy verbs."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"

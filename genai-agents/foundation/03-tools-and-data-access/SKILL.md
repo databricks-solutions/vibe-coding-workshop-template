@@ -15,7 +15,7 @@ deploy_verb: none
 deploy_note: "Agent tools + managed/external MCP servers + UC resource grants — code + grants, no bundle resource. Tooling resolves identically on both clients; on Genie Code use its built-in tool surface and run grant CLI steps through runDatabricksCli. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"
@@ -156,18 +156,25 @@ allowed to.
 
 | MCP Server | URL Pattern | OAuth Scope | Purpose |
 |---|---|---|---|
-| **Vector Search** | `/api/2.0/mcp/vector-search/{catalog}/{schema}/{index_name}` | `vector-search` | Semantic search over indexed documents. Index must use Databricks managed embeddings. |
-| **Genie Space** | `/api/2.0/mcp/genie/{genie_space_id}` | `genie` | Query Genie Spaces to analyze structured data via natural language. Read-only. |
+| **AI Search** | `/api/2.0/mcp/ai-search/{catalog}/{schema}/{index_name}` | `ai-search` | Semantic search over indexed documents. Index must use Databricks managed embeddings. |
+| **Genie Space** | `/api/2.0/mcp/genie/{genie_space_id}` | `genie` | Query a single Genie Space to analyze structured data via natural language. Read-only. |
+| **Genie (cross-space)** | `/api/2.0/mcp/genie` | `genie` | Ask natural-language questions across all Genie Spaces and UC data; returns a grounded answer with a deep link. Read-only. |
 | **Databricks SQL** | `/api/2.0/mcp/sql` | `sql` | Run AI-generated SQL for data pipelines and ad-hoc queries. Read and write. |
 | **UC Functions** | `/api/2.0/mcp/functions/{catalog}/{schema}/{function_name}` | `unity-catalog` | Call registered Unity Catalog SQL/Python functions. |
 
+> **Naming note:** AI Search was formerly **Vector Search**. The legacy
+> `/api/2.0/mcp/vector-search/...` URL prefix and `vector-search` OAuth scope
+> still work for backward compatibility, but `ai-search` is the current
+> canonical name.
+
 To view your MCP servers and their endpoint URLs, go to your workspace >
-**Agents** > **MCP Servers**.
+**AI Gateway** > **MCPs**.
 
 ### Polling Note
 
-Vector Search and Genie MCP servers may require polling for results of
-long-running queries. Handle this in your tool invocation loop.
+The Genie, Genie Space, and Databricks SQL MCP servers run asynchronously and
+require polling for results of long-running queries (e.g. call `genie_ask`,
+then poll `genie_poll_response`). Handle this in your tool invocation loop.
 
 ### Example: Customer Support Agent
 
@@ -175,7 +182,7 @@ long-running queries. Handle this in your tool invocation loop.
 host = workspace_client.config.host
 
 MANAGED_MCP_SERVER_URLS = [
-    f"{host}/api/2.0/mcp/vector-search/prod/customer_support/ticket_index",
+    f"{host}/api/2.0/mcp/ai-search/prod/customer_support/ticket_index",
     f"{host}/api/2.0/mcp/genie/{billing_space_id}",
     f"{host}/api/2.0/mcp/functions/prod/billing/lookup_account",
 ]

@@ -15,7 +15,7 @@ deploy_verb: bundle_deploy
 deploy_note: "Live monitoring = MLflow registered scorers (SDK) + periodic trace-archival/backfill jobs deployed via the `bundle deploy --target dev` spine; archived traces land in the per-user prefixed schema. On Genie Code run job deploy/run through runDatabricksCli. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"

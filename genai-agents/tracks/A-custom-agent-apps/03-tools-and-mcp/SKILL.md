@@ -11,7 +11,7 @@ deploy_verb: none
 deploy_note: "Tool + MCP wiring (local function tools, DatabricksMCPClient, MCPServerSse) — code, no bundle resource. Resolves identically on both clients; on Genie Code use its built-in tool surface for ad-hoc calls and runDatabricksCli for grants. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-04-15"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"
@@ -355,8 +355,9 @@ from databricks.sdk import WorkspaceClient
 ws = WorkspaceClient()
 host = ws.config.host
 
-vector_search_mcp = MCPServerSse(
-    url=f"https://{host}/api/2.0/mcp/vector-search/prod/docs/knowledge_index",
+ai_search_mcp = MCPServerSse(
+    # AI Search (formerly Vector Search); legacy /mcp/vector-search/ prefix still works
+    url=f"https://{host}/api/2.0/mcp/ai-search/prod/docs/knowledge_index",
     headers={"Authorization": f"Bearer {ws.config.token}"},
 )
 
@@ -374,7 +375,7 @@ agent = Agent(
     name="analyst",
     instructions="Use tools to search documents, query data, and check code.",
     model="databricks-claude-sonnet-4-6",
-    mcp_servers=[vector_search_mcp, sql_mcp, github_mcp],
+    mcp_servers=[ai_search_mcp, sql_mcp, github_mcp],
 )
 ```
 
@@ -388,7 +389,7 @@ agent = Agent(
     instructions="Use tools to answer questions. Use calculate_metrics for math.",
     model="databricks-claude-sonnet-4-6",
     tools=[calculate_metrics, get_current_time],
-    mcp_servers=[vector_search_mcp, sql_mcp],
+    mcp_servers=[ai_search_mcp, sql_mcp],
 )
 ```
 

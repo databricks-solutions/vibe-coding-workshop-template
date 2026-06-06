@@ -25,7 +25,7 @@ metadata:
   consumes:
     - plans/manifests/ml-manifest.yaml
   consumes_fallback: "Gold table inventory (self-discovery from catalog)"
-  last_verified: "2026-04-27"
+  last_verified: "2026-06-05"
   volatility: high
   upstream_sources:
     - name: "ai-dev-kit"
@@ -39,15 +39,15 @@ metadata:
     - name: "databricks-docs-feature-store"
       url: "https://docs.databricks.com/aws/en/machine-learning/feature-store/"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
     - name: "databricks-docs-feature-tables-uc"
       url: "https://docs.databricks.com/aws/en/machine-learning/feature-store/uc/feature-tables-uc"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
     - name: "databricks-docs-feature-store-python-api"
       url: "https://docs.databricks.com/aws/en/machine-learning/feature-store/python-api"
       relationship: "upstream"
-      last_synced: "2026-04-27"
+      last_synced: "2026-06-05"
 ---
 
 # MLflow & ML Models Patterns
