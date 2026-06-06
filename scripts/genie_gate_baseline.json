@@ -8,7 +8,7 @@
     "(root)::SETUP_SCRIPT": 3,
     "(root)::SHELL_DATABRICKS": 8,
     "agentic-framework::APP_DEPLOY": 17,
-    "apps_lakebase::APP_DEPLOY": 1693,
+    "apps_lakebase::APP_DEPLOY": 1697,
     "apps_lakebase::BARE_ARTIFACT_PATH": 36,
     "apps_lakebase::CLIENT_NAV": 7,
     "apps_lakebase::GENIE_RESOURCE": 8,
@@ -44,7 +44,7 @@
     "skills::SHELL_DATABRICKS": 59
   },
   "by_class": {
-    "APP_DEPLOY": 2077,
+    "APP_DEPLOY": 2081,
     "BARE_ARTIFACT_PATH": 48,
     "CLIENT_NAV": 8,
     "GENIE_RESOURCE": 46,
@@ -57,5 +57,5 @@
     "SETUP_SCRIPT": 14,
     "SHELL_DATABRICKS": 591
   },
-  "total": 3553
+  "total": 3557
 }

@@ -293,13 +293,19 @@ This is *how* a session runs — distilled from the field forks (someone ran thi
 - **Read and write *workspace* files**, not `/tmp` — `/tmp` is not durable and is not where artifacts
   belong. Build artifacts **in memory** or write to a project/workspace path.
 - **Anchor every relative artifact path to `artifact_root`, never the page CWD or your home dir.**
-  `artifact_root` is the workshop clone / git-folder root that `skills/vibecoding-state` captures into the
-  `## Environment Capabilities` block (= the local repo root on `ide_cli`; the cloned-repo path under
-  `/Workspace/Users/<email>/.assistant/skills/<repo>` on `genie_code`). A bare `docs/design_prd.md` is
+  `artifact_root` is the workshop PROJECT root that `skills/vibecoding-state` captures into the
+  `## Environment Capabilities` block (= the local repo root on `ide_cli`; the USER PROJECT path
+  `/Workspace/Users/<email>/<repo>` on `genie_code` — **NOT** the skills clone, which lives separately at
+  `skills_install_root` = `/Workspace/Users/<email>/.assistant/skills/<repo>` and is read-only framework, so
+  generated bundles/apps/docs never get mixed into it). A bare `docs/design_prd.md` is
   unsafe here because Genie Code's CWD is **page-type-dependent** (the bundle root on a bundle page, the
   workspace home otherwise — see §"Resolved vs. open"), so the same relative path resolves to different
   places.   Write deliverables to `<ARTIFACT_ROOT>/<relpath>` (e.g. `<ARTIFACT_ROOT>/docs/design_prd.md`),
-  filling `<ARTIFACT_ROOT>` from the captured `artifact_root`. `/tmp` remains forbidden. [TESTED P2]
+  filling `<ARTIFACT_ROOT>` from the captured `artifact_root`. `/tmp` remains forbidden. **`git clone` creates
+  only the `.assistant/skills/<repo>` clone (`skills_install_root`), NOT `artifact_root`** — create
+  `<artifact_root>` (the workspace path) with `mkdir -p` semantics before the first write (`vibecoding-state`'s
+  `resolve_root` / `bootstrap` step 0 now do this; create-then-confirm with `os.path.exists` to clear the FUSE
+  create-then-validate gap). [TESTED P2]
 - **The data-product bundle anchors to `dp_bundle_root`, a dedicated subdir — not the bare clone root.**
   `skills/vibecoding-state` captures `dp_bundle_root = <artifact_root>/<use_case_slug>_dab` (e.g.
   `…/vibe-coding-workshop/booking_app_dab`). The whole DP pipeline (bronze→silver→gold→semantic) writes its
@@ -313,8 +319,10 @@ This is *how* a session runs — distilled from the field forks (someone ran thi
   resolution**: a file under `.assistant/skills/` is loadable only as `skills/{path-after-.assistant/skills/}`.
   Because this repo is cloned to `.assistant/skills/<clone-folder>/`, a repo-relative skill path `X/Y/SKILL.md`
   must be loaded as `readSkillFile("<skill_ref_root>/X/Y/SKILL.md")` where `skill_ref_root` is captured by
-  `skills/vibecoding-state` (= `"skills/" + basename(artifact_root)`, default `skills/vibe-coding-workshop`;
-  **empty on `ide_cli`**, where `@`-mentions resolve from the workspace root). Nesting depth is irrelevant —
+  `skills/vibecoding-state` (= `"skills/" + basename(skills_install_root)`, default `skills/vibe-coding-workshop`;
+  **empty on `ide_cli`**, where `@`-mentions resolve from the workspace root). Note `skill_ref_root` is anchored
+  to `skills_install_root` (the `.assistant/skills/<repo>` clone), NOT `artifact_root` (the user project) — so
+  skills keep loading from the clone even though artifacts build in the project. Nesting depth is irrelevant —
   e.g. `data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md` loads as
   `skills/vibe-coding-workshop/data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md`. A bare
   `@data_product_accelerator/…` sends Genie Code on a goose chase. **`AGENTS.md` does not help here** — it is
