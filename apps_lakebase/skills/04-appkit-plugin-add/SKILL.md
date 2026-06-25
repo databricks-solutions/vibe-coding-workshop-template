@@ -81,7 +81,7 @@ This skill is written for the **IDE/CLI** path. Plugin registration itself — e
 | `databricks <cmd> … --profile $PROFILE` | run via `runDatabricksCli`, **omit `--profile`** (pre-authenticated) |
 | `databricks apps deploy …` | see the `03-appkit-deploy` deploy-routing contract (`runDatabricksCli`, else SDK `w.apps.deploy(... SNAPSHOT)`) |
 
-Paths in this skill are relative to `apps_lakebase/$APP_NAME` — on Genie Code that is under your `.assistant/skills` repo clone, never `/tmp`. See `skills/genie-code-environment` for the full manifest.
+Paths in this skill are relative to `apps_lakebase/$APP_NAME` — on Genie Code that resolves inside your git-cloned workshop project (`artifact_root`), never the read-only `.assistant/skills` copy and never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ---
 

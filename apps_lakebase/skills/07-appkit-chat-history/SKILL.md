@@ -100,7 +100,7 @@ Everything in this skill is **source editing + server-side code** (DDL, proxy ro
 | local `curl http://localhost:8000/api/…` gates (Steps 3, 7) | no local dev server — exercise the routes on the **deployed** app via browser, or the OAuth-session `requests.Session()` test in `03-appkit-deploy` |
 | `databricks apps deploy …` | see the `03-appkit-deploy` deploy-routing contract (`runDatabricksCli`, else SDK `w.apps.deploy(... SNAPSHOT)`) |
 
-Paths are relative to `apps_lakebase/$APP_NAME` — under your `.assistant/skills` repo clone on Genie Code, never `/tmp`. See `skills/genie-code-environment` for the full manifest.
+Paths are relative to `apps_lakebase/$APP_NAME` — inside your git-cloned workshop project (`artifact_root`) on Genie Code, never the read-only `.assistant/skills` copy and never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ---
 

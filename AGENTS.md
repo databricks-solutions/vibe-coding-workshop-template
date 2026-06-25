@@ -71,9 +71,9 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 | **Read from** (framework) | `apps_lakebase/`, `agentic-framework/`, `data_product_accelerator/` | Skills, instructions, agent prompts, docs |
 | **Write to** (artifacts) | Dedicated top-level folders (same for every client) | Data-product bundle → `<use_case_slug>_dab/` (holds `gold_layer_design/`, `plans/`, `src/`, `resources/`, `databricks.yml`); AppKit app → `<app_name>/`; design docs → `docs/` |
 
-> **Rule:** Generated artifacts live in **dedicated top-level folders at the repo/project root** (the local repo on IDE/CLI; your user project `/Workspace/Users/<email>/<repo>` on Genie Code — never the read-only `.assistant/skills/` clone) — NOT scattered at the bare root and NEVER inside a read-only framework dir (`data_product_accelerator/`, `apps_lakebase/`, `agentic-framework/`). The data-product bundle goes under `<use_case_slug>_dab/`; the AppKit app under `<app_name>/`; design docs (`docs/`) at the repo root. This shape is identical on every coding agent (IDE/CLI and Databricks Genie Code), so the product's root folder has parity regardless of client.
+> **Rule:** Generated artifacts live in **dedicated top-level folders at the repo/project root** (the local repo on IDE/CLI; your user project `/Workspace/Users/<email>/<repo>` on Genie Code, which is a **git clone** of the workshop repo so generated bundles are recognized — the read-only `.assistant/skills/` **copy** is only for skill discovery) — NOT scattered at the bare root and NEVER inside a read-only framework dir (`data_product_accelerator/`, `apps_lakebase/`, `agentic-framework/`). The data-product bundle goes under `<use_case_slug>_dab/`; the AppKit app under `<app_name>/`; design docs (`docs/`) at the repo root. This shape is identical on every coding agent (IDE/CLI and Databricks Genie Code), so the product's root folder has parity regardless of client.
 >
-> **Data-product bundle root (`dp_bundle_root`):** The data-product pipeline (bronze → silver → gold → semantic) writes EVERYTHING into a single **self-contained project subdirectory at the repo/project root** (the local repo on IDE/CLI; your user project on Genie Code — never the `.assistant/skills/` clone), `<artifact_root>/<use_case_slug>_dab/` (e.g. `booking_app_dab/`) — the Gold design (`gold_layer_design/`), the plans/manifests (`plans/`), and the Asset Bundle itself (`databricks.yml`, `src/`, `resources/`) all live there, co-located so the Gold pipeline can `sync` `gold_layer_design/yaml/**` from right beside the bundle. Isolating it gives `bundle deploy` an unambiguous page-context root on Genie Code (the agent must be on that folder's page to deploy — see `skills/genie-code-environment` §8). `skills/vibecoding-state` captures this path as `dp_bundle_root = <artifact_root>/<use_case_slug>_dab` in the `## Environment Capabilities` block; data-product prompts anchor every write to it and never to the bare project root. Only `docs/` (PRD, UI design) stays at the project root.
+> **Data-product bundle root (`dp_bundle_root`):** The data-product pipeline (bronze → silver → gold → semantic) writes EVERYTHING into a single **self-contained project subdirectory at the repo/project root** (the local repo on IDE/CLI; your user project on Genie Code, a **git clone** of the workshop repo — never the `.assistant/skills/` discovery copy), `<artifact_root>/<use_case_slug>_dab/` (e.g. `booking_app_dab/`) — the Gold design (`gold_layer_design/`), the plans/manifests (`plans/`), and the Asset Bundle itself (`databricks.yml`, `src/`, `resources/`) all live there, co-located so the Gold pipeline can `sync` `gold_layer_design/yaml/**` from right beside the bundle. Isolating it gives `bundle deploy` an unambiguous page-context root on Genie Code (the agent must be on that folder's page to deploy — see `skills/genie-code-environment` §8). `skills/vibecoding-state` captures this path as `dp_bundle_root = <artifact_root>/<use_case_slug>_dab` in the `## Environment Capabilities` block; data-product prompts anchor every write to it and never to the bare project root. Only `docs/` (PRD, UI design) stays at the project root.
 >
 > **AppKit app root (`app_root`):** The AppKit application track (Pathways A/B/C) scaffolds, wires, and deploys the app inside its own **self-contained top-level directory**, `<repo-root>/<app_name>/` (e.g. `jane-d-booking/`) — a sibling of `<use_case_slug>_dab/`, NOT nested under `apps_lakebase/` (which holds only the read-only skills + prompts) and NOT at the bare root. `app.yaml`, `databricks.yml`, `server/`, `client/`, and `<app_name>/.vibecoding-state.md` live there. `skills/vibecoding-state` captures this as `app_root = <artifact_root>/<app_name>`; on Genie Code it is the `apps init --output-dir` target. Same shape on both clients.
 
@@ -83,7 +83,7 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 
 **MANDATORY:** Before starting any task, match keywords below to find the right component. Read the linked file FIRST.
 
-> **Client-agnostic by design.** Routing is the same for every client. The active client (`client_context`) is detected and gated by `skills/vibecoding-state`; for how the in-workspace agent behaves, load `skills/genie-code-environment` (pre-auth, serverless, page-context CLI, project-rooted artifact placement — skills load from the `.assistant/skills` clone). Routed prompts open with a client-specific RULE_0 preamble — follow it as written.
+> **Client-agnostic by design.** Routing is the same for every client. The active client (`client_context`) is detected and gated by `skills/vibecoding-state`; for how the in-workspace agent behaves, load `skills/genie-code-environment` (pre-auth, serverless, page-context CLI, project-rooted artifact placement — skills load from the `.assistant/skills` copy). Routed prompts open with a client-specific RULE_0 preamble — follow it as written.
 
 ### Data Product Accelerator — `data_product_accelerator/AGENTS.md`
 
@@ -199,7 +199,7 @@ This framework is built on the open [Agent Skills (SKILL.md)](https://agentskill
 | **VS Code / Copilot** | Reads `AGENTS.md` or `.github/copilot-instructions.md` | `#file:path/to/file` |
 | **Windsurf** | Reads `AGENTS.md` or `.windsurfrules` at repo root | `@path/to/file` |
 | **Codex** | Reads `AGENTS.md` at repo root | Reference files by path |
-| **Genie Code** (in-workspace) | Recurses into this repo cloned under `/Users/<you>/.assistant/skills/` — see the Genie Code section below | Reference files by path; load `skills/genie-code-environment` first |
+| **Genie Code** (in-workspace) | Recurses into the skill-tree **copy** under `/Users/<you>/.assistant/skills/` (the workshop repo is git-cloned into your user project; the skills folder gets a copy) — see the Genie Code section below | Reference files by path; load `skills/genie-code-environment` first |
 | **Other** | Point the agent to this file manually | Paste file contents or path |
 
 **Databricks Agent Skills** are installed project-level into `.agents/skills/` (gitignored) for all IDEs:
@@ -212,14 +212,20 @@ This follows the [agentskills.io](https://agentskills.io) cross-agent standard a
 
 ### Genie Code (in-workspace agent)
 
-Genie Code runs **inside the Databricks workspace** (pre-authenticated, serverless) and discovers skills by **recursing into a cloned repo** placed in your per-user skills folder. **First-run kickstart — clone the whole workshop repo once**, before running any prompt:
+Genie Code runs **inside the Databricks workspace** (pre-authenticated, serverless). It needs the workshop repo in **two places**: a **git clone in your user project** (so generated bundles are recognized as Databricks Asset Bundles — bundle recognition requires a git working tree, see `skills/genie-code-environment` §3) and a **copy in your per-user skills folder** (where Genie Code recurses to auto-discover every `SKILL.md`). **First-run kickstart — run both once**, before running any prompt:
 
 ```bash
+# 1. Git-clone the workshop repo INTO your user project (= artifact_root, git-backed so bundles are recognized)
 git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git \
-  /Users/<your-username>/.assistant/skills/vibe-coding-workshop
+  /Workspace/Users/<your-username>/vibe-coding-workshop
+
+# 2. Copy the tree into your per-user skills folder for skill discovery (no git needed here)
+cp -r /Workspace/Users/<your-username>/vibe-coding-workshop \
+  /Workspace/Users/<your-username>/.assistant/skills/vibe-coding-workshop
+# (a second `git clone` to the skills path instead of `cp -r` is the optional `git pull`-refresh alternative)
 ```
 
-After cloning, **start a NEW Agent-mode chat thread** (hard-refresh the page if the skills don't appear) so Genie Code recurses into the clone and auto-loads every `SKILL.md` beneath it. Then **load `skills/genie-code-environment`** so the agent knows how it behaves on Genie Code (pre-auth, serverless, page-context CLI via `runDatabricksCli`, artifact placement under your user project root — skills load from the `.assistant/skills` clone — never `/tmp`). Session state and client detection are owned by `skills/vibecoding-state` (it sets `client_context` and gates each prompt). Full setup: [PRE-REQUISITES.md](PRE-REQUISITES.md) (Genie Code path). Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
+After the copy lands, **start a NEW Agent-mode chat thread** (hard-refresh the page if the skills don't appear) so Genie Code recurses into the `.assistant/skills` copy and auto-loads every `SKILL.md` beneath it. Then **load `skills/genie-code-environment`** so the agent knows how it behaves on Genie Code (pre-auth, serverless, page-context CLI via `runDatabricksCli`, artifact placement under your git-cloned user project root — skills load from the `.assistant/skills` copy — never `/tmp`). Session state and client detection are owned by `skills/vibecoding-state` (it sets `client_context` and gates each prompt). Full setup: [PRE-REQUISITES.md](PRE-REQUISITES.md) (Genie Code path). Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 **Skill roots** (Genie Code recurses all of these; any IDE can also reference them directly):
 

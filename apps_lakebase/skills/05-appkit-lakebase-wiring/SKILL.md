@@ -95,7 +95,7 @@ All the **code** in this skill — DDL, routes, hooks, mappers — is written in
 | `databricks … --profile $PROFILE` | run via `runDatabricksCli`, **omit `--profile`** (pre-authenticated) |
 | local `curl … -H "Authorization: Bearer …"` health test | browser `ConnectionStatus` + `apps logs`, **or** the 3-hop OAuth `requests.Session()` test (see Quick Reference note and `03-appkit-deploy`) |
 
-Paths are relative to `apps_lakebase/$APP_NAME` — on Genie Code that lives under your `.assistant/skills` repo clone, never `/tmp`. The `apps validate` skip and the health-test routing are already flagged inline at Steps 4a2 and Quick Reference. See `skills/genie-code-environment` for the full manifest.
+Paths are relative to `apps_lakebase/$APP_NAME` — on Genie Code that resolves inside your git-cloned workshop project (`artifact_root`), never the read-only `.assistant/skills` copy and never `/tmp`. The `apps validate` skip and the health-test routing are already flagged inline at Steps 4a2 and Quick Reference. See `skills/genie-code-environment` for the full manifest.
 
 ---
 

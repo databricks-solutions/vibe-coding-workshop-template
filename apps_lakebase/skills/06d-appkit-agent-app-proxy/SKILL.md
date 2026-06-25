@@ -238,7 +238,7 @@ The proxy handler and OBO forwarding (Step 2) are **server-side code — identic
 | `databricks apps deploy …` (Step 6a) | see the `03-appkit-deploy` deploy-routing contract (`runDatabricksCli`, else SDK `w.apps.deploy(... SNAPSHOT)`) |
 | `test-agent-app-proxy.sh` four-probe E2E (Step 6b) | runs against **deployed** apps; on Genie Code drive its `databricks`/`curl` calls via `runDatabricksCli` / `executeCode` (omit `--profile`). The browser check (Step 6c) is the simplest manual verify. |
 
-Paths are relative to `apps_lakebase/$APP_NAME` — under your `.assistant/skills` repo clone on Genie Code, never `/tmp`. See `skills/genie-code-environment` for the full manifest.
+Paths are relative to `apps_lakebase/$APP_NAME` — inside your git-cloned workshop project (`artifact_root`) on Genie Code, never the read-only `.assistant/skills` copy and never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ---
 

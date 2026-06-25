@@ -81,7 +81,7 @@ P0 Workspace
 
 > **Client fork — pick your path before Section 0.**
 > - **IDE/CLI (Cursor, Claude Code, VS Code, Codex):** complete the Databricks CLI auth + prerequisite checks in Section 0 below.
-> - **Genie Code (in-workspace):** Genie Code is pre-authenticated and serverless — skip the CLI auth steps. First, **Set Up Project**: clone the whole repo into `/Users/<your-username>/.assistant/skills/vibe-coding-workshop`, then **start a NEW Agent-mode chat thread** (hard-refresh if skills don't appear) so the skills load, and load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context` and gates each prompt. See [repo-root AGENTS.md](../AGENTS.md) ("Genie Code" section) / [PRE-REQUISITES.md](../PRE-REQUISITES.md). Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
+> - **Genie Code (in-workspace):** Genie Code is pre-authenticated and serverless — skip the CLI auth steps. First, **Set Up Project**: `git clone` the repo into your user project (`/Workspace/Users/<your-username>/vibe-coding-workshop` = `artifact_root`, git-backed so generated bundles are recognized) and **copy** the tree into `/Workspace/Users/<your-username>/.assistant/skills/vibe-coding-workshop` for skill discovery, then **start a NEW Agent-mode chat thread** (hard-refresh if skills don't appear) so the skills load, and load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context` and gates each prompt. See [repo-root AGENTS.md](../AGENTS.md) ("Genie Code" section) / [PRE-REQUISITES.md](../PRE-REQUISITES.md). Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 ## Section 0: Workspace Setup
 

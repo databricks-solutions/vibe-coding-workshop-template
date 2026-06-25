@@ -88,7 +88,7 @@ This skill is **source editing + server-side code** (feedback routes, MLflow ass
 | `app.yaml` / `databricks.yml` `MLFLOW_EXPERIMENT_ID` edits (Step 1) | source edits — identical on both clients |
 | `databricks apps deploy …` | see the `03-appkit-deploy` deploy-routing contract (`runDatabricksCli`, else SDK `w.apps.deploy(... SNAPSHOT)`) |
 
-Paths are relative to `apps_lakebase/$APP_NAME` — under your `.assistant/skills` repo clone on Genie Code, never `/tmp`. See `skills/genie-code-environment` for the full manifest.
+Paths are relative to `apps_lakebase/$APP_NAME` — inside your git-cloned workshop project (`artifact_root`) on Genie Code, never the read-only `.assistant/skills` copy and never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ---
 

@@ -67,7 +67,7 @@ This skill is **source editing** — designing SQL queries, writing `server/serv
 | `ls node_modules/@databricks/appkit-ui/…` | no local `node_modules` — consult the appkit-ui docs (WebFetch) instead |
 | `databricks apps validate --profile $PROFILE` (checklist) | hard-blocked on Genie Code — skip; rely on `bundle validate` (`runDatabricksCli`, omit `--profile`) + server-side build logs per `03-appkit-deploy` / `07-appkit-chat-history` Step 9 |
 
-Edit files **in your workshop project** — paths are relative to the top-level app dir `$APP_ROOT` (= `<artifact_root>/<app_name>`; on Genie Code, under `/Workspace/Users/<your-email>/vibe-coding-workshop/<app_name>`, NOT the `.assistant/skills` clone), never `/tmp`. See `skills/genie-code-environment` for the full manifest.
+Edit files **in your workshop project** — paths are relative to the top-level app dir `$APP_ROOT` (= `<artifact_root>/<app_name>`; on Genie Code, under `/Workspace/Users/<your-email>/vibe-coding-workshop/<app_name>` — your git-cloned workshop project, NOT the `.assistant/skills` copy), never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 **Optional upstream checks** (skip if latency-constrained or the `last_verified` date above is < 30 days old):
 

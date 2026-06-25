@@ -191,7 +191,7 @@ The workshop runs from one of **two clients**. Steps **9–11 below are the loca
 | **AI IDE + Databricks CLI** (laptop) | Complete **§9, §10, §11** below. | You authenticate locally (PAT / `databricks auth login`) — §11. | Databricks CLI + Node.js v22+ + Git. |
 | **Genie Code** (in-workspace) | **Skip §9–§11.** | **Pre-authenticated** to its host workspace — no PAT, no `databricks configure`, no token. | **None** — runs inside Databricks on **serverless** compute. |
 
-> **Genie Code participants:** there is nothing to install or authenticate locally. Instead, before you begin: (1) confirm you can open the workshop project in Genie Code; (2) confirm your **per-user prefixed** target catalog/schema and app name so your artifacts stay isolated in the shared catalog (this is the workshop's isolation contract); (3) know that deploys run from the project's bundle-folder page (`bundle deploy --target dev`) and the App's frontend is **built server-side** (no local Node step). For exactly how Genie Code behaves — pre-auth, serverless, page-context CLI, file placement — see the `skills/genie-code-environment` manifest (load it once at the start of your session). Everything else in this guide (Admin §1–§5, IDE §6–§8) applies to both clients.
+> **Genie Code participants:** there is nothing to install or authenticate locally. Instead, before you begin: (0) **first-run kickstart — set up the repo in two locations**: `git clone` the workshop repo into your **user project** (`/Workspace/Users/<you>/vibe-coding-workshop`, which becomes `artifact_root` — a git working tree, so the bundles you generate are recognized as Databricks Asset Bundles) and **copy** the tree into your **per-user skills folder** (`/Workspace/Users/<you>/.assistant/skills/vibe-coding-workshop`) for skill discovery — see [AGENTS.md](AGENTS.md) → "Genie Code (in-workspace agent)" for the exact two commands; (1) confirm you can open the workshop project in Genie Code; (2) confirm your **per-user prefixed** target catalog/schema and app name so your artifacts stay isolated in the shared catalog (this is the workshop's isolation contract); (3) know that deploys run from the project's bundle-folder page (`bundle deploy --target dev`) and the App's frontend is **built server-side** (no local Node step). For exactly how Genie Code behaves — pre-auth, serverless, page-context CLI, file placement — see the `skills/genie-code-environment` manifest (load it once at the start of your session). Everything else in this guide (Admin §1–§5, IDE §6–§8) applies to both clients.
 
 ---
 
@@ -234,7 +234,7 @@ You should see output like `Databricks CLI v0.x.x`. Any recent version is accept
 
 ### 10. Install Node.js v22+ and Git
 
-> **IDE/CLI client only** — Genie Code builds the App frontend **server-side** and clones the repo in-workspace, so no local Node.js is needed there.
+> **IDE/CLI client only** — Genie Code builds the App frontend **server-side** and git-clones the repo into your user project in-workspace (and copies it to the skills folder), so no local Node.js is needed there.
 
 The AppKit workshop (Path A) requires **Node.js v22+** for scaffolding and running Databricks Apps locally. **Git** is required for cloning the template and installing agent skills.
 

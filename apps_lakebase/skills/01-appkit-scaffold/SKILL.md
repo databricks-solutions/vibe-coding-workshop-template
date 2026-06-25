@@ -62,7 +62,7 @@ Scaffolding works on both clients; the per-step notes below carry the details. T
 | `--profile <PROFILE>` on any `databricks …` | **omit** — Genie Code injects the workspace + OAuth | all |
 | `databricks apps deploy` | not run from this skill — see the `03-appkit-deploy` deploy-routing contract | next |
 
-Scaffold **into your workshop project root** (`<artifact_root>` — the local repo on IDE/CLI; `/Workspace/Users/<your-email>/vibe-coding-workshop` on Genie Code, NOT the `.assistant/skills` clone), never `/tmp`. See `skills/genie-code-environment` for the full manifest.
+Scaffold **into your workshop project root** (`<artifact_root>` — the local repo on IDE/CLI; `/Workspace/Users/<your-email>/vibe-coding-workshop` on Genie Code, a **git clone** of the workshop repo so generated bundles are recognized, NOT the `.assistant/skills` copy), never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ## Prerequisites
 

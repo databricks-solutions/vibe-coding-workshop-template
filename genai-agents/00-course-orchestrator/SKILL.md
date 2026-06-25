@@ -89,7 +89,7 @@ only routes to the correct domain skill.
 **Client awareness (by reference).** `vibecoding-state` also detects and gates
 `client_context`. The course routes the same for every client; only deploy/run
 mechanics differ. On the in-workspace agent, load `../../skills/genie-code-environment/SKILL.md`
-(pre-auth, serverless, page-context CLI, project-rooted artifacts — skills load from the `.assistant/skills` clone) — local dev servers
+(pre-auth, serverless, page-context CLI, project-rooted artifacts — skills load from the `.assistant/skills` copy) — local dev servers
 and CLI/profile authentication do not apply there (see PRE-REQUISITES §11 for the
 IDE/CLI auth path). Routed prompts open with a client-specific RULE_0 preamble;
 follow it as written.

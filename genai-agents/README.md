@@ -154,7 +154,7 @@ patterns, see [`databricks/databricks-agent-skills`](https://github.com/databric
 **Pick your client path first:**
 
 - **IDE/CLI (Cursor, Claude Code, VS Code, Codex):** authenticate the Databricks CLI (see [PRE-REQUISITES.md](../PRE-REQUISITES.md)), then start at step 1 below.
-- **Genie Code (in-workspace):** pre-authenticated and serverless — first **Set Up Project**: clone the whole repo into `/Users/<your-username>/.assistant/skills/vibe-coding-workshop`, then **start a NEW Agent-mode chat thread** (hard-refresh if skills don't appear) so the skills load, and load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context`. Then start at step 1. Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
+- **Genie Code (in-workspace):** pre-authenticated and serverless — first **Set Up Project**: `git clone` the repo into your user project (`/Workspace/Users/<your-username>/vibe-coding-workshop` = `artifact_root`, git-backed so generated bundles are recognized) and **copy** the tree into `/Workspace/Users/<your-username>/.assistant/skills/vibe-coding-workshop` for skill discovery, then **start a NEW Agent-mode chat thread** (hard-refresh if skills don't appear) so the skills load, and load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context`. Then start at step 1. Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 1. Start with the [GenAI Skill Navigator](./00-course-orchestrator/SKILL.md)
 2. Complete Foundation Steps F0-F5 as routed by the navigator

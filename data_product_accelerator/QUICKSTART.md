@@ -17,14 +17,18 @@ This guide walks you through building a complete Databricks data platform — fr
 
 > **File references:** The prompts below use `@` to reference files (supported by Cursor, Windsurf, and others). If your IDE doesn't support `@`, ask the agent to "read the file at [path]" instead.
 
-> **Genie Code (in-workspace) — Set Up Project first.** Genie Code discovers skills by recursing into a repo cloned in your per-user skills folder. Clone the **whole** workshop repo once, then start a fresh thread so the skills load:
->
+> **Genie Code (in-workspace) — Set Up Project first.** Genie Code needs the repo in **two places**: a git clone in your user project (so generated bundles are recognized — bundle recognition requires a git working tree) and a copy in your per-user skills folder (where Genie Code recurses to discover skills). Run both once, then start a fresh thread so the skills load:
+> 
 > ```bash
+> # 1. Git-clone into your user project (= artifact_root, git-backed so bundles are recognized)
 > git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git \
->   /Users/<your-username>/.assistant/skills/vibe-coding-workshop
+>   /Workspace/Users/<your-username>/vibe-coding-workshop
+> # 2. Copy the tree into your per-user skills folder for skill discovery
+> cp -r /Workspace/Users/<your-username>/vibe-coding-workshop \
+>   /Workspace/Users/<your-username>/.assistant/skills/vibe-coding-workshop
 > ```
->
-> After cloning, **start a NEW Agent-mode chat thread** (hard-refresh the page if skills don't appear), then load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context` and gates each prompt. Genie Code is pre-authenticated — skip the CLI auth prerequisite above. Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
+> 
+> After the copy lands, **start a NEW Agent-mode chat thread** (hard-refresh the page if skills don't appear), then load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context` and gates each prompt. Genie Code is pre-authenticated — skip the CLI auth prerequisite above. Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 ---
 

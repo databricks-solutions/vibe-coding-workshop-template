@@ -70,8 +70,8 @@ Detection (bootstrap step 0) — [inference, pending the live Genie Code probe]:
   - `runDatabricksCli` tool / Genie serverless markers present  ⇒  client_context: genie_code
       cli_channel: runDatabricksCli ; bundle_deploy.page_context_required: true
       state_file_root: <user project workspace path>
-      artifact_root:  <user project workspace path>   # where artifacts build, e.g. /Workspace/Users/<email>/<repo>
-      skills_install_root: <git-folder workspace path> # the clone, e.g. /Workspace/Users/<email>/.assistant/skills/<repo>
+      artifact_root:  <user project workspace path>   # a git clone of the workshop repo (git-backed → bundles recognized), e.g. /Workspace/Users/<email>/<repo>
+      skills_install_root: <skills copy path>          # a copy of the tree for discovery, e.g. /Workspace/Users/<email>/.assistant/skills/<repo>
       skill_ref_root: skills/<clone-folder>          # readSkillFile prefix, = "skills/" + basename(skills_install_root), e.g. skills/vibe-coding-workshop
   - otherwise                                                    ⇒  client_context: ide_cli
       cli_channel: local_shell ; bundle_deploy.page_context_required: false
@@ -83,15 +83,16 @@ Detection (bootstrap step 0) — [inference, pending the live Genie Code probe]:
 `artifact_root` is where RELATIVE artifact paths in prompt bodies resolve (`<ARTIFACT_ROOT>/docs/design_prd.md`).
 It defaults equal to `state_file_root` and is kept as a distinct field so an app/agent subdir can later diverge
 without overloading `state_file_root`. On genie_code it is the USER PROJECT root
-(`/Workspace/Users/<email>/<repo>`) — NOT the skills clone — so generated bundles/apps/docs never land inside the
-read-only `.assistant/skills/` framework folder. Bare relative paths are unsafe on genie_code because its CWD is
-page-type-dependent — see `skills/genie-code-environment` §8. `git clone` creates only the `skills_install_root`
-clone, not `artifact_root`, so `resolve_root` / `bootstrap` step 0 create `artifact_root` (`mkdir -p` semantics) if
-absent before the first write.
-`skills_install_root` is the read-side anchor: the cloned-repo path under
+(`/Workspace/Users/<email>/<repo>`), a **git clone** of the workshop repo — a git working tree, so generated
+bundles/apps/docs are recognized as Databricks Asset Bundles. Bare relative paths are unsafe on genie_code because its CWD is
+page-type-dependent — see `skills/genie-code-environment` §8. The kickstart `git clone`s the workshop repo into
+`artifact_root`; `resolve_root` / `bootstrap` step 0 confirm `<artifact_root>/.git` is present (and `git clone` it
+if absent) before the first write — a bare `mkdir` leaves bundles unrecognized (a Repos-managed Git folder is the fallback).
+`skills_install_root` is the read-side anchor: a **copy** of the clone under
 `/Workspace/Users/<email>/.assistant/skills/<repo>` on genie_code (= `artifact_root` on ide_cli, where the repo IS
-the project). It is decoupled from `artifact_root` so the workshop builds artifacts in the user project while
-skills keep loading from the clone.
+the project). It is a separate copy from `artifact_root` so skills load via `readSkillFile` from the
+`.assistant/skills/` discovery path while artifacts build in the git-backed user project; the copy needs no git
+(an optional 2nd `git clone` there is the easy-refresh alternative).
 `skill_ref_root` is derived from it: the prefix that makes a repo-relative SKILL path loadable on genie_code via
 `readSkillFile` (`<skill_ref_root>/data_product_accelerator/skills/.../SKILL.md`), = `"skills/" +
 basename(skills_install_root)`. Empty on ide_cli (paths/@-mentions resolve from the workspace root). See
@@ -104,8 +105,9 @@ The `{user_schema_prefix}_` prefix is the SAME username-derived prefix used for 
 authenticated user, e.g. `jane_d`); prefixing the folder disambiguates concurrent users in a shared
 workspace. The bundle `name:` inside `databricks.yml` MUST match this folder name
 (`bundle: { name: {user_schema_prefix}_<use_case_slug>_dab }`) for the same reason. Generated `databricks.yml` /
-`src/` / `resources/` live UNDER it — never at the bare clone root (mixing generated artifacts into the framework
-clone is the "one level too high" bug) and never inside a read-only framework dir (`data_product_accelerator/` etc.).
+`src/` / `resources/` live UNDER it — never at the bare `artifact_root` root (which is the framework clone itself;
+isolating the bundle in its own `_dab` subdir gives `bundle deploy` an unambiguous page-context root) and never
+inside a read-only framework dir (`data_product_accelerator/` etc.).
 On genie_code it is also the **`bundle deploy` page-context root** (be on this folder's page to deploy). It is
 derived once `use_case_slug` is known (bootstrap), so `resolve_root` (pre-bootstrap) does not produce it.
 `app_root` is the write-side anchor for the AppKit application track (Pathways A/B/C) — the exact analog of
@@ -141,8 +143,8 @@ environment_capabilities:
   app_deploy:    { verb: "apps deploy", gated: true }
   destructive_ops: confirm_required
   state_file_root: <local repo path | user project workspace path>
-  artifact_root: <local repo path | user project workspace path>   # relative artifact paths resolve here (<ARTIFACT_ROOT>/<relpath>); defaults to state_file_root; on genie_code the USER PROJECT root (e.g. /Workspace/Users/<email>/<repo>), NOT the skills clone
-  skills_install_root: <local repo path | git-folder workspace path>   # the cloned repo (read-side). On genie_code /Workspace/Users/<email>/.assistant/skills/<repo>; on ide_cli same as artifact_root. Decoupled from artifact_root so artifacts build in the user project while skills load from the clone.
+  artifact_root: <local repo path | user project workspace path>   # relative artifact paths resolve here (<ARTIFACT_ROOT>/<relpath>); defaults to state_file_root; on genie_code the USER PROJECT root (e.g. /Workspace/Users/<email>/<repo>), a git clone of the workshop repo (git-backed → bundles recognized)
+  skills_install_root: <local repo path | skills copy path>   # the skills copy (read-side). On genie_code a copy of the tree at /Workspace/Users/<email>/.assistant/skills/<repo>; on ide_cli same as artifact_root. A separate copy from artifact_root so skills load from the .assistant/skills/ discovery path while artifacts build in the git-backed user project.
   skill_ref_root: <"" | "skills/<clone-folder>">   # readSkillFile prefix for repo-relative SKILL paths on genie_code (= "skills/" + basename(skills_install_root)); empty on ide_cli
   dp_bundle_root: <artifact_root>/{user_schema_prefix}_<use_case_slug>_dab   # self-contained DAB project dir for the data-product pipeline; username-prefixed (same {user_schema_prefix}_ as the _bronze/_silver/_gold schemas) so concurrent users never collide. The bundle name: in databricks.yml MUST match this folder name. Generated databricks.yml/src/resources live here, and on genie_code it is the `bundle deploy` page-context root. Derived at bootstrap (needs use_case_slug + user_schema_prefix); <pending> until then.
   app_root: <artifact_root>/<app_name>   # self-contained AppKit app project dir (Pathways A/B/C); top-level sibling of dp_bundle_root, NOT under apps_lakebase/ and NOT the bare clone root. app.yaml/databricks.yml/server/client and app_root/.vibecoding-state.md live here on BOTH clients (root-folder parity). On genie_code it is the `apps init --output-dir` target. Derived once APP_NAME is known (Module 1 / prompt 04); <pending> until then. n/a for Pathway D (agent-only).

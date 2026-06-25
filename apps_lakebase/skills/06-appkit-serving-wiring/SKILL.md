@@ -98,7 +98,7 @@ All the **code** in this skill — plugin config, hooks, proxy routes — is wri
 | `databricks auth token` + `curl -H "Authorization: Bearer …"` (Steps 9b/9c) | hard-blocked / raw Bearer rejected by the Apps OAuth gate → use **browser** (open the app URL, test chat) **or** the 3-hop OAuth `requests.Session()` test in `03-appkit-deploy` |
 | `databricks apps deploy …` (Step 9a) | see the `03-appkit-deploy` deploy-routing contract (`runDatabricksCli`, else SDK `w.apps.deploy(... SNAPSHOT)`) |
 
-Paths are relative to `apps_lakebase/$APP_NAME` — under your `.assistant/skills` repo clone on Genie Code, never `/tmp`. See `skills/genie-code-environment` for the full manifest.
+Paths are relative to `apps_lakebase/$APP_NAME` — inside your git-cloned workshop project (`artifact_root`) on Genie Code, never the read-only `.assistant/skills` copy and never `/tmp`. See `skills/genie-code-environment` for the full manifest.
 
 ---
 

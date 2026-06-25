@@ -108,6 +108,15 @@ The deploy contract is identical to the IDE — `bundle deploy --target dev`, ru
   canonical sequence is: write `databricks.yml` under `dp_bundle_root` → open that folder's **bundle editor** →
   run `bundle validate`/`deploy`/`run` there. A `databricks.yml not found` error means you are NOT on the
   bundle page — open the bundle editor for the `dp_bundle_root` folder; never fall back to direct SQL. [TESTED — user-observed]
+- **Bundle recognition requires a git working tree — this is why `artifact_root` is a git clone.** A 3x2
+  workspace probe settled the rule: a folder's `databricks.yml` shows the "Open in bundle editor" affordance
+  (and a working Deploy surface) **only when it sits inside a git working tree**. A **web `git clone`** (a
+  plain workspace "Folder" containing `.git`) is sufficient — recognized at the root AND in **nested**
+  subfolders (so `<artifact_root>/<use_case_slug>_dab/databricks.yml` is recognized when `artifact_root` is the
+  clone); a managed Databricks **Repos** object is NOT required (it is the documented fallback). A plain
+  `mkdir` directory (no `.git`), even with a valid `databricks.yml`, is **NOT** recognized. This is the whole
+  reason the kickstart `git clone`s the workshop repo INTO `artifact_root` (and merely *copies* the tree to the
+  `.assistant/skills` discovery path). [TESTED — 3x2 workspace probe]
 - **Surface a clickable bundle-editor link — don't make the operator hunt for the icon.** With the
   pre-authenticated `WorkspaceClient` (`w`): `host = w.config.host`; `o = w.get_workspace_id()`;
   `file_id = w.workspace.get_status("<dp_bundle_root>/databricks.yml").object_id`;
@@ -295,34 +304,38 @@ This is *how* a session runs — distilled from the field forks (someone ran thi
 - **Anchor every relative artifact path to `artifact_root`, never the page CWD or your home dir.**
   `artifact_root` is the workshop PROJECT root that `skills/vibecoding-state` captures into the
   `## Environment Capabilities` block (= the local repo root on `ide_cli`; the USER PROJECT path
-  `/Workspace/Users/<email>/<repo>` on `genie_code` — **NOT** the skills clone, which lives separately at
-  `skills_install_root` = `/Workspace/Users/<email>/.assistant/skills/<repo>` and is read-only framework, so
-  generated bundles/apps/docs never get mixed into it). A bare `docs/design_prd.md` is
+  `/Workspace/Users/<email>/<repo>` on `genie_code`, which is a **git clone** of the workshop repo — a git
+  working tree, so generated bundles/apps/docs are recognized as Databricks Asset Bundles). The skill tree is
+  **copied** from `artifact_root` to `skills_install_root` = `/Workspace/Users/<email>/.assistant/skills/<repo>`
+  (the read-only discovery path); artifacts build in `artifact_root`, skills load from `skills_install_root`. A
+  bare `docs/design_prd.md` is
   unsafe here because Genie Code's CWD is **page-type-dependent** (the bundle root on a bundle page, the
   workspace home otherwise — see §"Resolved vs. open"), so the same relative path resolves to different
   places.   Write deliverables to `<ARTIFACT_ROOT>/<relpath>` (e.g. `<ARTIFACT_ROOT>/docs/design_prd.md`),
-  filling `<ARTIFACT_ROOT>` from the captured `artifact_root`. `/tmp` remains forbidden. **`git clone` creates
-  only the `.assistant/skills/<repo>` clone (`skills_install_root`), NOT `artifact_root`** — create
-  `<artifact_root>` (the workspace path) with `mkdir -p` semantics before the first write (`vibecoding-state`'s
-  `resolve_root` / `bootstrap` step 0 now do this; create-then-confirm with `os.path.exists` to clear the FUSE
-  create-then-validate gap). [TESTED P2]
-- **The data-product bundle anchors to `dp_bundle_root`, a dedicated subdir — not the bare clone root.**
+  filling `<ARTIFACT_ROOT>` from the captured `artifact_root`. `/tmp` remains forbidden. **The kickstart `git
+  clone`s the workshop repo INTO `artifact_root`** (the workspace path), making it a git working tree where
+  bundles are recognized — a bare `mkdir` does NOT (TESTED, §3). Confirm `<artifact_root>/.git` is present
+  before the first write (`vibecoding-state`'s `resolve_root` / `bootstrap` step 0 do this; `git clone` if
+  absent, then confirm with `os.path.exists` to clear the FUSE create-then-validate gap; a Repos-managed Git
+  folder is the documented fallback). [TESTED P2]
+- **The data-product bundle anchors to `dp_bundle_root`, a dedicated subdir — not the bare `artifact_root` root.**
   `skills/vibecoding-state` captures `dp_bundle_root = <artifact_root>/<use_case_slug>_dab` (e.g.
   `…/vibe-coding-workshop/booking_app_dab`). The whole DP pipeline (bronze→silver→gold→semantic) writes its
-  `databricks.yml` / `src/` / `resources/` UNDER `<DP_BUNDLE_ROOT>`. Writing them at the clone root is the
-  observed "one level too high" bug (generated artifacts mixed into the framework clone). Because `bundle
+  `databricks.yml` / `src/` / `resources/` UNDER `<DP_BUNDLE_ROOT>`. Writing them at the bare `artifact_root`
+  root (the framework clone itself) is the observed "one level too high" bug — the bundle then has no clean
+  page-context root to deploy from. Because `bundle
   deploy`'s CWD is pinned to the current page's bundle root, `<DP_BUNDLE_ROOT>` is ALSO the page you deploy
   from: be on that folder's page, then run `bundle validate`/`deploy`/`run`. A `databricks.yml not found`
   error means you are on the wrong page — navigate to `<DP_BUNDLE_ROOT>`; never fall back to direct SQL.
 - **Load every workshop skill by its clone-rooted `readSkillFile` path, never a bare repo-relative path or
   `@`-mention.** Genie Code loads skills through `readSkillFile`, which has **no repo-root-relative
   resolution**: a file under `.assistant/skills/` is loadable only as `skills/{path-after-.assistant/skills/}`.
-  Because this repo is cloned to `.assistant/skills/<clone-folder>/`, a repo-relative skill path `X/Y/SKILL.md`
+  Because the skill tree is copied to `.assistant/skills/<clone-folder>/`, a repo-relative skill path `X/Y/SKILL.md`
   must be loaded as `readSkillFile("<skill_ref_root>/X/Y/SKILL.md")` where `skill_ref_root` is captured by
   `skills/vibecoding-state` (= `"skills/" + basename(skills_install_root)`, default `skills/vibe-coding-workshop`;
   **empty on `ide_cli`**, where `@`-mentions resolve from the workspace root). Note `skill_ref_root` is anchored
-  to `skills_install_root` (the `.assistant/skills/<repo>` clone), NOT `artifact_root` (the user project) — so
-  skills keep loading from the clone even though artifacts build in the project. Nesting depth is irrelevant —
+  to `skills_install_root` (the `.assistant/skills/<repo>` copy), NOT `artifact_root` (the git-cloned user
+  project) — so skills keep loading from the `.assistant/skills` copy even though artifacts build in the project. Nesting depth is irrelevant —
   e.g. `data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md` loads as
   `skills/vibe-coding-workshop/data_product_accelerator/skills/bronze/00-bronze-layer-setup/SKILL.md`. A bare
   `@data_product_accelerator/…` sends Genie Code on a goose chase. **`AGENTS.md` does not help here** — it is
