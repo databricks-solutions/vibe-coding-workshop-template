@@ -10,10 +10,12 @@
 # CLI (`databricks --version`) and the `aitools install` verb, both of which are
 # HARD-BLOCKED on Genie Code. On Genie Code the Databricks skills are already
 # loaded in-session, so the default flow is not used; instead the Genie Code path
-# is a per-user whole-repo git-clone kickstart into
-# `/Users/<your-username>/.assistant/skills/` (Genie Code recurses to discover
-# every skill). Run `bash install-agent-skills.sh --genie-code` to print it; it is
-# also documented in the repo-root AGENTS.md "Genie Code" section.
+# is a two-location first-run kickstart: git clone the workshop repo into your
+# user project (= artifact_root, git-backed so generated bundles are recognized),
+# then copy the tree into your per-user skills folder
+# `/Workspace/Users/<your-username>/.assistant/skills/` (Genie Code recurses there
+# to discover every skill). Run `bash install-agent-skills.sh --genie-code` to
+# print it; it is also documented in the repo-root AGENTS.md "Genie Code" section.
 #
 # Strategy (IDE/CLI):
 #   1. Always clone into .agents/skills/ (agentskills.io standard, works in all IDEs)
@@ -102,7 +104,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   echo "  - Clones skills into .agents/skills/databricks-skills (all IDEs)"
   echo "  - Optionally runs IDE-native install for Cursor/Claude Code"
   echo ""
-  echo "  --genie-code   Print the Genie Code whole-repo clone kickstart and exit"
+  echo "  --genie-code   Print the Genie Code clone+copy kickstart and exit"
   echo "                 (no local CLI/Node/auth — Genie Code is pre-authenticated)"
   echo ""
   echo "Prerequisites (default IDE/CLI flow): git, Databricks CLI >= 0.295.0, Node.js v22+"
@@ -111,16 +113,24 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 fi
 
 # Genie Code path: no local CLI/Node/auth (pre-authenticated, in-workspace).
-# Genie Code discovers skills by recursing into a clone of THIS repo under the
-# per-user skills folder — so the kickstart is a one-time whole-repo clone.
+# Genie Code discovers skills by recursing into the skills-folder COPY of this
+# repo — so the kickstart clones the repo into the user project (git-backed, for
+# bundle recognition) and copies the tree into the per-user skills folder.
 if [[ "${1:-}" == "--genie-code" ]]; then
   cat <<'EOF'
 Genie Code path — pre-authenticated, in-workspace, serverless (no local CLI/Node).
-Genie Code discovers skills by recursing into a clone of THIS repo under your
-per-user skills folder. Run this once (first-run kickstart):
+Genie Code needs the workshop repo in TWO places: a git clone in your user
+project (so generated bundles are recognized — bundle recognition requires a git
+working tree) and a copy in your per-user skills folder (where Genie Code recurses
+to discover every skill). Run this once (first-run kickstart):
 
+  # 1. git clone the workshop repo INTO your user project (= artifact_root, git-backed)
   git clone https://github.com/databricks-solutions/vibe-coding-workshop-template.git \
-    /Users/<your-username>/.assistant/skills/vibe-coding-workshop
+    /Workspace/Users/<your-username>/vibe-coding-workshop
+
+  # 2. copy the tree into your per-user skills folder for discovery (no git needed here)
+  cp -r /Workspace/Users/<your-username>/vibe-coding-workshop \
+    /Workspace/Users/<your-username>/.assistant/skills/vibe-coding-workshop
 
 Then load skills/genie-code-environment (the behavior manifest). The default
 IDE/CLI flow below is NOT used on Genie Code (its CLI checks are hard-blocked).
