@@ -87,7 +87,7 @@ These AI-Dev-Kit skills currently have **no corresponding skill** in our reposit
 | Upstream Skill | Description | Potential Mapping |
 |---|---|---|
 | `databricks-app-apx` | Full-stack apps (FastAPI + React) | New skill or extend genai-agents |
-| `databricks-app-python` | Python web apps (Dash, Streamlit, Flask) | New skill or extend genai-agents |
+| `databricks-apps-python` | Python web apps (Dash, Streamlit, Flask) | New skill or extend genai-agents |
 | `databricks-dbsql` | DBSQL advanced: SQL scripting, stored procs, pipe syntax, AI functions, geospatial | Broadly useful — consider new common skill |
 | `databricks-docs` | Documentation index via llms.txt | Low priority — reference utility |
 | `databricks-lakebase-autoscale` | Lakebase with automatic scaling | Complement to lakebase-memory-patterns |
@@ -186,7 +186,7 @@ For reference, these are the upstream components in `databricks-solutions/ai-dev
 | | `databricks-zerobus-ingest` | ZeroBus ingestion patterns |
 | **Development & Deployment** | `databricks-asset-bundles` | DABs for multi-environment deployments (apps, dashboards, jobs, pipelines) |
 | | `databricks-app-apx` | Full-stack apps (FastAPI + React) |
-| | `databricks-app-python` | Python web apps (Dash, Streamlit, Flask) |
+| | `databricks-apps-python` | Python web apps (Dash, Streamlit, Flask) |
 | | `databricks-python-sdk` | Python SDK, Connect, CLI, REST API |
 | | `databricks-config` | Profile authentication setup |
 | | `databricks-lakebase-provisioned` | Managed PostgreSQL for OLTP workloads |
