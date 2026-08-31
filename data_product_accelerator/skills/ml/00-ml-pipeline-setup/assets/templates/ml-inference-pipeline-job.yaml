@@ -17,7 +17,7 @@
 resources:
   jobs:
     ml_inference_pipeline_job:
-      name: "[${bundle.target}] ML Inference Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] ML Inference Pipeline"
       description: "Batch inference using fe.score_batch"
 
       # PIN EXACT VERSIONS — MUST match training pipeline

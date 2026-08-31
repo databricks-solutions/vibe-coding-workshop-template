@@ -36,10 +36,19 @@ variables:
     # Alternative: hardcode ID (less portable)
     # default: "<warehouse_id>"
 
+  user_prefix:
+    description: Per-user identifier for shared workspaces (used in job/pipeline names)
+    default: ${workspace.current_user.short_name}
+
 targets:
   dev:
     mode: development
     default: true
+    # Disable DAB auto-prefixing so the explicit
+    # [${bundle.target} ${var.user_prefix}] token in each name is the SOLE
+    # prefix authority (prevents doubled "[dev x] [dev x] ..." names).
+    presets:
+      name_prefix: ""
     variables:
       catalog: <dev_catalog>
       # Override schema names with dev prefixes if needed
@@ -52,6 +61,7 @@ targets:
     variables:
       catalog: <prod_catalog>
       # Production uses standard schema names (no prefix)
+      user_prefix: ""   # keep prod job/pipeline names clean -> "[prod] ..."
 
 # Include all resource definitions from resources/ folder
 include:
@@ -76,7 +86,7 @@ include:
 resources:
   jobs:
     <job_key>:
-      name: "[${bundle.target}] <Job Display Name>"
+      name: "[${bundle.target} ${var.user_prefix}] <Job Display Name>"
       
       # ✅ MANDATORY: Serverless environment configuration
       environments:
@@ -152,7 +162,7 @@ resources:
 resources:
   pipelines:
     <pipeline_key>:
-      name: "[${bundle.target}] <Pipeline Display Name>"
+      name: "[${bundle.target} ${var.user_prefix}] <Pipeline Display Name>"
       
       # Pipeline root folder (Lakeflow Pipelines Editor best practice)
       # All pipeline assets must be within this root folder
@@ -224,7 +234,7 @@ For pipelines with multiple notebooks, use `glob` instead of listing each notebo
 resources:
   pipelines:
     <pipeline_key>:
-      name: "[${bundle.target}] <Pipeline Name>"
+      name: "[${bundle.target} ${var.user_prefix}] <Pipeline Name>"
       root_path: ../src/<layer>_pipeline
       catalog: ${var.catalog}
       schema: ${var.<layer>_schema}
@@ -261,7 +271,7 @@ resources:
 resources:
   pipelines:
     my_pipeline:
-      name: "[${bundle.target}] My Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] My Pipeline"
       
       # Root path - all pipeline assets must be within this folder
       root_path: ../src/<layer>_pipeline
@@ -459,7 +469,7 @@ env:
 resources:
   jobs:
     <job_key>:
-      name: "[${bundle.target}] <Job Display Name>"
+      name: "[${bundle.target} ${var.user_prefix}] <Job Display Name>"
       
       # Job parameters
       parameters:
@@ -500,7 +510,7 @@ resources:
 resources:
   jobs:
     <job_key>:
-      name: "[${bundle.target}] <Multi-Step Job>"
+      name: "[${bundle.target} ${var.user_prefix}] <Multi-Step Job>"
       
       environments:
         - environment_key: default

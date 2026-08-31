@@ -26,7 +26,7 @@ Two-task job: (1) Create tables from YAML, (2) Apply FK constraints after PKs ex
 resources:
   jobs:
     gold_setup_job:
-      name: "[${bundle.target}] {Project} Gold Layer - Setup"
+      name: "[${bundle.target} ${var.user_prefix}] {Project} Gold Layer - Setup"
       description: "Creates Gold layer tables from YAML schema definitions"
 
       # PyYAML dependency required
@@ -90,7 +90,7 @@ Periodic MERGE operations from Silver to Gold:
 resources:
   jobs:
     gold_merge_job:
-      name: "[${bundle.target}] {Project} Gold Layer - MERGE Updates"
+      name: "[${bundle.target} ${var.user_prefix}] {Project} Gold Layer - MERGE Updates"
       description: "Periodic MERGE operations from Silver to Gold"
 
       environments:

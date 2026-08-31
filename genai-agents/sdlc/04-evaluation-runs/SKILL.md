@@ -26,13 +26,13 @@ metadata:
   produces: "evaluation_results, thresholds_met, mlflow_run_id, failure_shape_classification, failing_trace_ids, safety_buffer, predict_fn_exception_count, predict_fn_sentinel_count_per_run, judges_with_silent_aggregation_dropouts, mlflow_eval_predict_fn_signature, mlflow_eval_known_quality_issues, evaluation_runs_preflight, human_label_count, synthesized_label_count"
   grounded_in: "https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/eval-harness, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/evaluation-runs, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/evaluate-conversations, https://docs.databricks.com/aws/en/mlflow3/genai/human-feedback/, https://docs.databricks.com/aws/en/mlflow3/genai/human-feedback/expert-feedback/label-existing-traces"
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-mlflow-evaluation/SKILL.md"
+        - "skills/databricks-mlflow-evaluation/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-04-27"
-      sync_commit: "281d9acd92d936bd5294f78bd7ec68fb12d4a696"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 fields_read:
   - agent.reviewer_role
   - agent.must_do
@@ -55,7 +55,7 @@ Canonical reference for **evaluation execution**, **threshold gating**, **human 
 
 ## Upstream Lineage
 
-This skill extends AI-Dev-Kit's `databricks-mlflow-evaluation` skill for `mlflow.genai.evaluate()` execution, regression detection, production trace re-scoring, human labeling loops, and evaluation result analysis. If the eval harness contract or result object behavior is ambiguous, consult the upstream skill first, then preserve this skill's SDLC telemetry and gate-capture requirements.
+This skill extends Databricks Agent Skills' `databricks-mlflow-evaluation` skill for `mlflow.genai.evaluate()` execution, regression detection, production trace re-scoring, human labeling loops, and evaluation result analysis. If the eval harness contract or result object behavior is ambiguous, consult the upstream skill first, then preserve this skill's SDLC telemetry and gate-capture requirements.
 
 ## When to Use
 

@@ -159,7 +159,7 @@ pii_columns:
 resources:
   jobs:
     gold_merge_job:
-      name: "[${bundle.target}] Hospitality - Merge Guests"
+      name: "[${bundle.target} ${var.user_prefix}] Hospitality - Merge Guests"
       tags:
         team: platform-engineering         # From customer config
         cost_center: CC-9901               # From customer config
@@ -175,7 +175,7 @@ resources:
 resources:
   jobs:
     gold_merge_job:
-      name: "[${bundle.target}] Hospitality - Merge Guests"
+      name: "[${bundle.target} ${var.user_prefix}] Hospitality - Merge Guests"
       tags:
         team: data-engineering             # Default — add tagging config to context/ to customize
         cost_center: REVIEW-REQUIRED       # TODO: Add tagging config to context/ with cost_center
@@ -191,7 +191,7 @@ resources:
 resources:
   pipelines:
     silver_pipeline:
-      name: "[${bundle.target}] Silver Hospitality Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] Silver Hospitality Pipeline"
       tags:
         team: platform-engineering         # From customer config
         cost_center: CC-9901               # From customer config
@@ -207,7 +207,7 @@ resources:
 resources:
   pipelines:
     silver_pipeline:
-      name: "[${bundle.target}] Silver Hospitality Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] Silver Hospitality Pipeline"
       tags:
         team: data-engineering             # Default — add tagging config to context/ to customize
         cost_center: REVIEW-REQUIRED       # TODO: Add tagging config to context/ with cost_center

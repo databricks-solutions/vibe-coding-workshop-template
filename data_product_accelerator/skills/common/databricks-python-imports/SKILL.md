@@ -14,13 +14,13 @@ metadata:
   deploy_note: "import/path patterns are client-agnostic; relative ../.. links are repo-relative skill cross-refs (RULE_6: portable, retained)"
   coverage: all_stages
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-config/SKILL.md"
+        - "skills/databricks-core/SKILL.md"
       relationship: "reference"
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 # Databricks Python Imports and Code Sharing
 

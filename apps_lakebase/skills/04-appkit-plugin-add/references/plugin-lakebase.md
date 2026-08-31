@@ -132,6 +132,8 @@ databricks postgres list-databases projects/$APP_NAME/branches/production \
 
 > **Do NOT use the old `postgres:` resource format** at the top level (with `branch:` / `database:` / `permission:` fields as a top-level bundle resource). That format is for Lakebase Provisioned only and will be rejected by the bundle deployer for Autoscaling projects. The `postgres:` block shown above is nested under `app.resources` — a different context.
 
+> **Provisioned is being retired.** Databricks is migrating Lakebase Provisioned to Autoscaling through 2026 (no customer action required), so new projects are Autoscaling-only. Treat the legacy `database` resource key / `w.database` SDK / `databricks database` CLI as historical — use the Autoscaling `postgres` model everywhere.
+
 ### 4. Configure Environment Variables
 
 **For deployment** — add to `app.yaml`:

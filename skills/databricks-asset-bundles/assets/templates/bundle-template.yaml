@@ -37,6 +37,11 @@ targets:
   dev:
     mode: development
     default: true
+    # Disable DAB's automatic "[dev username]" name prefixing so the explicit
+    # [${bundle.target} ${var.user_prefix}] token in each resource name is the
+    # SOLE authority (prevents doubled prefixes like "[dev x] [dev x] ...").
+    presets:
+      name_prefix: ""
     variables:
       catalog: <dev_catalog>
       bronze_schema: dev_<username>_<bronze_schema_name>
@@ -48,6 +53,8 @@ targets:
     variables:
       catalog: <prod_catalog>
       # Production uses standard schema names (no prefix)
+      # Keep prod job/pipeline names clean: empty user_prefix -> "[prod] ..."
+      user_prefix: ""
 
 # Include all resource definitions from resources/ folder
 include:
@@ -62,7 +69,7 @@ include:
 # resources:
 #   jobs:
 #     <job_key>:
-#       name: "[${bundle.target}] <Job Display Name>"
+#       name: "[${bundle.target} ${var.user_prefix}] <Job Display Name>"
 #       
 #       # ✅ MANDATORY: Serverless environment configuration
 #       environments:
@@ -91,7 +98,7 @@ include:
 # resources:
 #   pipelines:
 #     <pipeline_key>:
-#       name: "[${bundle.target}] <Pipeline Display Name>"
+#       name: "[${bundle.target} ${var.user_prefix}] <Pipeline Display Name>"
 #       
 #       # ✅ MANDATORY: Root path for Lakeflow Pipelines Editor
 #       root_path: ../src/<layer>_pipeline

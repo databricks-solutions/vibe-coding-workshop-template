@@ -29,7 +29,7 @@ If you are asked to create a runtime Python tool file (e.g., `genie_tool.py`, `c
 
 ## Reference Skills (Canonical Databricks Patterns)
 
-Before creating any new skill, read the reference skills at https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-skills/ for implementation patterns. Key skills to reference:
+Before creating any new skill, read the reference skills at https://github.com/databricks/databricks-agent-skills/tree/main/skills/ for implementation patterns. Key skills to reference:
 
 | Skill | Path | When to Read |
 |-------|------|-------------|
@@ -92,7 +92,7 @@ Instructions for the agent...
 ### Step 1: Discover What Exists
 
 Before creating any skill, scan the project:
-- Read reference skills from https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-skills/ -- check if the skill you need already exists there
+- Read reference skills from https://github.com/databricks/databricks-agent-skills/tree/main/skills/ -- check if the skill you need already exists there
 - List project-specific skills in `agentic-framework/skills/` to understand what has already been built locally
 - List existing runtime tools in the project's agent/tools directory (e.g., `server/agents/tools/`)
 - Read the PRD or prd-analyzer output to understand what capabilities are needed
@@ -149,7 +149,7 @@ Include:
 
 ### Step 7: Update Registry (if applicable)
 
-If the project uses UC functions for the Supervisor Agent, scaffold the UC function SQL definition alongside the skill using the `databricks-unity-catalog` skill from https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-skills/databricks-unity-catalog/ as a guide.
+If the project uses UC functions for the Supervisor Agent, scaffold the UC function SQL definition alongside the skill using the `databricks-unity-catalog` skill from https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-unity-catalog/ as a guide.
 
 ## Bootstrapping from Scratch
 

@@ -14,13 +14,13 @@ metadata:
   deploy_note: "CREATE/ALTER SCHEMA run inside a bundle setup job at deploy time (RULE_10: deploy-time body, retained)"
   coverage: all_stages
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-unity-catalog/SKILL.md"
+        - "skills/databricks-unity-catalog/SKILL.md"
       relationship: "derived"
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 
 # Schema Management Patterns for Databricks Asset Bundles
@@ -83,7 +83,7 @@ spark.sql(f"""
 resources:
   pipelines:
     silver_dlt_pipeline:
-      name: "[${bundle.target}] Silver Layer Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] Silver Layer Pipeline"
       
       # Catalog for serverless (required)
       catalog: ${var.catalog}

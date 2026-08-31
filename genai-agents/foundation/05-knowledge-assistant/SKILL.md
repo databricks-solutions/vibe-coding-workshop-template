@@ -514,7 +514,7 @@ This skill builds on, and delegates to, existing Databricks Agent Skills:
 
 - [databricks/databricks-agent-skills — skills/](https://github.com/databricks/databricks-agent-skills/tree/main/skills)
   (auth, CLI basics, Model Serving endpoint management)
-- [databricks-solutions/ai-dev-kit — knowledge-assistants skill](https://github.com/databricks-solutions/ai-dev-kit/blob/main/databricks-skills/databricks-agent-bricks/1-knowledge-assistants.md)
+- [databricks/databricks-agent-skills — databricks-agent-bricks / knowledge-assistants](https://github.com/databricks/databricks-agent-skills/blob/main/skills/databricks-agent-bricks/references/1-knowledge-assistants.md)
   (KA lifecycle, provisioning timeline, Supervisor integration patterns)
 
 ---

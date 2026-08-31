@@ -236,10 +236,17 @@ targets:
   dev:
     mode: development
     default: true
+    presets:
+      name_prefix: ""   # explicit [${bundle.target} ${var.user_prefix}] token owns the prefix
 ```
 
-`mode: development` prefixes resource names with the deployer's username and
-adds `[dev]` tags. Useful for isolated testing.
+`mode: development` would normally prefix resource names with the deployer's
+username and add `[dev]` tags. To avoid two competing prefix sources, we disable
+that auto-prefix (`presets.name_prefix: ""`) and instead put an explicit
+`[${bundle.target} ${var.user_prefix}]` token in every job/pipeline `name:` (the
+single canonical convention — see
+`skills/databricks-asset-bundles/SKILL.md` → "Shared Workspace Naming"). The
+`environment` tag remains `${bundle.target}`.
 
 ### Staging
 

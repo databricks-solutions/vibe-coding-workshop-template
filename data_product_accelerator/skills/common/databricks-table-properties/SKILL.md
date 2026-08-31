@@ -14,13 +14,13 @@ metadata:
   deploy_note: "TBLPROPERTIES/CREATE TABLE are deploy-time bundle-resource bodies (RULE_10: run during bundle deploy, retained)"
   coverage: all_stages
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-unity-catalog/SKILL.md"
+        - "skills/databricks-unity-catalog/SKILL.md"
       relationship: "derived"
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 
 # Databricks Table Properties Standards

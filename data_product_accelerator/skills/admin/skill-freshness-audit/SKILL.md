@@ -5,12 +5,12 @@ description: >
   staleness detection, and upstream lineage tracking across every Agent Skill in the
   repository (data_product_accelerator/, genai-agents/, apps_lakebase/). Fetches official
   documentation URLs embedded in skills, compares patterns against live docs, tracks lineage
-  to databricks-solutions/ai-dev-kit and databricks/databricks-agent-skills, and reports
+  to databricks/databricks-agent-skills (the single upstream registry), and reports
   drift. Use when auditing skill currency, verifying skills against latest Databricks/MLflow
-  docs, checking for stale skills, syncing with either upstream registry, or after a platform
+  docs, checking for stale skills, syncing with the upstream registry, or after a platform
   release. Triggers on "audit skills", "check freshness", "stale skills", "verify skills",
   "skill audit", "update check", "Databricks released", "new MLflow version", "upstream
-  sync", "ai-dev-kit lineage", "databricks-agent-skills lineage".
+  sync", "databricks-agent-skills lineage", "upstream lineage".
 license: Apache-2.0
 clients: [ide_cli, genie_code]
 bundle_resource: none
@@ -56,13 +56,13 @@ metadata:
     - url: "https://mlflow.org/docs/latest/genai/serving/responses-agent"
       check_for: "ResponsesAgent API, predict() signature"
   upstream_sources:                     # Repo-level lineage tracking (tracks upstream dependencies)
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-agent-bricks/SKILL.md"
+        - "skills/databricks-agent-bricks/SKILL.md"
       relationship: "extended"          # derived | extended | inspired | reference
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ```
 
 `verification_sources` checks live documentation URLs for API drift. `upstream_sources` tracks structured repo-level lineage for systematic upstream sync audits. Both are complementary.
@@ -120,16 +120,15 @@ metadata:
 
 ### Upstream Source Audit — Check Lineage Across Both Registries
 
-Skills track their lineage to one of two recognized upstream registries via
+Skills track their lineage to the single authoritative upstream registry via
 `upstream_sources` metadata:
 
 | Upstream registry | Repo | Manifest | Use for |
 |---|---|---|---|
-| AI-Dev-Kit | [`databricks-solutions/ai-dev-kit`](https://github.com/databricks-solutions/ai-dev-kit) | n/a | Accelerator-specific skills (silver, gold, ml, semantic-layer) |
-| Databricks Agent Skills | [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills) | [`manifest.json`](https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/manifest.json) | Canonical Databricks-platform skills (apps, lakebase, model-serving, agent-bricks, pipelines, dabs) |
+| Databricks Agent Skills | [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills) | [`manifest.json`](https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/manifest.json) | All canonical Databricks-platform and accelerator skills (apps, lakebase, model-serving, agent-bricks, pipelines, dabs, unity-catalog, metric-views, genie-agents, mlflow-evaluation, synthetic-data-gen, and more) |
 
-Both registries are first-class: the scanner is registry-agnostic and just
-parses `upstream_sources` entries. Skills should pick **one** of these styles:
+The scanner is registry-agnostic and just parses `upstream_sources` entries.
+Skills should pick **one** of these styles:
 
 - **Structured `upstream_sources`** — for skills that genuinely derive from or
   extend an upstream skill. Scanner audits this for sync drift.
@@ -151,10 +150,9 @@ last synced.
 4. After syncing, update last_synced date and sync_commit in the skill frontmatter
 ```
 
-**Lineage Maps:**
+**Lineage Map:**
 
-- [references/ai-dev-kit-lineage-map.md](references/ai-dev-kit-lineage-map.md) — accelerator skills mapped to upstream AI-Dev-Kit.
-- [references/databricks-agent-skills-lineage-map.md](references/databricks-agent-skills-lineage-map.md) — apps / platform skills mapped to upstream `databricks/databricks-agent-skills`.
+- [references/databricks-agent-skills-lineage-map.md](references/databricks-agent-skills-lineage-map.md) — all skills mapped to their upstream `databricks/databricks-agent-skills` sources.
 
 **Priority by relationship type:**
 
@@ -342,7 +340,6 @@ Before marking a skill as "verified":
 ## Additional Resources
 
 - [Verification Sources Master List](references/verification-sources.md) — All skills mapped to their verification URLs
-- [AI-Dev-Kit Lineage Map](references/ai-dev-kit-lineage-map.md) — All skills mapped to their upstream AI-Dev-Kit sources
 - [Databricks Agent Skills Lineage Map](references/databricks-agent-skills-lineage-map.md) — All skills mapped to their upstream `databricks/databricks-agent-skills` sources
 - [Volatility Classification](references/volatility-classification.md) — Complete volatility ratings for all skills
 - [Verification Metadata Template](assets/templates/verification-metadata.yaml) — Copy-paste frontmatter template (includes `upstream_sources`)
@@ -352,6 +349,7 @@ Before marking a skill as "verified":
 
 | Date | Changes |
 |---|---|
-| Apr 27, 2026 | Repo-wide scanner extension (`--root` / `--exclude`, multi-domain attribution); `databricks/databricks-agent-skills` registered as a second authoritative upstream registry alongside AI-Dev-Kit |
-| Feb 9, 2026 | Added upstream_sources lineage tracking: AI-Dev-Kit lineage map, upstream source audit workflow, upstream drift report format, scan script upstream sync support |
+| Aug 30, 2026 | Consolidated to a single upstream registry: `databricks/databricks-agent-skills` (32-skill manifest) now covers all accelerator + platform lineage. Retired the `databricks-solutions/ai-dev-kit` lineage map and remapped every `upstream_sources` entry (slug renames: `databricks-genie`→`databricks-genie-agents`, `databricks-asset-bundles`→`databricks-dabs`, `databricks-synthetic-data-generation`→`databricks-synthetic-data-gen`, `databricks-spark-declarative-pipelines`→`databricks-pipelines`, `databricks-config`→`databricks-core`) |
+| Apr 27, 2026 | Repo-wide scanner extension (`--root` / `--exclude`, multi-domain attribution); `databricks/databricks-agent-skills` registered as an authoritative upstream registry (later consolidated as the single registry) |
+| Feb 9, 2026 | Added upstream_sources lineage tracking: initial lineage map, upstream source audit workflow, upstream drift report format, scan script upstream sync support |
 | Feb 7, 2026 | Initial creation: audit workflow, verification anchors, volatility classification, scan script |

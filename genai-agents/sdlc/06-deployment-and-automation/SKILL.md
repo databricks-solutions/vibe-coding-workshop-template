@@ -26,13 +26,13 @@ metadata:
   produces: "databricks_app, deployment_pipeline, serving_endpoint"
   grounded_in: "https://docs.databricks.com/aws/en/dev-tools/bundles/, https://docs.databricks.com/aws/en/dev-tools/databricks-apps/, https://docs.databricks.com/aws/en/generative-ai/mcp/, https://docs.databricks.com/aws/en/generative-ai/agent-bricks/multi-agent-supervisor-long-running-tasks, https://docs.databricks.com/aws/en/mlflow3/genai/prompt-version-mgmt/version-tracking/link-production-traces-to-app-versions"
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-mlflow-evaluation/SKILL.md"
+        - "skills/databricks-mlflow-evaluation/SKILL.md"
       relationship: "reference"
-      last_synced: "2026-04-27"
-      sync_commit: "281d9acd92d936bd5294f78bd7ec68fb12d4a696"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 
 # Deployment and Automation
@@ -43,7 +43,7 @@ your CI system.
 
 ## Upstream Lineage
 
-This skill references AI-Dev-Kit's `databricks-mlflow-evaluation` skill for evaluate-gate-promote automation, production trace linkage, and monitoring handoff guidance. If release gates depend on eval harness semantics or upstream monitoring patterns, consult the upstream skill first, then apply this skill's Databricks Apps and Asset Bundle deployment contracts.
+This skill references Databricks Agent Skills' `databricks-mlflow-evaluation` skill for evaluate-gate-promote automation, production trace linkage, and monitoring handoff guidance. If release gates depend on eval harness semantics or upstream monitoring patterns, consult the upstream skill first, then apply this skill's Databricks Apps and Asset Bundle deployment contracts.
 
 ## When to Use
 

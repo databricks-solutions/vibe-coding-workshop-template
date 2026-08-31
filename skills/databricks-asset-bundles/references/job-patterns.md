@@ -60,7 +60,7 @@ Complete guide to hierarchical job architecture, task types, and parameter passi
 resources:
   jobs:
     tvf_deployment_job:
-      name: "[${bundle.target}] Health Monitor - TVF Deployment"
+      name: "[${bundle.target} ${var.user_prefix}] Health Monitor - TVF Deployment"
       description: "Atomic job: Deploys Table-Valued Functions"
       
       environments:
@@ -93,7 +93,7 @@ resources:
 resources:
   jobs:
     semantic_layer_setup_job:
-      name: "[${bundle.target}] Health Monitor - Semantic Layer Setup"
+      name: "[${bundle.target} ${var.user_prefix}] Health Monitor - Semantic Layer Setup"
       description: "Composite job: Deploys TVFs and Metric Views by referencing atomic jobs"
       
       tasks:
@@ -125,7 +125,7 @@ resources:
 resources:
   jobs:
     master_setup_orchestrator:
-      name: "[${bundle.target}] Health Monitor - Master Setup Orchestrator"
+      name: "[${bundle.target} ${var.user_prefix}] Health Monitor - Master Setup Orchestrator"
       description: "Master orchestrator: References all setup jobs (no direct notebooks)"
       
       tasks:
@@ -298,7 +298,7 @@ databricks bundle run -t dev master_setup_orchestrator
 resources:
   jobs:
     setup_orchestrator_job:
-      name: "[${bundle.target}] <Project> Setup Orchestrator"
+      name: "[${bundle.target} ${var.user_prefix}] <Project> Setup Orchestrator"
       description: "Orchestrates complete setup: tables, functions, monitoring"
       
       # Shared environment for all tasks
@@ -390,7 +390,7 @@ resources:
 resources:
   jobs:
     refresh_orchestrator_job:
-      name: "[${bundle.target}] <Project> Refresh Orchestrator"
+      name: "[${bundle.target} ${var.user_prefix}] <Project> Refresh Orchestrator"
       description: "Orchestrates complete data pipeline: Bronze → Silver → Gold"
       
       environments:

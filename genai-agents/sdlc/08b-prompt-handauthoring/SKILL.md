@@ -34,7 +34,7 @@ metadata:
 
 This is the **default** path for instruction-shaped prompt iteration in the reusable MLflow workshop. It produces hand-authored prompt revisions guided by failing-scorer rationales from the first scored eval, then validates them against the **full** evaluation dataset before promotion. It is intentionally cheap, transparent, and easy to roll back.
 
-> **GEPA / automated optimization is NOT in the default flow.** If the prompt explicitly declares `prompt_iteration_strategy: gepa`, route to [08-prompt-optimization](../08-prompt-optimization/SKILL.md) instead. That skill owns the AI-Dev-Kit `databricks-mlflow-evaluation` upstream lineage for `optimize_prompts()` / GEPA guidance and is maintained as the optional advanced path.
+> **GEPA / automated optimization is NOT in the default flow.** If the prompt explicitly declares `prompt_iteration_strategy: gepa`, route to [08-prompt-optimization](../08-prompt-optimization/SKILL.md) instead. That skill owns the Databricks Agent Skills `databricks-mlflow-evaluation` upstream lineage for `optimize_prompts()` / GEPA guidance and is maintained as the optional advanced path.
 
 ---
 

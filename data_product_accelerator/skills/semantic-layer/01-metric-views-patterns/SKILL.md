@@ -19,13 +19,13 @@ metadata:
   last_verified: "2026-06-06"
   volatility: high
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-metric-views/SKILL.md"
+        - "skills/databricks-metric-views/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-04-27"
-      sync_commit: "latest"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
     - name: "databricks-docs-overview"
       url: "https://docs.databricks.com/aws/en/business-semantics/metric-views/"
       relationship: "upstream"

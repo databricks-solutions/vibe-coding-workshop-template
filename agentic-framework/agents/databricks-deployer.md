@@ -30,7 +30,7 @@ Databricks App (FastAPI)
 
 ## Reference Skills
 
-Read these skills from https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-skills/ before deploying:
+Read these skills from https://github.com/databricks/databricks-agent-skills/tree/main/skills/ before deploying:
 
 | Skill | Files to Read | Purpose |
 |-------|---------------|---------|

@@ -11,7 +11,7 @@
 resources:
   jobs:
     ml_feature_pipeline_job:
-      name: "[${bundle.target}] ML Feature Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] ML Feature Pipeline"
       description: "Creates and updates feature tables in Unity Catalog"
 
       environments:

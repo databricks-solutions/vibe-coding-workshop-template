@@ -109,7 +109,7 @@ def get_parameters():
 resources:
   jobs:
     my_job:
-      name: "[${bundle.target}] My Job"
+      name: "[${bundle.target} ${var.user_prefix}] My Job"
       
       # ✅ Serverless environment
       environments:

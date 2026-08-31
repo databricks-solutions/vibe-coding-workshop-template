@@ -1,6 +1,6 @@
 ---
 name: self-improvement
-description: Enables agent self-reflection and learning from mistakes through systematic skill updates. Prioritizes updating existing skills over creating new ones - always searches existing skills first, creates new skills only when justified. Includes upstream source sync workflow for tracking and updating skills from databricks-solutions/ai-dev-kit. Use after encountering errors, completing complex tasks, or when asked to reflect, learn, or document a mistake. Triggers on "learn from this", "don't repeat", "remember this pattern", "what went wrong", "update skills", "capture this learning", "document mistake", "prevent this error", "AI-Dev-Kit updated", "upstream changed", "sync with ai-dev-kit".
+description: Enables agent self-reflection and learning from mistakes through systematic skill updates. Prioritizes updating existing skills over creating new ones - always searches existing skills first, creates new skills only when justified. Includes upstream source sync workflow for tracking and updating skills from databricks/databricks-agent-skills. Use after encountering errors, completing complex tasks, or when asked to reflect, learn, or document a mistake. Triggers on "learn from this", "don't repeat", "remember this pattern", "what went wrong", "update skills", "capture this learning", "document mistake", "prevent this error", "databricks-agent-skills updated", "upstream changed", "sync with databricks-agent-skills".
 license: Apache-2.0
 clients: [ide_cli, genie_code]
 bundle_resource: none
@@ -55,7 +55,7 @@ These triggers are **proactive** — they don't require an error to fire. They k
 |---------|--------|--------|
 | **Periodic review** | User says "audit skills" or "check freshness" | Run `admin/skill-freshness-audit` skill |
 | **Platform release** | User says "Databricks released X" or "new MLflow version" | Find affected skills by domain → fetch verification_sources → flag drift |
-| **AI-Dev-Kit updated** | User says "AI-Dev-Kit updated" or "upstream changed" | Find skills with `upstream_sources` referencing ai-dev-kit → fetch upstream → compare → flag drift |
+| **Upstream updated** | User says "databricks-agent-skills updated" or "upstream changed" | Find skills with `upstream_sources` referencing databricks-agent-skills → fetch upstream → compare → flag drift |
 | **Documentation change** | WebFetch returns different API pattern than skill documents | Flag skill for update, log drift details in drift report |
 | **Pre-task verification** | Loading a high-volatility skill for implementation | Check `last_verified` age; if stale (>30 days for high), suggest quick verification |
 | **Post-implementation review** | Completed a task using a skill | If skill patterns needed adjustment, update the skill and `last_verified` |
@@ -73,7 +73,7 @@ Respond to phrases like:
 - "Create a skill from this"
 - "Audit skills" / "Check freshness" (→ delegates to `skill-freshness-audit`)
 - "Databricks released X" / "New MLflow version" (→ platform release audit)
-- "AI-Dev-Kit updated" / "Upstream changed" / "Sync with ai-dev-kit" (→ upstream sync workflow)
+- "databricks-agent-skills updated" / "Upstream changed" / "Sync with databricks-agent-skills" (→ upstream sync workflow)
 
 ---
 
@@ -307,10 +307,10 @@ I'm about to use a high-volatility skill. Quick freshness check:
 - Does the skill's version history show recent updates?
 ```
 
-### After AI-Dev-Kit Update
+### After a Databricks Agent Skills Update
 ```
-The AI-Dev-Kit upstream has been updated. Let me sync:
-- Which skills have upstream_sources pointing to ai-dev-kit? (check lineage map)
+The databricks-agent-skills upstream has been updated. Let me sync:
+- Which skills have upstream_sources pointing to databricks-agent-skills? (check lineage map)
 - What changed in the upstream files? (WebFetch raw GitHub URLs)
 - Do any of our skills need updating based on upstream changes?
 - For derived/extended skills: are there new patterns we should adopt?
@@ -322,14 +322,14 @@ The AI-Dev-Kit upstream has been updated. Let me sync:
 
 ## Upstream Source Sync Workflow
 
-Skills in this repository track their lineage to `databricks-solutions/ai-dev-kit` via `upstream_sources` metadata in their frontmatter. This workflow describes how to sync skills when the upstream changes.
+Skills in this repository track their lineage to `databricks/databricks-agent-skills` via `upstream_sources` metadata in their frontmatter. This workflow describes how to sync skills when the upstream changes.
 
-**Lineage Map:** See `admin/skill-freshness-audit/references/ai-dev-kit-lineage-map.md` for the complete mapping.
+**Lineage Map:** See `admin/skill-freshness-audit/references/databricks-agent-skills-lineage-map.md` for the complete mapping.
 
 ### When to Sync
 
-- User says "AI-Dev-Kit updated", "sync with ai-dev-kit", or "upstream changed"
-- After a known AI-Dev-Kit release or major commit
+- User says "databricks-agent-skills updated", "sync with databricks-agent-skills", or "upstream changed"
+- After a known databricks-agent-skills release or major commit
 - During periodic freshness audits (check `last_synced` staleness)
 - When a skill with upstream sources produces incorrect patterns
 
@@ -337,7 +337,7 @@ Skills in this repository track their lineage to `databricks-solutions/ai-dev-ki
 
 ```
 1. IDENTIFY affected skills:
-   a. Read the lineage map (admin/skill-freshness-audit/references/ai-dev-kit-lineage-map.md)
+   a. Read the lineage map (admin/skill-freshness-audit/references/databricks-agent-skills-lineage-map.md)
    b. OR: Glob all SKILL.md files and read upstream_sources from frontmatter
    c. Filter to skills where upstream_sources is non-empty
 
@@ -382,13 +382,13 @@ Update the skill's frontmatter:
 ```yaml
 metadata:
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-agent-bricks/SKILL.md"
+        - "skills/databricks-agent-bricks/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-19"    # ← Update to today's date
-      sync_commit: "latest"        # ← Update to latest upstream commit
+      last_synced: "2026-08-30"    # ← Update to today's date
+      sync_commit: "ca92a6c"       # ← Update to latest upstream commit
 ```
 
 ### Key Principles

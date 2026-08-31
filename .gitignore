@@ -108,3 +108,6 @@ retrospectives
 # large regenerated audit CSV and skill manifest are ignored.
 genie_compat_audit.csv
 skill_manifest.txt
+
+# Agents on Databricks slide outline (working draft, not source)
+presentations/agents-on-databricks-outline.md

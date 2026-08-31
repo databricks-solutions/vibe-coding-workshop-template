@@ -116,6 +116,12 @@ button{font-family:inherit;}
 .sc-9{border-color:var(--teal);} .sc-9 .sn-num{color:var(--teal);}
 .sc-8{border-color:var(--pink);} .sc-8 .sn-num{color:var(--pink);}
 .sc-9{border-color:var(--cyan);} .sc-9 .sn-num{color:var(--cyan);}
+.sc-a1{border-color:var(--cyan);} .sc-a1 .sn-num{color:var(--cyan);}
+.sc-a2{border-color:var(--blue);} .sc-a2 .sn-num{color:var(--blue);}
+.sc-a3{border-color:var(--teal);} .sc-a3 .sn-num{color:var(--teal);}
+.sc-a4{border-color:var(--purple);} .sc-a4 .sn-num{color:var(--purple);}
+.sc-a5{border-color:var(--green);} .sc-a5 .sn-num{color:var(--green);}
+.sc-a6{border-color:var(--gold);} .sc-a6 .sn-num{color:var(--gold);}
 
 /* ==================== MODE 2: GUIDED TOURS ==================== */
 #tours.active{display:flex;flex-direction:column;height:calc(100vh - 53px);}
@@ -442,11 +448,12 @@ body.light .tour-card.active{box-shadow:0 4px 16px rgba(226,55,29,.15);}
   <canvas id="starfield"></canvas>
   <div class="galaxy-content">
     <div class="stats-bar">
-      <div class="stat"><div class="stat-num">54</div><div class="stat-label">Agent Skills</div></div>
+      <div class="stat"><div class="stat-num">73</div><div class="stat-label">Agent Skills</div></div>
       <div class="stat"><div class="stat-num">9</div><div class="stat-label">Pipeline Stages</div></div>
       <div class="stat"><div class="stat-num">5</div><div class="stat-label">App Phases</div></div>
-      <div class="stat"><div class="stat-num">14</div><div class="stat-label">Platform Modules</div></div>
-      <div class="stat"><div class="stat-num">3</div><div class="stat-label">Guided Tours</div></div>
+      <div class="stat"><div class="stat-num">19</div><div class="stat-label">Agent Lifecycle</div></div>
+      <div class="stat"><div class="stat-num">19</div><div class="stat-label">Platform Modules</div></div>
+      <div class="stat"><div class="stat-num">4</div><div class="stat-label">Guided Tours</div></div>
     </div>
 
     <!-- DPA Galaxy -->
@@ -474,6 +481,14 @@ body.light .tour-card.active{box-shadow:0 4px 16px rgba(226,55,29,.15);}
       <div class="subtitle">Agent prompts for building multi-agent systems.</div>
       <div class="agentic-nodes" id="agenticNodes"></div>
     </div>
+
+    <!-- Agents + MLflow Galaxy -->
+    <div class="galaxy-section" style="text-align:center;">
+      <div class="galaxy-label" style="text-align:center;">Agents on Databricks + MLflow</div>
+      <h2>The Agent + MLflow SDLC Lifecycle</h2>
+      <div class="subtitle">From agent spec to production monitoring. Click any stage; dots are the steps within it.</div>
+      <div class="pipeline-flow" id="agentFlow"></div>
+    </div>
   </div>
 </div>
 
@@ -491,6 +506,10 @@ body.light .tour-card.active{box-shadow:0 4px 16px rgba(226,55,29,.15);}
     <div class="tour-card" onclick="selectTour('c')" id="tc-c">
       <h3>Tour C: The Full Picture</h3>
       <p>Both paths converge — data pipeline meets the application layer</p>
+    </div>
+    <div class="tour-card" onclick="selectTour('d')" id="tc-d">
+      <h3>Tour D: App to Agent</h3>
+      <p>Turn the app into a governed agent — tools, memory, auth, then evaluate, deploy, and monitor with MLflow</p>
     </div>
   </div>
   <div class="tour-controls">
@@ -777,6 +796,114 @@ const SKILLS = [
    code:'@tool(description="Search hotel bookings by guest name")\ndef search_bookings(\n  guest_name: str,\n  limit: int = 10\n) -> list[dict]:\n  return db.sql(f"SELECT * FROM gold.fact_bookings\n    WHERE guest_name ILIKE \'%{guest_name}%\'\n    LIMIT {limit}").to_dict()'},
   {id:'af-test',name:'Agent Tester',domain:'agentic',component:'agentic',type:'worker',desc:'Tests agent behavior with scenario-based test suites: given input X, the agent should call tool Y with parameters Z and produce answer W. Validates both the tool-calling sequence and the final output quality.',keywords:['test agent'],workers:[],commonDeps:[],
    rationale:'Agent testing is harder than unit testing because <em>outputs are non-deterministic</em>. The tester uses LLM-judge evaluation and structural assertions (did the agent call the right tools?) to create reliable, repeatable test suites.'},
+  // --- Agents on Databricks + MLflow SDLC (sections 38-56) ---
+  {id:'ag-spec',name:'Agent Spec Design',domain:'agents',component:'agents',type:'orchestrator',
+   desc:'<strong>What This Stage Does</strong><br>Captures agent intent as <code>agent_spec.yaml</code> before any code — purpose, users and journeys, capabilities, guardrails, and measurable success criteria.<br><br><div class="ac-diagram"><span class="hl">Purpose + users</span> → who is this for, what journeys<br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-p">Capabilities</span> → what the agent must be able to do<br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-g">Guardrails + success criteria</span> → limits + how we measure quality</div><br><strong>Why spec first?</strong> The success criteria become the seed of the evaluation dataset later.',
+   keywords:['agent spec','agent design','capabilities','success criteria'],workers:['ag-toolplan'],commonDeps:[],
+   code:'name: booking-assistant\npurpose: Answer booking + policy questions\nusers: [guest, support_agent]\ncapabilities:\n  - answer data questions via Genie\n  - cite policy docs via Knowledge Assistant\nguardrails:\n  - never expose another users data\nsuccess_criteria:\n  - grounded, cited answers\n  - correct tool selection',
+   rationale:'Great agents start as a <em>spec, not a prompt</em>. Writing purpose, capabilities, guardrails, and success criteria first aligns everyone on scope and seeds the evaluation dataset — those success criteria literally become test cases downstream.',
+   prompt:'Design the agent spec.\nRead @apps_lakebase/prompts/sections/38-agent_spec_design.md'},
+  {id:'ag-toolplan',name:'Tool Selection Plan',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Maps each capability from the spec to exactly one tool — and nothing more.<br><br><table><tr><th>Capability</th><th>Tool</th></tr><tr><td>Structured data Q&amp;A</td><td>Genie</td></tr><tr><td>Policy / doc Q&amp;A</td><td>Knowledge Assistant</td></tr><tr><td>Find similar cases</td><td>Vector Search</td></tr><tr><td>Take an action</td><td>UC Function</td></tr></table><br><strong>Principle:</strong> least tools, clearest descriptions — the tool description is the routing logic the model reads.',
+   keywords:['tool plan','tool selection','MCP','Genie','UC functions'],workers:[],commonDeps:[],
+   rationale:'Every capability should map to one clear tool; capabilities that need no tool should not get one. Fewer, well-described tools make the agent more reliable and easier to evaluate — an over-tooled agent gets confused about which tool to call.',
+   prompt:'Plan the agent tools.\nRead @apps_lakebase/prompts/sections/39-agent_tool_selection.md'},
+  {id:'ag-uc',name:'UC Resources Foundation',domain:'agents',component:'agents',type:'orchestrator',
+   desc:'<strong>What This Stage Does</strong><br>Lays the Unity Catalog foundation before wiring: schema, volume for artifacts, registered tool functions, grants, and an MLflow experiment home.<br><br><div class="ac-diagram"><span class="hl">catalog.schema</span> → functions + volume + (model, prompt, memory later)<br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-g">Grants</span> → EXECUTE on functions, CAN_QUERY on endpoints<br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-p">MLflow experiment</span> → tracing has a governed home</div>',
+   keywords:['UC resources','schema','grants','volume','experiment'],workers:['ag-tracing','ag-ka'],commonDeps:[],
+   code:'CREATE SCHEMA IF NOT EXISTS main.agent;\nGRANT USE SCHEMA ON SCHEMA main.agent TO `app-sp`;\nGRANT EXECUTE ON FUNCTION main.agent.create_booking TO `app-sp`;',
+   rationale:'Agents fail in production for boring reasons — a missing grant, an unregistered function. Laying the UC foundation first means permissions line up at deploy time and everything the agent touches is a governed, audited securable.',
+   prompt:'Set up UC resources for the agent.\nRead @apps_lakebase/prompts/sections/40-uc_resources_foundation.md',platform:'uc'},
+  {id:'ag-tracing',name:'MLflow Agent Tracing',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Turns the agent into a glass box with one line of MLflow autologging — capturing a span tree of Agent → LLM → Tool → Retriever for debugging, audit, and later evaluation.',
+   keywords:['MLflow tracing','spans','observability','autolog'],workers:[],commonDeps:[],
+   code:'import mlflow\nmlflow.set_experiment(\'/Shared/agent\')\nmlflow.openai.autolog()\n# every LLM + tool call is now traced',
+   rationale:'MLflow Tracing turns the agent from a black box into a span tree you can inspect — the same traces you debug with in dev become the raw material for evaluation and production monitoring later.',
+   prompt:'Enable MLflow tracing.\nRead @apps_lakebase/prompts/sections/41-mlflow_agent_tracing_uc.md',platform:'mlflow-eval'},
+  {id:'ag-ka',name:'Knowledge Assistant',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Creates an Agent Bricks <strong>Knowledge Assistant</strong> — managed RAG over your documents that returns grounded, cited answers. The agent calls it as one tool.<br><br><div class="ac-diagram"><span class="hl">Documents (UC Volume)</span> → <span class="hl-g">Knowledge Assistant</span> (chunk + embed + retrieve)<br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-p">Grounded answer + citations</span> → exposed as an agent tool</div>',
+   keywords:['Knowledge Assistant','Agent Bricks','RAG','citations','grounding'],workers:[],commonDeps:[],
+   rationale:'RAG is usually a project — chunking, embeddings, a retriever, citations. Knowledge Assistant collapses that into a managed, UC-governed service the agent calls as a single tool, so you get production RAG without owning the plumbing.',
+   prompt:'Create a Knowledge Assistant.\nRead @apps_lakebase/prompts/sections/42-knowledge_assistant_create.md',platform:'knowledge-assistant'},
+  {id:'ag-clone',name:'Clone Agent Framework',domain:'agents',component:'agents',type:'orchestrator',
+   desc:'<strong>What This Stage Does</strong><br>Clones a proven Databricks agent template (OpenAI Agents SDK or LangGraph advanced) instead of starting from a blank file — you get the ResponsesAgent contract, tool wiring, tracing, and a memory-ready structure.',
+   keywords:['clone template','ResponsesAgent','agent framework','app template'],workers:['ag-tools','ag-authmem'],commonDeps:[],
+   code:'git clone https://github.com/databricks/app-templates.git\ncd app-templates/agent-openai-advanced\n# ResponsesAgent + tools/ + AgentServer + databricks.yml',
+   rationale:'Templates give you the standard ResponsesAgent contract (so MLflow, evaluation, and serving all understand your agent), pre-wired tool calling, tracing, and — in advanced variants — short-term memory and background execution. Your job becomes customization, not creation.',
+   prompt:'Clone the agent framework.\nRead @apps_lakebase/prompts/sections/43-track_a_agent_app_clone_framework.md',platform:'genai-agents'},
+  {id:'ag-tools',name:'Wire KA + Genie Tools',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Registers the first real tools for the agent — Knowledge Assistant (cited doc Q&amp;A) and Genie (NL → governed SQL). The tool description is the routing logic the model reads to decide when to call each.',
+   keywords:['wire tools','Genie tool','KA tool','tool description'],workers:[],commonDeps:[],
+   code:'@tool(description="Answer questions about hotel data via Genie")\ndef genie_query(question: str) -> str:\n    return genie.ask(space_id, question)\n\n@tool(description="Answer policy questions from docs, with citations")\ndef knowledge_lookup(question: str) -> str:\n    return ka.query(question)',
+   rationale:'The craft here is the tool <em>description</em> — that is what the model reads to route a question to the right tool. Wire Genie for data questions and Knowledge Assistant for document questions, and the agent can field both in one conversation.',
+   prompt:'Wire KA and Genie tools.\nRead @apps_lakebase/prompts/sections/44-track_a_agent_ka_genie_tools.md',platform:'genie'},
+  {id:'ag-authmem',name:'Auth + Lakebase Memory',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Wires two core primitives into code: <strong>OBO authentication</strong> (tools run as the logged-in user) and <strong>Lakebase memory</strong> (short-term thread context + long-term per-user recall).<br><br><div class="ac-diagram"><span class="hl">Auth</span>: user token → downscoped → tools run as user<br><span class="hl-p">Short-term</span>: thread_id + last-N turns (Lakebase)<br><span class="hl-g">Long-term</span>: embeddings per user — search before, persist after</div>',
+   keywords:['authentication','OBO','memory','Lakebase','short-term','long-term'],workers:[],commonDeps:[],
+   code:'session = AsyncDatabricksSession(thread_id=thread_id)   # short-term\nfacts = long_term.search(user_id, query)                # recall\n# ... call LLM with facts + last-N turns ...\nlong_term.persist(user_id, new_facts)                   # remember',
+   rationale:'OBO makes the agent act as the logged-in user, so Genie queries honor the requesting user UC permissions and the audit log names the real person. Lakebase memory adds short-term thread context and long-term per-user recall — an agent that acts as you and remembers you.',
+   prompt:'Wire OBO auth and Lakebase memory.\nRead @apps_lakebase/prompts/sections/45-track_a_agent_auth_memory.md',platform:'agent-memory'},
+  {id:'ag-evaldeploy',name:'Agent Eval + Deploy',domain:'agents',component:'agents',type:'orchestrator',
+   desc:'<strong>What This Stage Does</strong><br>Runs a first evaluation of the Track A agent and deploys it as its own Databricks App / endpoint, verifying it responds before wiring a UI.',
+   keywords:['agent eval','deploy agent','Track A','verify'],workers:['ag-proxy','ag-feedback'],commonDeps:[],
+   code:'databricks bundle deploy\ndatabricks apps deploy --name booking-agent\n# probe: curl the endpoint, confirm a streamed response',
+   rationale:'A first eval + deploy proves the agent works end-to-end (auth, tools, memory) before any frontend depends on it. Verify with a probe rather than trusting a green checkmark.',
+   prompt:'Evaluate and deploy the agent.\nRead @apps_lakebase/prompts/sections/46-track_a_agent_eval_deploy.md',platform:'genai-agents'},
+  {id:'ag-proxy',name:'AppKit Agent Proxy Chat',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Fronts the agent behind the AppKit UI with an OBO proxy that forwards the end-user token and streams SSE responses into the React chat.<br><br><div class="ac-diagram"><span class="hl">AppKit UI</span> → <code>/api/chat</code> (proxy + x-forwarded-access-token)<br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-g">Separate Agent App</span> streams the answer back</div>',
+   keywords:['agent proxy','06d','OBO','x-forwarded-access-token','two apps'],workers:[],commonDeps:[],
+   rationale:'The 2-Apps architecture keeps the Python agent runtime separate from the TypeScript UI while preserving end-user identity through OBO forwarding — the canonical AppKit integration path.',
+   prompt:'Proxy the agent into AppKit chat.\nRead @apps_lakebase/prompts/sections/47-appkit_agent_app_proxy_chat.md',platform:'agent-auth'},
+  {id:'ag-feedback',name:'Chat Feedback to MLflow',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Adds thumbs up/down on assistant responses and logs each vote as an <strong>MLflow assessment</strong> on the exact trace that produced the answer.',
+   keywords:['feedback','thumbs','MLflow assessment','trace ID'],workers:[],commonDeps:[],
+   rationale:'Feedback closes the loop from production usage back into evaluation — real user judgments linked to real executions become training and evaluation signal.',
+   prompt:'Add chat feedback linked to MLflow.\nRead @apps_lakebase/prompts/sections/48-appkit_chat_feedback_mlflow.md',platform:'genai-agents'},
+  {id:'ag-prompts',name:'MLflow Prompt Registry',domain:'agents',component:'agents',type:'orchestrator',
+   desc:'<strong>What This Stage Does</strong><br>Versions the system prompt in the <strong>MLflow Prompt Registry</strong> (a UC asset) and promotes by alias — the agent loads <code>prompt@production</code> at runtime, never a hard-coded string.',
+   keywords:['prompt registry','versioning','alias','production'],workers:['ag-datasets','ag-scorers','ag-evalruns','ag-signoff','ag-register'],commonDeps:[],
+   code:'import mlflow\nmlflow.genai.register_prompt(name="main.agent.system", template=SYSTEM)\nmlflow.genai.set_prompt_alias("main.agent.system", alias="production", version=3)',
+   rationale:'The system prompt is the most-edited logic in the agent, so version it like code. Loading by alias means shipping or rolling back a prompt is just moving a label — no redeploy, full history, full audit.',
+   prompt:'Set up the MLflow prompt registry.\nRead @apps_lakebase/prompts/sections/49-mlflow_prompt_registry.md',platform:'mlflow-eval'},
+  {id:'ag-datasets',name:'Evaluation Datasets',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Builds an evaluation dataset (&ge; ~20 rows) covering every capability and journey from the spec. Sources: spec criteria, real traces, SME examples, edge cases. Coverage over volume.',
+   keywords:['evaluation dataset','benchmark','coverage','test cases'],workers:[],commonDeps:[],
+   rationale:'Evaluation needs a curated benchmark of inputs the agent should handle, ideally with expected outputs. Aim for coverage of every capability and journey plus the nasty edge cases — this dataset is the yardstick for every change from here on.',
+   prompt:'Build evaluation datasets.\nRead @apps_lakebase/prompts/sections/50-mlflow_evaluation_datasets.md',platform:'mlflow-eval'},
+  {id:'ag-scorers',name:'Scorers & Judges',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Defines the grading suite: built-in scorers (safety, relevance, groundedness), guidelines-as-judge (plain-English rules), custom code scorers (deterministic), and LLM judges (via make_judge) — each with pass/fail thresholds.',
+   keywords:['scorers','judges','LLM judge','guidelines','safety'],workers:[],commonDeps:[],
+   code:'from mlflow.genai.scorers import Safety, RelevanceToQuery\nfrom mlflow.genai.judges import make_judge\ntone = make_judge("tone", instructions="Is the reply empathetic and correct?")\nscorers = [Safety(), RelevanceToQuery(), tone]',
+   rationale:'Mixing deterministic checks (valid JSON, exact ID) with judgment-based scorers (tone, nuanced correctness) makes evaluation both rigorous and realistic. Pass/fail thresholds keep results unambiguous.',
+   prompt:'Define scorers and judges.\nRead @apps_lakebase/prompts/sections/51-mlflow_scorers_and_judges.md',platform:'mlflow-eval'},
+  {id:'ag-evalruns',name:'Evaluation Runs & Iteration',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Scores the agent with <code>mlflow.genai.evaluate()</code>, then reads results by <strong>failure shape</strong> — each shape routes to a specific fix.<br><br><div class="ac-diagram"><span class="hl-o">Retrieval miss</span> → improve KA / docs<br><span class="hl-o">Wrong tool</span> → sharpen tool description<br><span class="hl-o">Hallucination</span> → tighten prompt / guideline<br><span class="hl-o">Safety trip</span> → add guardrail</div>',
+   keywords:['evaluation run','iteration','failure shape','mlflow.genai.evaluate'],workers:[],commonDeps:[],
+   code:'results = mlflow.genai.evaluate(data=eval_dataset, predict_fn=agent, scorers=scorers)\n# inspect by failure shape, fix the specific lever, re-run',
+   rationale:'Do not just read "62% pass" — categorize failures. Each shape (retrieval miss, wrong tool, hallucination, format, safety) points to a specific lever, so iteration is targeted, not random.',
+   prompt:'Run evaluation and iterate.\nRead @apps_lakebase/prompts/sections/52-mlflow_evaluation_runs_and_iteration.md',platform:'mlflow-eval'},
+  {id:'ag-signoff',name:'Human Review & Sign-off',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Adds humans to the loop: SMEs label a sample via the MLflow review app, stakeholders record an APPROVED decision in <code>decision.md</code>, and a regression subset is tagged as must-never-regress.',
+   keywords:['human review','sign-off','labeling','regression'],workers:[],commonDeps:[],
+   rationale:'Numbers get you close, but launch decisions need judgment and accountability. SME labeling catches what scorers miss; a recorded sign-off makes go/no-go auditable; a pinned regression subset guards against backsliding.',
+   prompt:'Run human review and sign-off.\nRead @apps_lakebase/prompts/sections/53-mlflow_human_review_and_signoff.md',platform:'genai-agents'},
+  {id:'ag-register',name:'Logged Model + UC Registration',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Logs the agent as an MLflow model, registers it in Unity Catalog, and moves the <code>@champion</code> alias to the approved version — the deployed system always resolves @champion.',
+   keywords:['logged model','UC registration','champion','promotion'],workers:[],commonDeps:[],
+   code:'info = mlflow.models.log_model(name="agent", python_model=agent)\nmlflow.set_registry_uri("databricks-uc")\nmv = mlflow.register_model(info.model_uri, "main.agent.booking")\nclient.set_registered_model_alias("main.agent.booking", "champion", mv.version)',
+   rationale:'Registering ties evaluation to deployment: the exact artifact that passed eval and sign-off is the one that runs, and promotion or rollback is just moving the @champion alias.',
+   prompt:'Register the agent in Unity Catalog.\nRead @apps_lakebase/prompts/sections/54-mlflow_logged_model_uc_registration.md',platform:'uc'},
+  {id:'ag-gateway',name:'AI Gateway & Deployment',domain:'agents',component:'agents',type:'orchestrator',
+   desc:'<strong>What This Stage Does</strong><br>Optionally hardens LLM calls with the <strong>AI Gateway</strong> (PII/safety guardrails, rate limits, usage tracking, inference tables), then deploys the governed agent.',
+   keywords:['AI Gateway','guardrails','rate limits','inference tables','deploy'],workers:['ag-monitor'],commonDeps:[],
+   rationale:'The AI Gateway is the enterprise seatbelt: guardrails on inputs/outputs, rate limits to control cost and abuse, and inference tables logging every request to Delta for audit — which also feeds monitoring.',
+   prompt:'Add the AI Gateway and deploy.\nRead @apps_lakebase/prompts/sections/55-mlflow_gateway_and_deployment.md',platform:'agent-monitoring'},
+  {id:'ag-monitor',name:'Production Monitoring',domain:'agents',component:'agents',type:'worker',
+   desc:'<strong>What This Skill Does</strong><br>Reuses the same eval scorers as <strong>continuous monitors</strong> on live traffic — sample production traces, score in the background, alert on drift, and auto-triage failures with an agent-as-judge.<br><br><div class="ac-diagram"><span class="hl">Prod traces</span> → sample → <span class="hl-g">scorers</span> → dashboard<br>&nbsp;&nbsp;&nbsp;&nbsp;↓ breach<br><span class="hl-o">SQL alert</span> → agent-as-judge triage → new eval rows</div>',
+   keywords:['production monitoring','continuous eval','SQL alert','agent-as-judge','drift'],workers:[],commonDeps:[],
+   code:'from mlflow.genai.scorers import ScorerSamplingConfig\nSafety().register(name="prod_safety")\nSafety().start(sampling_config=ScorerSamplingConfig(sample_rate=0.2))',
+   rationale:'The same scorers you built offline become online monitors: sample live traffic, score continuously, and alert when groundedness or safety trend down. Hard real-world failures feed back into the eval dataset — closing the loop.',
+   prompt:'Set up production monitoring.\nRead @apps_lakebase/prompts/sections/56-mlflow_production_monitoring_and_debugging.md',platform:'agent-monitoring'},
 ];
 
 const SKILL_MAP = {};
@@ -801,6 +928,15 @@ const PHASES = [
   {num:3,label:'Setup Lakebase',skills:['appkit-04']},
   {num:4,label:'Wire Branches',skills:['appkit-04','appkit-05','appkit-06','appkit-06d','appkit-07','appkit-08']},
   {num:5,label:'Deploy + E2E',skills:['appkit-03']},
+];
+
+const AGENT_STAGES = [
+  {num:'1',label:'Design',sc:'sc-a1',orch:'ag-spec'},
+  {num:'2',label:'Foundation',sc:'sc-a2',orch:'ag-uc'},
+  {num:'3',label:'Build Agent',sc:'sc-a3',orch:'ag-clone'},
+  {num:'4',label:'Integrate',sc:'sc-a4',orch:'ag-evaldeploy'},
+  {num:'5',label:'Eval & Govern',sc:'sc-a5',orch:'ag-prompts'},
+  {num:'6',label:'Ship & Operate',sc:'sc-a6',orch:'ag-gateway'},
 ];
 
 // ======================== TOUR DATA ========================
@@ -964,6 +1100,69 @@ const TOURS = {
       {narration:'<strong>The complete picture:</strong> Path B builds the data, Path A builds the experience. Together, a production data product with a beautiful frontend.',tier:[1,'Complete'],
        summary:true},
     ]
+  },
+  d: {
+    name:'App to Agent',
+    tree: buildAgentsTree(),
+    steps: [
+      {expand:['tg-root'],activate:['tg-n-root'],narration:'<span class="hl">From app to governed agent.</span> You already have an app + Lakebase. Now add an agent with tools, memory, and auth — then evaluate, deploy, and monitor it with MLflow.',tier:[1,'Tier 1: Overview'],
+       designRationale:'This track takes the app you built and makes it <em>intelligent and trustworthy</em>. The lifecycle has two acts. <strong>Act I — build the agent</strong>: design a spec, lay the UC foundation, wire tools, add memory and auth, and ship a first version. <strong>Act II — earn trust</strong>: version the prompt, evaluate against a real dataset, get human sign-off, register in UC, and monitor in production. Every artifact you produce (traces, feedback, eval results) feeds the next stage — it is a loop, not a line.',
+       inputOutput:{inputs:['deployed app','Lakebase','Genie Space'],outputs:['governed, monitored agent']}},
+      {expand:['tg-s1'],activate:['tg-n-s1'],narration:'<span class="hl">Stage 1: Design</span> — capture the agent as a <code>spec</code>, not a prompt: purpose, capabilities, guardrails, success criteria.',tier:[2,'Stage 1: Design'],
+       skillIds:['ag-spec'],
+       designRationale:'A great agent starts as a spec. Writing purpose, users, capabilities, guardrails, and measurable success criteria first aligns everyone on scope <em>before</em> any code. Crucially, those success criteria become the seed of your evaluation dataset later — design decisions here echo all the way to monitoring.',
+       inputOutput:{inputs:['product intent','user journeys'],outputs:['agent_spec.yaml','success criteria']}},
+      {activate:['tg-n-s1-w1'],narration:'Map each capability to <span class="hl-y">exactly one tool</span> — least tools, clearest descriptions.',tier:[3,'Tier 3: Worker'],
+       skillIds:['ag-toolplan'],
+       designRationale:'Every capability from the spec should map to one clear tool; capabilities that need no tool should not get one. The tool <em>description</em> is the routing logic the model reads, so fewer well-described tools make the agent more reliable and easier to evaluate. Structured data → Genie; documents → Knowledge Assistant; actions → UC Functions.',
+       inputOutput:{inputs:['capabilities'],outputs:['capability→tool map']}},
+      {expand:['tg-s2'],activate:['tg-n-s2'],narration:'<span class="hl">Stage 2: Foundation</span> — lay the Unity Catalog groundwork: schema, volume, functions, grants, MLflow experiment.',tier:[2,'Stage 2: Foundation'],
+       skillIds:['ag-uc'],
+       designRationale:'Agents fail in production for boring reasons — a missing grant, an unregistered function. Laying the UC foundation first means permissions line up at deploy time and everything the agent touches is a governed, audited securable. This is also where the MLflow experiment gets a home so tracing has somewhere to land.',
+       inputOutput:{inputs:['tool plan'],outputs:['UC schema + volume','registered functions','grants','MLflow experiment']}},
+      {activate:['tg-n-s2-w1','tg-n-s2-w2'],narration:'Turn on <span class="hl-y">MLflow tracing</span> (glass-box spans) and create a <span class="hl-y">Knowledge Assistant</span> (managed RAG with citations).',tier:[3,'Tier 3: Workers'],
+       skillIds:['ag-tracing','ag-ka'],
+       designRationale:'Tracing makes the agent a glass box — one line of autologging captures a span tree of Agent → LLM → Tool → Retriever. The same traces you debug with become the raw material for evaluation and monitoring. Knowledge Assistant collapses an entire RAG project (chunking, embeddings, retriever, citations) into one managed, UC-governed tool the agent can call.',
+       inputOutput:{inputs:['UC foundation','documents'],outputs:['trace spans','Knowledge Assistant endpoint']}},
+      {expand:['tg-s3'],activate:['tg-n-s3'],narration:'<span class="hl">Stage 3: Build Agent</span> — clone a proven Databricks agent template instead of a blank file.',tier:[2,'Stage 3: Build Agent'],
+       skillIds:['ag-clone'],
+       designRationale:'Templates give you the standard ResponsesAgent contract (so MLflow, evaluation, and serving all understand your agent), pre-wired tool calling, tracing, and — in advanced variants — short-term memory and background execution. Your job becomes customization, not creation.',
+       inputOutput:{inputs:['agent spec','tool plan'],outputs:['ResponsesAgent scaffold','tools/ + AgentServer']}},
+      {activate:['tg-n-s3-w1','tg-n-s3-w2'],narration:'Wire <span class="hl-y">KA + Genie tools</span>, then add <span class="hl-y">OBO auth + Lakebase memory</span> — an agent that acts as you and remembers you.',tier:[3,'Tier 3: Workers'],
+       skillIds:['ag-tools','ag-authmem'],
+       designRationale:'Genie answers data questions, Knowledge Assistant answers document questions — the tool description routes between them. Then two core primitives go into code: <strong>OBO authentication</strong> (tools run as the logged-in user, so Genie honors that user\'s permissions and the audit log names the real person) and <strong>Lakebase memory</strong> (short-term thread context + long-term per-user recall).',
+       inputOutput:{inputs:['ResponsesAgent','Genie + KA'],outputs:['wired tools','OBO auth','short + long-term memory']}},
+      {expand:['tg-s4'],activate:['tg-n-s4'],narration:'<span class="hl">Stage 4: Integrate</span> — first eval + deploy the agent as its own App/endpoint, then verify it responds.',tier:[2,'Stage 4: Integrate'],
+       skillIds:['ag-evaldeploy'],
+       designRationale:'A first eval + deploy proves the agent works end-to-end (auth, tools, memory) before any frontend depends on it. Verify with a probe (curl the endpoint, confirm a streamed response) rather than trusting a green checkmark.',
+       inputOutput:{inputs:['wired agent'],outputs:['deployed agent endpoint','smoke-test result']}},
+      {activate:['tg-n-s4-w1','tg-n-s4-w2'],narration:'Front the agent behind the AppKit UI with an <span class="hl-y">OBO proxy</span>, and log <span class="hl-y">thumbs feedback</span> as MLflow assessments.',tier:[3,'Tier 3: Workers'],
+       skillIds:['ag-proxy','ag-feedback'],
+       designRationale:'The 2-Apps architecture keeps the Python agent runtime separate from the TypeScript UI while preserving end-user identity through OBO forwarding (<code>x-forwarded-access-token</code>). Feedback then closes the loop — each thumbs up/down is logged as an MLflow assessment on the exact trace that produced the answer, turning production usage into evaluation signal.',
+       inputOutput:{inputs:['agent endpoint','AppKit UI'],outputs:['streamed chat in the app','feedback linked to traces']}},
+      {expand:['tg-s5'],activate:['tg-n-s5'],narration:'<span class="hl">Stage 5: Evaluate & Govern</span> — version the system prompt in the MLflow Prompt Registry and load it by alias.',tier:[2,'Stage 5: Evaluate & Govern'],
+       skillIds:['ag-prompts'],
+       designRationale:'The system prompt is the most-edited logic in the agent, so version it like code. Storing it in the MLflow Prompt Registry (a UC asset) and loading by alias means shipping or rolling back a prompt is just moving a label — no redeploy, full history, full audit.',
+       inputOutput:{inputs:['system prompt'],outputs:['versioned prompt','@production alias']}},
+      {activate:['tg-n-s5-w1','tg-n-s5-w2','tg-n-s5-w3'],narration:'Build an <span class="hl-y">eval dataset</span>, define <span class="hl-y">scorers &amp; judges</span>, and run <span class="hl-y">evaluation</span> — reading results by failure shape.',tier:[3,'Tier 3: Workers'],
+       skillIds:['ag-datasets','ag-scorers','ag-evalruns'],
+       designRationale:'Evaluation replaces vibes with evidence. Build a benchmark that covers every capability and journey (coverage over volume). Grade with a mix of deterministic checks and judgment-based scorers (built-in, guidelines-as-judge, custom code, LLM judges). Then run <code>mlflow.genai.evaluate()</code> and categorize failures by shape — retrieval miss → improve KA; wrong tool → sharpen description; hallucination → tighten prompt; safety trip → add guardrail. Each shape points to a specific lever.',
+       inputOutput:{inputs:['agent','spec criteria','traces'],outputs:['eval dataset','scorer suite','scored runs + failure analysis']}},
+      {activate:['tg-n-s5-w4','tg-n-s5-w5'],narration:'Add <span class="hl-y">human review &amp; sign-off</span>, then log + <span class="hl-y">register the agent in UC</span> and set the @champion alias.',tier:[3,'Tier 3: Workers'],
+       skillIds:['ag-signoff','ag-register'],
+       designRationale:'Numbers get you close, but launch decisions need judgment and accountability — SMEs label a sample, stakeholders record an APPROVED decision, and a regression subset is pinned as must-never-regress. Registration then ties evaluation to deployment: the exact artifact that passed eval and sign-off is registered in Unity Catalog, and promotion or rollback is just moving the <code>@champion</code> alias.',
+       inputOutput:{inputs:['eval results'],outputs:['SME labels','recorded sign-off','UC-registered model @champion']}},
+      {expand:['tg-s6'],activate:['tg-n-s6'],narration:'<span class="hl">Stage 6: Ship & Operate</span> — harden LLM calls with the AI Gateway (guardrails, rate limits, inference tables), then deploy.',tier:[2,'Stage 6: Ship & Operate'],
+       skillIds:['ag-gateway'],
+       designRationale:'The AI Gateway is the enterprise seatbelt: guardrails on inputs/outputs, rate limits to control cost and abuse, and inference tables logging every request to Delta for audit — which also feeds monitoring downstream.',
+       inputOutput:{inputs:['registered agent'],outputs:['gateway guardrails + rate limits','inference tables','governed deployment']}},
+      {activate:['tg-n-s6-w1'],narration:'Reuse the same scorers as <span class="hl-y">continuous monitors</span> on live traffic — sample, score, alert, and auto-triage. The loop closes.',tier:[3,'Tier 3: Worker'],
+       skillIds:['ag-monitor'],
+       designRationale:'The same scorers you built offline become online monitors: sample live traffic, score continuously in the background, and fire SQL alerts when groundedness or safety trend down. An agent-as-judge auto-categorizes failing traces, and the hardest real-world failures feed back into the eval dataset — closing the loop from production straight back to evaluation.',
+       inputOutput:{inputs:['production traces','scorer suite'],outputs:['monitoring dashboard','SQL alerts','new eval rows']}},
+      {narration:'<strong>Agent lifecycle complete!</strong> From spec to production monitoring — an agent that is tooled, remembers, respects permissions, is evaluated, governed, and watched. And every failure feeds the next iteration.',tier:[1,'Complete'],
+       summary:true},
+    ]
   }
 };
 
@@ -1004,6 +1203,19 @@ function buildConvergenceTree(){
 <ul>
 <li id="tc-pathb" class="collapsed"><div class="tnode type-orchestrator" id="tc-n-pathb" data-skill="gold-00" data-toggle="tc-pathb"><div class="icon">B</div><div class="name">Path B: Data Pipeline</div><div class="tag">9 stages</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-manifest" id="tc-n-gold" data-skill="gold-01"><div class="icon">→</div><div class="name">Gold Tables (dimensional model)</div><div class="tag">output</div></div></li><li><div class="tnode type-manifest" id="tc-n-semantic" data-skill="semantic-00"><div class="icon">→</div><div class="name">Semantic Layer (Metric Views)</div><div class="tag">output</div></div></li><li><div class="tnode type-manifest" id="tc-n-genie" data-skill="semantic-03"><div class="icon">→</div><div class="name">Genie Spaces (NL analytics)</div><div class="tag">output</div></div></li></ul></li>
 <li id="tc-patha" class="collapsed"><div class="tnode type-orchestrator" id="tc-n-patha" data-skill="appkit-00" data-toggle="tc-patha" style="border-color:var(--green)"><div class="icon" style="background:var(--green-dim);color:var(--green)">A</div><div class="name">Path A: Databricks App</div><div class="tag" style="background:var(--green-dim);color:var(--green)">branch-aware</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tc-n-analytics" data-skill="appkit-04"><div class="icon">→</div><div class="name">analytics() → Gold Tables</div><div class="tag">plugin</div></div></li><li><div class="tnode type-worker" id="tc-n-genieplugin" data-skill="semantic-03"><div class="icon">→</div><div class="name">genie() → Genie Spaces</div><div class="tag">plugin</div></div></li><li><div class="tnode type-worker" id="tc-n-lakebase" data-skill="appkit-05"><div class="icon">→</div><div class="name">lakebase() → App State</div><div class="tag">plugin</div></div></li><li><div class="tnode type-worker" id="tc-n-agentproxy" data-skill="appkit-06d"><div class="icon">→</div><div class="name">06d → Agent App Proxy</div><div class="tag">agent chat</div></div></li><li><div class="tnode type-worker" id="tc-n-feedback" data-skill="appkit-08"><div class="icon">→</div><div class="name">07/08 → History + Feedback</div><div class="tag">quality loop</div></div></li></ul></li>
+</ul></li></ul>`;
+}
+
+function buildAgentsTree(){
+  return `<ul>
+<li id="tg-root" class="collapsed"><div class="tnode type-entry" id="tg-n-root" data-skill="" data-toggle="tg-root"><div class="icon" style="background:var(--cyan-dim);color:var(--cyan)">A</div><div class="name">Agents on Databricks + MLflow</div><div class="tag" style="background:var(--cyan-dim);color:var(--cyan)">lifecycle</div><div class="chevron">▶</div></div>
+<ul>
+<li id="tg-s1" class="collapsed"><div class="tnode type-orchestrator" id="tg-n-s1" data-skill="ag-spec" data-toggle="tg-s1"><div class="icon">1</div><div class="name">Stage 1: Design</div><div class="tag">stage</div><div class="meta">spec + tools</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tg-n-s1-w1" data-skill="ag-toolplan"><div class="icon">W</div><div class="name">tool selection plan</div><div class="tag">worker</div></div></li></ul></li>
+<li id="tg-s2" class="collapsed"><div class="tnode type-orchestrator" id="tg-n-s2" data-skill="ag-uc" data-toggle="tg-s2"><div class="icon">2</div><div class="name">Stage 2: Foundation</div><div class="tag">stage</div><div class="meta">2 workers</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tg-n-s2-w1" data-skill="ag-tracing"><div class="icon">W</div><div class="name">MLflow tracing</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="tg-n-s2-w2" data-skill="ag-ka"><div class="icon">W</div><div class="name">Knowledge Assistant</div><div class="tag">worker</div></div></li></ul></li>
+<li id="tg-s3" class="collapsed"><div class="tnode type-orchestrator" id="tg-n-s3" data-skill="ag-clone" data-toggle="tg-s3"><div class="icon">3</div><div class="name">Stage 3: Build Agent</div><div class="tag">stage</div><div class="meta">2 workers</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tg-n-s3-w1" data-skill="ag-tools"><div class="icon">W</div><div class="name">wire KA + Genie tools</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="tg-n-s3-w2" data-skill="ag-authmem"><div class="icon">W</div><div class="name">auth + Lakebase memory</div><div class="tag">worker</div></div></li></ul></li>
+<li id="tg-s4" class="collapsed"><div class="tnode type-orchestrator" id="tg-n-s4" data-skill="ag-evaldeploy" data-toggle="tg-s4"><div class="icon">4</div><div class="name">Stage 4: Integrate</div><div class="tag">stage</div><div class="meta">2 workers</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tg-n-s4-w1" data-skill="ag-proxy"><div class="icon">W</div><div class="name">AppKit agent proxy chat</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="tg-n-s4-w2" data-skill="ag-feedback"><div class="icon">W</div><div class="name">chat feedback → MLflow</div><div class="tag">worker</div></div></li></ul></li>
+<li id="tg-s5" class="collapsed"><div class="tnode type-orchestrator" id="tg-n-s5" data-skill="ag-prompts" data-toggle="tg-s5"><div class="icon">5</div><div class="name">Stage 5: Evaluate & Govern</div><div class="tag">stage</div><div class="meta">5 workers</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tg-n-s5-w1" data-skill="ag-datasets"><div class="icon">W</div><div class="name">evaluation datasets</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="tg-n-s5-w2" data-skill="ag-scorers"><div class="icon">W</div><div class="name">scorers & judges</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="tg-n-s5-w3" data-skill="ag-evalruns"><div class="icon">W</div><div class="name">evaluation runs & iteration</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="tg-n-s5-w4" data-skill="ag-signoff"><div class="icon">W</div><div class="name">human review & sign-off</div><div class="tag">worker</div></div></li><li><div class="tnode type-worker" id="tg-n-s5-w5" data-skill="ag-register"><div class="icon">W</div><div class="name">logged model + UC registration</div><div class="tag">worker</div></div></li></ul></li>
+<li id="tg-s6" class="collapsed"><div class="tnode type-orchestrator" id="tg-n-s6" data-skill="ag-gateway" data-toggle="tg-s6"><div class="icon">6</div><div class="name">Stage 6: Ship & Operate</div><div class="tag">stage</div><div class="meta">1 worker</div><div class="chevron">▶</div></div><ul><li><div class="tnode type-worker" id="tg-n-s6-w1" data-skill="ag-monitor"><div class="icon">W</div><div class="name">production monitoring</div><div class="tag">worker</div></div></li></ul></li>
 </ul></li></ul>`;
 }
 
@@ -1404,6 +1616,63 @@ databricks bundle run ml_inference_pipeline_job -t dev  # Score batch</pre>`,
 <h5>Deployment Pipeline</h5><div class="ac-diagram"><span class="hl">Build Agent App</span> → <span class="hl-p">Evaluate (MLflow)</span> → Quality Gate (pass?) → <span class="hl-g">Deploy App</span> → <span class="hl-o">Wire AppKit 06d</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="hl">Production Monitoring</span> + <span class="hl-p">End-user feedback</span></div>
 <h5>Production Monitoring</h5><p>Deployed agents are continuously monitored: registered scorers evaluate a sample of production requests, while AppKit feedback can become human-labeled assessment data for future evaluations.</p>`,
    quiz:[{q:'What is the canonical course track?',opts:['Track A custom Agent App','Node-native single app only','Legacy setup skill'],answer:0},{q:'Which AppKit skill connects a separate Agent App?',opts:['06d-appkit-agent-app-proxy','05-appkit-lakebase-wiring','03-appkit-deploy'],answer:0},{q:'Where does agent conversation memory persist?',opts:['Browser localStorage','Lakebase PostgreSQL','In-memory only'],answer:1},{q:'What must pass before production deployment?',opts:['Manual code review only','MLflow evaluation quality gate','Unit tests only'],answer:1}]},
+
+  {id:'agent-memory',title:'Agent Memory',subtitle:'Short-term threads and long-term recall',icon:'🧠',color:'#6366f1',
+   content:`<h5>Why Memory?</h5><p>Memory is what separates a chatbot from an assistant. Databricks agents support two <em>layers</em> of memory, and two <em>ways</em> to run them.</p>
+<h5>Short-Term vs Long-Term</h5><table><tr><th>Layer</th><th>Scope</th><th>Mechanism</th><th>Purpose</th></tr><tr><td>Short-term</td><td>One conversation</td><td>thread_id + checkpointing (last-N turns)</td><td>Follow-up questions work</td></tr><tr><td>Long-term</td><td>Across conversations</td><td>Embeddings keyed by user_id</td><td>Remembers preferences + past decisions</td></tr></table>
+<h5>Self-Managed vs Managed</h5><table><tr><th>Aspect</th><th>Self-managed (Lakebase)</th><th>Managed (Unity Catalog)</th></tr><tr><td>You control</td><td>Schema, connection, access</td><td>Databricks runs + isolates it</td></tr><tr><td>Store</td><td>Postgres tables you own</td><td>UC memory store + entries</td></tr><tr><td>Isolation</td><td>Your own queries</td><td>The scope (per user / per org)</td></tr><tr><td>Use when</td><td>Direct SQL, custom schema</td><td>No plumbing, UC governance</td></tr></table>
+<h5>The Long-Term Loop</h5><div class="ac-diagram"><span class="hl">New turn</span> → <span class="hl-p">search long-term (Lakebase/UC)</span> → assemble context (+ last-N)<br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-g">LLM answers</span> → <span class="hl-o">persist new facts</span> → available next time</div>
+<h5>Managed Memory: Scope is the Boundary</h5><p>Every memory entry belongs to exactly one <strong>scope</strong>, and a search only returns entries in the scope you query. Personal memory uses the end-user ID; organizational knowledge uses a shared key. <strong>Set the scope in trusted code — never let the model choose it</strong>, or one user could read another user's memories.</p>
+<pre>conversation = client.conversations.create(extra_body={
+  "memory_store": {"name": "main.default.support_agent_memory"},
+  "scope": {"kind": "user", "value": user_id},
+})</pre>`,
+   quiz:[{q:'What does short-term memory use to keep context?',opts:['A vector index','thread_id + checkpointing','A UC volume'],answer:1},{q:'In managed memory, what isolates one user from another?',opts:['A separate database','The scope','Row-level security'],answer:1},{q:'When should you use self-managed (Lakebase) memory?',opts:['When you need direct SQL access / custom schema','Always','Never'],answer:0},{q:'Who should set the memory scope?',opts:['The model','Trusted application code','The end user'],answer:1}]},
+
+  {id:'agent-auth',title:'Agent Authentication',subtitle:'App authorization vs on-behalf-of-user (OBO)',icon:'🔐',color:'#e07b39',
+   content:`<h5>Whose Permissions?</h5><p>When an agent queries a table or calls a tool, whose permissions apply? Databricks gives you two answers, and choosing correctly is a security decision.</p>
+<h5>Two Modes</h5><table><tr><th>Aspect</th><th>App authorization</th><th>User authorization (OBO)</th></tr><tr><td>Identity</td><td>Service Principal (the app)</td><td>The logged-in user</td></tr><tr><td>Data access</td><td>Everyone sees the same slice</td><td>Each user's own UC permissions</td></tr><tr><td>Audit</td><td>Shows the app SP</td><td>Shows the real person</td></tr><tr><td>Best for</td><td>Shared reference data</td><td>User-specific / sensitive data</td></tr></table>
+<h5>How OBO Works on Databricks Apps</h5><div class="ac-diagram"><span class="hl">User signs in (SSO)</span> → proxy adds <code>x-forwarded-access-token</code><br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-p">App downscopes the token</span> to declared scopes<br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-g">Tools run as the user</span> — Genie/UC honor that user's grants</div>
+<h5>Declaring Scopes</h5><p>You choose access per resource via <code>user_api_scopes</code> in the bundle config. Grant only what the agent needs — least privilege.</p>
+<pre># databricks.yml (agent app)
+user_api_scopes:
+  - sql
+  - dashboards.genie
+  - serving.serving-endpoints</pre>
+<h5>Rule of Thumb</h5><p>Shared, non-sensitive data → app authorization (simple, one identity). Anything user-specific or governed by row/column security → OBO, so permissions and audit "just work" per person.</p>`,
+   quiz:[{q:'In OBO, whose identity runs the tool calls?',opts:['The service principal','The logged-in user','A shared robot account'],answer:1},{q:'Which header carries the user token on Databricks Apps?',opts:['Authorization','x-forwarded-access-token','x-databricks-user'],answer:1},{q:'Where do you declare the scopes an agent needs?',opts:['app.tsx','user_api_scopes in the bundle','the LLM prompt'],answer:1},{q:'When is app authorization (SP) a good fit?',opts:['Shared reference data','Per-user sensitive data','Never'],answer:0}]},
+
+  {id:'knowledge-assistant',title:'Knowledge Assistant',subtitle:'Managed RAG over your documents',icon:'📚',color:'#00A972',
+   content:`<h5>What is Knowledge Assistant?</h5><p>Part of Agent Bricks, Knowledge Assistant (KA) is <strong>managed RAG</strong>: point it at documents and it builds and optimizes the retrieval pipeline for you, serving grounded answers <em>with citations</em>. Your agent calls it as one tool.</p>
+<h5>What It Replaces</h5><div class="ac-diagram"><span class="hl-o">DIY RAG</span>: chunking + embeddings + vector store + retriever + citations<br>&nbsp;&nbsp;&nbsp;&nbsp;↓ collapses into<br><span class="hl-g">Knowledge Assistant</span>: a managed, UC-governed Q&amp;A endpoint</div>
+<h5>How the Agent Uses It</h5><div class="ac-diagram"><span class="hl">Question</span> → Agent decides: policy/doc question?<br>&nbsp;&nbsp;&nbsp;&nbsp;↓ yes<br><span class="hl-g">call Knowledge Assistant</span> → grounded answer + citations<br>&nbsp;&nbsp;&nbsp;&nbsp;(data question? → call Genie instead)</div>
+<h5>Why It Matters</h5><table><tr><th>Benefit</th><th>Detail</th></tr><tr><td>Grounded</td><td>Answers cite their sources — no bare hallucinations</td></tr><tr><td>Managed</td><td>No chunking / embedding / retriever to own</td></tr><tr><td>Governed</td><td>Access controlled with UC like any asset</td></tr><tr><td>Composable</td><td>Just one tool among the agent's tools</td></tr></table>`,
+   quiz:[{q:'What is Knowledge Assistant?',opts:['A vector database','Managed RAG with citations','A prompt template'],answer:1},{q:'How does an agent use KA?',opts:['As its only model','As one tool among several','As a memory store'],answer:1},{q:'What do KA answers include?',opts:['Citations to sources','Only a score','Raw SQL'],answer:0}]},
+
+  {id:'mlflow-eval',title:'MLflow GenAI Evaluation',subtitle:'Datasets, scorers, judges, and iteration',icon:'✅',color:'#2272B4',
+   content:`<h5>Why Evaluate?</h5><p>The dangerous temptation is to ship on vibes. Evaluation replaces vibes with evidence — a versioned prompt, a real dataset, automated scorers, and scored runs you can iterate on.</p>
+<h5>Evaluation Datasets</h5><p>A curated benchmark (&ge; ~20 rows) covering every capability and journey from the agent spec. Each row is an input plus an optional expected output. Sources: spec criteria, real traces, SME examples, edge cases. <strong>Coverage over volume.</strong></p>
+<h5>Four Kinds of Scorers</h5><table><tr><th>Scorer</th><th>Handles</th><th>Example</th></tr><tr><td>Built-in</td><td>Universals</td><td>Safety, Relevance, Groundedness</td></tr><tr><td>Guidelines-as-judge</td><td>Plain-English rules</td><td>"Always cite a source"</td></tr><tr><td>Custom code</td><td>Deterministic checks</td><td>Valid JSON? Exact ID match?</td></tr><tr><td>LLM judge</td><td>Fuzzy, human-like criteria</td><td>Is the tone empathetic?</td></tr></table>
+<h5>Running Evaluation</h5><pre>import mlflow
+results = mlflow.genai.evaluate(
+  data=eval_dataset,
+  predict_fn=agent,
+  scorers=[Safety(), RelevanceToQuery(), tone_judge],
+)</pre>
+<h5>Iterate by Failure Shape</h5><div class="ac-diagram"><span class="hl-o">Retrieval miss</span> → improve KA / docs<br><span class="hl-o">Wrong tool</span> → sharpen tool description<br><span class="hl-o">Hallucination</span> → tighten prompt / guideline<br><span class="hl-o">Bad format</span> → add a code scorer + prompt<br><span class="hl-o">Safety trip</span> → add a guardrail</div>
+<h5>Prompt Registry</h5><p>Store the system prompt in the MLflow Prompt Registry (a UC asset). Version every change and promote by alias (<code>@staging</code> → <code>@production</code>). The agent loads by alias, so shipping or rolling back is just moving a label — no redeploy.</p>`,
+   quiz:[{q:'What matters most in an eval dataset?',opts:['Volume','Coverage of capabilities','Random inputs'],answer:1},{q:'Which scorer handles deterministic checks like valid JSON?',opts:['LLM judge','Custom code scorer','Guidelines-as-judge'],answer:1},{q:'What function runs an evaluation?',opts:['mlflow.evaluate_agent()','mlflow.genai.evaluate()','mlflow.score()'],answer:1},{q:'How do you promote a prompt version?',opts:['Redeploy the app','Move an alias like @production','Edit the code'],answer:1}]},
+
+  {id:'agent-monitoring',title:'Production Monitoring & AI Gateway',subtitle:'Continuous eval, alerts, and guardrails',icon:'📡',color:'#FF3621',
+   content:`<h5>Launch is the Start</h5><p>Shipping is where the real learning starts. Databricks reuses your <em>offline</em> eval config as your <em>online</em> monitors — one config, offline and online.</p>
+<h5>Continuous Monitoring</h5><div class="ac-diagram"><span class="hl">Prod traffic → traces (Delta)</span> → sample (keep the set small)<br>&nbsp;&nbsp;&nbsp;&nbsp;↓<br><span class="hl-g">Scorer suite runs in background</span> → time-series dashboard<br>&nbsp;&nbsp;&nbsp;&nbsp;↓ metric dips<br><span class="hl-o">alert</span></div>
+<pre>from mlflow.genai.scorers import ScorerSamplingConfig
+Safety().register(name="prod_safety")
+Safety().start(sampling_config=ScorerSamplingConfig(sample_rate=0.2))</pre>
+<h5>Alerts + Agent-as-Judge</h5><table><tr><th>Piece</th><th>What It Does</th></tr><tr><td>SQL alerts</td><td>Fire on safety / groundedness / latency / error-rate breaches</td></tr><tr><td>Agent-as-judge</td><td>Auto-categorizes failing traces and routes them</td></tr><tr><td>Feedback loop</td><td>Hard cases become new eval rows</td></tr><tr><td>Rollback</td><td>Move @champion back to a known-good version</td></tr></table>
+<h5>AI Gateway (Optional Hardening)</h5><p>Route model calls through the AI Gateway to add PII/safety <strong>guardrails</strong>, <strong>rate limits</strong>, usage tracking, and <strong>inference tables</strong> (every request/response logged to Delta for audit — which also feeds monitoring).</p>
+<h5>The Loop Closes</h5><div class="ac-diagram"><span class="hl">Monitor</span> → <span class="hl-o">alert</span> → <span class="hl-p">triage</span> → <span class="hl-g">new eval rows</span> → fix + re-eval → promote @champion → Monitor</div>`,
+   quiz:[{q:'Where do production monitoring scorers come from?',opts:['A separate monitoring tool','The same scorers used in offline eval','Manual review only'],answer:1},{q:'Why sample production traces instead of scoring all?',opts:['To control cost','Because scorers cannot read all','It is required by law'],answer:0},{q:'What does the AI Gateway add?',opts:['A new model','Guardrails, rate limits, inference tables','A vector index'],answer:1},{q:'How do you roll back a bad agent version?',opts:['Delete the app','Move the @champion alias back','Restart the warehouse'],answer:1}]},
 ];
 
 // (Prompt Lab removed)
@@ -1495,6 +1764,18 @@ function initGalaxy() {
   ag.innerHTML = SKILLS.filter(s=>s.component==='agentic').map(s =>
     `<div class="agentic-node" onclick="openDetail('${s.id}')" title="${stripHtml(s.desc)}"><strong>${s.name}</strong></div>`
   ).join('');
+
+  const af = document.getElementById('agentFlow');
+  if (af) af.innerHTML = AGENT_STAGES.map((st, i) => {
+    const orch = SKILL_MAP[st.orch];
+    const wc = orch ? (orch.workers||[]).length : 0;
+    const dots = Array(wc).fill(0).map((_,j) => {
+      const wid = orch && orch.workers[j] ? orch.workers[j] : '';
+      return `<div class="worker-dot" title="${SKILL_MAP[wid]?.name||''}" onclick="event.stopPropagation();openDetail('${wid}')"></div>`;
+    }).join('');
+    return (i > 0 ? '<div class="stage-arrow">›</div>' : '') +
+      `<div class="stage-cluster"><div class="stage-node ${st.sc}" onclick="openDetail('${st.orch}')" title="${stripHtml(SKILL_MAP[st.orch]?.desc||'')}"><div class="sn-num">${st.num}</div><div class="sn-label">${st.label}</div></div><div class="worker-dots">${dots}</div></div>`;
+  }).join('');
 }
 
 // ======================== STARFIELD ========================

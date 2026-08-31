@@ -425,7 +425,7 @@ npm run dev
 
 ### Authoritative upstream skill registries
 
-For canonical Databricks-platform skills (Apps, Lakebase, Model Serving, DABs, Pipelines, Core), see [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills). The local skills in this repo extend or specialize those for our workshop and accelerator use cases. Where a local skill genuinely derives from an upstream skill, its frontmatter records a structured `upstream_sources` entry that the freshness scanner audits for drift; lighter "see also" references appear as a `## See Also` footer in the skill body. The `databricks-solutions/ai-dev-kit` registry remains a parallel authoritative source for accelerator-specific medallion / semantic-layer / ML patterns.
+For canonical Databricks-platform and accelerator skills (Apps, Lakebase, Model Serving, DABs, Pipelines, Core, Unity Catalog, Metric Views, Genie, MLflow evaluation, synthetic data, and more), see [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills) — the single authoritative upstream skill registry. The local skills in this repo extend or specialize those for our workshop and accelerator use cases. Where a local skill genuinely derives from an upstream skill, its frontmatter records a structured `upstream_sources` entry that the freshness scanner audits for drift; lighter "see also" references appear as a `## See Also` footer in the skill body.
 
 ---
 

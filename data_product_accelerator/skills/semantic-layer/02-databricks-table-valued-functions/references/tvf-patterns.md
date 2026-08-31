@@ -611,7 +611,7 @@ Deploy TVFs using a `sql_task` in your Asset Bundle job configuration.
 resources:
   jobs:
     gold_setup_job:
-      name: "[${bundle.target}] {Project} Gold Layer - Setup"
+      name: "[${bundle.target} ${var.user_prefix}] {Project} Gold Layer - Setup"
       
       tasks:
         # ... existing table creation tasks ...

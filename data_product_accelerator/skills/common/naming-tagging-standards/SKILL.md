@@ -154,6 +154,24 @@ Whether or not customer config is supplied, the agent **always** scans column na
 
 The `environment` tag is **always** `${bundle.target}` — never hardcoded. This is non-negotiable regardless of config.
 
+### Step 4b: Job / Pipeline Name Prefix (Non-Negotiable)
+
+Every job and pipeline `name:` field **MUST** begin with the user-prefixed token
+`[${bundle.target} ${var.user_prefix}]` — this is the single canonical prefix
+across all layers (Bronze, Silver, Gold, ML, semantic, monitoring). Rules:
+
+- The bundle **MUST** declare the `user_prefix` variable (default
+  `${workspace.current_user.short_name}`), so dev renders `[dev jsmith] …`.
+- Do **NOT** rely on `mode: development` auto-prefixing; set
+  `presets.name_prefix: ""` on the dev target so the explicit token is the sole
+  authority (prevents `[dev jsmith] [dev jsmith] …` doubling).
+- Prod keeps names clean by setting `user_prefix: ""` in the prod target.
+- The project/domain token stays in the name after the prefix (e.g.
+  `[dev jsmith] Wanderbricks Bronze Layer - Clone`).
+
+Authoritative definition: `skills/databricks-asset-bundles/SKILL.md` →
+"Shared Workspace Naming".
+
 ### Step 5: Consistency Enforcement
 
 All tags must be **consistent** across all assets in the project:
@@ -184,8 +202,8 @@ The canonical schema the agent normalizes to is defined in [references/canonical
 | Column | `{descriptive_name}` | `customer_id`, `order_date` |
 | Constraint | `{type}_{table}[_{column}]` | `pk_dim_customer`, `fk_orders_customer` |
 | Function | `get_{entity}_{action}` | `get_daily_sales` |
-| Job | `[${bundle.target}] {Domain} - {Action} {Entity}` | `[dev] Sales - Merge Orders` |
-| Pipeline | `[${bundle.target}] {Layer} {Domain} Pipeline` | `[dev] Silver Sales Pipeline` |
+| Job | `[${bundle.target} ${var.user_prefix}] {Domain} - {Action} {Entity}` | `[dev jsmith] Sales - Merge Orders` |
+| Pipeline | `[${bundle.target} ${var.user_prefix}] {Layer} {Domain} Pipeline` | `[dev jsmith] Silver Sales Pipeline` |
 | Dashboard | `{Domain} - {Report Type}` | `Sales - Revenue Overview` |
 | Metric View | `mv_{domain}_{entity}` | `mv_billing_cost_summary` |
 | Genie Space | `{Domain} {Description} Space` | `Hospitality Booking Analytics Space` |
@@ -447,6 +465,7 @@ For tag query patterns and serverless cost attribution, see [references/tagging-
 - [ ] Only approved abbreviations used
 - [ ] Columns follow standard patterns (PK, FK, boolean, SCD2)
 - [ ] Jobs/pipelines follow naming format
+- [ ] Every job/pipeline `name:` starts with `[${bundle.target} ${var.user_prefix}]` and the bundle declares the `user_prefix` variable (dev renders `[dev <short_name>] …`)
 
 ### Comments
 - [ ] DDL includes `/* */` block comments

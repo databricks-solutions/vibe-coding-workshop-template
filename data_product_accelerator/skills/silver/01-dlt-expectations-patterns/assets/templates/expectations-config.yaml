@@ -5,7 +5,7 @@
 resources:
   pipelines:
     silver_dlt_pipeline:
-      name: "[${bundle.target}] Silver Layer Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] Silver Layer Pipeline"
       
       # ✅ CORRECT: Use 'schema' (Direct Publishing Mode)
       catalog: ${var.catalog}

@@ -64,14 +64,14 @@ metadata:
   deploy_note: "operations/CLI reference — on Genie Code every databricks command routes via runDatabricksCli FROM THE BUNDLE EDITOR (dp_bundle_root); a blocked bundle deploy/run is a page-context signal, NEVER substitute SDK/REST creation (RULE_10); see genie-code-environment"
   coverage: all_stages
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-python-sdk/SKILL.md"
-        - "databricks-skills/databricks-jobs/SKILL.md"
+        - "skills/databricks-python-sdk/SKILL.md"
+        - "skills/databricks-jobs/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-20"
-      sync_commit: "latest"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 
 # Databricks Autonomous Operations

@@ -14,7 +14,7 @@
 resources:
   jobs:
     bronze_setup_job:
-      name: "[${bundle.target}] {Project} Bronze Layer - Setup"
+      name: "[${bundle.target} ${var.user_prefix}] {Project} Bronze Layer - Setup"
       description: "Creates Bronze layer tables for testing/demo"
 
       environments:

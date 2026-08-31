@@ -16,7 +16,7 @@
 resources:
   jobs:
     bronze_data_generator_job:
-      name: "[${bundle.target}] {Project} Bronze Layer - Generate Data"
+      name: "[${bundle.target} ${var.user_prefix}] {Project} Bronze Layer - Generate Data"
       description: "Generates fake data for Bronze tables using Faker"
 
       environments:

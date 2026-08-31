@@ -12,23 +12,16 @@ metadata:
   clients: [ide_cli, genie_code]   # one deploy contract, both clients; Genie detail via genie-code-environment
   deploy_verb: "bundle deploy --target dev"
   deploy_note: "the canonical deploy spine — IDE local CLI ≡ Genie Code runDatabricksCli; App via apps deploy"
-  bundle_resource: "jobs, pipelines, dashboards, alerts, apps, volumes, schemas, postgres_*; genie_spaces Tier-1 pending CLI support"
+  bundle_resource: "jobs, pipelines, dashboards, alerts, apps, volumes, schemas, postgres_*; genie_spaces Tier-1 LANDED (native resource; CLI >= 1.3.0, verified on 1.10.0)"
   coverage: all_stages
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
-      paths:
-        - "databricks-skills/databricks-asset-bundles/SKILL.md"
-      relationship: "extended"
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
-    - name: "databricks-agent-skills/databricks-dabs"
+    - name: "databricks-agent-skills"
       repo: "databricks/databricks-agent-skills"
       paths:
         - "skills/databricks-dabs/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-04-27"
-      sync_commit: "manifest-v2-2026-04-22"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 
 # Databricks Asset Bundles (DABs)
@@ -132,7 +125,7 @@ After `bundle deploy` + `bundle run`, verify the produced UC state — but verif
 resources:
   jobs:
     <job_name>:
-      name: "[${bundle.target}] <Display Name>"
+      name: "[${bundle.target} ${var.user_prefix}] <Display Name>"
       
       # ✅ MANDATORY: Serverless environment with V4
       environments:
@@ -242,7 +235,7 @@ See [Notebook Source Format](references/notebook-source-format.md) for complete 
 resources:
   jobs:
     <job_key>:
-      name: "[${bundle.target}] <Job Display Name>"
+      name: "[${bundle.target} ${var.user_prefix}] <Job Display Name>"
       
       # ✅ MANDATORY: Serverless environment
       environments:
@@ -270,7 +263,7 @@ resources:
 resources:
   pipelines:
     <pipeline_key>:
-      name: "[${bundle.target}] <Pipeline Display Name>"
+      name: "[${bundle.target} ${var.user_prefix}] <Pipeline Display Name>"
       
       # ✅ MANDATORY: Root path for Lakeflow Pipelines Editor
       root_path: ../src/<layer>_pipeline
@@ -303,7 +296,7 @@ resources:
 resources:
   jobs:
     tvf_deployment_job:
-      name: "[${bundle.target}] TVF Deployment"
+      name: "[${bundle.target} ${var.user_prefix}] TVF Deployment"
       environments:
         - environment_key: default
           spec:
@@ -320,7 +313,7 @@ resources:
 resources:
   jobs:
     semantic_layer_setup_job:
-      name: "[${bundle.target}] Semantic Layer Setup"
+      name: "[${bundle.target} ${var.user_prefix}] Semantic Layer Setup"
       tasks:
         - task_key: deploy_tvfs
           run_job_task:  # ✅ Reference job, NOT notebook
@@ -364,24 +357,32 @@ active one.** In **every** tier the Space **title carries the per-user prefix** 
 `table_identifiers` are **fully-qualified under the prefixed schema**. Record the chosen tier in
 `deploy_note` (`tier_1_native` once it lands, else `tier_2_provisioning_job`, or `tier_3_createasset`).
 
-### Tier 1 — native `genie_spaces` bundle resource (preferred target; enable when the GO/NO-GO passes)
+### Tier 1 — native `genie_spaces` bundle resource (LANDED — preferred, use this)
 
-This is the intended end state — a first-class bundle resource deployed declaratively like any job or
-pipeline. **DABs support is landing ~this month.** As of the last GO/NO-GO (P7, 2026-06-01) `bundle
-validate` does **not** yet accept `genie_spaces` (it is absent from the supported resource list and warns
-"unknown field"), so the block is kept **commented and ready-to-enable** in `bundle-template.yaml` behind a
-`# enable when bundle validate accepts genie_spaces` marker. Flipping to Tier 1 is then a **one-line
-change, not a rewrite**: uncomment the block, re-run the GO/NO-GO, set `deploy_note: tier_1_native`.
+This is now the intended end state AND the working default. **UPDATE 2026-08-23:** `genie_spaces` is a
+first-class bundle resource; `bundle validate` accepts it (verified on CLI 1.10.0 with the direct engine,
+the default from 1.3.0). Deploy it declaratively like any job or pipeline — skip the Tier 2 provisioning
+job. The Space **title still carries the per-user prefix** (decision #7) and identifiers are still
+fully-qualified under the prefixed schema; reference the schema **resource name**
+(`${resources.schemas.<k>.name}`) so identifiers match dev-prefixed schemas. The resource takes either an
+inline `serialized_space` or a `file_path` to a `.geniespace.json`; `warehouse_id` MUST be serverless.
+Set `deploy_note: tier_1_native`.
 
 ```yaml
-# resources:                       # enable when bundle validate accepts genie_spaces (re-run GO/NO-GO)
-#   genie_spaces:
-#     revenue_analytics:
-#       title: "[${var.user_prefix}] Revenue Analytics"   # prefixed (decision #7)
-#       warehouse_id: ${var.warehouse_id}
-#       table_identifiers:
-#         - ${var.catalog}.${var.gold_schema}.fact_revenue # fully-qualified under the prefixed schema
+resources:
+  genie_spaces:
+    revenue_analytics:
+      title: "[${bundle.target} ${var.user_prefix}] Revenue Analytics"   # prefixed (decision #7)
+      warehouse_id: ${var.warehouse_id}                                   # serverless SQL warehouse
+      parent_path: /Workspace/Users/${workspace.current_user.userName}/.genie
+      file_path: ../src/genie_spaces/revenue_analytics.geniespace.json    # serialized_space (v2) body
 ```
+
+Note: `serialized_space` uses the v2 schema (`data_sources.tables` / `data_sources.metric_views` with
+`column_configs`, `instructions.text_instructions`, `benchmarks.questions`); all id fields are 32-char
+lowercase hex and every id/identifier collection must be pre-sorted or the API rejects it. Verify at first
+deploy that `${...}` tokens inside the referenced `.geniespace.json` are interpolated; if not, switch to an
+inline `serialized_space`.
 
 ### Tier 2 — Genie-artifact + provisioning job (active fallback, bundle-deployed; both clients)
 
@@ -430,7 +431,7 @@ an alternative to a standalone bundle resource. Explored in the AppKit skills (M
 
 ## Upstream Updates (February 2026)
 
-Recent additions from the upstream `databricks-asset-bundles` skill in AI-Dev-Kit:
+Recent additions from the upstream `databricks-dabs` skill in Databricks Agent Skills:
 
 ### Dashboard `dataset_catalog` / `dataset_schema` (CLI v0.281.0+)
 
@@ -491,13 +492,28 @@ Relative paths depend on YAML file location:
 
 ## Shared Workspace Naming (Multi-User Environments)
 
-In shared workspaces (workshops, demos), pipeline and job names MUST include a user identifier to prevent name collisions:
+This is the **single canonical convention** for every job and pipeline `name:`
+across all layers (Bronze, Silver, Gold, ML, semantic, monitoring). In shared
+workspaces (workshops, demos), names MUST include a user identifier to prevent
+collisions:
 
 ```yaml
 variables:
   user_prefix:
     description: "User identifier for shared workspaces"
     default: ${workspace.current_user.short_name}
+
+targets:
+  dev:
+    mode: development
+    # Disable DAB auto-prefixing so the explicit token below is the SOLE
+    # authority — prevents doubled "[dev x] [dev x] ..." names.
+    presets:
+      name_prefix: ""
+  prod:
+    mode: production
+    variables:
+      user_prefix: ""   # keep prod names clean -> "[prod] ..."
 
 resources:
   pipelines:
@@ -508,7 +524,12 @@ resources:
       name: "[${bundle.target} ${var.user_prefix}] Gold Merge"
 ```
 
-**Rule:** Always include `${var.user_prefix}` in resource names when deploying to shared workspaces. Without it, the second user to deploy will hit a name conflict that `--force` cannot resolve.
+**Rules:**
+
+- **Always** prefix job/pipeline names with `[${bundle.target} ${var.user_prefix}]`. Without it, the second user to deploy hits a name conflict that `--force` cannot resolve.
+- **Do NOT** rely on `mode: development` auto-prefixing. It prepends its own `[dev username]`, which — combined with the explicit token — produces a doubled prefix. Set `presets.name_prefix: ""` on the dev target so the explicit token is the only prefix.
+- **Keep the project/domain token** after the prefix (e.g. `[dev jsmith] Wanderbricks Bronze Layer - Clone`).
+- **Prod** sets `user_prefix: ""` so names render `[prod] ...` (no per-user identifier in production).
 
 ## Profile & Workspace Resolution
 

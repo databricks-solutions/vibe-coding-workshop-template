@@ -17,7 +17,7 @@
 resources:
   jobs:
     ml_training_pipeline_job:
-      name: "[${bundle.target}] ML Training Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] ML Training Pipeline"
       description: "Trains all ML models with Feature Engineering"
 
       # Shared environment for all tasks — PIN EXACT VERSIONS

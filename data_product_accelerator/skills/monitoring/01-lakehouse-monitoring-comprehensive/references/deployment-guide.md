@@ -131,7 +131,7 @@ COMMENT ON COLUMN {catalog}.{schema}.{table}.net_revenue IS
 resources:
   jobs:
     monitoring_setup:
-      name: "${bundle.target}-monitoring-setup"
+      name: "[${bundle.target} ${var.user_prefix}] Monitoring - Setup"
       tasks:
         - task_key: setup_monitors
           notebook_task:
@@ -165,7 +165,7 @@ resources:
 resources:
   jobs:
     monitoring_refresh:
-      name: "${bundle.target}-monitoring-refresh"
+      name: "[${bundle.target} ${var.user_prefix}] Monitoring - Refresh"
       schedule:
         quartz_cron_expression: "0 0 6 * * ?"  # Daily at 6 AM
         timezone_id: "America/New_York"

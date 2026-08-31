@@ -30,13 +30,13 @@ metadata:
   produces: "feedback_assessments, feedback_volume_metric, feedback_eval_dataset"
   grounded_in: "https://docs.databricks.com/aws/en/mlflow3/genai/tracing/collect-user-feedback/, https://docs.databricks.com/aws/en/mlflow3/genai/getting-started/human-feedback, https://docs.databricks.com/aws/en/mlflow3/genai/human-feedback/dev-annotations, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/build-eval-dataset"
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-mlflow-evaluation/SKILL.md"
+        - "skills/databricks-mlflow-evaluation/SKILL.md"
       relationship: "reference"
-      last_synced: "2026-04-27"
-      sync_commit: "281d9acd92d936bd5294f78bd7ec68fb12d4a696"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 fields_read:
   - agent.feedback.dimensions
   - agent.feedback.user_id_source
@@ -48,7 +48,7 @@ Canonical reference for **collecting end-user feedback in production** and writi
 
 ## Upstream Lineage
 
-This skill references AI-Dev-Kit's `databricks-mlflow-evaluation` skill for feedback-to-dataset, production trace analysis, and evaluation-loop guidance. If collected feedback needs to become labeled eval data or monitoring signal, consult the upstream skill first, then apply this skill's production feedback correlation and assessment write-path contracts.
+This skill references Databricks Agent Skills' `databricks-mlflow-evaluation` skill for feedback-to-dataset, production trace analysis, and evaluation-loop guidance. If collected feedback needs to become labeled eval data or monitoring signal, consult the upstream skill first, then apply this skill's production feedback correlation and assessment write-path contracts.
 
 This skill is the **production user-feedback** counterpart to [04-evaluation-runs](../04-evaluation-runs/SKILL.md):
 

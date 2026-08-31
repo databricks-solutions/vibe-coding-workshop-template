@@ -28,14 +28,14 @@ metadata:
   last_verified: "2026-06-05"
   volatility: high
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-model-serving/SKILL.md"
-        - "databricks-skills/databricks-vector-search/SKILL.md"
+        - "skills/databricks-model-serving/SKILL.md"
+        - "skills/databricks-vector-search/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-04-27"
-      sync_commit: "latest"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
     - name: "databricks-docs-feature-store"
       url: "https://docs.databricks.com/aws/en/machine-learning/feature-store/"
       relationship: "upstream"
@@ -672,5 +672,5 @@ End with:
 
 ## See Also
 
-- Authoritative upstream (alternate registry): [databricks-agent-skills / `databricks-model-serving`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-model-serving) — canonical Model Serving endpoint guidance. (Pairs with the existing `ai-dev-kit` `upstream_sources` entry on this skill.)
+- Authoritative upstream: [databricks-agent-skills / `databricks-model-serving`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-model-serving) — canonical Model Serving endpoint guidance. (Matches the `databricks-agent-skills` `upstream_sources` entry on this skill.)
 

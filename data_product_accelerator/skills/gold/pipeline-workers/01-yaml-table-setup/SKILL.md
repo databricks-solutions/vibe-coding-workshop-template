@@ -271,7 +271,7 @@ sync:
 resources:
   jobs:
     gold_setup_job:
-      name: "[${bundle.target}] Health Monitor - Gold Layer Setup"
+      name: "[${bundle.target} ${var.user_prefix}] Health Monitor - Gold Layer Setup"
       
       # PyYAML dependency required
       environments:

@@ -22,7 +22,7 @@
 resources:
   jobs:
     semantic_layer_job:
-      name: "${bundle.target}-semantic-layer-deployment"
+      name: "[${bundle.target} ${var.user_prefix}] Semantic Layer - Deployment"
 
       tags:
         environment: "${bundle.target}"

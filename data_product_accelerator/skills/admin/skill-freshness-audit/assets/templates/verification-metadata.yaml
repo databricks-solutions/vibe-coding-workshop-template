@@ -29,17 +29,17 @@ metadata:
       check_for: "Brief description of what to verify"
 
 # Upstream source lineage tracking (tracks repo-level dependencies)
-  # Links this skill back to its source(s) in databricks-solutions/ai-dev-kit or other repos.
+  # Links this skill back to its source(s) in databricks/databricks-agent-skills or other repos.
   # This complements verification_sources (which checks live doc URLs) by tracking structured
   # repo-level lineage for systematic upstream sync audits.
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-agent-bricks/SKILL.md"  # specific file(s) this skill derives from
+        - "skills/databricks-agent-bricks/SKILL.md"  # specific file(s) this skill derives from
       relationship: "extended"    # derived | extended | inspired | reference
-      last_synced: "2026-02-19"   # ISO date when skill was last synced with upstream
-      sync_commit: "abc1234"      # short hash of upstream commit at time of last sync
+      last_synced: "2026-08-30"   # ISO date when skill was last synced with upstream
+      sync_commit: "ca92a6c"      # short hash of upstream commit at time of last sync
 
   # Relationship types:
   #   derived  — skill content directly draws from upstream source
@@ -64,13 +64,13 @@ metadata:
 #     - url: "https://docs.databricks.com/en/machine-learning/model-serving/create-manage-serving-endpoints.html"
 #       check_for: "OBO authentication flow, SystemAuthPolicy format"
 #   upstream_sources:
-#     - name: "ai-dev-kit"
-#       repo: "databricks-solutions/ai-dev-kit"
+#     - name: "databricks-agent-skills"
+#       repo: "databricks/databricks-agent-skills"
 #       paths:
-#         - "databricks-skills/databricks-agent-bricks/SKILL.md"
+#         - "skills/databricks-agent-bricks/SKILL.md"
 #       relationship: "extended"
-#       last_synced: "2026-02-19"
-#       sync_commit: "a1b2c3d"
+#       last_synced: "2026-08-30"
+#       sync_commit: "ca92a6c"
 
 # --- Example: Minimal for a stable skill (no upstream) ---
 # metadata:

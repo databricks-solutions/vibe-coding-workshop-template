@@ -7,7 +7,7 @@
 resources:
   jobs:
     generate_bronze_data:
-      name: "[${bundle.target}] Generate Bronze Data"
+      name: "[${bundle.target} ${var.user_prefix}] Generate Bronze Data"
 
       # ✅ MANDATORY: Serverless environment with required libraries
       environments:

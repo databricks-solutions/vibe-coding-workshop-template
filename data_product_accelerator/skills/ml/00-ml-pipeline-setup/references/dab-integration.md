@@ -7,7 +7,7 @@
 resources:
   jobs:
     ml_feature_pipeline_job:
-      name: "[${bundle.target}] ML Feature Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] ML Feature Pipeline"
       description: "Creates and updates feature tables in Unity Catalog"
       
       environments:
@@ -44,7 +44,7 @@ resources:
 resources:
   jobs:
     ml_training_orchestrator_job:
-      name: "[${bundle.target}] ML Training Orchestrator"
+      name: "[${bundle.target} ${var.user_prefix}] ML Training Orchestrator"
       description: "Trains all ML models with MLflow 3.1+ LoggedModel tracking"
       
       # Shared environment for all tasks — PIN EXACT VERSIONS
@@ -112,7 +112,7 @@ resources:
 resources:
   jobs:
     ml_batch_inference_job:
-      name: "[${bundle.target}] ML Batch Inference"
+      name: "[${bundle.target} ${var.user_prefix}] ML Batch Inference"
       
       # PIN EXACT VERSIONS — MUST match training pipeline
       environments:

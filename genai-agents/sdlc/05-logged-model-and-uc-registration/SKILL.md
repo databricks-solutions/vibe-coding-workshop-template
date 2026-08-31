@@ -25,20 +25,20 @@ metadata:
   produces: "logged_model_id, uc_model_version, champion_alias"
   grounded_in: "https://docs.databricks.com/en/mlflow/models-in-uc.html, https://docs.databricks.com/aws/en/mlflow3/genai/prompt-version-mgmt/version-tracking/link-production-traces-to-app-versions, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/eval-harness"
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-mlflow-evaluation/SKILL.md"
+        - "skills/databricks-mlflow-evaluation/SKILL.md"
       relationship: "reference"
-      last_synced: "2026-04-27"
-      sync_commit: "281d9acd92d936bd5294f78bd7ec68fb12d4a696"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 
 # Logged Model and Unity Catalog Registration
 
 ## Upstream Lineage
 
-This skill references AI-Dev-Kit's `databricks-mlflow-evaluation` skill for metric-based promotion gates, evaluation result interpretation, and production trace/model lineage. If registration or champion promotion depends on scorer outputs or eval harness behavior, consult the upstream skill first, then apply this skill's LoggedModel and UC alias conventions.
+This skill references Databricks Agent Skills' `databricks-mlflow-evaluation` skill for metric-based promotion gates, evaluation result interpretation, and production trace/model lineage. If registration or champion promotion depends on scorer outputs or eval harness behavior, consult the upstream skill first, then apply this skill's LoggedModel and UC alias conventions.
 
 ## When to Use
 

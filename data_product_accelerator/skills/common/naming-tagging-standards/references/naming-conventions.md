@@ -137,26 +137,35 @@ These column names are **mandatory** for SCD2 dimensions:
 
 ## Job & Pipeline Naming
 
+> **Single source of truth:** Every job/pipeline `name:` MUST begin with the
+> user-prefixed token `[${bundle.target} ${var.user_prefix}]`. This is the ONE
+> canonical prefix — do NOT rely on `mode: development` auto-prefixing (set
+> `presets.name_prefix: ""` on the dev target so this token is the sole
+> authority). The bundle MUST declare the `user_prefix` variable (default
+> `${workspace.current_user.short_name}`). See
+> `skills/databricks-asset-bundles/SKILL.md` → "Shared Workspace Naming" for the
+> authoritative definition.
+
 ### Jobs
 
 ```
-[${bundle.target}] {Domain} - {Action} {Entity}
+[${bundle.target} ${var.user_prefix}] {Domain} - {Action} {Entity}
 ```
 
 Examples:
-- `[dev] Sales - Ingest Orders`
-- `[prod] Billing - Merge Daily Usage`
-- `[dev] Platform - Setup Gold Tables`
+- `[dev jsmith] Sales - Ingest Orders`
+- `[prod] Billing - Merge Daily Usage` (prod sets `user_prefix: ""`)
+- `[dev jsmith] Platform - Setup Gold Tables`
 
 ### DLT Pipelines
 
 ```
-[${bundle.target}] {Layer} {Domain} Pipeline
+[${bundle.target} ${var.user_prefix}] {Layer} {Domain} Pipeline
 ```
 
 Examples:
-- `[dev] Silver Sales Pipeline`
-- `[prod] Bronze Events Pipeline`
+- `[dev jsmith] Silver Sales Pipeline`
+- `[prod] Bronze Events Pipeline` (prod sets `user_prefix: ""`)
 
 ---
 

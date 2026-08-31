@@ -26,13 +26,13 @@ metadata:
   produces: "evaluation_dataset, mlflow_dataset_entity"
   grounded_in: "https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/build-eval-dataset, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/eval-harness, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/evaluation-runs"
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-mlflow-evaluation/SKILL.md"
+        - "skills/databricks-mlflow-evaluation/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-04-27"
-      sync_commit: "281d9acd92d936bd5294f78bd7ec68fb12d4a696"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 fields_read:
   - ui.user_journeys
   - agent.benchmark_seeds.coverage_buckets
@@ -55,7 +55,7 @@ Patterns for building, validating, versioning, and logging evaluation datasets f
 
 ## Upstream Lineage
 
-This skill extends AI-Dev-Kit's `databricks-mlflow-evaluation` skill for evaluation dataset construction, production trace-to-dataset workflows, and expectation schema guidance. If local dataset guidance is insufficient or MLflow evaluation dataset APIs drift, consult the upstream skill first, then adapt its patterns to this workshop's canonical row fields and SDLC artifact contracts.
+This skill extends Databricks Agent Skills' `databricks-mlflow-evaluation` skill for evaluation dataset construction, production trace-to-dataset workflows, and expectation schema guidance. If local dataset guidance is insufficient or MLflow evaluation dataset APIs drift, consult the upstream skill first, then adapt its patterns to this workshop's canonical row fields and SDLC artifact contracts.
 
 ## When to Use
 

@@ -24,7 +24,7 @@ When given a PRD file, follow these steps:
 
 Before analyzing the PRD, scan the project to understand what exists:
 - Look for PRD or design documents in `docs/`, `context/`, or the project root (`*.md` files)
-- Read reference skills from https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-skills/ -- these are the canonical Databricks skill patterns (model-serving, agent-bricks, databricks-genie, agent-evaluation, instrumenting-with-mlflow-tracing, databricks-config, databricks-python-sdk, databricks-unity-catalog, databricks-app-apx, etc.)
+- Read reference skills from https://github.com/databricks/databricks-agent-skills/tree/main/skills/ -- these are the canonical Databricks skill patterns (model-serving, agent-bricks, databricks-genie, agent-evaluation, instrumenting-with-mlflow-tracing, databricks-config, databricks-python-sdk, databricks-unity-catalog, databricks-app-apx, etc.)
 - Look for project-specific skills in `agentic-framework/skills/` (created locally for this project)
 - Look for existing runtime tools in the project's agent/tools directory (e.g., `server/agents/tools/`)
 - Look for database schemas in `db/`, `migrations/`, or SQL files
@@ -92,7 +92,7 @@ REQ-002: [Requirement Name] -> [Capability Type] ([Databricks Service], [Data So
 
 Discover these dynamically -- do NOT assume fixed paths:
 - **PRD documents**: Search `docs/`, `context/`, and project root for `*.md` files containing requirements
-- **Canonical Databricks skills**: https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-skills/ -- read the relevant SKILL.md files for implementation patterns (model-serving, agent-bricks, databricks-genie, agent-evaluation, databricks-unity-catalog, databricks-config, databricks-python-sdk, etc.)
+- **Canonical Databricks skills**: https://github.com/databricks/databricks-agent-skills/tree/main/skills/ -- read the relevant SKILL.md files for implementation patterns (model-serving, agent-bricks, databricks-genie, agent-evaluation, databricks-unity-catalog, databricks-config, databricks-python-sdk, etc.)
 - **Project-specific skills**: `agentic-framework/skills/*/SKILL.md` -- skills created locally for this project
 - **Existing runtime tools**: `server/agents/tools/` or equivalent agent tools directory
 - **Database schemas**: `db/`, `migrations/`, `*.sql` files
@@ -107,7 +107,7 @@ Always return your analysis as:
 3. **Requirements -> Capability Matrix**: Structured mapping of every requirement to agent components
 4. **Data Sources Needed**: Tables, APIs, endpoints identified from the PRD (not assumed)
 5. **LLM Prompt Types Needed**: What kinds of LLM interactions the system requires (if any)
-6. **Skills to Build**: Recommendations for new skills that the skill-scaffolder should create in `agentic-framework/skills/`. Reference implementation patterns from https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-skills/ when recommending skill structures
+6. **Skills to Build**: Recommendations for new skills that the skill-scaffolder should create in `agentic-framework/skills/`. Reference implementation patterns from https://github.com/databricks/databricks-agent-skills/tree/main/skills/ when recommending skill structures
 7. **Gaps or Risks**: Any requirements that are ambiguous, under-specified, or not coverable with the available services
 
 Be thorough and skeptical -- flag any requirement that seems ambiguous or under-specified. Never assume a Databricks service is available unless you can confirm it from the project's config files.

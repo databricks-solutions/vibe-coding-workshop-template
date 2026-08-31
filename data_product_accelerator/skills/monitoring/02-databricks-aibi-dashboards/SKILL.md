@@ -31,13 +31,13 @@ metadata:
   last_verified: "2026-04-16"
   volatility: medium
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-aibi-dashboards/SKILL.md"
+        - "skills/databricks-aibi-dashboards/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 
 # Databricks AI/BI Dashboards

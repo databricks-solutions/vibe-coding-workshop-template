@@ -21,7 +21,7 @@
 resources:
   jobs:
     genie_deployment_job:
-      name: "${bundle.target}-genie-space-deployment"
+      name: "[${bundle.target} ${var.user_prefix}] Semantic Layer - Genie Space Deployment"
 
       tags:
         environment: "${bundle.target}"

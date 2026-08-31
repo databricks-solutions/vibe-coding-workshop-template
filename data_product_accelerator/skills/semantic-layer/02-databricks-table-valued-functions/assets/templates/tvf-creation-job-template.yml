@@ -16,7 +16,7 @@
 resources:
   jobs:
     tvf_creation_job:
-      name: "${bundle.target}-tvf-creation"
+      name: "[${bundle.target} ${var.user_prefix}] Semantic Layer - TVF Creation"
 
       tags:
         environment: "${bundle.target}"

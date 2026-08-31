@@ -9,10 +9,10 @@ metadata:
   last_verified: "{YYYY-MM-DD}"
   volatility: {high|medium|low}
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "{path to upstream source file}"
+        - "{path to upstream source file, e.g. skills/databricks-unity-catalog/SKILL.md}"
       relationship: "{derived|extended|inspired|reference}"
       last_synced: "{YYYY-MM-DD}"
       sync_commit: "{short-hash}"

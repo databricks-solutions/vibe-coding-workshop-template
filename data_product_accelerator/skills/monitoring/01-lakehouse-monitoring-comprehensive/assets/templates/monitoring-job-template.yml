@@ -8,11 +8,12 @@
 #   var.catalog: Target catalog name
 #   var.gold_schema: Gold layer schema name
 #   var.gold_schema_monitoring: Monitoring output schema (convention: {gold_schema}_monitoring)
+#   var.user_prefix: Per-user identifier (default ${workspace.current_user.short_name})
 
 resources:
   jobs:
     monitoring_setup:
-      name: "${bundle.target}-monitoring-setup"
+      name: "[${bundle.target} ${var.user_prefix}] Monitoring - Setup"
       description: "Create and initialize Lakehouse Monitors for Gold layer tables"
       tags:
         domain: "monitoring"
@@ -47,7 +48,7 @@ resources:
             client: "1"
 
     monitoring_refresh:
-      name: "${bundle.target}-monitoring-refresh"
+      name: "[${bundle.target} ${var.user_prefix}] Monitoring - Refresh"
       description: "Scheduled refresh of Lakehouse Monitors"
       tags:
         domain: "monitoring"

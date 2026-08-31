@@ -19,7 +19,7 @@
 resources:
   jobs:
     metric_views_job:
-      name: "${bundle.target}-metric-views-creation"
+      name: "[${bundle.target} ${var.user_prefix}] Semantic Layer - Metric Views Creation"
 
       tags:
         environment: "${bundle.target}"

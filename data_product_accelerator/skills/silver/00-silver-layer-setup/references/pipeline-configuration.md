@@ -35,7 +35,7 @@ edition: CORE                        # CORE/PRO don't support expectations
 resources:
   pipelines:
     silver_dlt_pipeline:
-      name: "[${bundle.target}] Silver Layer Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] Silver Layer Pipeline"
       
       # Pipeline root folder (Lakeflow Pipelines Editor best practice)
       # All pipeline assets must be within this root folder
@@ -145,7 +145,7 @@ edition: ADVANCED
 resources:
   jobs:
     silver_dq_setup_job:
-      name: "[${bundle.target}] {Project} Silver Layer - DQ Rules Setup"
+      name: "[${bundle.target} ${var.user_prefix}] {Project} Silver Layer - DQ Rules Setup"
       description: "One-time: Create and populate data quality rules Delta table"
 
       environments:

@@ -29,13 +29,13 @@ metadata:
   produces: "optimized_prompt_versions, staging_aliases, optimization_reports"
   grounded_in: "https://docs.databricks.com/aws/en/mlflow3/genai/prompt-version-mgmt/prompt-registry/automatically-optimize-prompts, https://docs.databricks.com/aws/en/mlflow3/genai/tutorials/examples/prompt-optimization-quickstart, https://docs.databricks.com/aws/en/mlflow3/genai/tutorials/examples/multi-prompt-optimization, https://docs.databricks.com/aws/en/mlflow3/genai/tutorials/examples/custom-scorers"
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-mlflow-evaluation/SKILL.md"
+        - "skills/databricks-mlflow-evaluation/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-04-27"
-      sync_commit: "281d9acd92d936bd5294f78bd7ec68fb12d4a696"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 
 # Prompt Optimization (MLflow `optimize_prompts` + GEPA)
@@ -44,7 +44,7 @@ metadata:
 
 ## Upstream Lineage
 
-This skill extends AI-Dev-Kit's `databricks-mlflow-evaluation` skill for automated prompt optimization with GEPA and `mlflow.genai.optimize_prompts()`. If optimizer contracts, dataset shape, scorer requirements, or promotion patterns are unclear, consult the upstream skill first, then apply this skill's workshop-specific safeguards and default-routing constraints.
+This skill extends Databricks Agent Skills' `databricks-mlflow-evaluation` skill for automated prompt optimization with GEPA and `mlflow.genai.optimize_prompts()`. If optimizer contracts, dataset shape, scorer requirements, or promotion patterns are unclear, consult the upstream skill first, then apply this skill's workshop-specific safeguards and default-routing constraints.
 
 Use this skill when your agent has a **real evaluation dataset** (SDLC Step 2), **real scorers** (Step 3), and an **evaluation run** (Step 4) that identifies specific prompt-related failure modes — e.g. the agent misses guideline checks, cites wrong sources, or omits required structure — but the retrieval and tools are otherwise healthy.
 

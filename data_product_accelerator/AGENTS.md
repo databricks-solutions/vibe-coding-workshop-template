@@ -144,7 +144,7 @@ Skills follow an **orchestrator/worker** pattern:
 
 ### Authoritative upstream skill registries
 
-For canonical Databricks-platform skills (Apps, Lakebase, Model Serving, DABs, Pipelines, Core), see [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills). The accelerator skills here extend or specialize those for the design-first pipeline. Local skills that genuinely derive from an upstream skill record a structured `upstream_sources` entry; the freshness audit (`skills/admin/skill-freshness-audit/`) tracks drift against that registry alongside the existing `databricks-solutions/ai-dev-kit` mappings.
+For canonical Databricks-platform and accelerator skills (Apps, Lakebase, Model Serving, DABs, Pipelines, Core, Unity Catalog, Metric Views, Genie, MLflow evaluation, synthetic data, and more), see [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills) — the single authoritative upstream registry. The accelerator skills here extend or specialize those for the design-first pipeline. Local skills that genuinely derive from an upstream skill record a structured `upstream_sources` entry; the freshness audit (`skills/admin/skill-freshness-audit/`) tracks drift against that single upstream registry.
 
 ## IDE Compatibility
 

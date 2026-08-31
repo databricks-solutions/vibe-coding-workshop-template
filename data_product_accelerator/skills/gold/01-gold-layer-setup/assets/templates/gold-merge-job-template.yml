@@ -8,7 +8,7 @@
 resources:
   jobs:
     gold_merge_job:
-      name: "[${bundle.target}] {Project} Gold Layer - MERGE Updates"
+      name: "[${bundle.target} ${var.user_prefix}] {Project} Gold Layer - MERGE Updates"
       description: "Periodic MERGE operations from Silver to Gold"
 
       environments:

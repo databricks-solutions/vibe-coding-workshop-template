@@ -19,13 +19,13 @@ metadata:
   last_verified: "2026-02-07"
   volatility: low
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-synthetic-data-generation/SKILL.md"
+        - "skills/databricks-synthetic-data-gen/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 # Faker Data Generation Patterns
 
@@ -35,7 +35,7 @@ When generating synthetic data for Databricks Bronze layer tables, use Faker wit
 
 ## Upstream: Synthetic Data Generation Workflow
 
-The upstream `databricks-synthetic-data-generation` skill in AI-Dev-Kit introduces a file-based workflow:
+The upstream `databricks-synthetic-data-gen` skill in Databricks Agent Skills introduces a file-based workflow:
 
 ### File-Based Execution
 1. Write Python code to a local file (e.g., `scripts/generate_data.py`)

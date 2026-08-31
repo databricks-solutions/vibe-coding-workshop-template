@@ -340,6 +340,8 @@ databricks apps deploy --skip-build --profile $PROFILE
 
 For Lakebase Autoscaling, use `postgres_project`/`postgres_branch`/`postgres_endpoint` resources (CLI v0.287.0+) if you want bundle-managed project lifecycle. For Lakebase Provisioned, use `database_instance` + `app.resources[].database` (CLI v0.265.0+). Do not mix the two models.
 
+> **Provisioned is being retired.** Databricks is migrating Lakebase Provisioned to Autoscaling through 2026 with no customer action required. New work should use the Autoscaling `postgres_*` model; the Provisioned `database_instance` path above is retained only for pre-existing instances.
+
 Wait for completion — typically 1-3 minutes for redeployments, 3-5 minutes for first deploys. Do not treat longer waits as failures until 7+ minutes have elapsed.
 
 Verify the app is running before proceeding:
