@@ -15,7 +15,7 @@ This module (`data_product_accelerator/`) contains the framework — skills, doc
 repo-root/                           <-- workspace root / agent CWD
 ├── data_product_accelerator/        <-- framework (skills, docs, context)
 │   ├── AGENTS.md
-│   ├── skills/                      <-- 44 agent skills (read-only)
+│   ├── skills/                      <-- 45 agent skills (read-only)
 │   ├── context/                     <-- customer schema CSV (input)
 │   └── docs/                        <-- framework documentation
 │
@@ -127,7 +127,7 @@ For full agent behavior, read: `skills/databricks-expert-agent/SKILL.md`
 
 ## Skills Location
 
-All 44 Agent Skills are in `data_product_accelerator/skills/` using the open [SKILL.md format](https://agentskills.io). Each skill directory contains:
+All 45 Agent Skills are in `data_product_accelerator/skills/` using the open [SKILL.md format](https://agentskills.io). Each skill directory contains:
 
 ```
 skill-name/

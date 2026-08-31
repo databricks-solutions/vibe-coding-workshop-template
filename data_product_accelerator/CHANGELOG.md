@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.1.0] — 2026-08-30
+
+### Gold Design — Industry Data Model Alignment (new design worker)
+
+Added an optional, source-bounded capability to align a Gold dimensional design to Databricks Industry Vibe Data Models (and other canonical industry references — TM Forum SID, ARTS, ACORD, HL7, BIAN). Two touchpoints: active guidance during Gold design (Phases 0 and 2) and an advisory scorecard at validation (Phase 8). Accelerator skill count 44 → 45.
+
+### Added
+
+- **`skills/gold/design-workers/08-industry-alignment/`** — New design worker (SKILL.md + `references/industry-data-model-alignment.md` + `scripts/industry_overlay.py` + `assets/templates/industry_reference.template.yaml`). Overlays the parsed source schema with industry entities in Phase 0, steers domain/conformed-dimension/grain/terminology decisions in Phase 2, and writes `INDUSTRY_CROSSWALK.csv`. Upholds "Extract, Don't Generate" — never invents tables absent from the source; unmet entities are surfaced as gaps for `Waived`/`Planned` disposition.
+
+### Changed
+
+- **`skills/gold/design-workers/07-design-validation/SKILL.md`** — Added advisory Validation 6 (Industry Data Model Alignment): loads/verifies/scores `INDUSTRY_CROSSWALK.csv`, emits `INDUSTRY_ALIGNMENT.md`, and is excluded from the pass/fail `all_valid` result.
+- **`skills/gold/00-gold-layer-design/SKILL.md`** — Wired the new worker into metadata (`workers`/`dependencies`/`emits`), the dependency and reading-strategy tables (Phase 0 and 2, gated on `industry_reference_source`), Phase 0/1/2 steps, Phase 8 note, deliverables checklist, and the file-organization tree.
+- **`skills/gold/00-gold-layer-design/assets/templates/design-decisions-template.md`** — Added optional Section 8 (Industry Alignment) plus a sign-off line.
+- **`skills/gold/00-gold-layer-design/references/validation-checklists.md`** — Added an Industry Data Model Alignment (advisory) checklist section.
+- **`skills/skill-navigator/SKILL.md`** + **`references/domain-indexes.md`** — Added `08-industry-alignment` to the routing table, directory tree, and design-worker index.
+- **`AGENTS.md`** (root + `data_product_accelerator/`) and **`presentations/workshop-explorer.html`** — Updated accelerator skill count 44 → 45.
+
+---
+
 ## [2.0.2] — 2026-02-21
 
 ### Framework Visual Docs + Naming Consistency Cleanup

@@ -459,9 +459,125 @@ Add Validation 5 alongside the existing four in `run_design_validation`:
 results["semantic_rules"] = validate_semantic_rules(yaml_dir)
 ```
 
+## Validation 6: Industry Data Model Alignment (ADVISORY)
+
+### What to Check
+
+Benchmark the Gold design against a **Databricks Industry Vibe Data Model** (or any canonical industry reference) for **entity coverage, terminology, and sensitivity alignment**. Unlike Validations 1–5 — self-referential consistency checks that MUST pass — Validation 6 is **advisory**: it produces a coverage scorecard and gap list but NEVER flips the overall `all_valid` result.
+
+**Read first:** `design-workers/08-industry-alignment/references/industry-data-model-alignment.md` — the Silver-vs-Gold nuance, the manifest, the crosswalk states, and the scoring rubric. This is semantic coverage, NOT structural equivalence.
+
+### Single Source of Matching
+
+Matching is owned by `design-workers/08-industry-alignment` (Phase 0/2), which writes `gold_layer_design/INDUSTRY_CROSSWALK.csv`. Validation 6 **loads** that crosswalk — it does NOT re-match — then verifies it against the current YAML and scores it. This avoids two divergent matchers.
+
+### Preconditions
+
+- If `INDUSTRY_CROSSWALK.csv` is absent, `industry_reference_source: none` (or the worker was skipped). Record "Industry alignment: N/A" and return `{"valid": True, "applicable": False}` — never a failure.
+
+### Rule Table
+
+| # | Rule | Severity | How detected |
+|---|------|----------|--------------|
+| 1 | Every `core` reference entity is `Covered`, `Absorbed`, `Waived`, or `Planned` | advisory-high | Crosswalk row in `Gap` state with `importance: core` |
+| 2 | `Covered`/`Absorbed` `gold_tables` still exist in the current YAML | advisory-high | Named Gold table not found among YAML `table_name`s (drift after Phase 2) |
+| 3 | Every `PII` entity's covering Gold table carries a `PII` tag | advisory-med | Covering table missing `table_properties.PII` |
+| 4 | Every `Waived`/`Planned`/`Gap` row has a rationale | advisory-low | Empty `rationale` cell |
+
+### Validation Pattern
+
+```python
+import csv
+import yaml
+from pathlib import Path
+
+# Reuse the authoritative constants from the worker's overlay script.
+IMPORTANCE_WEIGHT = {"core": 3, "extended": 2, "optional": 1}
+
+
+def _load_gold_tables(yaml_dir: Path) -> dict:
+    tables = {}
+    for yaml_file in yaml_dir.rglob("*.yaml"):
+        with open(yaml_file) as f:
+            spec = yaml.safe_load(f) or {}
+        name = spec.get("table_name", yaml_file.stem)
+        props = spec.get("table_properties", {}) or {}
+        tables[name] = {"has_pii": str(props.get("PII", "")).lower() in {"true", "yes", "pii"}}
+    return tables
+
+
+def validate_industry_alignment(yaml_dir: Path, crosswalk_csv: Path) -> dict:
+    """Validation 6 — advisory. Loads the worker's crosswalk, verifies it against the
+    current YAML, and scores coverage / terminology / PII. `valid` is always True."""
+    if not crosswalk_csv or not Path(crosswalk_csv).exists():
+        return {"valid": True, "applicable": False,
+                "note": "INDUSTRY_CROSSWALK.csv absent — industry alignment N/A."}
+
+    gold = _load_gold_tables(yaml_dir)
+    rows = list(csv.DictReader(open(crosswalk_csv)))
+    issues = []
+    covered_w = applicable_w = 0
+    pii_hits = pii_total = 0
+
+    for r in rows:
+        state = r["state"].strip()
+        importance = r.get("importance", "optional").strip()
+        weight = IMPORTANCE_WEIGHT.get(importance, 1)
+        gold_tables = [t for t in (r.get("gold_tables", "") or "").split("|") if t]
+        sensitive = r.get("sensitivity", "none").strip().upper() == "PII"
+
+        # Scoring: Waived/Planned removed from denominator (not penalized)
+        if state not in {"Waived", "Planned"}:
+            applicable_w += weight
+            if state in {"Covered", "Absorbed"}:
+                covered_w += weight
+
+        # Rule 1: unresolved core gaps
+        if state == "Gap" and importance in {"core", "extended"}:
+            issues.append(f"[gap] {importance} entity '{r['entity']}' not covered/waived/planned")
+
+        # Rule 2: crosswalk drift vs current YAML
+        for t in gold_tables:
+            if t not in gold:
+                issues.append(f"[drift] '{r['entity']}' maps to '{t}' which is not in the current YAML")
+
+        # Rule 3: PII alignment
+        if sensitive and state in {"Covered", "Absorbed"}:
+            pii_total += 1
+            if any(gold.get(t, {}).get("has_pii") for t in gold_tables):
+                pii_hits += 1
+            else:
+                issues.append(f"[pii] '{r['entity']}' is PII but covering table(s) {gold_tables} lack a PII tag")
+
+        # Rule 4: rationale required for non-modeled states
+        if state in {"Waived", "Planned", "Gap"} and not (r.get("rationale", "") or "").strip():
+            issues.append(f"[rationale] '{r['entity']}' is {state} but has no rationale")
+
+    def pct(a, b):
+        return round(100 * a / b) if b else 100
+
+    return {
+        "valid": True,              # advisory — never blocks
+        "applicable": True,
+        "scorecard": {
+            "entity_coverage_pct": pct(covered_w, applicable_w),
+            "pii_alignment_pct": pct(pii_hits, pii_total),
+        },
+        "issues": issues,
+    }
+```
+
+### Emit the Report
+
+From the returned dict, emit `gold_layer_design/INDUSTRY_ALIGNMENT.md` using the report template in `08-industry-alignment/references/industry-data-model-alignment.md`. Record the scorecard line in the validation report; if `applicable` is False, print "Industry alignment: N/A (no reference model provided)".
+
+### Why Advisory, Not a Gate
+
+The reference is external, volatile, and models a *different layer* (Silver business model vs. Gold dimensional). A hard gate would produce false failures whenever the customer's legitimate scope differs from the industry archetype — contradicting Vibe's own "shaped entirely by YOUR context" philosophy. The value is a documented coverage %, a gap list for Phase 9 stakeholder review, and a terminology/PII sanity check — not a pass/fail wall.
+
 ## Complete Design Validation Workflow
 
-Run all four validations as a comprehensive pre-handoff check:
+Run all validations as a comprehensive pre-handoff check (Validations 1–5 are must-pass; Validation 6 is advisory and excluded from `all_valid`):
 
 ```python
 def run_design_validation(project_dir: Path) -> dict:
@@ -489,9 +605,17 @@ def run_design_validation(project_dir: Path) -> dict:
     
     # Validation 4: Mandatory Fields
     results["mandatory_fields"] = validate_yaml_mandatory_fields(yaml_dir)
-    
-    # Summary
-    all_valid = all(r.get("valid", False) for r in results.values())
+
+    # Validation 5: Cross-Worker Semantic Rule Compliance
+    results["semantic_rules"] = validate_semantic_rules(yaml_dir)
+
+    # Validation 6: Industry Data Model Alignment (ADVISORY — excluded from all_valid)
+    crosswalk_csv = project_dir / "gold_layer_design" / "INDUSTRY_CROSSWALK.csv"
+    results["industry_alignment"] = validate_industry_alignment(yaml_dir, crosswalk_csv)
+
+    # Summary — compute all_valid over the MUST-PASS checks only (1–5); Validation 6 is advisory
+    must_pass = {k: v for k, v in results.items() if k != "industry_alignment"}
+    all_valid = all(r.get("valid", False) for r in must_pass.values())
     total_issues = sum(len(r.get("issues", [])) for r in results.values())
     
     print(f"\n{'='*60}")
@@ -522,6 +646,7 @@ Before handing off to implementation:
 - [ ] **PK NOT NULL:** All PRIMARY KEY columns have `nullable: false`
 - [ ] **Grain Documented:** All fact tables have explicit `grain` and `grain_type` in YAML
 - [ ] **Semantic rule compliance:** Transformation enum, FK format, description format, booleans, unknown_member — all pass (Validation 5)
+- [ ] **Industry alignment (advisory):** If a reference model was provided, `INDUSTRY_ALIGNMENT.md` emitted with a coverage scorecard; unresolved core/extended gaps reviewed (Validation 6 — never blocks handoff)
 
 ## Reference Files
 

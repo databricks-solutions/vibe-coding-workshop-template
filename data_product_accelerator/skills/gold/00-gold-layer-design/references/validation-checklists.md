@@ -153,6 +153,23 @@ All design validation checklists extracted from `context/prompts/03a-gold-layer-
 
 ---
 
+## Industry Data Model Alignment (Advisory)
+
+Applies ONLY when `industry_reference_source` ≠ `none`. Advisory — never blocks handoff. Owned by `design-workers/08-industry-alignment`, scored by Validation 6 in `design-workers/07-design-validation`.
+
+- [ ] `context/industry_reference.yaml` manifest present (Mode A: Vibe-generated Silver model reduced; or Mode B: published vertical model)
+- [ ] Phase 0 coverage overlay run and folded into the Schema Intake Report
+- [ ] `INDUSTRY_CROSSWALK.csv` written with all reference entities (`entity, domain, importance, sensitivity, state, gold_tables, rationale`)
+- [ ] Every `core`/`extended` entity is `Covered`, `Absorbed`, `Waived`, or `Planned` (no unresolved `Gap`)
+- [ ] Every `Waived`/`Planned`/`Gap` row has a rationale (waivers cross-referenced in `SOURCE_TABLE_MAPPING.csv`)
+- [ ] `Covered`/`Absorbed` `gold_tables` exist in the current YAML (no crosswalk drift)
+- [ ] Every `PII` industry entity maps to a Gold table carrying a `PII` tag
+- [ ] No source-absent industry entity was fabricated as a Gold table (Extract, Don't Generate)
+- [ ] `INDUSTRY_ALIGNMENT.md` emitted with the coverage/terminology/PII scorecard
+- [ ] `DESIGN_DECISIONS.md` Section 8 records vertical, coverage %, domain/terminology changes, gap dispositions
+
+---
+
 ## Cross-Artifact Consistency
 
 - [ ] All columns in ERD exist in YAML

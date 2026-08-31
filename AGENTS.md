@@ -2,7 +2,7 @@
 
 > **This file is the universal entry point for any AI coding assistant** — Cursor, Claude Code, Windsurf, Copilot, Codex, or any agent that reads `AGENTS.md`.
 
-This is a **monorepo** with four components: a Databricks AppKit workshop with Lakebase and agent-chat extensions, a standalone GenAI agent course, a Data Product Accelerator with 44 agent skills, and an Agentic Framework for building multi-agent systems.
+This is a **monorepo** with four components: a Databricks AppKit workshop with Lakebase and agent-chat extensions, a standalone GenAI agent course, a Data Product Accelerator with 45 agent skills, and an Agentic Framework for building multi-agent systems.
 
 Cross-client behavior is steered by four root [`skills/`](skills/): `vibecoding-state` detects the active client (`client_context`) and gates each prompt, `genie-code-environment` is the in-workspace (Genie Code) behavioral manifest, and `databricks-asset-bundles` + `databricks-expert-agent` are shared deep-reference skills. Routing is identical for every client; the per-client difference is carried by a RULE_0 preamble at the top of each routed prompt.
 
@@ -48,12 +48,12 @@ vibe-coding-workshop-template/          <-- workspace root / agent CWD
 │
 ├── presentations/                      <-- Workshop slide deck (Marp, HTML, PDF, PPTX)
 │
-├── data_product_accelerator/           <-- Component 4: 44 Agent Skills for Data Products
+├── data_product_accelerator/           <-- Component 4: 45 Agent Skills for Data Products
 │   ├── AGENTS.md                       #   *** DETAILED SKILL ROUTING TABLE ***
 │   ├── QUICKSTART.md                   #   One-prompt-per-stage guide
 │   ├── README.md                       #   Accelerator overview
 │   ├── context/                        #   Customer schema CSV inputs
-│   ├── skills/                         #   44 skills across 12 domains
+│   ├── skills/                         #   45 skills across 12 domains
 │   └── docs/                           #   Framework design documentation
 │
 ├── <use_case_slug>_dab/                <-- GENERATED data-product bundle = dp_bundle_root (ONE self-contained folder)
@@ -147,7 +147,7 @@ The standalone GenAI course is the current entry point for building production G
 
 ## Data Product Accelerator — 9-Stage Pipeline (Quick Reference)
 
-For data product, medallion architecture, or Lakehouse tasks, the Data Product Accelerator provides a **Design-First Pipeline** with 44 agent skills. Read `data_product_accelerator/AGENTS.md` for the full routing table.
+For data product, medallion architecture, or Lakehouse tasks, the Data Product Accelerator provides a **Design-First Pipeline** with 45 agent skills. Read `data_product_accelerator/AGENTS.md` for the full routing table.
 
 ```
 data_product_accelerator/context/*.csv
@@ -233,7 +233,7 @@ After the copy lands, **start a NEW Agent-mode chat thread** (hard-refresh the p
 |------|----------|
 | `skills/` | Controller + cross-cutting: `vibecoding-state`, `genie-code-environment`, `databricks-asset-bundles`, `databricks-expert-agent` |
 | `apps_lakebase/skills/` | AppKit workshop lifecycle (10 skills) |
-| `data_product_accelerator/skills/` | Data Product Accelerator (44 skills across 12 domains) |
+| `data_product_accelerator/skills/` | Data Product Accelerator (45 skills across 12 domains) |
 | `genai-agents/` | GenAI agent course (orchestrator, foundation, sdlc, tracks) |
 | `agentic-framework/skills/` | Multi-agent build framework |
 

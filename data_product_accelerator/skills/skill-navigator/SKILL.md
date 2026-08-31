@@ -224,6 +224,7 @@ domain-folder/
 | "fact pattern", "factless", "accumulating snapshot", "measure additivity" | Gold | `gold/design-workers/03-fact-table-patterns` |
 | "conformed dimension", "bus matrix", "drill-across" | Gold | `gold/design-workers/04-conformed-dimensions` |
 | "design validation", "validate model" | Gold | `gold/design-workers/07-design-validation` |
+| "industry alignment", "industry data model", "Vibe data model", "industry coverage" | Gold | `gold/design-workers/08-industry-alignment` |
 | "schema validation" | Gold | `gold/pipeline-workers/05-schema-validation` |
 | "fact grain" | Gold | `gold/pipeline-workers/04-grain-validation` |
 | "YAML setup" | Gold | `gold/pipeline-workers/01-yaml-table-setup` |
@@ -360,7 +361,8 @@ skills/
 │   │   ├── 04-conformed-dimensions/SKILL.md                      # Worker: Enterprise integration [stage 1]
 │   │   ├── 05-erd-diagrams/SKILL.md                              # Worker: ERD diagrams [stage 1]
 │   │   ├── 06-table-documentation/SKILL.md                       # Worker: Table documentation [stage 1]
-│   │   └── 07-design-validation/SKILL.md                         # Worker: Design validation [stage 1]
+│   │   ├── 07-design-validation/SKILL.md                         # Worker: Design validation [stage 1]
+│   │   └── 08-industry-alignment/SKILL.md                        # Worker: Industry data model alignment (advisory) [stage 1]
 │   └── pipeline-workers/
 │       ├── 01-yaml-table-setup/SKILL.md                          # Worker: YAML-driven tables [stage 4]
 │       ├── 02-merge-patterns/SKILL.md                            # Worker: MERGE operations [stage 4]

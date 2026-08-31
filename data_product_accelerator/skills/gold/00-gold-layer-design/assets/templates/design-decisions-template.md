@@ -138,6 +138,44 @@ Every Gold table's YAML declares a `population_strategy` so the Gold pipeline (s
 
 ---
 
+## 8. Industry Alignment (Optional)
+
+Fill this in ONLY when `industry_reference_source` ≠ `none`. It records how the Gold design aligns to a **Databricks Industry Vibe Data Model** (or other canonical industry reference). Owned by `design-workers/08-industry-alignment`; scored advisory-only by Validation 6. This alignment is **semantic coverage, not structural equivalence** — never invent Gold tables for uncovered entities.
+
+| Field | Value |
+|-------|-------|
+| Industry vertical | `retail` |
+| Reference source | `vibe_generated` \| `published` |
+| Reference path | `context/industry_reference.yaml` |
+| Provisional coverage % (Phase 0 overlay) | `88%` |
+
+**Domain renames** (source/working name → canonical industry domain):
+
+| From | To (industry domain) |
+|------|----------------------|
+| `sales_txn` | `sales` |
+
+**Conformed-dimension promotions** (entities shared across 2+ facts):
+
+| Dimension | Shared by (facts) |
+|-----------|-------------------|
+| `dim_customer` | `fact_sales`, `fact_returns` |
+
+**Terminology changes** (off-standard name → industry name):
+
+| From (Gold) | To (industry term) |
+|-------------|--------------------|
+| `dim_buyer` | `dim_customer` |
+
+**Gap dispositions** (every `core`/`extended` industry entity with no Gold coverage):
+
+| Industry entity | Importance | Disposition | Rationale |
+|-----------------|-----------|-------------|-----------|
+| `supplier` | core | `Waived` | No supplier source data in Phase 1 (see SOURCE_TABLE_MAPPING.csv) |
+| `inventory_position` | extended | `Planned` | Deferred to Phase 2 implementation |
+
+---
+
 ## Sign-off Checklist
 
 Before handing off to Phase 3:
@@ -152,3 +190,4 @@ Before handing off to Phase 3:
 - [ ] Population strategy in §7 set for every table (`generate_sequence` for `dim_date`/`dim_time`, `merge_from_silver` otherwise)
 - [ ] `gold_layer_design/DESIGN_DECISIONS.md` written to disk
 - [ ] This file will be embedded verbatim in every Phase 4 subagent prompt
+- [ ] (If `industry_reference_source` ≠ `none`) Section 8 complete: coverage %, domain/terminology changes, and every core/extended gap dispositioned; `INDUSTRY_CROSSWALK.csv` written

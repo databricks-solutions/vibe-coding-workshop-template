@@ -1,6 +1,6 @@
 ---
 name: gold-layer-design
-description: End-to-end orchestrator for designing complete Gold layer schemas with ERDs, YAML files, lineage tracking, and comprehensive business documentation. Guides users through dimensional modeling, ERD creation (master/domain/summary based on table count), YAML schema generation, column-level lineage documentation, business onboarding guide creation, source table mapping, and design validation. Orchestrates design-workers (05-erd-diagrams, 06-table-documentation, 01-grain-definition, 07-design-validation, 02-dimension-patterns, 03-fact-table-patterns, 04-conformed-dimensions). Use when designing a Gold layer from scratch, creating dimensional models, documenting business processes, or preparing for Gold layer implementation.
+description: End-to-end orchestrator for designing complete Gold layer schemas with ERDs, YAML files, lineage tracking, and comprehensive business documentation. Guides users through dimensional modeling, ERD creation (master/domain/summary based on table count), YAML schema generation, column-level lineage documentation, business onboarding guide creation, source table mapping, and design validation. Orchestrates design-workers (05-erd-diagrams, 06-table-documentation, 01-grain-definition, 07-design-validation, 02-dimension-patterns, 03-fact-table-patterns, 04-conformed-dimensions, 08-industry-alignment). Use when designing a Gold layer from scratch, creating dimensional models, documenting business processes, aligning to Databricks Industry Vibe Data Models, or preparing for Gold layer implementation.
 license: Apache-2.0
 clients: [ide_cli, genie_code]
 bundle_resource: none
@@ -18,12 +18,15 @@ metadata:
     - bronze-layer-setup
   reads:
     - context/*.csv
+    - context/industry_reference.yaml  # optional; enables industry alignment (design-workers/08-industry-alignment)
   emits:
     - gold_layer_design/yaml/
     - gold_layer_design/erd_master.md
     - gold_layer_design/docs/BUSINESS_ONBOARDING_GUIDE.md
     - gold_layer_design/COLUMN_LINEAGE.csv
     - gold_layer_design/SOURCE_TABLE_MAPPING.csv
+    - gold_layer_design/INDUSTRY_CROSSWALK.csv       # advisory (only when an industry reference is provided)
+    - gold_layer_design/INDUSTRY_ALIGNMENT.md        # advisory (only when an industry reference is provided)
   workers:
     - design-workers/01-grain-definition
     - design-workers/02-dimension-patterns
@@ -32,6 +35,7 @@ metadata:
     - design-workers/05-erd-diagrams
     - design-workers/06-table-documentation
     - design-workers/07-design-validation
+    - design-workers/08-industry-alignment
   common_dependencies:
     - databricks-expert-agent
     - naming-tagging-standards
@@ -43,6 +47,7 @@ metadata:
     - design-workers/05-erd-diagrams
     - design-workers/06-table-documentation
     - design-workers/07-design-validation
+    - design-workers/08-industry-alignment
   last_verified: "2026-02-07"
   volatility: low
   upstream_sources: []  # Internal dimensional modeling methodology
@@ -73,6 +78,7 @@ This skill orchestrates the following skills. Each MUST be read and followed at 
 | `design-workers/05-erd-diagrams` | Phase 3 | ERD creation and organization strategy |
 | `design-workers/06-table-documentation` | Phase 4 | Dual-purpose documentation standards |
 | `design-workers/07-design-validation` | Phase 8 | YAML↔ERD↔Lineage cross-validation |
+| `design-workers/08-industry-alignment` | Phase 0 & 2 | (Optional) Align the design to Databricks Industry Vibe Data Models — coverage overlay + active guidance. Read only when `industry_reference_source` ≠ `none` |
 
 ### 🔴 Non-Negotiable Defaults (YAML Schemas MUST Encode These)
 
@@ -123,6 +129,10 @@ table_properties:
 - [ ] DESIGN_GAP_ANALYSIS.md - Coverage analysis
 - [ ] README.md - Navigation hub
 
+**Advisory (only when an industry reference is provided):**
+- [ ] INDUSTRY_CROSSWALK.csv - Industry entity ↔ Gold table crosswalk (from `08-industry-alignment`)
+- [ ] INDUSTRY_ALIGNMENT.md - Industry coverage scorecard (from Validation 6)
+
 ### ERD Organization Decision
 
 | Tables | Strategy | Required Deliverables |
@@ -154,9 +164,9 @@ This orchestrator spans 9 phases over 4-8 hours. To maintain coherence without c
 
 | Phase | Worker/reference skills to read at the start of this phase |
 |---|---|
-| 0 | `skills/databricks-expert-agent`, `common/naming-tagging-standards`, `design-workers/00-schema-intake` |
+| 0 | `skills/databricks-expert-agent`, `common/naming-tagging-standards`, `design-workers/00-schema-intake`; **if `industry_reference_source` ≠ `none`:** `design-workers/08-industry-alignment` (coverage overlay) |
 | 1 | `design-workers/01-business-onboarding` |
-| 2 | `design-workers/02-dimension-patterns`, `design-workers/03-fact-patterns`, `references/dimensional-modeling-guide.md` |
+| 2 | `design-workers/02-dimension-patterns`, `design-workers/03-fact-patterns`, `references/dimensional-modeling-guide.md`; **if `industry_reference_source` ≠ `none`:** `design-workers/08-industry-alignment` (active guidance rules) |
 | 3 | `design-workers/04-erd-patterns`, `references/erd-organization-strategy.md` |
 | 4 | `design-workers/05-yaml-schema-patterns`, `design-workers/06-table-documentation`, `references/yaml-schema-patterns.md`, `references/lineage-documentation-guide.md` |
 | 5-7 | `design-workers/06-table-documentation` (lineage CSV + business onboarding guide + source mapping) |
@@ -208,7 +218,11 @@ These rules are the authoritative source whenever a domain-specific skill below 
      - Pattern 2: Column name `other_table_id` matches a known table name
    - Returns list of `{from_table, from_column, to_table, to_column, source}`
 
-4. **Produce Schema Intake Report:**
+4. **(Optional) Industry coverage overlay — only if `industry_reference_source` ≠ `none`:**
+
+   **Read** `data_product_accelerator/skills/gold/design-workers/08-industry-alignment/SKILL.md`. Run `build_industry_overlay(classified, Path(industry_reference_path))` from its `scripts/industry_overlay.py` to annotate each source table with its industry entity (`Covered` / `Absorbed` / `Gap`) and a provisional coverage %. This is a **lens over the parsed source schema — it never invents tables.** Fold the printed overlay into the Schema Intake Report and carry every `core`/`extended` `Gap` into Phase 1/2 for a `Waived`/`Planned` decision. Skip this step entirely when no industry reference is provided.
+
+5. **Produce Schema Intake Report:**
 
 The report summarizes: table inventory, entity classification, inferred relationships, and domain suggestions. This feeds Phase 1 (Requirements) and Phase 2 (Dimensional Modeling).
 
@@ -237,6 +251,9 @@ The report summarizes: table inventory, entity classification, inferred relation
 | Reporting Frequency | Daily, Weekly, Monthly |
 | Table Count | 15 tables — 8 dims, 5 facts, 2 bridge (from Phase 0) |
 | Inferred Relationships | 12 FK relationships (from Phase 0) |
+| Industry Vertical | `retail`, `banking`, `healthcare` (optional — enables industry alignment) |
+| Industry Reference Source | `vibe_generated` \| `published` \| `none` (default `none`) |
+| Industry Reference Path | `context/industry_reference.yaml` (required when source ≠ `none`) |
 
 **Output:** Populated project context document (with Phase 0 schema intake data incorporated)
 
@@ -252,6 +269,7 @@ The report summarizes: table inventory, entity classification, inferred relation
 3. Define measures and metrics with calculation logic
 4. Define relationships (FK constraints)
 5. Assign tables to domains (Location, Product, Time, Sales, etc.)
+6. **(Optional) Apply industry alignment** — if `industry_reference_source` ≠ `none`, read `design-workers/08-industry-alignment` and apply its guidance rules 1–6 (canonical domain names, conformed-dimension identification, grain/measure completeness, terminology steering, gap disposition, sensitivity). Record every decision in `DESIGN_DECISIONS.md` Section 8 and write `gold_layer_design/INDUSTRY_CROSSWALK.csv`. Never invent tables for uncovered entities — disposition them as `Waived`/`Planned` in `SOURCE_TABLE_MAPPING.csv`.
 
 **MANDATORY: Read these skills using the Read tool in order during Phase 2:**
 
@@ -299,6 +317,8 @@ The file MUST contain these six sections:
 4. **Transformation type enum** — the 15 allowed values (see Phase 4 Critical Rules); no other values permitted.
 5. **Top-level YAML key contract** — mandatory keys for every YAML file, plus dimension-only and fact-only keys. See the template for the authoritative list.
 6. **Boolean-to-text conversion list** — every source BOOLEAN column that will be rewritten as a STRING attribute in a business-sourced dimension (e.g., `is_verified` → `verification_status: "Verified"/"Unverified"`), plus the documented `dim_date` exception.
+
+**(Optional) Section 8 — Industry Alignment:** When `industry_reference_source` ≠ `none`, also record the industry vertical, reference source, provisional coverage %, domain renames, conformed-dimension promotions, terminology changes (old→new), and every core/extended gap disposition (`Waived`/`Planned`). See `design-workers/08-industry-alignment` and Section 8 of `assets/templates/design-decisions-template.md`.
 
 **If using parallel subagents in Phase 4**, include the full text of `DESIGN_DECISIONS.md` in every subagent prompt (not by reference). This is the single most effective guard against format divergence across subagent boundaries.
 
@@ -459,6 +479,7 @@ The file MUST contain these six sections:
 5. Validate FOREIGN KEY references point to valid tables/columns
 6. Run lineage validation script
 7. **Upstream cross-reference (MANDATORY when Silver exists):** Check whether upstream source tables exist (via `spark.catalog.tableExists()`). If they do, you MUST run `cross_reference_silver_at_design_time()` from `references/schema-intake-patterns.md` to validate YAML lineage `silver_column` values against the actual source-table schemas, fix any mismatches found, and **record the resulting mismatch count (target: 0) as an explicit line in the validation report** — running it silently does not satisfy this check. This is the only validation that confirms the artifacts agree with *reality* rather than just with each other (the YAML/ERD/lineage consistency checks are self-referential — all three are generated from the same session data, so a systematic column error would pass them while failing here). Only when source tables do not exist yet is this deferred — in that case note that it will be enforced as a hard gate during Phase 0 of `01-gold-layer-setup`.
+8. **(Advisory) Industry alignment — Validation 6:** If `gold_layer_design/INDUSTRY_CROSSWALK.csv` exists, `07-design-validation` loads, verifies, and scores it and emits `gold_layer_design/INDUSTRY_ALIGNMENT.md`. This is **advisory** — excluded from the pass/fail `all_valid` result. Skipped (N/A) when no industry reference was provided.
 
 **Outputs:**
 - Validation report (pass/fail for each category)
@@ -498,6 +519,8 @@ gold_layer_design/
 ├── COLUMN_LINEAGE.csv                 # MANDATORY
 ├── COLUMN_LINEAGE.md                  # Human-readable
 ├── SOURCE_TABLE_MAPPING.csv           # MANDATORY
+├── INDUSTRY_CROSSWALK.csv             # Advisory (only with an industry reference)
+├── INDUSTRY_ALIGNMENT.md              # Advisory (only with an industry reference)
 ├── DESIGN_SUMMARY.md                  # Design decisions
 └── DESIGN_GAP_ANALYSIS.md            # Coverage analysis
 ```

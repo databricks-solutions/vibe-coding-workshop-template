@@ -106,6 +106,7 @@ See: [Gold Layer Index (Stages 1 & 4)](#gold-layer-index-stages-1--4) below for 
 | `05-erd-diagrams` | `gold/design-workers/05-erd-diagrams/SKILL.md` | ~1.2K | Yes |
 | `06-table-documentation` | `gold/design-workers/06-table-documentation/SKILL.md` | ~1.1K | Yes |
 | `07-design-validation` | `gold/design-workers/07-design-validation/SKILL.md` | ~1.1K | Yes |
+| `08-industry-alignment` | `gold/design-workers/08-industry-alignment/SKILL.md` | ~1.3K | Yes |
 
 ### Pipeline Workers (Stage 4 — called by `gold-layer-setup`)
 

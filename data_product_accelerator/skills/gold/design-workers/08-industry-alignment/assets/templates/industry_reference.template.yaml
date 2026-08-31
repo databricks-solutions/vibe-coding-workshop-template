@@ -1,0 +1,88 @@
+# Industry Data Model alignment manifest (STARTER TEMPLATE)
+#
+# Copy this to `context/industry_reference.yaml` and fill it in for your vertical, then
+# set `industry_reference_source` + `industry_reference_path` in Phase 1.
+#
+# HOW TO POPULATE:
+#   Mode A (strongest) — reduce the customer's OWN Vibe-generated Silver model (DBML / UC
+#     catalog / YAML) into this structure: one entity per business entity, its aliases,
+#     importance, sensitivity, and a few core attributes.
+#   Mode B (softer) — use the matching published Lakehouse Industry Data Model for the
+#     vertical as an archetype (github.com/databricks-industry-solutions/lakehouse-industry-data-models).
+#
+# FIELD RULES:
+#   source        : vibe_generated | published
+#   importance    : core | extended | optional   (scoring weights 3 / 2 / 1)
+#   sensitivity   : PII | none                    (PII entities must map to a PII-tagged Gold table)
+#   aliases       : industry synonyms used for name/terminology matching (singular, snake_case)
+#   core_attributes: representative attributes (used for "absorbed" matching + review only)
+#
+# The example below is RETAIL — replace it wholesale with your vertical.
+
+industry: retail
+source: published
+reference: "Databricks Lakehouse Industry Data Model — Retail (ARTS-inspired)"
+version: "2026-08"
+
+domains:
+  - name: customer
+    entities:
+      - name: customer
+        aliases: [party, shopper, guest, member]
+        importance: core
+        sensitivity: PII
+        core_attributes: [customer_id, full_name, email, loyalty_tier, status]
+      - name: customer_address
+        aliases: [address, location]
+        importance: extended
+        sensitivity: PII
+        core_attributes: [address_id, customer_id, postal_code, country]
+      - name: loyalty_program
+        aliases: [rewards, membership]
+        importance: optional
+        sensitivity: none
+        core_attributes: [program_id, program_name, tier, points_balance]
+
+  - name: product
+    entities:
+      - name: product
+        aliases: [item, sku, article]
+        importance: core
+        sensitivity: none
+        core_attributes: [product_id, product_name, category, brand, unit_price]
+      - name: product_category
+        aliases: [category, department, merchandise_hierarchy]
+        importance: extended
+        sensitivity: none
+        core_attributes: [category_id, category_name, parent_category_id]
+
+  - name: sales
+    entities:
+      - name: sales_transaction
+        aliases: [order, sale, purchase, transaction]
+        importance: core
+        sensitivity: none
+        core_attributes: [transaction_id, customer_id, transaction_ts, total_amount]
+      - name: sales_line_item
+        aliases: [order_item, line_item, order_line]
+        importance: core
+        sensitivity: none
+        core_attributes: [line_item_id, transaction_id, product_id, quantity, line_amount]
+      - name: store
+        aliases: [location, outlet, branch]
+        importance: extended
+        sensitivity: none
+        core_attributes: [store_id, store_name, region, postal_code]
+
+  - name: supply
+    entities:
+      - name: supplier
+        aliases: [vendor, distributor]
+        importance: core
+        sensitivity: none
+        core_attributes: [supplier_id, supplier_name, country]
+      - name: inventory_position
+        aliases: [stock, inventory, on_hand]
+        importance: extended
+        sensitivity: none
+        core_attributes: [product_id, store_id, on_hand_qty, as_of_date]
