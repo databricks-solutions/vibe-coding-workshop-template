@@ -15,24 +15,24 @@ deploy_verb: none
 deploy_note: "Scorers/judges defined via the MLflow GenAI SDK; no bundle resource. Identical on both clients; on Genie Code run any CLI step through runDatabricksCli. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-06-05"
+  last_verified: "2026-08-30"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"
-  version: "4.1.0"
+  version: "4.2.0"
   domain: "genai-agents"
   pipeline_position: "S3"
   consumes: "evaluation_dataset"
   produces: "scorer_list, threshold_config, helper_functions"
-  grounded_in: "https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/scorers, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/create-custom-scorers, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/evaluate-conversations, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/eval-harness"
+  grounded_in: "https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/scorers, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/custom-judge/, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/custom-scorers, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/evaluate-conversations, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/eval-harness"
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-mlflow-evaluation/SKILL.md"
+        - "skills/databricks-mlflow-evaluation/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-04-27"
-      sync_commit: "281d9acd92d936bd5294f78bd7ec68fb12d4a696"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 fields_read:
   - governance.scorer_suite.guidelines
   - governance.scorer_suite.judge_questions
@@ -61,7 +61,7 @@ Patterns for MLflow GenAI scorers and LLM judges aligned with [Databricks MLflow
 
 ## Upstream Lineage
 
-This skill extends AI-Dev-Kit's `databricks-mlflow-evaluation` skill for built-in scorers, custom scorer development, `make_judge`, MemAlign-aligned judge workflows, and scorer API contracts. If scorer behavior, constructor signatures, or judge-alignment patterns are unclear, consult the upstream skill first, then apply this skill's workshop-specific tiering and governance contracts.
+This skill extends Databricks Agent Skills' `databricks-mlflow-evaluation` skill for built-in scorers, custom scorer development, `make_judge`, MemAlign-aligned judge workflows, and scorer API contracts. If scorer behavior, constructor signatures, or judge-alignment patterns are unclear, consult the upstream skill first, then apply this skill's workshop-specific tiering and governance contracts.
 
 ## When to Use
 
@@ -85,7 +85,7 @@ Upstream harness context: SDLC Step 4 (evaluation runs). Dataset contract: SDLC 
 | 2 | **`@scorer` decorator** | Custom deterministic or programmatic logic; full control over `Feedback`. |
 | 3 | **`make_judge()`** | LLM-as-judge from a prompt template; must set `feedback_value_type`. |
 
-Imports vary slightly by MLflow version; confirm `mlflow.genai.scorers` in your environment. Examples below use common patterns from [custom scorers](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/create-custom-scorers).
+Imports vary slightly by MLflow version; confirm `mlflow.genai.scorers` (code-based scorers) and `mlflow.genai.judges` (`make_judge`) in your environment. Examples below use common patterns from [code-based scorers](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/custom-scorers) and [custom judges](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/custom-judge/).
 
 ---
 
@@ -154,14 +154,14 @@ Return **`Feedback(name=..., value=..., rationale=...)`** (and optional metadata
 
 ## Custom Judge via `make_judge()`
 
-Use **`make_judge()`** for LLM-based scoring instead of ad hoc SDK calls inside every row. You **must** pass **`feedback_value_type`**: one of **`"boolean"`**, **`"integer"`**, **`"float"`**, or a typed **`Literal[...]`** so MLflow can parse and aggregate judge outputs.
+Use **`make_judge()`** for LLM-based scoring instead of ad hoc SDK calls inside every row. You **must** pass **`feedback_value_type`**: a Python type — **`bool`**, **`int`**, **`float`**, **`str`**, a nullable primitive (**`float | None`** / **`Optional[int]`**), or a typed **`Literal[...]`** — so MLflow can parse and aggregate judge outputs via structured outputs. Pass the type itself (`feedback_value_type=float`), never the string name (`"float"`).
 
-Template placeholders are Jinja-style. Use top-level **`{{ inputs }}`**, **`{{ outputs }}`**, **`{{ expectations }}`** (and, when applicable, **`{{ trace }}`**, **`{{ conversation }}`** per [MLflow template rules](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/create-custom-scorers)). Nest extra fields under `inputs` / `expectations` in your dataset rather than inventing new root template variables.
+Template placeholders are Jinja-style. Use top-level **`{{ inputs }}`**, **`{{ outputs }}`**, **`{{ expectations }}`** (and, when applicable, **`{{ trace }}`**, **`{{ conversation }}`** per [MLflow custom-judge template rules](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/custom-judge/)). Custom variables are not supported. **`{{ conversation }}` may only coexist with `{{ expectations }}`** — it cannot be combined with `{{ inputs }}`, `{{ outputs }}`, or `{{ trace }}`. Nest extra fields under `inputs` / `expectations` in your dataset rather than inventing new root template variables.
 
 ```python
 from typing import Literal
 
-from mlflow.genai import make_judge  # MLflow 3.11+: import from mlflow.genai
+from mlflow.genai.judges import make_judge  # canonical path (MLflow >= 3.4)
 
 domain_judge = make_judge(
     name="domain_accuracy",
@@ -173,7 +173,7 @@ Trace: {{ trace }}
 Reply with a single token: "yes" if the output is accurate, "no" otherwise.
 """,
     feedback_value_type=Literal["yes", "no"],
-    model="endpoints:/" + LLM_JUDGE_DEFAULT_ENDPOINT,
+    model="databricks:/" + LLM_JUDGE_DEFAULT_ENDPOINT,  # provider:/<model>; databricks:/ for serving endpoints
 )
 ```
 
@@ -183,7 +183,8 @@ The keyword for the prompt string may differ by version (e.g. `judge_prompt` vs 
 
 These rules are platform reality on MLflow 3.11; violating them silently breaks aggregation or fails construction:
 
-- **Import path:** import `make_judge` from `mlflow.genai` (`from mlflow.genai import make_judge`). The legacy path under `mlflow.genai.scorers` may not be available — prefer the canonical top-level import on 3.11+.
+- **Import path:** import `make_judge` from `mlflow.genai.judges` (`from mlflow.genai.judges import make_judge`) — the canonical path documented by MLflow and Databricks (SDK requires MLflow >= 3.4; the Judge Builder UI requires >= 3.9). A top-level `mlflow.genai.make_judge` alias also exists, but do **not** import it from `mlflow.genai.scorers`.
+- **Judge `model` URI scheme:** use `provider:/<model>` — `databricks:/<serving-endpoint>` for Databricks-hosted judges (e.g. `databricks:/databricks-gpt-5-mini`), `openai:/<model>` or `anthropic:/<model>` for others. The older `endpoints:/` prefix is not in current docs; prefer `databricks:/`.
 - **Set judge aggregation explicitly so `<scorer>/mean` exists.** Without an explicit aggregation (e.g. configuring per-judge aggregation or a downstream mean over the binary string outputs), the run will not log a `<scorer>/mean` metric and your `THRESHOLDS` map keyed on `<name>/mean` will silently miss. Verify metric keys on a pilot run.
 - **Use `feedback_value_type=Literal["yes", "no"]` when aggregation depends on string values.** Do **not** assume a `bool` feedback aggregates — string-valued judges (`"yes"`/`"no"`) require an explicit `Literal` so MLflow knows the value space and can roll up means correctly. Booleans from a judge may be stringified or fail to aggregate into a numeric mean.
 - **`Correctness` consumes `expected_response`, not `expected_signal`.** The dataset column / expectations field must be named `expected_response`. Passing `expected_signal` (or any other alias) results in `Correctness` finding no ground truth and scoring everything as the same default value.
@@ -293,7 +294,8 @@ Define a single factory that returns the list passed to **`mlflow.genai.evaluate
 ```python
 def build_scorers(agent_description: str):
     """Return scorers tuned to the agent's risk profile and I/O schema."""
-    from mlflow.genai.scorers import Safety, Guidelines, RelevanceToQuery, make_judge
+    from mlflow.genai.scorers import Safety, Guidelines, RelevanceToQuery
+    from mlflow.genai.judges import make_judge
 
     rubric = Guidelines(
         name="agent_rubric",
@@ -301,9 +303,9 @@ def build_scorers(agent_description: str):
     )
     tone = make_judge(
         name="professional_tone",
-        judge_prompt="Inputs: {{ inputs }}\nOutputs: {{ outputs }}\n"
+        instructions="Inputs: {{ inputs }}\nOutputs: {{ outputs }}\n"
         "Rate professionalism from 0.0 to 1.0.",
-        feedback_value_type="float",
+        feedback_value_type=float,
     )
     return [Safety(), rubric, RelevanceToQuery(), tone]
 ```
@@ -365,7 +367,7 @@ After an upgrade, re-check logged metric keys in the MLflow UI once; rename thre
 | Mistake | Consequence | Fix |
 |---------|-------------|-----|
 | Wrong shape for `outputs` vs your agent | Flat or misleading scores | Document agent JSON; read fields explicitly in `@scorer` |
-| Missing `feedback_value_type` on `make_judge` | Build or runtime errors | Set `"boolean"`, `"integer"`, or `"float"` |
+| Missing `feedback_value_type` on `make_judge` | Build or runtime errors | Set a Python type: `bool`, `int`, `float`, `str`, or `Literal[...]` (not the string `"float"`) |
 | Invalid template variables in `judge_prompt` | `MlflowException` | Use only allowed placeholders; nest data under `inputs` / `expectations` |
 | Threshold keys don’t match logged metrics | Gates always pass or always fail | Inspect one run’s metrics; align `THRESHOLDS` keys |
 | Treating `make_judge` result as a full evaluator | Wrong API usage | Pass scorers into `mlflow.genai.evaluate(scorers=[...])` |
@@ -377,8 +379,9 @@ After an upgrade, re-check logged metric keys in the MLflow UI once; rename thre
 ## Validation Checklist
 
 - [ ] Chosen path: built-in class, `@scorer`, or `make_judge` matches the use case.
-- [ ] `make_judge` is imported from `mlflow.genai` (MLflow 3.11+).
-- [ ] Every `make_judge` specifies `feedback_value_type`; string-valued judges use `Literal["yes", "no"]` (or equivalent typed Literal), not bare `bool`.
+- [ ] `make_judge` is imported from `mlflow.genai.judges` (SDK >= 3.4).
+- [ ] Judge `model` uses the `provider:/<model>` scheme (`databricks:/<endpoint>` for serving endpoints), not `endpoints:/`.
+- [ ] Every `make_judge` specifies `feedback_value_type` as a Python type (`bool`/`int`/`float`/`str`/`Literal[...]`, not a string); string-valued judges use `Literal["yes", "no"]`, not bare `bool`.
 - [ ] Judge aggregation is set explicitly so `<scorer>/mean` is logged on the run.
 - [ ] `Correctness` reads `expected_response` from the dataset (not `expected_signal`).
 - [ ] Judge instruction templates include required placeholders such as `{{ trace }}`.
@@ -402,7 +405,8 @@ After an upgrade, re-check logged metric keys in the MLflow UI once; rename thre
 ### Official documentation (Databricks)
 
 - [Scorers concepts](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/scorers)
-- [Create custom scorers](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/create-custom-scorers)
+- [Custom judges (`make_judge`)](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/custom-judge/)
+- [Code-based scorers (`@scorer`)](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/custom-scorers)
 - [Evaluate conversations](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/evaluate-conversations)
 - [Evaluation harness concepts](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/eval-harness)
 
@@ -426,6 +430,7 @@ After an upgrade, re-check logged metric keys in the MLflow UI once; rename thre
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 4.2.0 | 2026-08-30 | Doc-drift remediation: `make_judge` import standardized to `mlflow.genai.judges`; judge `model` URI corrected to `provider:/<model>` (`databricks:/<endpoint>`, replacing `endpoints:/`); `feedback_value_type` now passed as a Python type (`bool`/`int`/`float`/`str`/`Literal`/nullable), not a string; `build_scorers()` example uses `instructions=` + `feedback_value_type=float`; `{{ conversation }}`-only-with-`{{ expectations }}` constraint documented; dead `create-custom-scorers` URLs repointed to `custom-judge/` + `custom-scorers`. |
 | 4.1.0 | 2026-04-26 | Added MLflow 3.11 contracts: `make_judge` import from `mlflow.genai`, explicit aggregation for `<scorer>/mean`, `feedback_value_type=Literal["yes", "no"]` for string-valued judges, `Correctness` consumes `expected_response`, judge instructions must include `{{ trace }}`. Added 5-tier scorer model (`L1`, `L2-instruction`, `L2-behavior`, `L3-deterministic`, `L3-judge`) with `pii_protection` rename, auto-derived L2-behavior from `agent.tools[].writes_to`, `domain_accuracy` prompt in `state://Governance`, `sql_execution_readonly` heuristic with refusal short-circuit and SQL-keyword adjacency, and default judge endpoint via `llm_role_endpoints.llm_judge_default.endpoint`. |
 | 4.0.0 | 2026-04-10 | De-coupled from repo-specific patterns. Added conversation evaluation, `make_judge` `feedback_value_type`, and built-in conversation scorers. Grounded in official Databricks scorers and evaluation docs. |
 | 3.1.0 | 2026-03-27 | Added reference files, DO/DON'T, scripts section, expanded thresholds and checklist. |

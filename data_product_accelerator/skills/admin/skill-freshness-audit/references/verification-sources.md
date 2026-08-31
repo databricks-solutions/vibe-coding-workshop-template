@@ -8,75 +8,80 @@ Maps every skill to the official documentation URLs used to verify its patterns 
 
 ## GenAI Agents Domain (High Volatility)
 
+> The GenAI course lives under `genai-agents/{00-course-orchestrator, foundation/, sdlc/, tracks/}`.
+> URLs below track the current MLflow 3 GenAI doc family on `docs.databricks.com/aws/en/mlflow3/genai/`.
+
 ### `genai-agents/00-course-orchestrator`
 | URL | Check For |
 |---|---|
-| https://docs.databricks.com/en/generative-ai/agent-framework/ | Agent Framework overview, supported agent types |
+| https://docs.databricks.com/aws/en/generative-ai/agent-framework/ | Agent Framework overview, supported agent types |
 | https://mlflow.org/docs/latest/genai/serving/responses-agent | ResponsesAgent API, class signature |
-| https://mlflow.org/docs/latest/llms/llm-evaluate/ | Evaluation API, metric names |
-| https://mlflow.org/docs/latest/llms/tracing/index.html | Tracing API, span types |
-| https://learn.microsoft.com/en-us/azure/databricks/genie/conversation-api | Conversation API endpoints |
-| https://learn.microsoft.com/en-us/azure/databricks/mlflow3/genai/eval-monitor/production-monitoring | Production monitoring patterns |
-| https://docs.databricks.com/en/lakebase/ | Lakebase API, database operations |
+| https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/ | Evaluation & monitoring overview |
+| https://docs.databricks.com/aws/en/mlflow3/genai/tracing/ | Tracing API, span types |
+| https://docs.databricks.com/aws/en/genie/conversation-api | Genie Agents API endpoints |
+| https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/production-monitoring | Production monitoring patterns |
+| https://docs.databricks.com/aws/en/lakebase/ | Lakebase API, database operations |
 | https://docs.databricks.com/aws/en/generative-ai/agent-framework/multi-agent-genie | Multi-agent patterns |
 
-### `genai-agents/01-responses-agent-patterns`
+### `genai-agents/foundation/01-mlflow-genai-foundation`
 | URL | Check For |
 |---|---|
-| https://mlflow.org/docs/latest/genai/serving/responses-agent | ResponsesAgent class, predict() signature, predict_stream() |
-| https://mlflow.org/docs/latest/llms/tracing/index.html | Trace decorators, span types |
-| https://docs.databricks.com/en/machine-learning/model-serving/create-manage-serving-endpoints.html | OBO auth, SystemAuthPolicy |
-| https://docs.databricks.com/aws/en/mlflow3/genai/tracing/storage | Unity Catalog trace storage |
+| https://mlflow.org/docs/latest/genai/serving/responses-agent | ResponsesAgent class, model signature inference |
+| https://docs.databricks.com/aws/en/mlflow3/genai/tracing/app-instrumentation/automatic | Autolog integrations |
+| https://mlflow.org/docs/latest/models.html#model-signature | Model signature spec |
 
-### `genai-agents/02-mlflow-genai-evaluation`
+### `genai-agents/foundation/02-experiment-tracing-and-uc-storage`
 | URL | Check For |
 |---|---|
-| https://mlflow.org/docs/latest/llms/llm-evaluate/ | evaluate() API, return types |
-| https://mlflow.org/docs/latest/llms/llm-evaluate/index.html#creating-custom-llm-evaluation-metrics | Custom metric creation API |
-| https://docs.databricks.com/en/generative-ai/agent-evaluation/ | Databricks-specific evaluation patterns |
-| https://mlflow.org/docs/latest/llms/llm-evaluate/index.html#llm-as-judge-metrics | LLM-as-Judge patterns |
+| https://docs.databricks.com/aws/en/mlflow3/genai/tracing/trace-unity-catalog | UC OTEL trace storage, table schema, grants |
+| https://docs.databricks.com/aws/en/mlflow3/genai/tracing/app-instrumentation/ | Auto/manual/combined tracing, decorators, span types |
+| https://docs.databricks.com/aws/en/mlflow3/genai/tracing/third-party/otel-span-attributes | gen_ai.* semantic-convention attributes |
 
-### `genai-agents/03-lakebase-memory-patterns`
+### `genai-agents/foundation/03-tools-and-data-access`, `04-ai-gateway`, `05-knowledge-assistant`
 | URL | Check For |
 |---|---|
-| https://docs.databricks.com/aws/en/notebooks/source/generative-ai/short-term-memory-agent-lakebase.html | CheckpointSaver API |
-| https://docs.databricks.com/aws/en/notebooks/source/generative-ai/long-term-memory-agent-lakebase.html | DatabricksStore API |
-| https://learn.microsoft.com/en-us/azure/databricks/generative-ai/agent-framework/stateful-agents | Stateful agent patterns |
-| https://docs.databricks.com/en/lakebase/ | Lakebase connection, SQL syntax |
+| https://docs.databricks.com/aws/en/generative-ai/agent-framework/ | Tool calling, UC function tools |
+| https://docs.databricks.com/aws/en/ai-gateway/ | AI Gateway config, rate limits, guardrails |
+| https://docs.databricks.com/aws/en/generative-ai/agent-bricks/knowledge-assistant | Knowledge Assistant setup |
 
-### `genai-agents/04-prompt-registry-patterns`
+### `genai-agents/sdlc/01-prompt-registry`
 | URL | Check For |
 |---|---|
-| https://mlflow.org/docs/latest/llms/prompt-engineering/index.html | Prompt registry API, versioning |
-| https://docs.databricks.com/data-governance/unity-catalog/create-tables.html | UC table storage for prompts |
-| https://docs.databricks.com/en/generative-ai/agent-framework/configuration.html | Agent configuration management |
+| https://docs.databricks.com/aws/en/mlflow3/genai/prompt-registry/ | Prompt registry API, UC-backed versioning |
 
-### `genai-agents/05-multi-agent-genie-orchestration`
+### `genai-agents/sdlc/02-evaluation-datasets`, `04-evaluation-runs`
 | URL | Check For |
 |---|---|
-| https://docs.databricks.com/en/generative-ai/genie/conversation-api.html | Conversation API schema, endpoints |
-| https://docs.databricks.com/en/generative-ai/genie/spaces.html | Genie Space configuration |
+| https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/eval-harness | evaluate() harness, predict_fn, dataset contract |
+| https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/evaluate-conversations | Conversation (multi-turn) evaluation |
 
-### `genai-agents/06-deployment-automation`
+### `genai-agents/sdlc/03-scorers-and-judges`
 | URL | Check For |
 |---|---|
-| https://mlflow.org/docs/latest/model-registry.html | Model registry API, versioning |
-| https://mlflow.org/docs/latest/data/index.html | Dataset tracking API |
-| https://docs.databricks.com/en/dev-tools/bundles/index.html | Asset Bundle job triggers |
-| https://docs.databricks.com/en/machine-learning/model-serving/index.html | Serving endpoint deployment |
+| https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/scorers | Built-in scorers, judge model URI (provider:/model) |
+| https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/custom-judge/ | make_judge() import (mlflow.genai.judges), template vars, feedback_value_type |
+| https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/custom-scorers | @scorer decorator, code-based scorers |
 
-### `genai-agents/07-production-monitoring`
+### `genai-agents/sdlc/05-logged-model-and-uc-registration`, `06-deployment-and-automation`
 | URL | Check For |
 |---|---|
-| https://mlflow.org/docs/latest/llms/llm-evaluate/index.html#registered-scorers | Registered scorer API |
-| https://docs.databricks.com/aws/en/mlflow3/genai/tracing/storage | Trace archival, retention |
-| https://mlflow.org/docs/latest/llms/llm-evaluate/index.html#assess | assess() API |
+| https://docs.databricks.com/aws/en/mlflow3/genai/ | LoggedModel, UC model registration |
+| https://docs.databricks.com/aws/en/dev-tools/bundles/ | Asset Bundle job triggers |
+| https://docs.databricks.com/aws/en/machine-learning/model-serving/ | Serving endpoint deployment |
 
-### `genai-agents/08-mlflow-genai-foundation`
+### `genai-agents/sdlc/07-production-monitoring`
 | URL | Check For |
 |---|---|
-| https://mlflow.org/docs/latest/genai/serving/responses-agent | Model signature inference |
-| https://mlflow.org/docs/latest/llms/tracing/index.html | Autolog, trace decorators |
+| https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/production-monitoring | Registered scorers, sampling, backfill |
+| https://docs.databricks.com/aws/en/mlflow3/genai/tracing/trace-unity-catalog | Trace archival, retention, monitoring warehouse |
+| https://docs.databricks.com/aws/en/mlflow3/genai/human-feedback/ | Human feedback / labeling sessions |
+
+### `genai-agents/tracks/*` (custom Agent App)
+| URL | Check For |
+|---|---|
+| https://docs.databricks.com/aws/en/generative-ai/agent-framework/ | ResponsesAgent, agent framework patterns |
+| https://docs.databricks.com/aws/en/machine-learning/model-serving/create-manage-serving-endpoints | OBO auth, SystemAuthPolicy |
+| https://docs.databricks.com/aws/en/lakebase/ | Lakebase memory (short/long-term) |
 
 ---
 

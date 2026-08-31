@@ -12,11 +12,11 @@ deploy_verb: none
 deploy_note: "Experiment + tracing + UC OTEL trace storage configured via the MLflow SDK; OTEL trace tables land in the per-user prefixed schema. No bundle resource. Identical on both clients; on Genie Code use its serverless runtime + runDatabricksCli for any CLI step. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-06-05"
+  last_verified: "2026-08-30"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"
-  version: "3.6.0"
+  version: "3.6.1"
   domain: "genai-agents"
   pipeline_position: "F2"
   consumes: "mlflow_environment"

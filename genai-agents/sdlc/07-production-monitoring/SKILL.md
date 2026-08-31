@@ -15,24 +15,24 @@ deploy_verb: bundle_deploy
 deploy_note: "Live monitoring = MLflow registered scorers (SDK) + periodic trace-archival/backfill jobs deployed via the `bundle deploy --target dev` spine; archived traces land in the per-user prefixed schema. On Genie Code run job deploy/run through runDatabricksCli. See `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-06-05"
+  last_verified: "2026-08-30"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"
-  version: "4.0.0"
+  version: "4.0.1"
   domain: "genai-agents"
   pipeline_position: "S7"
   consumes: "databricks_app, serving_endpoint"
   produces: "production_scorers, trace_archival_table, monitoring_dashboards"
   grounded_in: "https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/production-monitoring, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/concepts/scorers, https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/evaluate-conversations, https://docs.databricks.com/aws/en/mlflow3/genai/human-feedback/"
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-mlflow-evaluation/SKILL.md"
+        - "skills/databricks-mlflow-evaluation/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-04-27"
-      sync_commit: "281d9acd92d936bd5294f78bd7ec68fb12d4a696"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 fields_read:
   - governance.scorer_suite.production_scorers
   - governance.monitoring.required_alerts
@@ -44,7 +44,7 @@ Continuous monitoring for GenAI agents after deployment: **define â†’ register â
 
 ## Upstream Lineage
 
-This skill extends AI-Dev-Kit's `databricks-mlflow-evaluation` skill for UC trace ingestion, production monitoring, registered scorers, backfill, and trace analysis patterns. If monitoring APIs, UC trace table behavior, or scorer lifecycle semantics drift, consult the upstream skill first, then apply this skill's live-traffic sampling and dashboard conventions.
+This skill extends Databricks Agent Skills' `databricks-mlflow-evaluation` skill for UC trace ingestion, production monitoring, registered scorers, backfill, and trace analysis patterns. If monitoring APIs, UC trace table behavior, or scorer lifecycle semantics drift, consult the upstream skill first, then apply this skill's live-traffic sampling and dashboard conventions.
 
 ## When to Use
 

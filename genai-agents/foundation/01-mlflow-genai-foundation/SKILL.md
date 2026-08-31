@@ -12,11 +12,11 @@ deploy_verb: none
 deploy_note: "MLflow 3.x GenAI environment setup — no deployed resource; configured via the MLflow SDK identically on both clients. On Genie Code the runtime is serverless workspace compute (pre-authenticated); see `skills/genie-code-environment`."
 coverage: full
 metadata:
-  last_verified: "2026-06-05"
+  last_verified: "2026-08-30"
   volatility: high
   upstream_sources: []
   author: "prashanth-subrahmanyam"
-  version: "3.1.0"
+  version: "3.1.1"
   domain: "genai-agents"
   pipeline_position: "F1"
   produces: "mlflow_environment, autolog_enabled, connection_pool"
@@ -253,7 +253,7 @@ For 12 complete DO/DON'T pairs with code examples, see: [`references/anti-patter
 - [MLflow GenAI concepts](https://mlflow.org/docs/latest/genai/)
 - [MLflow tracing](https://mlflow.org/docs/latest/tracing/)
 - [MLflow Model Signatures](https://mlflow.org/docs/latest/models.html#model-signature)
-- [ResponsesAgent API](https://mlflow.org/docs/latest/genai/responses-agent/)
+- [ResponsesAgent API](https://mlflow.org/docs/latest/genai/serving/responses-agent/)
 
 ### Reference files (this skill)
 

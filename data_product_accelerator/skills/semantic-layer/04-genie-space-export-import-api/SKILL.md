@@ -8,7 +8,7 @@ deploy_note: "RULE_8 tiers: T1 native `genie_spaces` bundle entry (preferred; ve
 coverage: full
 metadata:
   author: prashanth subrahmanyam
-  version: "1.0"
+  version: "3.8.0"
   domain: semantic-layer
   role: worker
   pipeline_stage: 6
@@ -16,32 +16,32 @@ metadata:
   called_by:
     - semantic-layer-setup
   standalone: true
-  last_verified: "2026-06-05"
+  last_verified: "2026-08-30"
   volatility: high
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-genie/SKILL.md"
+        - "skills/databricks-genie-agents/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-04-27"
-      sync_commit: "latest"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
     - name: "databricks-docs-genie-getspace"
       url: "https://docs.databricks.com/api/workspace/genie/getspace"
       relationship: "upstream"
-      last_synced: "2026-06-05"
+      last_synced: "2026-08-30"
     - name: "databricks-docs-genie-createspace"
       url: "https://docs.databricks.com/api/workspace/genie/createspace"
       relationship: "upstream"
-      last_synced: "2026-06-05"
+      last_synced: "2026-08-30"
     - name: "databricks-docs-genie-updatespace"
       url: "https://docs.databricks.com/api/workspace/genie/updatespace"
       relationship: "upstream"
-      last_synced: "2026-06-05"
+      last_synced: "2026-08-30"
     - name: "databricks-docs-genie-conversation-api"
       url: "https://docs.databricks.com/aws/en/genie/conversation-api"
       relationship: "upstream"
-      last_synced: "2026-06-05"
+      last_synced: "2026-08-30"
 ---
 
 # Genie Space Export/Import API
@@ -49,6 +49,8 @@ metadata:
 ## Overview
 
 This skill provides comprehensive patterns for programmatically creating, exporting, and importing Databricks Genie Spaces via the REST API. It covers the complete `GenieSpaceExport` JSON schema, API endpoints, common deployment errors, and production-ready workflows including variable substitution and asset inventory-driven generation.
+
+> **Terminology (2026):** Databricks renamed **Genie Spaces** to **Genie Agents**. The REST endpoints are unchanged (`/api/2.0/genie/spaces`), and this skill uses "Genie Space" and "Genie Agent" interchangeably. The API now also exposes **Agent-mode** endpoints (stream reasoning + SQL + final reports with citations) alongside the Chat-mode and Management APIs covered here. See the [Genie Agents API](https://docs.databricks.com/aws/en/genie/conversation-api).
 
 ## When to Use This Skill
 
@@ -103,13 +105,13 @@ This skill handles **individual Genie Space API operations.** The orchestrator h
 
 ### Required Root Field
 
-Every Genie Space JSON MUST include `"version": 2` at the root of `serialized_space`:
+Every Genie Space JSON MUST include an explicit `"version"` at the root of `serialized_space`. The API accepts **versions 1 and 2**; **use version 2** — it is the richer schema that supports `benchmarks`, `data_sources.metric_views`, `example_question_sqls[].parameters`, and `join_specs`:
 
 ```json
 {"version": 2, "config": {...}, "data_sources": {...}, "instructions": {...}, "benchmarks": {...}}
 ```
 
-Omitting `"version": 2` causes silent failures or API rejection. The API does NOT default to version 2.
+Omitting `version` (or sending `0`) causes silent failures or API rejection (`ExportConverter supports versions 1 and 2, but got 0`). The API does NOT default the version — set it explicitly.
 
 ### Required `serialized_space` Invariants (MANDATORY — validate BEFORE every POST / PATCH)
 
@@ -117,17 +119,18 @@ Genie Space creation silently succeeds but produces a broken room when these inv
 
 | Field path (inside `serialized_space`) | Required type | Non-negotiable invariants |
 |---|---|---|
-| `version` | `int` | Must equal `2`. |
+| `version` | `int` | Must be `1` or `2`; prefer `2`. Missing or `0` is rejected. |
 | `config.title` | `str` | Non-empty. Mirrors top-level `title` in the POST envelope. |
 | `config.description` | `str` | Non-empty. |
 | `config.semantic_warehouse_id` | `str` (16+ hex chars) | Must be the **deploy-time** warehouse id (see Action S10). Never a template placeholder. |
-| `data_sources.tables` | `list[object]` | Each entry: `{identifier: "catalog.schema.table", description?: List[str]}`. **NO `id` field** (adding one fails with `Cannot find field: id`). **Sorted by `identifier`** to keep diffs stable. |
-| `data_sources.metric_views` | `list[object]` | Each entry: `{identifier: "catalog.schema.mv_name", description?: List[str]}`. **NO `id` field**. Sorted by `identifier`. |
+| `data_sources.tables` | `list[object]` | Each entry: `{identifier: "catalog.schema.table", description?: List[str], column_configs?: [...] }`. **NO `id` field** (adding one fails with `Cannot find field: id`). **Sorted by `identifier`**; any `column_configs` sorted by `column_name`. |
+| `data_sources.metric_views` | `list[object]` | Each entry: `{identifier: "catalog.schema.mv_name", description?: List[str], column_configs?: [...] }`. **NO `id` field**. Sorted by `identifier`; any `column_configs` sorted by `column_name`. |
 | `instructions.general_instructions` | `list[str]` | List of plain strings — no nested objects. |
 | `instructions.sql_functions` | `list[object]` | Each: `{id: uuid4.hex, identifier: "catalog.schema.fn_name"}`. No other fields. Max 50 entries. |
-| `instructions.example_question_sqls` | `list[object]` | Each: `{id: uuid4.hex, question: List[str], sql: List[str]}`. **`question` and `sql` MUST be `List[str]`**, never single strings. |
+| `instructions.example_question_sqls` | `list[object]` | Each: `{id: uuid4.hex, question: List[str], sql: List[str]}` plus optional `parameters: [{name, type_hint, description?: List[str], default_value?}]` and `usage_guidance?: List[str]`. **`question` and `sql` MUST be `List[str]`**, never single strings. |
+| `instructions.join_specs` | `list[object]` | (v2) Each: `{id: uuid4.hex, left: {identifier, alias}, right: {identifier, alias}, sql: List[str], comment?: List[str], instruction?: List[str]}`. **`sql` MUST contain exactly two elements**: the backtick-quoted join condition AND a relationship annotation `"--rt=FROM_RELATIONSHIP_TYPE_<CARDINALITY>--"`. Sorted by `id`. |
 | `benchmarks.questions` | `list[object]` | Each: `{id: uuid4.hex, question: List[str], answer: [{format: "SQL"\|"INSTRUCTIONS", content: List[str]}]}`. SQL lives inside `answer[].content`, never as a top-level `sql` field. Max 50 entries. |
-| Every `id` field | `str` (32 hex chars) | `uuid.uuid4().hex` — lowercase, no dashes. Regenerate on every new deploy (never copy/paste IDs across environments). |
+| Every `id` field | `str` (32 hex chars) | `uuid.uuid4().hex` — lowercase, no dashes. Regenerate on every new deploy (never copy/paste IDs across environments). Time-ordered 32-hex UUIDs also work and self-satisfy sort order. |
 
 **The #1 silent-failure mode observed in production:** `example_question_sqls[].sql`, `example_question_sqls[].question`, or `benchmarks.questions[].answer[].content` submitted as a single string instead of `List[str]`. The API accepts it, but the resulting space has empty/broken example queries because Genie serializes only the first character and then errors internally on render. There is no error surfaced on POST.
 
@@ -153,18 +156,24 @@ def _assert_sql_arrays(space: dict) -> None:
     Validate serialized_space invariants before POST / PATCH.
     Raises RuntimeError on the FIRST violation — never returns False / warns.
 
-    Schema reference: https://docs.databricks.com/api/workspace/genie/getspace
+    Schema reference: https://docs.databricks.com/aws/en/genie/conversation-api
     Enforces:
-      - data_sources.tables / metric_views entries use `identifier` only (NO `id`).
+      - version is 1 or 2 (prefer 2); missing / 0 is rejected.
+      - data_sources.tables / metric_views entries use `identifier` only (NO `id`);
+        any column_configs are sorted by `column_name`.
       - instructions.sql_functions entries: {id, identifier} only.
-      - instructions.example_question_sqls entries: {id, question: List[str], sql: List[str]}.
+      - instructions.example_question_sqls entries: {id, question: List[str], sql: List[str]}
+        (optional `parameters` / `usage_guidance` are allowed).
+      - instructions.join_specs[].sql has exactly two elements (condition + --rt=...-- annotation).
       - benchmarks.questions[].answer[].content must be List[str] (SQL lives there,
         not as a top-level `sql` field).
     """
     errors: List[str] = []
 
-    if space.get("version") != 2:
-        errors.append("serialized_space.version must be exactly 2 (got %r)" % space.get("version"))
+    if space.get("version") not in (1, 2):
+        errors.append(
+            "serialized_space.version must be 1 or 2 (prefer 2); got %r" % space.get("version")
+        )
 
     cfg = space.get("config") or {}
     if not isinstance(cfg.get("title"), str) or not cfg.get("title"):
@@ -200,6 +209,17 @@ def _assert_sql_arrays(space: dict) -> None:
                 errors.append(
                     f"data_sources.{key} entry `identifier` must be 'catalog.schema.name': {it}"
                 )
+            # column_configs (optional) must be sorted by column_name.
+            ccs = it.get("column_configs")
+            if ccs is not None:
+                if not isinstance(ccs, list):
+                    errors.append(f"data_sources.{key} entry `column_configs` must be a list: {it}")
+                else:
+                    names = [c.get("column_name", "") for c in ccs]
+                    if names != sorted(names):
+                        errors.append(
+                            f"data_sources.{key}[{ident}].column_configs must be sorted by column_name (got {names})"
+                        )
 
     instr = space.get("instructions") or {}
 
@@ -238,6 +258,37 @@ def _assert_sql_arrays(space: dict) -> None:
                         f"instructions.example_question_sqls[{idx}].{arr_field} must be a non-empty "
                         f"List[str] — single strings cause silent breakage. Wrap as [\"...\"]."
                     )
+
+    # instructions.join_specs (v2) — {id, left, right, sql}. sql MUST be exactly two
+    # elements: the join condition AND a "--rt=FROM_RELATIONSHIP_TYPE_<CARDINALITY>--" annotation.
+    joins = instr.get("join_specs") or []
+    if not isinstance(joins, list):
+        errors.append("instructions.join_specs must be a list")
+    else:
+        join_ids = [j.get("id", "") for j in joins if isinstance(j, dict)]
+        if join_ids != sorted(join_ids):
+            errors.append(f"instructions.join_specs must be sorted by id (got {join_ids})")
+        for idx, it in enumerate(joins):
+            if not isinstance(it, dict):
+                errors.append(f"instructions.join_specs[{idx}] must be an object")
+                continue
+            if not _is_uuid_hex(it.get("id")):
+                errors.append(f"instructions.join_specs[{idx}].id must be uuid4.hex")
+            for side in ("left", "right"):
+                node = it.get(side)
+                if not isinstance(node, dict) or not isinstance(node.get("identifier"), str):
+                    errors.append(f"instructions.join_specs[{idx}].{side} must be {{identifier, alias}}")
+            sql = it.get("sql")
+            if not isinstance(sql, list) or len(sql) != 2:
+                errors.append(
+                    f"instructions.join_specs[{idx}].sql must be a 2-element List[str]: "
+                    f"[join condition, '--rt=FROM_RELATIONSHIP_TYPE_<CARDINALITY>--']"
+                )
+            elif not str(sql[1]).startswith("--rt=FROM_RELATIONSHIP_TYPE_"):
+                errors.append(
+                    f"instructions.join_specs[{idx}].sql[1] must be a relationship annotation "
+                    f"'--rt=FROM_RELATIONSHIP_TYPE_<CARDINALITY>--'; omitting it is rejected by the API."
+                )
 
     # benchmarks.questions — SQL lives inside answer[].content, NOT a top-level sql field.
     bench = (space.get("benchmarks") or {}).get("questions") or []
@@ -378,10 +429,13 @@ Use the canonical nested-schema field paths below. Any older guidance that liste
 - `instructions.sql_functions[].id`
 - `instructions.text_instructions[].id`
 - `instructions.example_question_sqls[].id`
+- `instructions.join_specs[].id`
 - `instructions.sql_snippets.measures[].id`
 - `instructions.sql_snippets.filters[].id`
 - `instructions.sql_snippets.expressions[].id`
 - `benchmarks.questions[].id`
+
+> **Tip:** `uuid.uuid4().hex` is always valid. The Genie docs also suggest a **time-ordered** 32-hex UUID so IDs sort alphabetically in creation order and self-satisfy the sort requirements below.
 
 **❌ Arrays that MUST NOT have an `id`** (adding one causes `Cannot find field: id in message ...` errors — see Common Errors):
 
@@ -488,26 +542,40 @@ genie_config['data_sources']['tables'] = [
 - ✅ Enforces API limits automatically
 - ✅ Single source of truth for assets
 
-### 6. Column Configs Warning
+### 6. Column Configs (optional, richer context)
 
-`column_configs` triggers Unity Catalog validation that can fail for complex spaces:
+`column_configs` is a first-class, per-column list on `data_sources.tables[]` and `data_sources.metric_views[]` that gives Genie extra retrieval/formatting hints. Supported per-column fields:
+
+| Field | Purpose |
+|-------|---------|
+| `column_name` | Target column (required within a config entry). |
+| `description` | `List[str]` column description. |
+| `synonyms` | `List[str]` alternate names for entity matching. |
+| `get_example_values` | Sample distinct values so Genie learns the domain. |
+| `build_value_dictionary` | Build a value dictionary for high-cardinality categorical filters. |
+| `enable_entity_matching` | Match user-mentioned entities to this column. |
+| `enable_format_assistance` | Help Genie format values (dates, regions, etc.). |
+| `exclude` | Hide the column from Genie. |
 
 ```json
 {
   "data_sources": {
-    "metric_views": [
+    "tables": [
       {
-        "identifier": "catalog.schema.mv_sales"
-        // ✅ Start without column_configs for reliable deployment
+        "identifier": "catalog.schema.orders",
+        "column_configs": [
+          {"column_name": "order_date", "enable_format_assistance": true},
+          {"column_name": "region", "enable_entity_matching": true, "build_value_dictionary": true}
+        ]
       }
     ]
   }
 }
 ```
 
-**Trade-off:**
-- **Without column_configs**: Reliable deployment, less LLM context
-- **With column_configs**: More LLM context, higher risk of `INTERNAL_ERROR`
+**Rules / trade-offs:**
+- `column_configs` entries MUST be **sorted by `column_name`** (the API validates this — see Section 8).
+- Richer configs add LLM context but increase the risk of `INTERNAL_ERROR` on very complex spaces. If a large space fails to deploy, drop back to `identifier`-only entries first, then reintroduce column_configs incrementally.
 
 ### 7. Field Validation Rules
 
@@ -535,10 +603,13 @@ genie_config['data_sources']['tables'] = [
 | Array Path | Sort Key | Direction |
 |------------|----------|-----------|
 | `data_sources.tables` | `identifier` | Ascending |
+| `data_sources.tables[].column_configs` | `column_name` | Ascending |
 | `data_sources.metric_views` | `identifier` | Ascending |
+| `data_sources.metric_views[].column_configs` | `column_name` | Ascending |
 | `instructions.sql_functions` | `(id, identifier)` | Ascending |
 | `instructions.text_instructions` | `id` | Ascending |
 | `instructions.example_question_sqls` | `id` | Ascending |
+| `instructions.join_specs` | `id` | Ascending |
 | `instructions.sql_snippets.measures` | `id` | Ascending |
 | `instructions.sql_snippets.filters` | `id` | Ascending |
 | `instructions.sql_snippets.expressions` | `id` | Ascending |
@@ -556,13 +627,20 @@ def sort_genie_config(config: dict) -> dict:
                     config["data_sources"][key],
                     key=lambda x: x.get("identifier", ""),
                 )
+                # column_configs (if present) must be sorted by column_name.
+                for entry in config["data_sources"][key]:
+                    if isinstance(entry.get("column_configs"), list):
+                        entry["column_configs"] = sorted(
+                            entry["column_configs"],
+                            key=lambda c: c.get("column_name", ""),
+                        )
     if "instructions" in config:
         if "sql_functions" in config["instructions"]:
             config["instructions"]["sql_functions"] = sorted(
                 config["instructions"]["sql_functions"],
                 key=lambda x: (x.get("id", ""), x.get("identifier", "")),
             )
-        for key in ["text_instructions", "example_question_sqls"]:
+        for key in ["text_instructions", "example_question_sqls", "join_specs"]:
             if key in config["instructions"]:
                 config["instructions"][key] = sorted(
                     config["instructions"][key],
@@ -777,6 +855,7 @@ After API deployment is complete:
 
 ## Version History
 
+- **v3.8.0** (Aug 30, 2026) — Reconciled with the Genie Agents API (Conversation API doc updated Aug 27, 2026). Added `instructions.join_specs` (schema row + `_assert_sql_arrays` block requiring the 2-element `sql` with a `--rt=FROM_RELATIONSHIP_TYPE_<CARDINALITY>--` annotation + `sort_genie_config()` sorting by `id`). Added `column_configs` sorting by `column_name` (validator + sort function + Section 8 table) and rewrote Section 6 to document the first-class column-config fields (`get_example_values`, `build_value_dictionary`, `enable_entity_matching`, `enable_format_assistance`, `exclude`, `synonyms`). Documented optional `example_question_sqls[].parameters` / `usage_guidance`. Relaxed the version check to accept v1 or v2 (prefer v2) instead of hard-failing non-2. Added Spaces->Agents terminology note and Agent-mode API pointer. Noted time-ordered UUIDs as a self-sorting ID option.
 - **v3.7.0** (Apr 27, 2026) — Reconciled `Required serialized_space Invariants` table and `_assert_sql_arrays` validator with the current `getspace`/`createspace`/`updatespace` API: `data_sources.tables`/`metric_views` use `identifier` only and MUST NOT include `id`; `instructions.sql_functions` is `{id, identifier}` (no `sql` array); SQL for benchmarks lives in `answer[].content: List[str]` (not a top-level `sql` field). Replaced legacy `table_full_name`/`metric_view_full_name`/`sample_queries` references with current schema names. Validator now enforces the post-rename surface.
 - **v3.6.0** (Feb 22, 2026) — Fixed Section 8 array sorting: corrected sort keys from `table_name`/`materialized_view_name`/`function_name` to `identifier`/`id` (matching actual API protobuf requirements). Replaced `sort_all_arrays()` with `sort_genie_config()` (canonical implementation in applier). Updated Common Errors with specific error message `Invalid export proto: data_sources.tables must be sorted by identifier`. Added missing arrays (`text_instructions`, `sample_questions`, `benchmarks.questions`) to sort table.
 - **v2.0** (Feb 2026) — Array sorting requirements (Section 8); idempotent deployment pattern (Section 9); expanded array format table; strengthened ID generation guidance; 3 new common errors; deploy template major rewrite; benchmark SQL validation templates added; Notes to Carry Forward and Next Step for progressive disclosure
