@@ -45,7 +45,7 @@ resources:
             path: ../src/company_silver/silver_transactions.py
         # Add DQX library dependency for DLT
         - pypi:
-            package: databricks-labs-dqx>=0.12.0
+            package: databricks-labs-dqx>=0.16.0
 ```
 
 **For Serverless Jobs (non-DLT):**
@@ -59,7 +59,7 @@ resources:
         - environment_key: default
           spec:
             dependencies:
-              - "databricks-labs-dqx>=0.12.0"
+              - "databricks-labs-dqx>=0.16.0"
       tasks:
         - task_key: apply_dqx_checks
           environment_key: default
@@ -243,7 +243,7 @@ resources:
         - environment_key: default
           spec:
             dependencies:
-              - "databricks-labs-dqx>=0.12.0"
+              - "databricks-labs-dqx>=0.16.0"
       tasks:
         - task_key: create_gold_tables
           environment_key: default
@@ -353,7 +353,7 @@ def silver_data():
 # resources/silver_dlt_pipeline.yml
 libraries:
   # - pypi:
-  #     package: databricks-labs-dqx>=0.12.0  # Comment out
+  #     package: databricks-labs-dqx>=0.16.0  # Comment out
 ```
 
 ### Option 3: Full Git Rollback
@@ -388,9 +388,9 @@ databricks bundle deploy -t dev
 - Use `is_data_fresh` to detect stale data from delayed pipelines
 
 ### 5. Version Compatibility
-- Pin to a specific DQX version in production (e.g., `==0.12.0`)
-- Use `>=0.12.0` during development for latest features
-- Review [CHANGELOG](https://github.com/databrickslabs/dqx/blob/main/CHANGELOG.md) for breaking changes before upgrading
+- Pin to a specific DQX version in production (e.g., `==0.16.0`)
+- Use `>=0.16.0` during development for latest features
+- Review [CHANGELOG](https://github.com/databrickslabs/dqx/blob/main/CHANGELOG.md) for breaking changes before upgrading — note the 0.16.0 `is_in_list`/`is_not_in_list` column-expression change (quote string literals) and the checks-storage default save mode shift to `append`
 
 ### 6. Governance
 - Store checks in Delta table for audit trail

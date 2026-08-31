@@ -1,5 +1,7 @@
 # DLT Expectations Patterns
 
+> **API note:** Examples below use `import dlt` to match the DQ-rules framework, but expectations **are available in the modern `dp` API** (`from pyspark import pipelines as dp`), which Databricks recommends. `@dp.expect_all_or_drop()` / `@dp.expect_all()` mirror the `@dlt.*` decorators — migrating is a mechanical swap of the import and prefix (`dlt.read_stream(x)` → `spark.readStream.table(x)`). The `toPandas()` rules-loader cache runs at module import time (outside dataset functions), so it remains the recommended pattern on both APIs. See the [Lakeflow pipelines Python reference](https://docs.databricks.com/aws/en/ldp/developer/python-ref).
+
 ## Pattern Recognition
 
 All Silver layer tables use data quality expectations loaded from a **Unity Catalog Delta table**. This pattern standardizes the Delta table-based approach for portable, maintainable, and runtime-updateable data quality management.
@@ -80,7 +82,7 @@ def silver_transactions():
 resources:
   pipelines:
     silver_dlt_pipeline:
-      name: "[${bundle.target}] Silver Layer Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] Silver Layer Pipeline"
       
       # ✅ CORRECT: Use 'schema' (Direct Publishing Mode)
       catalog: ${var.catalog}

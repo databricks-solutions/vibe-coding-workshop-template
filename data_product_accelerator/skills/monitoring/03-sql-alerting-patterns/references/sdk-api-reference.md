@@ -136,20 +136,20 @@ alerts = response.alerts  # NOT response.results
 existing_alerts = {a.display_name: a for a in alerts}
 ```
 
-### 3. PATCH Requires update_mask
+### 3. PATCH Requires update_mask (and the param is `id`, not `alert_id`)
 
-When updating an existing alert, you MUST specify which fields to update:
+The SDK signature is `update_alert(id, alert, update_mask)`. Pass the alert UUID as `id` (a call using `alert_id=` raises `TypeError`), and always specify which fields to update:
 
 ```python
 # ✅ CORRECT: Include update_mask
 ws.alerts_v2.update_alert(
-    alert_id=existing.id,
+    id=existing.id,
     alert=alert_v2,
     update_mask="query_text,evaluation,schedule"
 )
 
 # ❌ WRONG: Missing update_mask (silently fails or errors)
-ws.alerts_v2.update_alert(alert_id=existing.id, alert=alert_v2)
+ws.alerts_v2.update_alert(id=existing.id, alert=alert_v2)
 ```
 
 ### 4. RESOURCE_ALREADY_EXISTS Handling
@@ -167,7 +167,7 @@ except Exception as e:
         if existing:
             # Update instead of create
             ws.alerts_v2.update_alert(
-                alert_id=existing.id,
+                id=existing.id,
                 alert=alert_v2,
                 update_mask="query_text,evaluation,schedule"
             )
@@ -205,16 +205,22 @@ ws.alerts_v2.create_alert(alert_v2)
 response = ws.alerts_v2.list_alerts()
 alerts = response.alerts
 
-# Update (requires update_mask)
+# Get
+alert = ws.alerts_v2.get_alert(id="alert-id")
+
+# Update (requires update_mask; param is `id`, not `alert_id`)
 ws.alerts_v2.update_alert(
-    alert_id="alert-id",
+    id="alert-id",
     alert=alert_v2,
     update_mask="query_text,evaluation,schedule"
 )
 
-# Delete
-ws.alerts_v2.delete_alert(alert_id="alert-id")
+# Delete (V2 verb is `trash_alert`, not `delete_alert`)
+# Soft-delete to trash (recoverable ~30 days); pass purge=True to permanently delete.
+ws.alerts_v2.trash_alert(id="alert-id")
 ```
+
+**V2 read/delete verbs:** the current API uses `get_alert(id)` and `trash_alert(id, purge)`. There is no `delete_alert` on `alerts_v2`.
 
 ### Typed Classes (Legacy)
 

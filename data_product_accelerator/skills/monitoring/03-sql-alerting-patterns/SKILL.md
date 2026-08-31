@@ -16,7 +16,7 @@ metadata:
   called_by:
     - observability-setup
   standalone: true
-  last_verified: "2026-02-07"
+  last_verified: "2026-08-30"
   volatility: medium
   upstream_sources: []  # Internal alerting patterns
 ---
@@ -549,7 +549,7 @@ except Exception as e:
         existing = existing_alerts.get(alert_name)
         if existing:
             ws.alerts_v2.update_alert(
-                alert_id=existing.id,
+                id=existing.id,  # ⚠️ param is `id`, NOT `alert_id`
                 alert=alert_v2,
                 update_mask="query_text,evaluation,schedule"  # ⚠️ Required!
             )
@@ -557,7 +557,7 @@ except Exception as e:
         raise
 ```
 
-**Key:** PATCH requests require the `update_mask` parameter specifying which fields to update.
+**Key:** PATCH requests require the `update_mask` parameter specifying which fields to update. The SDK signature is `update_alert(id, alert, update_mask)` — pass the alert UUID as `id` (not `alert_id`).
 
 ### Pattern 4: DAB Job Configuration
 
@@ -569,7 +569,7 @@ except Exception as e:
 resources:
   jobs:
     alert_rules_setup_job:
-      name: "[${bundle.target}] Alert Rules - Setup"
+      name: "[${bundle.target} ${var.user_prefix}] Alert Rules - Setup"
       description: "Creates alert_rules configuration table"
       environments:
         - environment_key: default
@@ -591,7 +591,7 @@ resources:
 resources:
   jobs:
     alert_deploy_job:
-      name: "[${bundle.target}] Alert - Deploy"
+      name: "[${bundle.target} ${var.user_prefix}] Alert - Deploy"
       description: "Deploys SQL alerts from alert_rules configuration table"
       environments:
         - environment_key: default
@@ -619,7 +619,7 @@ resources:
 resources:
   jobs:
     alerting_layer_setup_job:
-      name: "[${bundle.target}] Alerting Layer - Full Setup"
+      name: "[${bundle.target} ${var.user_prefix}] Alerting Layer - Full Setup"
       description: "Orchestrates all alerting setup jobs"
       tasks:
         - task_key: setup_alerting_tables
@@ -820,7 +820,7 @@ existing_alerts = {a.display_name: a for a in ws.alerts_v2.list_alerts().alerts}
 existing = existing_alerts.get(alert_name)
 if existing:
     ws.alerts_v2.update_alert(
-        alert_id=existing.id,
+        id=existing.id,  # ⚠️ param is `id`, NOT `alert_id`
         alert=alert_v2,
         update_mask="query_text,evaluation,schedule"  # ⚠️ Required!
     )
@@ -861,11 +861,11 @@ df.write.mode("append").saveAsTable(cfg_table)
 
 **Root Cause:** Missing `update_mask` parameter. PATCH requests require specifying which fields to update.
 
-**Fix:** Include `update_mask` in update calls:
+**Fix:** Include `update_mask` in update calls (and pass the UUID as `id`, not `alert_id`):
 
 ```python
 ws.alerts_v2.update_alert(
-    alert_id=existing.id,
+    id=existing.id,  # ⚠️ param is `id`, NOT `alert_id`
     alert=alert_v2,
     update_mask="query_text,evaluation,schedule"  # ⚠️ Required!
 )
@@ -1007,3 +1007,7 @@ Hard-won operational lessons from production deployment:
 3. Set up alert_rules configuration table
 4. Create hierarchical job architecture
 5. Test with dry_run before production deployment
+
+## Version History
+
+- **2026-08-30** — Fixed `alerts_v2.update_alert` keyword from `alert_id=` to `id=` (the SDK signature is `update_alert(id, alert, update_mask)`); corrected deletion verb from the non-existent `delete_alert` to `trash_alert(id, purge)`; noted `get_alert(id)` as the V2 read verb. Bumped `last_verified`.

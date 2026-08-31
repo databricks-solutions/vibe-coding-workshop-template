@@ -47,7 +47,7 @@ metadata:
     - databricks-asset-bundles
     - databricks-expert-agent
     - databricks-python-imports
-  last_verified: "2026-02-07"
+  last_verified: "2026-08-30"
   volatility: medium
   upstream_sources: []  # Internal orchestrator
 ---

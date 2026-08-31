@@ -30,7 +30,7 @@ metadata:
     - silver-layer-setup
     - gold-layer-setup
   standalone: true
-  last_verified: "2026-02-18"
+  last_verified: "2026-08-30"
   volatility: medium
   verification_sources:
     - url: "https://databricks-sdk-py.readthedocs.io/en/latest/workspace/dataquality/data_quality.html"
@@ -47,7 +47,7 @@ metadata:
       paths:
         - "databricks/sdk/service/dataquality.py"
       relationship: "reference"
-      last_synced: "2026-02-18"
+      last_synced: "2026-08-30"
       sync_commit: "latest"
 ---
 
@@ -147,7 +147,12 @@ w.data_quality.create_monitor(object_id=f"{catalog}.{schema}", ...)
 ```
 
 ### Rule 2: Permissions Required
-- **MANAGE SCHEMA** or **MANAGE CATALOG** privileges on the target schema
+To create/manage a **schema** monitor (anomaly detection), the caller must have **either** of these sets (per the Data Quality Monitoring API):
+- **(a)** `MANAGE` **and** `USE_CATALOG` on the schema's parent catalog, **or**
+- **(b)** `USE_CATALOG` on the parent catalog **plus** `MANAGE` **and** `USE_SCHEMA` on the schema.
+
+(The Catalog Explorer UI states it more simply: `MANAGE` on the schema or its parent catalog.)
+- To view table health indicators: `SELECT` or `BROWSE` on the tables.
 - To query results: **SELECT** on `system.data_quality_monitoring.table_results`
 
 ### Rule 3: System Table Access Is Restricted
@@ -388,3 +393,7 @@ Ready-to-use SQL query for Databricks SQL Alerts with configurable thresholds an
 ## Summary
 
 Anomaly Detection provides automated, schema-level monitoring for table freshness and completeness. It complements the `lakehouse-monitoring-comprehensive` skill's custom business metrics with baseline data reliability monitoring. Enable it in minutes via UI or SDK, query results from the system table, and set up SQL alerts for proactive notification.
+
+## Version History
+
+- **2026-08-30** — Aligned Rule 2 permission wording to the live Data Quality Monitoring API: a schema monitor requires either `MANAGE` + `USE_CATALOG` on the parent catalog, or `USE_CATALOG` on the catalog + `MANAGE` + `USE_SCHEMA` on the schema; added the `SELECT`/`BROWSE` requirement for health indicators. Bumped `last_verified` and upstream `last_synced`.

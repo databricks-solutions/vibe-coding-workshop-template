@@ -27,7 +27,7 @@ metadata:
     - databricks-asset-bundles
     - sql-alerting-patterns
     - anomaly-detection
-  last_verified: "2026-02-18"
+  last_verified: "2026-08-30"
   volatility: medium
   verification_sources:
     - url: "https://databricks-sdk-py.readthedocs.io/en/latest/workspace/dataquality/data_quality.html"
@@ -44,7 +44,7 @@ metadata:
       paths:
         - "databricks/sdk/service/dataquality.py"
       relationship: "reference"
-      last_synced: "2026-02-18"
+      last_synced: "2026-08-30"
       sync_commit: "latest"
 ---
 
@@ -81,6 +81,14 @@ Data Profiling monitors provide **table-level custom business metrics** that tra
 | Phase 4: Validate | 15 min | Query `_profile_metrics` and `_drift_metrics` tables |
 
 ## Critical Rules
+
+### Rule 0: Permissions Required to Create a Table Monitor
+To create a data profiling monitor on a **table**, the caller (user or service principal) must have **all** of:
+- `USE CATALOG` on the parent catalog **and** `USE SCHEMA` on the parent schema,
+- `SELECT` on the table, **and**
+- `MANAGE` on the catalog, schema, **or** table.
+
+`MANAGE` alone does not grant data access — `SELECT` on the table is always required. Viewing the dashboard, computed metrics, or monitor config only needs `SELECT` (+ `USE_SCHEMA`/`USE_CATALOG`). (Grant the app/job service principal these before running the setup job.)
 
 ### Rule 1: SDK Module — Use `dataquality`, NOT `catalog`
 ```python
@@ -308,3 +316,7 @@ Delete the existing monitor first using `delete_monitor_if_exists()` from `scrip
 - [Lakehouse Monitoring Overview](https://learn.microsoft.com/en-us/azure/databricks/lakehouse-monitoring/)
 - [Custom Metrics](https://learn.microsoft.com/en-us/azure/databricks/lakehouse-monitoring/custom-metrics)
 - [Create Monitor API](https://learn.microsoft.com/en-us/azure/databricks/lakehouse-monitoring/create-monitor-api)
+
+## Version History
+
+- **2026-08-30** — Added Rule 0 documenting the permissions to create a table (data profiling) monitor: `USE CATALOG` + `USE SCHEMA` + `SELECT` on the table, plus `MANAGE` on the catalog/schema/table (`MANAGE` alone does not grant data access). Bumped `last_verified` and upstream `last_synced`.

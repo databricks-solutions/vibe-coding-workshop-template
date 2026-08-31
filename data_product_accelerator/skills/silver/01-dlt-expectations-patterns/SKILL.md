@@ -1,6 +1,6 @@
 ---
 name: dlt-expectations-patterns
-description: Spark Declarative Pipeline (SDP, formerly DLT) expectations patterns for data quality with Unity Catalog Delta table storage. Use when implementing Silver layer SDP/DLT pipelines, creating portable data quality rules, or needing runtime-updateable expectations without code deployment. Supports severity-based filtering (critical vs warning) and quarantine patterns. Uses `import dlt` (legacy API) because `@dlt.expect_all_or_drop()` decorators are not yet available in the modern `dp` API (`from pyspark import pipelines as dp`).
+description: Spark Declarative Pipeline (SDP, formerly DLT) expectations patterns for data quality with Unity Catalog Delta table storage. Use when implementing Silver layer SDP/DLT pipelines, creating portable data quality rules, or needing runtime-updateable expectations without code deployment. Supports severity-based filtering (critical vs warning) and quarantine patterns. Standardizes on `import dlt` for the DQ-rules framework; the modern `dp` API (`from pyspark import pipelines as dp`) also supports expectations (`dp.expect_all_or_drop`) and is Databricks' recommended forward path.
 clients: [ide_cli, genie_code]
 bundle_resource: pipelines
 deploy_verb: bundle_deploy
@@ -16,20 +16,20 @@ metadata:
   called_by:
     - silver-layer-setup
   standalone: true
-  last_verified: "2026-02-07"
+  last_verified: "2026-08-30"
   volatility: medium
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-spark-declarative-pipelines/SKILL.md"
+        - "skills/databricks-pipelines/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 # SDP/DLT Expectations Patterns
 
-> **Naming:** Databricks rebranded DLT to **Spark Declarative Pipelines (SDP)**. The modern Python API is `from pyspark import pipelines as dp` with `@dp.table()` decorators. However, expectations decorators (`@dlt.expect_all_or_drop()`, `@dlt.expect_all()`) remain in the legacy `import dlt` API. This skill uses the legacy API until expectations are migrated to `dp`.
+> **Naming:** Databricks rebranded DLT to **Spark Declarative Pipelines (SDP)**. The modern Python API is `from pyspark import pipelines as dp` with `@dp.table()` decorators, and **Databricks recommends `dp`**. Expectations decorators **are available in `dp`** — `@dp.expect_all_or_drop()` and `@dp.expect_all()` mirror the `@dlt.*` versions (see the [Lakeflow pipelines Python reference](https://docs.databricks.com/aws/en/ldp/developer/python-ref)). This skill standardizes on `import dlt` so the rules-loader and decorators stay uniform across the DQ-rules framework; migrating to `dp` is a mechanical swap (`import dlt` → `from pyspark import pipelines as dp`, `@dlt.` → `@dp.`).
 
 ## Overview
 
@@ -103,7 +103,7 @@ def silver_transactions():
 resources:
   pipelines:
     silver_dlt_pipeline:
-      name: "[${bundle.target}] Silver Layer Pipeline"
+      name: "[${bundle.target} ${var.user_prefix}] Silver Layer Pipeline"
       
       # ✅ CORRECT: Use 'schema' (Direct Publishing Mode)
       catalog: ${var.catalog}
@@ -206,6 +206,8 @@ def silver_transactions():
     return dlt.read_stream(get_source_table("bronze_transactions"))
 ```
 
+> **`dp` equivalent (recommended forward path):** the modern API supports the same expectations. Swap the import and prefix — `@dp.table(...)`, `@dp.expect_all_or_drop(...)`, `@dp.expect_all(...)`, and `spark.readStream.table(get_source_table(...))` instead of `dlt.read_stream(...)`. The rules loader is unchanged. See the [Lakeflow pipelines Python reference](https://docs.databricks.com/aws/en/ldp/developer/python-ref).
+
 ### 3. Avoiding `DataFrame.collect()` Warning
 
 **Problem:** DLT shows warning when `.collect()` is used in rules loader
@@ -231,6 +233,8 @@ def get_rules(table_name: str, severity: str) -> dict:
         _load_all_rules()
     return _rules_cache.get((table_name, severity), {})  # From cache!
 ```
+
+> **Why this stays valid on `dp`/SDP:** the Lakeflow pipelines Python reference lists `toPandas()` and `.collect()` among operations to avoid **inside dataset definitions** (the functions decorated with `@dlt.table`/`@dp.table`). This loader calls `toPandas()` at **module import time** (decorator-evaluation), *outside* any dataset function, and caches the result — so it runs once and never during streaming execution. That's the intended pattern for both APIs.
 
 **See:** `references/expectation-patterns.md` for complete pattern
 
@@ -486,4 +490,8 @@ The `expectations` array contains one entry per expectation with `name` (maps to
 ## See Also
 
 - Authoritative upstream (alternate registry): [databricks-agent-skills / `databricks-pipelines`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-pipelines) — canonical expectations / DLT reference.
+
+## Version History
+
+- **2026-08-30** — Corrected the description/Naming premise: expectations are available in the modern `dp` API (`dp.expect_all_or_drop`), which Databricks recommends. Added a `dp`-equivalent callout by the decorator patterns and a note that the `toPandas()` rules-loader cache runs at import time (outside dataset definitions) so it stays valid on both APIs. Kept `import dlt` as the framework standard. Bumped `last_verified`.
 

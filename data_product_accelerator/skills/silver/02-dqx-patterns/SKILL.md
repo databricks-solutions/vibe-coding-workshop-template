@@ -10,7 +10,7 @@ coverage: full
 metadata:
   author: prashanth subrahmanyam
   version: "2.0"
-  dqx_version: ">=0.12.0"
+  dqx_version: ">=0.16.0"
   domain: silver
   role: worker
   pipeline_stage: 2
@@ -21,9 +21,9 @@ metadata:
   dependencies:
     - databricks-python-imports
     - databricks-asset-bundles
-  last_verified: "2026-02-07"
+  last_verified: "2026-08-30"
   volatility: medium
-  upstream_sources: []  # DQX is from databrickslabs, not ai-dev-kit
+  upstream_sources: []  # DQX is from databrickslabs (databrickslabs/dqx), not the databricks-agent-skills registry
 ---
 # DQX Data Quality Framework Patterns
 
@@ -31,7 +31,7 @@ metadata:
 
 DQX is a Python-based data quality framework from Databricks Labs that validates PySpark DataFrames with richer diagnostics than standard DLT expectations. This skill provides production-grade patterns for integrating DQX into medallion architecture pipelines.
 
-**Recommended Version:** `>=0.12.0` (float support, outlier detection, JSON validation, AI-assisted rules)
+**Recommended Version:** `>=0.16.0` (float support, outlier detection, JSON validation, AI-assisted rules, plus the newer checks and behavior changes shipped in 0.13–0.16 — see "Breaking Changes Since 0.12.0" below)
 
 **Key Benefits:**
 - Detailed diagnostic information (`_error`, `_warning` columns)
@@ -54,7 +54,7 @@ DQX is a Python-based data quality framework from Databricks Labs that validates
 
 ```python
 # 1. Install DQX in notebook
-%pip install databricks-labs-dqx>=0.12.0
+%pip install databricks-labs-dqx>=0.16.0
 dbutils.library.restartPython()
 
 # 2. Define checks as dicts
@@ -105,14 +105,14 @@ environments:
   - environment_key: default
     spec:
       dependencies:
-        - "databricks-labs-dqx>=0.12.0"
+        - "databricks-labs-dqx>=0.16.0"
 ```
 
 **DLT Pipelines:** Pipeline-level library
 ```yaml
 libraries:
   - pypi:
-      package: databricks-labs-dqx>=0.12.0
+      package: databricks-labs-dqx>=0.16.0
 ```
 
 ### API Method Selection
@@ -144,7 +144,7 @@ def quarantine():
 
 ## Critical Rules
 
-### 1. Function Names (Verified against 0.12.0 API)
+### 1. Function Names (Verified against 0.16.0 API)
 
 **Reference:** [DQX Check Functions API](https://databrickslabs.github.io/dqx/docs/reference/api/check_funcs/)
 
@@ -157,6 +157,9 @@ def quarantine():
 | min <= col <= max | `is_in_range` | `min_limit`, `max_limit` | ~~is_between~~ |
 | Column in list | `is_in_list` | `allowed` | ~~is_in~~, ~~is_in_values~~ |
 | Column NOT in list | `is_not_in_list` | `forbidden` | |
+
+> **⚠️ 0.16.0 breaking change — `is_in_list` / `is_not_in_list` values are column expressions.**
+> Since 0.16.0 the `allowed` / `forbidden` entries resolve as **column expressions**, not bare literals. A bare string is treated as a **column reference**; string *literals* must be single-quoted (`"'ACTIVE'"`) or wrapped with `F.lit("ACTIVE")`. Numeric and ISO-date strings are parsed as numbers/dates. Example: `allowed=["'ACTIVE'", "'CLOSED'"]` (not `allowed=["ACTIVE", "CLOSED"]`, which now looks for columns named `ACTIVE`/`CLOSED`).
 | Unique values | `is_unique` | `columns` (list) | ~~has_unique_key~~, ~~has_no_duplicate_values~~ |
 | Strict > or < | `sql_expression` | `expression` | ~~is_greater_than~~, ~~is_less_than~~ |
 
@@ -175,8 +178,7 @@ def quarantine():
 
 ### 3. Data Types
 
-- **DQX < 0.12.0:** Integer types required for limits (float causes errors)
-- **DQX >= 0.12.0:** Float types supported for `limit`, `min_limit`, `max_limit`
+- **Float support (since 0.12.0):** `limit`, `min_limit`, `max_limit` accept floats. The old integer-only restriction was a pre-0.12.0 constraint and is now historical.
 - **Recommendation:** Use integers for clarity; floats when precision needed
 
 ### 4. Spark Connect Compatibility (Serverless)
@@ -198,9 +200,11 @@ from databricks.labs.dqx.config import TableChecksStorageConfig
 dq_engine.save_checks(checks, config=TableChecksStorageConfig(
     location="catalog.schema.dqx_checks",
     run_config_name="silver_transactions",
-    mode="overwrite"
+    mode="overwrite"  # be explicit: the default changed to "append" (with rule versioning) in newer DQX
 ))
 ```
+
+> **Note (save-mode default changed):** newer DQX releases default the Delta/Lakebase checks-storage save mode to **`append`** (with rule versioning) rather than `overwrite`. Always set `mode=` explicitly so a re-run doesn't silently accumulate duplicate rule rows.
 
 ## Core Patterns
 
@@ -280,7 +284,7 @@ DQX integration follows a 3-phase approach:
 ## Reference Files
 
 ### Configuration and API
-- **`references/dqx-configuration.md`** - Complete 0.12.0 API reference: all check functions, parameter names, DQEngine methods, version compatibility, common errors
+- **`references/dqx-configuration.md`** - Complete 0.16.0 API reference: all check functions, parameter names, DQEngine methods, version compatibility, common errors
 
 ### Rule Definition Patterns
 - **`references/rule-patterns.md`** - YAML declarative, Python programmatic, dataset-level (FK, outlier, aggregation), Delta storage, rich metadata, custom functions
@@ -331,7 +335,9 @@ python scripts/setup_dqx.py --catalog <catalog> --schema <schema> \
 - [ ] DQX library at environment level for serverless jobs
 - [ ] DQX library in `libraries:` block for DLT pipelines
 - [ ] Proper task dependencies configured
-- [ ] Version pinned appropriately (production: `==0.12.0`, dev: `>=0.12.0`)
+- [ ] Version pinned appropriately (production: `==0.16.0`, dev: `>=0.16.0`)
+- [ ] `is_in_list` / `is_not_in_list` literals quoted as column expressions (`"'ACTIVE'"`, not `"ACTIVE"`) — 0.16.0 breaking change
+- [ ] `save_checks` `mode=` set explicitly (default changed to `append`)
 
 ## Common Errors
 
@@ -343,9 +349,20 @@ python scripts/setup_dqx.py --catalog <catalog> --schema <schema> \
 | `Libraries field is not supported for serverless` | Task-level library | Move to `environments[].spec.dependencies` |
 | `sparkContext is not supported in Spark Connect` | JVM API on serverless | Use SQL queries |
 | `ModuleNotFoundError` | Notebook header in shared code | Remove `# Databricks notebook source` |
-| `Argument 'limit' should be of type 'int'` | Float on DQX < 0.12.0 | Use integers or upgrade to >= 0.12.0 |
+| `Argument 'limit' should be of type 'int'` | Float on DQX < 0.12.0 (historical) | Use integers or upgrade to >= 0.16.0 (floats supported since 0.12.0) |
+| `is_in_list`/`is_not_in_list` matches a column instead of a literal | 0.16.0 resolves `allowed`/`forbidden` as column expressions | Quote literals: `"'ACTIVE'"` or `F.lit("ACTIVE")` |
 
 **See:** `references/dqx-configuration.md` for detailed error solutions
+
+## Breaking Changes Since 0.12.0
+
+The skill was last pinned to 0.12.0; 0.13–0.16 shipped since. When bumping to `>=0.16.0`, review:
+
+1. **`is_in_list` / `is_not_in_list` value resolution (breaking).** `allowed` / `forbidden` entries are now **column expressions**. Bare strings resolve as column references; string literals must be single-quoted (`"'ACTIVE'"`) or `F.lit(...)`; numeric/ISO-date strings parse as numbers/dates.
+2. **Default checks-storage save mode → `append` (with rule versioning).** Previously `overwrite`. Set `mode=` explicitly on `save_checks(...)`.
+3. **New checks available (0.13–0.16, optional):** `is_valid_email`, `is_valid_uuid`, ISO code checks, `has_no_gaps_per_time_window`, `aggr_matches_dataset`, `has_no_outliers`, and the ML-assisted `has_no_row_anomalies`.
+
+**Authoritative source:** [DQX CHANGELOG](https://github.com/databrickslabs/dqx/blob/main/CHANGELOG.md).
 
 ## References
 
@@ -361,3 +378,7 @@ python scripts/setup_dqx.py --catalog <catalog> --schema <schema> \
 - `dlt-expectations-patterns` - DLT expectations patterns (complementary)
 - `databricks-python-imports` - Pure Python module patterns (critical for DQX file structure)
 - `databricks-asset-bundles` - Serverless configuration patterns
+
+## Version History
+
+- **2026-08-30** — Bumped recommended DQX version from `>=0.12.0` to `>=0.16.0` across the skill and reference files. Documented the 0.16.0 breaking change where `is_in_list`/`is_not_in_list` `allowed`/`forbidden` values resolve as column expressions (string literals must be quoted) and the checks-storage default save mode change to `append`. Quoted literals in `is_in_list` examples; added a "Breaking Changes Since 0.12.0" section and 0.13–0.16 check inventory. Bumped `last_verified`.

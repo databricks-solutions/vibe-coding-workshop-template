@@ -121,13 +121,15 @@
     business_rule: "Data should be updated within 24 hours"
 
 # ── List Membership (use 'allowed' parameter) ────────────────────────
+# DQX >= 0.16.0: `allowed` values resolve as COLUMN EXPRESSIONS. String literals
+# must be single-quoted (bare strings are treated as column references).
 - name: valid_status
   criticality: error
   check:
     function: is_in_list
     arguments:
       column: order_status
-      allowed: ["pending", "shipped", "delivered", "cancelled"]
+      allowed: ["'pending'", "'shipped'", "'delivered'", "'cancelled'"]
       case_sensitive: false
   metadata:
     check_type: referential_integrity

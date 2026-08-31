@@ -331,12 +331,12 @@ def table():
 resources:
   jobs:
     gold_merge_job:
-      name: "[${bundle.target}] Gold Layer - MERGE with DQX"
+      name: "[${bundle.target} ${var.user_prefix}] Gold Layer - MERGE with DQX"
       environments:
         - environment_key: default
           spec:
             dependencies:
-              - "databricks-labs-dqx>=0.12.0"
+              - "databricks-labs-dqx>=0.16.0"
       tasks:
         - task_key: store_dqx_checks
           environment_key: default

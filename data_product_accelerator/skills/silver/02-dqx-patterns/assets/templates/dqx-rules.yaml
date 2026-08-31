@@ -1,4 +1,4 @@
-# DQX Quality Checks Template (DQX >= 0.12.0)
+# DQX Quality Checks Template (DQX >= 0.16.0)
 # Copy this template and customize for your tables.
 # Reference: https://databrickslabs.github.io/dqx/docs/reference/api/check_funcs/
 
@@ -57,13 +57,15 @@
     business_rule: "Expected status is 'active'"
 
 # ── List Membership (use 'allowed' parameter) ────────────────────────
+# DQX >= 0.16.0: `allowed` values resolve as COLUMN EXPRESSIONS — single-quote
+# string literals (bare strings are treated as column references).
 - name: valid_channel
   criticality: error
   check:
     function: is_in_list
     arguments:
       column: sales_channel
-      allowed: ["web", "store", "app", "phone"]
+      allowed: ["'web'", "'store'", "'app'", "'phone'"]
   metadata:
     check_type: referential_integrity
     business_rule: "Channel must be a known value"

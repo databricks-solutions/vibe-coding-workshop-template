@@ -28,23 +28,23 @@ metadata:
     - naming-tagging-standards
     - databricks-autonomous-operations
   source: context/prompts/02-silver-layer-prompt.md
-  last_verified: "2026-02-07"
+  last_verified: "2026-08-30"
   volatility: medium
   upstream_sources:
-    - name: "ai-dev-kit"
-      repo: "databricks-solutions/ai-dev-kit"
+    - name: "databricks-agent-skills"
+      repo: "databricks/databricks-agent-skills"
       paths:
-        - "databricks-skills/databricks-spark-declarative-pipelines/SKILL.md"
+        - "skills/databricks-pipelines/SKILL.md"
       relationship: "extended"
-      last_synced: "2026-02-19"
-      sync_commit: "97a3637"
+      last_synced: "2026-08-30"
+      sync_commit: "ca92a6c"
 ---
 
 # Silver Layer Setup - Orchestrator Skill
 
 End-to-end workflow for creating production-grade Silver layer pipelines using Spark Declarative Pipelines (SDP, formerly Delta Live Tables/DLT) with Delta table-based data quality rules, quarantine patterns, streaming ingestion, and monitoring views.
 
-> **Naming:** Databricks rebranded DLT to **Spark Declarative Pipelines (SDP)** / **Lakeflow Declarative Pipelines (LDP)**. The modern Python API is `from pyspark import pipelines as dp`. However, our DQ rules framework still uses `import dlt` (legacy API) because `@dlt.expect_all_or_drop()` decorators are not yet available in the `dp` API. When Databricks migrates expectations to `dp`, both this skill and `dlt-expectations-patterns` will be updated. New projects may use `databricks pipelines init` to scaffold an SDP Asset Bundle project.
+> **Naming:** Databricks rebranded DLT to **Spark Declarative Pipelines (SDP)** / **Lakeflow Declarative Pipelines (LDP)**. The modern Python API is `from pyspark import pipelines as dp`, and Databricks now **recommends `dp`** over `import dlt`. Expectations **are available** in `dp` (e.g. `dp.expect_all_or_drop(...)`, `dp.expect_all(...)`) — the [Lakeflow pipelines Python reference](https://docs.databricks.com/aws/en/ldp/developer/python-ref) maps each `@dlt.expect*` decorator to a `dp` equivalent. This skill still standardizes on `import dlt` for the existing DQ-rules framework (`dlt-expectations-patterns`) because that framework's decorators are written against `dlt`; the two APIs are behaviorally equivalent, so a `dp` migration is straightforward (swap the import and decorator prefix). New projects may use `databricks pipelines init` to scaffold an SDP Asset Bundle project.
 
 **Time Estimate:** 3-4 hours for initial setup, 1 hour per additional table
 
@@ -175,12 +175,12 @@ edition: ADVANCED     # 🔴 MANDATORY - required for expectations
 
 **Why:** Silver is the validated copy of source data. Gold handles complex transformations. This keeps Silver focused on data quality and makes troubleshooting easier (column names match source).
 
-### Python API: ALWAYS use `import dlt` (Legacy API)
+### Python API: this skill standardizes on `import dlt` (`dp` is the recommended forward path)
 
-Our DQ rules framework (`dlt-expectations-patterns`) is built on the legacy `import dlt` API. **ALWAYS use this API for Silver layer creation.**
+Databricks **recommends the modern `dp` API** (`from pyspark import pipelines as dp`) and it **fully supports expectations**. This skill and its DQ-rules framework (`dlt-expectations-patterns`) are currently written against `import dlt`, so **use `import dlt` here to stay consistent with the framework's decorators.** The `dp` equivalents are drop-in — migrating is a mechanical swap of the import and decorator prefix.
 
 ```python
-# ✅ CORRECT: Legacy API (our standard)
+# ✅ CURRENT STANDARD for this skill: legacy `dlt` API (matches the DQ-rules framework)
 import dlt
 from dq_rules_loader import get_critical_rules_for_table
 
@@ -191,15 +191,17 @@ def silver_transactions():
 ```
 
 ```python
-# ❌ WRONG: Modern SDP API (not compatible with our DQ rules framework)
+# ✅ RECOMMENDED forward path: modern `dp` API (expectations supported — dp.expect_all_or_drop)
 from pyspark import pipelines as dp
+from dq_rules_loader import get_critical_rules_for_table
 
-@dp.table(name="silver_transactions")
+@dp.table(name="silver_transactions", cluster_by_auto=True)
+@dp.expect_all_or_drop(get_critical_rules_for_table("silver_transactions"))
 def silver_transactions():
     return spark.readStream.table("bronze_transactions")
 ```
 
-**Why not modern `dp` API?** The `@dlt.expect_all_or_drop()` and `@dlt.expect_all()` decorators from our `dlt-expectations-patterns` skill require the `dlt` module. When Databricks fully migrates expectations to `dp`, update both this skill and `dlt-expectations-patterns`.
+**Which to use?** Databricks documents `dp` as the recommended API and both `@dp.expect_all_or_drop()` and `@dp.expect_all()` exist. We keep `import dlt` as this skill's standard only so the rules loader and decorators stay uniform across the framework — **not** because `dp` lacks expectations. To migrate: change `import dlt` → `from pyspark import pipelines as dp`, `@dlt.` → `@dp.`, and `dlt.read_stream(x)` → `spark.readStream.table(x)`. See the [Lakeflow pipelines Python reference](https://docs.databricks.com/aws/en/ldp/developer/python-ref) for the full decorator mapping.
 
 ---
 
@@ -382,7 +384,7 @@ databricks bundle run silver_dq_setup_job -t dev
 # SELECT * FROM {catalog}.{silver_schema}.dq_rules
 
 # 4. THEN run DLT pipeline (loads rules from table)
-databricks pipelines start-update --pipeline-name "[dev ${var.user_prefix}] Silver Layer Pipeline"
+databricks pipelines start-update --pipeline-name "[${bundle.target} ${var.user_prefix}] Silver Layer Pipeline"
 ```
 
 ---
@@ -515,14 +517,14 @@ table_properties={
 ```
 **Fix:** ALWAYS include `"delta.enableRowTracking": "true"` in Silver table properties. Without it, downstream Gold materialized views cannot use incremental refresh and will do expensive full recomputation.
 
-### Mistake 9: Using Modern `dp` API with DQ Rules Framework
+### Mistake 9: Mixing `dlt` and `dp` decorators in the same table definition
 ```python
-# ❌ WRONG: dp API doesn't work with our dlt-expectations decorators
+# ❌ WRONG: mixing APIs — @dp.table with a @dlt.* decorator
 from pyspark import pipelines as dp
 @dp.table(name="silver_transactions")
 @dlt.expect_all_or_drop(get_critical_rules_for_table(...))  # Mixes APIs!
 ```
-**Fix:** ALWAYS use `import dlt` for Silver notebooks that use our DQ rules framework. See "Python API" section above.
+**Fix:** Pick one API and use it consistently. Both support expectations — `dp` is Databricks' recommended API (`@dp.table` + `@dp.expect_all_or_drop`), while this skill's DQ-rules framework standardizes on `import dlt` (`@dlt.table` + `@dlt.expect_all_or_drop`). Don't combine `@dp.*` and `@dlt.*` on the same function. See "Python API" section above.
 
 ---
 
@@ -552,7 +554,7 @@ Before considering the Silver layer complete, verify each item and confirm its s
 - [ ] Quarantine tables created for high-volume fact tables
 - [ ] DQ monitoring views created (including data freshness)
 - [ ] (User-triggered) Deployment order documented: DQ setup job runs BEFORE DLT pipeline
-- [ ] `import dlt` used (NOT `from pyspark import pipelines as dp`)
+- [ ] One pipelines API used consistently — `import dlt` is this skill's current standard; `dp` is the recommended forward path (don't mix `@dlt.*` and `@dp.*`)
 - [ ] `serverless: true` in pipeline YAML (NEVER classic clusters)
 - [ ] `photon: true` in pipeline YAML
 - [ ] `edition: ADVANCED` set in pipeline YAML (required for expectations/CDC)
@@ -648,4 +650,8 @@ End with:
 ## See Also
 
 - Authoritative upstream (alternate registry): [databricks-agent-skills / `databricks-pipelines`](https://github.com/databricks/databricks-agent-skills/tree/main/skills/databricks-pipelines) — canonical DLT / Spark Declarative Pipelines guidance.
+
+## Version History
+
+- **2026-08-30** — Reconciled the `dlt`-vs-`dp` premise: expectations **are** available in the modern `dp` API (`dp.expect_all_or_drop`), which Databricks recommends. Corrected the "not yet available in `dp`" wording, added a `dp` equivalent snippet, reframed Mistake 9 (mixing `dlt`/`dp` decorators) and the checklist item, and kept `import dlt` as this skill's standard with a mechanical migration note. Bumped `last_verified`.
 

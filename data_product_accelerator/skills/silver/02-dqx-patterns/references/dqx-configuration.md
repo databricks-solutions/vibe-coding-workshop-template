@@ -1,6 +1,6 @@
 # DQX Configuration and API Reference
 
-**Verified against:** [DQX 0.12.0 API Documentation](https://databrickslabs.github.io/dqx/docs/reference/api/check_funcs/)
+**Verified against:** [DQX 0.16.0 API Documentation](https://databrickslabs.github.io/dqx/docs/reference/api/check_funcs/)
 
 ## Installation Patterns
 
@@ -14,7 +14,7 @@ resources:
         - environment_key: default
           spec:
             dependencies:
-              - "databricks-labs-dqx>=0.12.0"
+              - "databricks-labs-dqx>=0.16.0"
       tasks:
         - task_key: apply_dqx_checks
           environment_key: default
@@ -34,13 +34,13 @@ resources:
         - notebook:
             path: ../src/company_silver/silver_transactions.py
         - pypi:
-            package: databricks-labs-dqx>=0.12.0
+            package: databricks-labs-dqx>=0.16.0
 ```
 
 ### Notebook Installation
 
 ```python
-%pip install databricks-labs-dqx>=0.12.0
+%pip install databricks-labs-dqx>=0.16.0
 dbutils.library.restartPython()
 ```
 
@@ -53,7 +53,7 @@ databricks labs dqx open-dashboards
 
 ---
 
-## Complete Check Functions Reference (DQX >= 0.12.0)
+## Complete Check Functions Reference (DQX >= 0.16.0)
 
 ### Row-Level Check Functions
 
@@ -158,6 +158,8 @@ databricks labs dqx open-dashboards
 | List (`is_in_list`) | valid values | **`allowed`** | `values`, `valid`, `list` |
 | Not-in-list (`is_not_in_list`) | invalid values | **`forbidden`** | `values`, `blocked`, `list` |
 | Regex (`regex_match`) | pattern | **`regex`** | `pattern`, `expr` |
+
+> **⚠️ DQX >= 0.16.0:** `allowed` / `forbidden` values resolve as **column expressions**. Single-quote string literals (`"'ACTIVE'"`) or wrap with `F.lit(...)`; a bare string is a column reference. Numeric/ISO-date strings parse as numbers/dates.
 | Freshness (`is_data_fresh`) | age | **`max_age_minutes`** | `max_age`, `minutes` |
 | Aggregation (`is_aggr_*`) | type | **`aggr_type`** | `agg_type`, `type` |
 
@@ -267,6 +269,11 @@ current_user = spark.sql("SELECT current_user() as user").collect()[0]["user"]
 | `has_no_outliers` (MAD) | 0.12.0 | Dataset-level |
 | JSON validation checks | 0.12.0 | `is_valid_json`, `has_json_keys` |
 | AI rules from profiles | 0.12.0 | |
+| `is_valid_email`, `is_valid_uuid`, ISO code checks | 0.13–0.16 | Additional built-in checks |
+| `has_no_gaps_per_time_window`, `aggr_matches_dataset` | 0.13–0.16 | Dataset-level |
+| ML `has_no_row_anomalies` | 0.13–0.16 | ML-assisted anomaly check |
+| `is_in_list`/`is_not_in_list` values as column expressions | 0.16.0 | **Breaking** — quote string literals |
+| Checks-storage default save mode → `append` | 0.16.0 | **Breaking** — set `mode=` explicitly |
 
 ## References
 

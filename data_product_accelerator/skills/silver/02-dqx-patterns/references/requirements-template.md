@@ -46,7 +46,7 @@ Choose one:
 ## Team Readiness Checklist
 
 - [ ] Team familiar with DQX concepts (profiling, checks, quarantine)
-- [ ] DQX version selected (recommended: >=0.12.0)
+- [ ] DQX version selected (recommended: >=0.16.0)
 - [ ] Compute configured (serverless with environment-level dependencies)
 - [ ] Pilot table identified and documented
 - [ ] Business rules documented for pilot table
@@ -63,8 +63,9 @@ Choose one:
 | 0.10.0 | Summary metrics, LLM-assisted rules, Lakebase storage | New `InputConfig`/`OutputConfig` objects |
 | 0.11.0 | ODCS Data Contracts, AI primary key detection | `level` → `criticality` in generator |
 | 0.12.0 | Float support, JSON validation, geometry checks, AI rules from profiles | None |
+| 0.13–0.16 | `is_valid_email`/`is_valid_uuid`, ISO code checks, `has_no_gaps_per_time_window`, `aggr_matches_dataset`, `has_no_outliers`, ML `has_no_row_anomalies` | **`is_in_list`/`is_not_in_list` values resolve as column expressions (quote literals); checks-storage default save mode → `append`** |
 
-**Recommended:** `>=0.12.0` for latest features and float support.
+**Recommended:** `>=0.16.0` for latest features and float support.
 
 ## Estimated Timeline
 
