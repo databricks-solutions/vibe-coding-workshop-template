@@ -86,9 +86,11 @@ PATTERNS = [
      "RULE_6_normalize_paths"),
     (re.compile(r"databricks-connect|spark-submit\b|local\[\d*\]"),
      "LOCAL_SPARK", "Local Spark; use workspace serverless compute.", "RULE_4_workspace_compute"),
-    (re.compile(r"\./scripts/\S*deploy\S*\.sh|bash\s+\S*deploy\S*\.sh"),
+    # A bare `./x.sh` in any directory counts too (lookbehind rejects `../x.sh`, `foo/./x.sh`).
+    (re.compile(r"\./scripts/\S*deploy\S*\.sh|bash\s+\S*deploy\S*\.sh|(?<![\w/.])\./\S*deploy\S*\.sh"),
      "SCRIPT_DEPLOY", "Deploy via script; use `bundle deploy` (spine) via runDatabricksCli.", "RULE_1_shared_deploy"),
-    (re.compile(r"\./scripts/\S+\.sh|setup-\S+\.sh|bootstrap\S*\.sh"),
+    (re.compile(r"\./scripts/\S+\.sh|setup-\S+\.sh|bootstrap\S*\.sh"
+                r"|(?<![\w/.])\./[\w.-][\w./-]*\.sh|\bsh\s+\S+\.sh"),
      "SETUP_SCRIPT", "Setup script; move build logic into bundle resource.", "RULE_3_logic_to_bundle"),
     (re.compile(r"databricks_bundles|from\s+databricks\.bundles|@bundle\b|resources\.py"),
      "PY_BUNDLE_CONFIG", "Python bundle config; standardize on YAML resources.", "RULE_5_yaml_only"),
