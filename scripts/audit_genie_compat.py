@@ -108,13 +108,54 @@ PATTERNS = [
      "CLIENT_NAV", "Client-specific navigation; template via client_context.", "RULE_0_template_preamble"),
 ]
 
+INSESSION_CREATE = next(rx for rx, cls, _, _ in PATTERNS if cls == "INSESSION_CREATE")
+
+# RULE_10 foundation carve-out (D-56): idempotent `CREATE SCHEMA|VOLUME IF NOT EXISTS` of the
+# participant's own prefixed schema/volume, on both clients, and nothing else. The schema segment
+# must START with one of these per-user prefix tokens (matched case-sensitively; no wildcard):
+#   {db_schema}             APP seed foundation prompt (`{catalog}.{db_schema}_agent` / `_ops`)
+#   ${user_schema_prefix}   genai-agents skills (`${user_schema_prefix}_agent` / `_ops`)
+#   {user_schema_prefix}    APP seed template variable; F0 reference implementation f-strings
+# A bare `{schema}` / `{catalog}.{schema}` is not provably the participant's prefix and stays counted.
+# The identifier must end at a real delimiter (whitespace, backtick, quote, ; , ) | or end of line).
+_RULE_10_PREFIX = r"(?-i:\{db_schema\}|\$\{user_schema_prefix\}|\{user_schema_prefix\})"
+_RULE_10_SEG = r"`?[\w${}]+`?"
+_RULE_10_SCHEMA_ID = rf"(?:{_RULE_10_SEG}\.)?`?{_RULE_10_PREFIX}[\w${{}}]*`?"
+_RULE_10_END = r"(?=[\s`'\";,)|]|$)"
+RULE_10_SANCTIONED = [
+    re.compile(rf"CREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS\s+{_RULE_10_SCHEMA_ID}{_RULE_10_END}", re.I),
+    re.compile(rf"CREATE\s+VOLUME\s+IF\s+NOT\s+EXISTS\s+{_RULE_10_SCHEMA_ID}\.{_RULE_10_SEG}{_RULE_10_END}",
+               re.I),
+]
+
+
+def _rule_10_sanctioned(line: str) -> bool:
+    """True if every INSESSION_CREATE trigger on the line is a sanctioned foundation statement.
+
+    Every position where a trigger starts (overlaps included, so one glued into an identifier is
+    seen) must be the leading `CREATE SCHEMA|VOLUME` of a sanctioned match on the original line.
+    """
+    starts = {m.start() for rx in RULE_10_SANCTIONED for m in rx.finditer(line)}
+    triggers = {p for p in range(len(line)) if INSESSION_CREATE.match(line, p)}
+    return bool(triggers) and triggers <= starts
+
 
 def _skip(fp: str) -> bool:
     return any(s in fp for s in SKIP_SUBSTR)
 
 
 def scan():
-    rows = []
+    """Counted flags. Sanctioned RULE_10 foundation lines are never returned (see scan_sanctioned)."""
+    return _walk()[0]
+
+
+def scan_sanctioned():
+    """Lines that match INSESSION_CREATE but fall under the RULE_10 foundation carve-out."""
+    return _walk()[1]
+
+
+def _walk():
+    rows, sanctioned = [], []
     for root in ROOTS:
         for dirpath, _, files in os.walk(root):
             for fn in files:
@@ -128,13 +169,20 @@ def scan():
                         for n, line in enumerate(f, 1):
                             for rx, cls, why, action in PATTERNS:
                                 if rx.search(line):
-                                    rows.append({"file": fp, "line": n, "class": cls,
-                                                 "action": action, "why": why,
-                                                 "text": line.strip()[:200]})
+                                    row = {"file": fp, "line": n, "class": cls,
+                                           "action": action, "why": why,
+                                           "text": line.strip()[:200]}
+                                    if cls == "INSESSION_CREATE" and _rule_10_sanctioned(line):
+                                        row.update({"class": "SANCTIONED_RULE_10",
+                                                    "action": "RULE_10_foundation_carveout",
+                                                    "why": "Idempotent prefixed foundation schema/volume (D-56)."})
+                                        sanctioned.append(row)
+                                    else:
+                                        rows.append(row)
                 except Exception as e:  # noqa: BLE001
                     rows.append({"file": fp, "line": 0, "class": "READ_ERROR",
                                  "action": "manual", "why": str(e), "text": ""})
-    return rows
+    return rows, sanctioned
 
 
 def main():
@@ -144,15 +192,20 @@ def main():
         default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "genie_compat_audit.csv"),
     )
     args = ap.parse_args()
-    rows = scan()
+    rows, sanctioned = _walk()
     with open(args.out, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["file", "line", "class", "action", "why", "text"])
         w.writeheader()
         w.writerows(rows)
+        w.writerows(sanctioned)
     print("=== environment-coupling summary ===")
     for cls, n in Counter(r["class"] for r in rows).most_common():
         print(f"{cls:18s} {n:5d}")
     print(f"\nTotal flags: {len(rows)} -> {args.out}")
+    print(f"\n=== sanctioned in-session creation, not counted (RULE_10 foundation carve-out): "
+          f"{len(sanctioned)} ===")
+    for r in sanctioned:
+        print(f"{r['file']}:{r['line']}: {r['text']}")
 
 
 if __name__ == "__main__":
