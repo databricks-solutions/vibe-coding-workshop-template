@@ -11,7 +11,7 @@ license: Apache-2.0
 clients: [ide_cli, genie_code]
 bundle_resource: schemas
 deploy_verb: bundle_deploy
-deploy_note: "Provisions UC schemas + managed volumes idempotently under the per-user prefixed schema (`{user_schema_prefix}`); created via SDK/DDL identically on both clients. On Genie Code run CLI steps through runDatabricksCli (pre-authenticated) and execute on serverless; see `skills/genie-code-environment`."
+deploy_note: "Provisions UC schemas + managed volumes idempotently under the per-user prefixed schema (`{user_schema_prefix}`); created via DDL `IF NOT EXISTS` identically on both clients. On Genie Code run CLI steps through runDatabricksCli (pre-authenticated) and execute on serverless; see `skills/genie-code-environment`."
 coverage: full
 metadata:
   last_verified: "2026-04-15"
@@ -58,7 +58,7 @@ fields_read:
 > per-version directory `v<N>/` carries the disambiguation.
 
 Every operation is **idempotent** (`CREATE SCHEMA IF NOT EXISTS`,
-`CREATE VOLUME IF NOT EXISTS` — `AlreadyExists` is treated as success). It
+`CREATE VOLUME IF NOT EXISTS`, both as DDL — an existing object is a no-op). It
 is safe to call this skill from any prompt that needs to be sure these
 resources exist; the cost on a warm workspace is one round-trip per resource.
 
@@ -127,8 +127,6 @@ flowchart TD
 
 ```python
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.catalog import VolumeType
-from databricks.sdk.errors import AlreadyExists
 
 def provision_uc_resources(
     *,
@@ -140,18 +138,24 @@ def provision_uc_resources(
 ) -> dict:
     w = WorkspaceClient()
 
-    # 1. Schemas (DDL via statement execution against the workshop warehouse)
-    for schema in (agent_schema, ops_schema):
+    # F0 provisions only the participant's own prefixed pair (RULE_10 foundation carve-out).
+    user_schema_prefix = agent_schema.removesuffix("_agent")
+    if agent_schema == user_schema_prefix or ops_schema != f"{user_schema_prefix}_ops":
+        raise ValueError("agent_schema / ops_schema must be <user_schema_prefix>_agent / _ops")
+
+    def run_ddl(statement: str) -> None:
         w.statement_execution.execute_statement(
-            warehouse_id=warehouse_id,
-            statement=(
-                f"CREATE SCHEMA IF NOT EXISTS {uc_catalog}.{schema} "
-                f"COMMENT 'F0-managed: agent or ops assets'"
-            ),
-            wait_timeout="30s",
+            warehouse_id=warehouse_id, statement=statement, wait_timeout="30s",
         )
 
-    # 2. Volumes (SDK; AlreadyExists is success)
+    # 1. Schemas (DDL via statement execution against the workshop warehouse)
+    for suffix in ("agent", "ops"):
+        run_ddl(
+            f"CREATE SCHEMA IF NOT EXISTS {uc_catalog}.{user_schema_prefix}_{suffix} "
+            f"COMMENT 'F0-managed: agent or ops assets'"
+        )
+
+    # 2. MANAGED volumes (DDL IF NOT EXISTS through the same warehouse)
     defaults = [
         {"name": "knowledge_sources", "schema": "agent",
          "comment": "KA + retrieval source files"},
@@ -163,22 +167,18 @@ def provision_uc_resources(
     volumes_spec = (required_volumes or []) + defaults
     seen, paths = set(), {}
     for v in volumes_spec:
-        target_schema = agent_schema if v["schema"] == "agent" else ops_schema
-        key = (target_schema, v["name"])
+        suffix = "agent" if v["schema"] == "agent" else "ops"
+        target_schema, name = f"{user_schema_prefix}_{suffix}", v["name"]
+        key = (target_schema, name)
         if key in seen:
             continue
         seen.add(key)
-        try:
-            w.volumes.create(
-                catalog_name=uc_catalog,
-                schema_name=target_schema,
-                name=v["name"],
-                volume_type=VolumeType.MANAGED,
-                comment=v.get("comment", "F0-managed volume"),
-            )
-        except AlreadyExists:
-            pass
-        paths[v["name"]] = f"/Volumes/{uc_catalog}/{target_schema}/{v['name']}"
+        comment = v.get("comment", "F0-managed volume").replace("'", "\\'")
+        run_ddl(
+            f"CREATE VOLUME IF NOT EXISTS {uc_catalog}.{user_schema_prefix}_{suffix}.{name} "
+            f"COMMENT '{comment}'"
+        )
+        paths[name] = f"/Volumes/{uc_catalog}/{target_schema}/{name}"
 
     return {
         "agent_schema": agent_schema,

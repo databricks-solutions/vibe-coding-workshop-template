@@ -100,8 +100,13 @@ The single creation event is **deploy**. SDK `w.*.create()`, hand-run SQL DDL, a
 **read-only authoring support** only (inspect schemas, confirm column names/types, check lineage, sample
 rows) — never the channel that brings a deliverable into existence. A `CREATE …` that is the *body of a
 bundle-authored DLT/SQL resource* runs **during** `bundle deploy` and **stays** — that is not in-session
-creation. The **sole carve-out** is a Genie Space via `createAsset` (RULE_8 **Tier 3**), Genie-Code-only
-and last-resort (see [Genie Spaces — three deploy tiers](#genie-spaces--three-deploy-tiers-rule_8)).
+creation. There are **two carve-outs**: (1) a Genie Space via `createAsset` (RULE_8 **Tier 3**),
+Genie-Code-only and last-resort (see [Genie Spaces — three deploy tiers](#genie-spaces--three-deploy-tiers-rule_8));
+(2) idempotent foundation provisioning of the participant's own prefixed schema/volume, on both clients:
+`CREATE SCHEMA IF NOT EXISTS {catalog}.{user_schema_prefix}_agent` / `CREATE VOLUME IF NOT EXISTS {catalog}.{user_schema_prefix}_agent.{volume}`
+(and the `_ops` equivalents), nothing else (no tables,
+jobs, pipelines, SDK create calls or unprefixed names); the audit lists these as sanctioned and does not count
+them (`scripts/audit_genie_compat.py` `RULE_10_SANCTIONED`).
 
 ### Verifying a deploy (client-agnostic)
 
