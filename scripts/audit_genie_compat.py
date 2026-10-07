@@ -117,10 +117,11 @@ INSESSION_CREATE = next(rx for rx, cls, _, _ in PATTERNS if cls == "INSESSION_CR
 #   ${user_schema_prefix}   genai-agents skills (`${user_schema_prefix}_agent` / `_ops`)
 #   {user_schema_prefix}    APP seed template variable; F0 reference implementation f-strings
 # A bare `{schema}` / `{catalog}.{schema}` is not provably the participant's prefix and stays counted.
+# The identifier must end at a real delimiter (whitespace, backtick, quote, ; , ) | or end of line).
 _RULE_10_PREFIX = r"(?-i:\{db_schema\}|\$\{user_schema_prefix\}|\{user_schema_prefix\})"
 _RULE_10_SEG = r"`?[\w${}]+`?"
 _RULE_10_SCHEMA_ID = rf"(?:{_RULE_10_SEG}\.)?`?{_RULE_10_PREFIX}[\w${{}}]*`?"
-_RULE_10_END = r"(?![\w${}.`])"
+_RULE_10_END = r"(?=[\s`'\";,)|]|$)"
 RULE_10_SANCTIONED = [
     re.compile(rf"CREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS\s+{_RULE_10_SCHEMA_ID}{_RULE_10_END}", re.I),
     re.compile(rf"CREATE\s+VOLUME\s+IF\s+NOT\s+EXISTS\s+{_RULE_10_SCHEMA_ID}\.{_RULE_10_SEG}{_RULE_10_END}",
@@ -129,11 +130,14 @@ RULE_10_SANCTIONED = [
 
 
 def _rule_10_sanctioned(line: str) -> bool:
-    """True if every INSESSION_CREATE trigger on the line is a sanctioned foundation statement."""
-    rest = line
-    for rx in RULE_10_SANCTIONED:
-        rest = rx.sub(" ", rest)
-    return rest != line and not INSESSION_CREATE.search(rest)
+    """True if every INSESSION_CREATE trigger on the line is a sanctioned foundation statement.
+
+    Every position where a trigger starts (overlaps included, so one glued into an identifier is
+    seen) must be the leading `CREATE SCHEMA|VOLUME` of a sanctioned match on the original line.
+    """
+    starts = {m.start() for rx in RULE_10_SANCTIONED for m in rx.finditer(line)}
+    triggers = {p for p in range(len(line)) if INSESSION_CREATE.match(line, p)}
+    return bool(triggers) and triggers <= starts
 
 
 def _skip(fp: str) -> bool:
