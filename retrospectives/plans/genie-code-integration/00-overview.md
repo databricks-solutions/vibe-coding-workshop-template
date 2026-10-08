@@ -14,8 +14,9 @@ with **no regression** for the IDE path, under one principle:
 > The **Declarative Automation Bundle is the one and only build artifact** for the data-product
 > spine. Both clients author the same `databricks.yml` and deploy with `databricks bundle deploy
 > --target dev`. On Genie Code this runs through the **`runDatabricksCli`** tool. The **one
-> exception** is the Databricks App, which deploys via **`apps deploy`** (also through
-> `runDatabricksCli`) because that verb runs AppKit's Node build internally.
+> exception** is the Databricks App, which deploys outside the bundle: on Genie Code via the SDK
+> `w.apps.deploy(…SNAPSHOT)` in `executeCode` (its build runs server-side, P11), or `apps deploy`
+> through `runDatabricksCli` where the page allows (P10); in the IDE via the CLI (RULE_9).
 
 Genie Code is **not a degraded client**: it has the CLI (via `runDatabricksCli`), a shell, and
 Python/SQL on serverless compute. Remaining client differences are **environmental, not capability

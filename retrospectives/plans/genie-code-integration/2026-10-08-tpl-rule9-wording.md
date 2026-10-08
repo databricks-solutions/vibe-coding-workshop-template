@@ -30,3 +30,8 @@ MERGE repo=template, reseed=no.
 
 ## Reverse
 Revert the PR (the RULE_9 row says CLI first again). If a live smoke proves the CLI reliable, reorder all three forks with it (D-44 reversal).
+
+## Amendment r1 (review)
+S2b 00-overview :16-18, North-star blockquote, the App-exception sentence only: "exception** is the Databricks App, which deploys outside the bundle: on Genie Code via the SDK `w.apps.deploy(…SNAPSHOT)` in `executeCode` (its build runs server-side, P11), or `apps deploy` through `runDatabricksCli` where the page allows (P10); in the IDE via the CLI (RULE_9)." The blockquote's other lines (the bundle spine sentences, `databricks bundle deploy --target dev`, `runDatabricksCli` for bundles) stay byte-identical.
+Reviewer finding (round 1, nonblocking, taken by the lead): the North star still said the App exception deploys via **`apps deploy`** (also through `runDatabricksCli`) because that verb runs AppKit's Node build internally. That names the CLI channel and the Node-build rationale that P10 calls not a reliable Genie Code path, while S1, P11 and APP fork 912 make SDK SNAPSHOT via `executeCode` canonical.
+X4 revert S2b → the text check fails: the North star must not name `apps deploy` as the only App channel.
