@@ -577,7 +577,7 @@ not found") is a **page-context** signal, never a license to create the delivera
 workaround for a blocked deploy:
 - `w.jobs.create()` / `POST /api/2.1/jobs/create`
 - `w.pipelines.create()` / `POST /api/2.0/pipelines` / `createAsset(pipeline)`
-- `w.schemas.create()` / `CREATE SCHEMA` / `CREATE VOLUME` / `CREATE TABLE` to provision the deliverable
+- `w.schemas.create()` / `CREATE SCHEMA` / `CREATE VOLUME` / `CREATE TABLE` to provision the deliverable (The RULE_10 foundation carve-out, D-56 — idempotent `IF NOT EXISTS` creation of your own prefixed foundation schema/volume — is separate and not a workaround.)
 
 The fix is **navigate to the bundle editor** on `dp_bundle_root` and redeploy. The SDK/REST creation route is an
 **escape hatch only on explicit operator authorization.** Likewise, a **failed** *job* is fixed by editing the

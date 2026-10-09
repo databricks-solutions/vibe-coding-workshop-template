@@ -116,7 +116,7 @@ derived once `use_case_slug` is known (bootstrap), so `resolve_root` (pre-bootst
 `apps_lakebase/` and NOT the bare clone root. The scaffolded app (`app.yaml`, `databricks.yml`, `server/`,
 `client/`, and `<app_root>/.vibecoding-state.md`) lives UNDER it on BOTH clients, so the app's root folder has
 parity regardless of coding agent. On genie_code it is the `apps init --output-dir` target. It is derived once
-`APP_NAME` is known (Module 1 / prompt 04); `<pending>` until then. The app deploys via `apps deploy` (RULE_9
+`APP_NAME` is known (Module 1 / prompt 04); `<pending>` until then. The app deploys via `apps deploy` in the IDE (local CLI) and, on genie_code, via the SDK `w.apps.deploy(…, mode=SNAPSHOT)` in `executeCode` (canonical; `apps deploy` via `runDatabricksCli` only where the page allows) (RULE_9
 exception), not `bundle deploy`, so there is no `bundle`-style page-context pin.
 `agent_app_root` is the write-side anchor for the Track A custom-agent application (Pathways C/D) — the exact
 analog of `app_root`: a SELF-CONTAINED agent project directory `<artifact_root>/<agent_app_name>` (e.g.
@@ -124,14 +124,14 @@ analog of `app_root`: a SELF-CONTAINED agent project directory `<artifact_root>/
 — NOT nested under `apps_lakebase/` and NOT the bare clone root. The cloned agent framework (`app.yaml`,
 `pyproject.toml`, `databricks.yml`, `server/`, and `<agent_app_root>/.vibecoding-state.md`) lives UNDER it on
 BOTH clients, so the agent app's root folder has parity regardless of coding agent. On genie_code it is the
-`apps init --output-dir` target and the `uv`-based FastAPI server builds server-side via `apps deploy`
-(`mode=SNAPSHOT`) — there is no local `uv run dev` loop. It is derived once `AGENT_APP_NAME` is known (Track A
+`apps init --output-dir` target and the `uv`-based FastAPI server builds server-side via the SDK `w.apps.deploy(…, mode=SNAPSHOT)` in `executeCode` (IDE: `apps deploy`)
+— there is no local `uv run dev` loop. It is derived once `AGENT_APP_NAME` is known (Track A
 clone / prompt 43); `<pending>` until then. Like `app_root`, the agent app deploys via `bundle deploy` (for the
-agent's bundle resources) plus `apps deploy` (for the host), not a bare-shell `databricks` call. `n/a` for
+agent's bundle resources) plus, for the host, `apps deploy` in the IDE or the SDK SNAPSHOT deploy in `executeCode` on genie_code (RULE_9), not a bare-shell `databricks` call. `n/a` for
 Pathways A/B (no agent app).
 Client-invariant fields (same for both clients):
   bundle_deploy.verb = "bundle deploy --target dev"   (never a bare-shell `databricks` call)
-  app_deploy         = { verb: "apps deploy", gated: true }   (RULE_9 exception)
+  app_deploy         = { verb: "apps deploy", gated: true }   (RULE_9 exception; IDE verb — on genie_code the SDK SNAPSHOT is canonical, RULE_9, so app_deploy is the one field here that is NOT client-invariant)
   destructive_ops    = confirm_required
 -->
 
@@ -148,7 +148,7 @@ environment_capabilities:
   skill_ref_root: <"" | "skills/<clone-folder>">   # readSkillFile prefix for repo-relative SKILL paths on genie_code (= "skills/" + basename(skills_install_root)); empty on ide_cli
   dp_bundle_root: <artifact_root>/{user_schema_prefix}_<use_case_slug>_dab   # self-contained DAB project dir for the data-product pipeline; username-prefixed (same {user_schema_prefix}_ as the _bronze/_silver/_gold schemas) so concurrent users never collide. The bundle name: in databricks.yml MUST match this folder name. Generated databricks.yml/src/resources live here, and on genie_code it is the `bundle deploy` page-context root. Derived at bootstrap (needs use_case_slug + user_schema_prefix); <pending> until then.
   app_root: <artifact_root>/<app_name>   # self-contained AppKit app project dir (Pathways A/B/C); top-level sibling of dp_bundle_root, NOT under apps_lakebase/ and NOT the bare clone root. app.yaml/databricks.yml/server/client and app_root/.vibecoding-state.md live here on BOTH clients (root-folder parity). On genie_code it is the `apps init --output-dir` target. Derived once APP_NAME is known (Module 1 / prompt 04); <pending> until then. n/a for Pathway D (agent-only).
-  agent_app_root: <artifact_root>/<agent_app_name>   # self-contained Track A custom-agent project dir (Pathways C/D); top-level sibling of app_root and dp_bundle_root, NOT under apps_lakebase/ and NOT the bare clone root. app.yaml/pyproject.toml/databricks.yml/server and agent_app_root/.vibecoding-state.md live here on BOTH clients (root-folder parity). On genie_code it is the `apps init --output-dir` target and builds the uv/FastAPI server server-side via `apps deploy` (mode=SNAPSHOT) — no local `uv run dev`. Derived once AGENT_APP_NAME is known (Track A clone / prompt 43); <pending> until then. n/a for Pathways A/B.
+  agent_app_root: <artifact_root>/<agent_app_name>   # self-contained Track A custom-agent project dir (Pathways C/D); top-level sibling of app_root and dp_bundle_root, NOT under apps_lakebase/ and NOT the bare clone root. app.yaml/pyproject.toml/databricks.yml/server and agent_app_root/.vibecoding-state.md live here on BOTH clients (root-folder parity). On genie_code it is the `apps init --output-dir` target and builds the uv/FastAPI server server-side via the SDK `w.apps.deploy(…, mode=SNAPSHOT)` in `executeCode` (IDE: `apps deploy`) — no local `uv run dev`. Derived once AGENT_APP_NAME is known (Track A clone / prompt 43); <pending> until then. n/a for Pathways A/B.
   genie_code_manifest_loaded: <n/a | false | true>   # G3 — seeded by bootstrap step 0: `n/a` on ide_cli (check is inert), `false` on genie_code. On genie_code the owning skill `skills/genie-code-environment` MUST flip this to `true` once it is read in the current thread; the first deploy/divergent prompt's `enter` halts while it is `false`/`<pending>`.
   # detected_via: <runDatabricksCli | genie_serverless_marker | no_managed_cli_channel>
 ```
