@@ -11,7 +11,7 @@ license: Apache-2.0
 clients: [ide_cli, genie_code]
 bundle_resource: schemas
 deploy_verb: bundle_deploy
-deploy_note: "Provisions UC schemas + managed volumes idempotently under the per-user prefixed schema (`{user_schema_prefix}`); created via SDK/DDL identically on both clients. On Genie Code run CLI steps through runDatabricksCli (pre-authenticated) and execute on serverless; see `skills/genie-code-environment`."
+deploy_note: "Provisions UC schemas + managed volumes idempotently under the per-user prefixed schema (`{user_schema_prefix}`); created via DDL `IF NOT EXISTS` identically on both clients. On Genie Code run CLI steps through runDatabricksCli (pre-authenticated) and execute on serverless; see `skills/genie-code-environment`."
 coverage: full
 metadata:
   last_verified: "2026-04-15"
@@ -58,7 +58,7 @@ fields_read:
 > per-version directory `v<N>/` carries the disambiguation.
 
 Every operation is **idempotent** (`CREATE SCHEMA IF NOT EXISTS`,
-`CREATE VOLUME IF NOT EXISTS` — `AlreadyExists` is treated as success). It
+`CREATE VOLUME IF NOT EXISTS`, both as DDL — an existing object is a no-op). It
 is safe to call this skill from any prompt that needs to be sure these
 resources exist; the cost on a warm workspace is one round-trip per resource.
 
@@ -91,7 +91,7 @@ resources exist; the cost on a warm workspace is one round-trip per resource.
 | `state://Resources.uc.catalog` is resolved | Set by `vibecoding-state` `bootstrap` op |
 | `state://Resources.uc.user_schema_prefix` is resolved | Derived in `bootstrap` from the user identity + `use_case_slug` |
 | Workshop SQL warehouse is RUNNING | `state://Resources.warehouse_id` (set by Prompt 1 preflight) — needed for `CREATE SCHEMA` execution via `WorkspaceClient.statement_execution` |
-| `databricks-sdk >= 0.30` installed | `python -c "from databricks.sdk import WorkspaceClient; from databricks.sdk.service.catalog import VolumeType"` |
+| `databricks-sdk >= 0.30` installed | `python -c "from databricks.sdk import WorkspaceClient; from databricks.sdk.service.sql import StatementState"` |
 | Caller has `USE CATALOG` + `CREATE SCHEMA` on the catalog | `databricks unity-catalog catalogs get $CATALOG --output json \| jq '.privileges'` |
 
 ---
@@ -101,6 +101,7 @@ resources exist; the cost on a warm workspace is one round-trip per resource.
 ```yaml
 # Resolved by the caller from state — F0 does not read state directly.
 uc_catalog:           "string (required)"        # e.g. "main"
+user_schema_prefix:   "string (required)"        # e.g. "jane_d_booking_app"
 agent_schema:         "string (required)"        # default: "${user_schema_prefix}_agent"
 ops_schema:           "string (required)"        # default: "${user_schema_prefix}_ops"
 warehouse_id:         "string (required)"        # SQL warehouse for DDL execution
@@ -110,6 +111,8 @@ required_volumes:                                 # optional — defaults below 
   - { name: "signoffs",          schema: "ops",   comment: "SDLC 04b stakeholder + engineering signoff decision.md artifacts" }
   # AgentSpec.required_volumes[] is appended verbatim
 ```
+
+`agent_schema` / `ops_schema` may be overridden to any name that starts with `${user_schema_prefix}_`; a non-prefixed override raises `ValueError`, because RULE_10 sanctions in-session provisioning of the participant's own prefixed schemas only.
 
 ## Operations
 
@@ -126,32 +129,57 @@ flowchart TD
 ### Reference implementation
 
 ```python
+import time
+
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.catalog import VolumeType
-from databricks.sdk.errors import AlreadyExists
+from databricks.sdk.service.sql import StatementState
 
 def provision_uc_resources(
     *,
     uc_catalog: str,
+    user_schema_prefix: str,
     agent_schema: str,
     ops_schema: str,
     warehouse_id: str,
     required_volumes: list[dict] | None = None,
+    ddl_timeout_s: int = 300,
 ) -> dict:
     w = WorkspaceClient()
 
+    # F0 provisions only the participant's own prefixed schemas (RULE_10 foundation carve-out).
+    suffixes = {}
+    for role, schema in (("agent", agent_schema), ("ops", ops_schema)):
+        if not schema.startswith(f"{user_schema_prefix}_") or schema == f"{user_schema_prefix}_":
+            raise ValueError(
+                f"{role}_schema {schema!r} must start with '{user_schema_prefix}_': RULE_10 "
+                "sanctions in-session provisioning of the participant's own prefixed schemas only"
+            )
+        suffixes[role] = schema.removeprefix(f"{user_schema_prefix}_")
+
+    def run_ddl(statement: str) -> None:
+        """Run one DDL statement to a terminal state; raise unless it SUCCEEDED (fail closed)."""
+        resp = w.statement_execution.execute_statement(
+            warehouse_id=warehouse_id, statement=statement, wait_timeout="30s",
+        )
+        deadline = time.monotonic() + ddl_timeout_s
+        while resp.status.state in (StatementState.PENDING, StatementState.RUNNING):
+            if time.monotonic() > deadline:
+                w.statement_execution.cancel_execution(resp.statement_id)
+                raise TimeoutError(f"DDL still {resp.status.state.value} after {ddl_timeout_s}s: {statement}")
+            time.sleep(2)
+            resp = w.statement_execution.get_statement(resp.statement_id)
+        if resp.status.state != StatementState.SUCCEEDED:  # FAILED / CANCELED / CLOSED
+            error = resp.status.error.message if resp.status.error else "no error message"
+            raise RuntimeError(f"DDL {resp.status.state.value}: {error} ({statement})")
+
     # 1. Schemas (DDL via statement execution against the workshop warehouse)
-    for schema in (agent_schema, ops_schema):
-        w.statement_execution.execute_statement(
-            warehouse_id=warehouse_id,
-            statement=(
-                f"CREATE SCHEMA IF NOT EXISTS {uc_catalog}.{schema} "
-                f"COMMENT 'F0-managed: agent or ops assets'"
-            ),
-            wait_timeout="30s",
+    for suffix in suffixes.values():
+        run_ddl(
+            f"CREATE SCHEMA IF NOT EXISTS {uc_catalog}.{user_schema_prefix}_{suffix} "
+            f"COMMENT 'F0-managed: agent or ops assets'"
         )
 
-    # 2. Volumes (SDK; AlreadyExists is success)
+    # 2. MANAGED volumes (DDL IF NOT EXISTS through the same warehouse)
     defaults = [
         {"name": "knowledge_sources", "schema": "agent",
          "comment": "KA + retrieval source files"},
@@ -163,22 +191,18 @@ def provision_uc_resources(
     volumes_spec = (required_volumes or []) + defaults
     seen, paths = set(), {}
     for v in volumes_spec:
-        target_schema = agent_schema if v["schema"] == "agent" else ops_schema
-        key = (target_schema, v["name"])
+        suffix = suffixes["agent" if v["schema"] == "agent" else "ops"]
+        target_schema, name = f"{user_schema_prefix}_{suffix}", v["name"]
+        key = (target_schema, name)
         if key in seen:
             continue
         seen.add(key)
-        try:
-            w.volumes.create(
-                catalog_name=uc_catalog,
-                schema_name=target_schema,
-                name=v["name"],
-                volume_type=VolumeType.MANAGED,
-                comment=v.get("comment", "F0-managed volume"),
-            )
-        except AlreadyExists:
-            pass
-        paths[v["name"]] = f"/Volumes/{uc_catalog}/{target_schema}/{v['name']}"
+        comment = v.get("comment", "F0-managed volume").replace("'", "\\'")
+        run_ddl(
+            f"CREATE VOLUME IF NOT EXISTS {uc_catalog}.{user_schema_prefix}_{suffix}.{name} "
+            f"COMMENT '{comment}'"
+        )  # raises unless SUCCEEDED, so only confirmed volumes are captured
+        paths[name] = f"/Volumes/{uc_catalog}/{target_schema}/{name}"
 
     return {
         "agent_schema": agent_schema,
