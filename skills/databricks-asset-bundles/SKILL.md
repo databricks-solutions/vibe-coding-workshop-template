@@ -11,7 +11,7 @@ metadata:
   volatility: medium
   clients: [ide_cli, genie_code]   # one deploy contract, both clients; Genie detail via genie-code-environment
   deploy_verb: "bundle deploy --target dev"
-  deploy_note: "the canonical deploy spine — IDE local CLI ≡ Genie Code runDatabricksCli; App via apps deploy"
+  deploy_note: "the canonical deploy spine — IDE local CLI ≡ Genie Code runDatabricksCli; App via apps deploy (IDE) / SDK SNAPSHOT (Genie Code, RULE_9)"
   bundle_resource: "jobs, pipelines, dashboards, alerts, apps, volumes, schemas, postgres_*; genie_spaces Tier-1 LANDED (native resource; CLI >= 1.3.0, verified on 1.10.0)"
   coverage: all_stages
   upstream_sources:
@@ -88,8 +88,8 @@ behavioral catalog lives in the **`genie-code-environment`** skill — load it o
 - **`bundle validate` / `bundle summary` / `--help` are pre-approved** from any bundle-context page — use
   them as safe pre-flight; `bundle deploy --target dev` then runs against the on-page bundle. [TESTED P4/P6]
 
-The **App** is the one deliberate exception to bundle-deploy: it ships via `apps deploy` (IDE local CLI;
-Genie Code SDK `w.apps.deploy(<name>, AppDeployment(source_code_path=…, mode=SNAPSHOT))` — see
+The **App** is the one deliberate exception to bundle-deploy. IDE: it ships via `apps deploy` (local CLI);
+Genie Code: the SDK `w.apps.deploy(<name>, AppDeployment(source_code_path=…, mode=SNAPSHOT))` via `executeCode` is canonical, the CLI verb via `runDatabricksCli` only where the page allows (RULE_9) — see
 `genie-code-environment` and the AppKit skills). Note the Genie SDK (`WorkspaceClient`) is the most capable
 path for individual API operations but has **no `bundle deploy` equivalent** (it is a composite
 client-side op) — so `bundle deploy` always runs through `runDatabricksCli`, never the SDK.
@@ -423,7 +423,7 @@ createAsset({ assetType: "genie",
               tableIdentifiers: ["<prefixed.schema.table>", ...] })
 ```
 
-This is the **one sanctioned exception** to the authoring discipline (user-approved). It is permitted
+This is one of the **two sanctioned exceptions** to the authoring discipline (user-approved; the other is RULE_10's idempotent foundation provisioning, D-56). It is permitted
 **only** inside a Genie Code session **and only** when neither bundle tier is viable (e.g. no bundle
 context). It creates workspace state the bundle does not own, so it is **non-version-controlled and never
 the default**; the IDE client has no Tier-3 equivalent. Keep **Tier 2 as the canonical, cross-client
