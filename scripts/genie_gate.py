@@ -117,6 +117,7 @@ def app_seed_rows(prompts: str) -> tuple[list[dict], dict]:
     extractor does not write. Rows are labelled `source` "section" or "trigger" and get
     area apps_lakebase. Returns (rows, info); info["status"] is "measured", "skip" (no
     seed or tooling) or "error" (the served rows and the section files do not match)."""
+    import re
     seed = os.path.join(prompts, SEED_NAME)
     if not os.path.isfile(seed):
         return [], {"status": "skip", "why": "no app seed"}
@@ -141,8 +142,22 @@ def app_seed_rows(prompts: str) -> tuple[list[dict], dict]:
         files = sorted(n for n in os.listdir(sections) if n.endswith(".md") and n != "README.md")
         info = {"status": "measured", "served": len(served), "dropped": dropped,
                 "section_files": len(files), "triggers": 0}
-        if len(files) != len(served):
-            info.update(status="error", why=f"{len(served)} served rows but {len(files)} section files")
+        served_ids = {fields["input_id"]: fields.get("section_tag", block["section_tag"])
+                      for block, fields in served}
+        file_ids = {}
+        for n in files:
+            with open(os.path.join(sections, n), encoding="utf-8") as f:
+                head = f.read(4000)
+            m, t = re.search(r"^input_id: (\d+)$", head, re.M), re.search(r"^section_tag: (\S+)$", head, re.M)
+            file_ids[int(m.group(1)) if m else n] = t.group(1) if t else "?"
+        if len(files) != len(served) or set(file_ids) != set(served_ids):
+            def ids(rows):
+                return ", ".join(f"{i} ({tag})" for i, tag in sorted(rows, key=str)) or "none"
+            missing = [(i, served_ids[i]) for i in set(served_ids) - set(file_ids)]
+            extra = [(i, file_ids[i]) for i in set(file_ids) - set(served_ids)]
+            info.update(status="error", why=f"{len(served)} served rows but {len(files)} section files; "
+                        f"served rows with no section file: {ids(missing)}; "
+                        f"section files with no served row: {ids(extra)}")
             return [], info
         os.mkdir(triggers)
         for _, fields in served:

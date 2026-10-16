@@ -107,3 +107,35 @@ regressions). Propose re-lock rows for BOTH directions, each marked AWAITING HUM
 - New acceptance A10: for 3 sampled served rows with a non-empty user_trigger_prompt containing a flagged line,
   the flagged line is counted once (and not at all for a superseded version of the same prompt).
 - prompt-tooling-roundtrip-fix (later) would let this drop the separate trigger read; note only.
+
+## Fix-up r1 (human, 2026-10-16, D-212) — one commit on PR #27
+- Re-locks in `scripts/genie_gate_baseline.json`, ALL SIGNED; change only these 9 keys (and keep the file's total /
+  by_class sums consistent with by_area_class, as #23 did):
+  - `apps_lakebase::GENIE_RESOURCE` 8 → 10 — SIGNED ON CONDITION: the PR body lists both extra lines (input_id,
+    section_tag, coding_assistant, version, line text) and shows (a) both rows are served at APP 7e2397a and
+    (b) both lines were already present in the old raw-seed/sections count (M2 layout) — i.e. not text added after
+    the lock was set (lock commit 1d6ee10). If either line is newer text, do NOT re-lock this key: STOP and report.
+  - tighten: `apps_lakebase::APP_DEPLOY` 1697 → 1272, `BARE_ARTIFACT_PATH` 36 → 15, `CLIENT_NAV` 7 → 0
+    (rule = drop ≥ 5 lines AND ≥ 10%), `INSESSION_CREATE` 136 → 76, `LOCAL_AUTH` 76 → 48, `SCRIPT_DEPLOY` 13 → 7,
+    `SETUP_SCRIPT` 18 → 8, `SHELL_DATABRICKS` 291 → 126.
+  - Every other key byte-identical; `--update-baseline` still never run (edit the JSON directly).
+- `scripts/genie_gate.py`: when served rows ≠ section files, the STOP/FAIL message lists the missing and the extra
+  row ids (input_id, section_tag), not only the two counts (reviewer note on 062eb32).
+- Acceptance after the fix-up: `python3 scripts/genie_gate.py --app-repo <APP at dc848dc>` → absolute audit exit 0
+  (no key over lock); baseline diff = exactly the 9 keys + consistent totals; diff gate exit 0, 78 → 78; fork checks
+  and round trip unchanged; A1 scope now = genie_gate.py, genie_gate_baseline.json (this trunk exception is signed
+  per key, D-212), the plan.
+- New tampers: X8 drop one served section file so served ≠ files → message lists that row id (and the audit FAILs);
+  X9 put `apps_lakebase::APP_DEPLOY` back to 1697 → baseline-diff check red; X10 set any unsigned key's lock +1 → red.
+
+## Fix-up r1 amendment (human, 2026-10-16, D-214) — overrides the GENIE_RESOURCE condition above
+- The D-212 condition was checked and NOT met: with the new rule the key was 6 at the lock-date APP seed ccf1b9a;
+  the 4 lines added since come from `insights_genie_in_app` (default + genie-code), first added in 24e7b99
+  (main Release 2.6.0, 2026-10-13), after lock commit 1d6ee10.
+- Ruling: re-lock `apps_lakebase::GENIE_RESOURCE` 8 → 10 anyway. Reason: those 4 lines are verbatim copies of the
+  sanctioned `activation_wire_genie` static-space-id guidance, in the #144 Insights rows waived under D-126, and add no
+  instruction; 10 is today's true count.
+- The PR description cites D-214 and lists the 4 lines (input_id, section_tag, coding_assistant, line text, first
+  commit 24e7b99) INSTEAD OF the "already in the old count" proof.
+- Everything else in Fix-up r1 unchanged: all 9 rows, the STOP message listing missing/extra row ids, tampers X8–X10;
+  then one fresh review + gate, merge only.
