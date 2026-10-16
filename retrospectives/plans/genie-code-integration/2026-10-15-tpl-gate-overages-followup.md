@@ -212,6 +212,26 @@ M0 (base 3f6ba0a + APP 2e3397f) stopped on two over-lock keys outside the B5 tab
   `99-activation_reverse_sync`, deploy-fork discipline on `99-gaccel_productionize` (3), state-persistence on 19 forks.
 - A1 now reads: M0 at APP 7e2397a pasted (and the de70b96 reproduction pasted); A2 covers all six keys.
 
+## Fix-up r1 — signed re-locks and the final A8 rule (human, 2026-10-15; D-196)
+
+- **R1 SIGNED:** `skills::APP_DEPLOY` lock 108 → 114. Reason: findings-log lines in
+  `skills/genie-code-environment/SKILL.md` (:478, :486–490); the regex hits `app.yaml` / `appkit` substrings, not a
+  deploy path; the lock in 1d6ee10 was set below the tree count.
+- **R2 SIGNED:** `skills::INSESSION_CREATE` lock 14 → 17. Reason: `skills/SKILL.md:34` is a privilege name; :82 and
+  :93 are filter literals; false positives; tidy queued as tpl-stray-skill-file.
+- **One fix-up commit** on #23: edit `scripts/genie_gate_baseline.json` `by_area_class` for exactly these two keys
+  (`by_class` and `total` kept arithmetically consistent: +6 and +3), nothing else; commit this plan file updated
+  (byte-identical to the lead copy); in the PR body, mark R1 and R2 "SIGNED (human, D-196)" with the reasons above.
+  Trunk exception for `scripts/genie_gate_baseline.json` applies (signed keys only).
+- **Final A8 rule:** (i) the Tier-3 `createAsset(` token is byte-identical to base; (ii) any added wording on that row
+  has no `createAsset(` (count word and the carve-out (3) mention are allowed); (iii) no counted line is added.
+  Retrospectives text is never a gate subject beyond this. Carve-out (3) text itself has no `createAsset(` anywhere.
+- **A10:** no-regression (D-195): `scripts/verify_agent_track_flow.py` fails identically at base and head.
+- **A5 after the fix-up:** with APP seed 7e2397a, the absolute gate is over lock only on the three apps_lakebase
+  (b) keys (GENIE_RESOURCE, APP_DEPLOY, LOCAL_AUTH), which go to genie-gate-absolute-dedupe; exit 1 for those is
+  expected and stated.
+- Then ONE full re-review + re-gate on the new head; merge only.
+
 ## Critic questions
 (a) Do the B5 numbers still hold at APP 2e3397f, and does the measuring method (raw seed extract) match how
 genie_gate.py actually reads APP content? (b) Are `:426`, `genie-code-environment/SKILL.md:368` and
