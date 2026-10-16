@@ -231,7 +231,7 @@ After the copy lands, **start a NEW Agent-mode chat thread** (hard-refresh the p
 
 | Root | Contents |
 |------|----------|
-| `skills/` | Controller + cross-cutting: `vibecoding-state`, `genie-code-environment`, `databricks-asset-bundles`, `databricks-expert-agent` |
+| `skills/` | Controller + cross-cutting: `vibecoding-state`, `genie-code-environment`, `databricks-asset-bundles`, `databricks-expert-agent`, `lakebase-cdf` |
 | `apps_lakebase/skills/` | AppKit workshop lifecycle (10 skills) |
 | `data_product_accelerator/skills/` | Data Product Accelerator (45 skills across 12 domains) |
 | `genai-agents/` | GenAI agent course (orchestrator, foundation, sdlc, tracks) |
