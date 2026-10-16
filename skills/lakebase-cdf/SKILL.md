@@ -6,7 +6,7 @@ description: >
   tables. Use for the sync_from_lakebase step when enable_lakebase_cdf is true:
   prerequisites (Postgres 17 autoscaling, non-default-storage catalog, REPLICA
   IDENTITY FULL), schema-level enablement, verifying STREAMING in
-  wal2delta.tables, consuming _pg_* columns, disabling, and the clone fallback.
+  wal2delta.tables, consuming _pg_* columns, and disabling.
 metadata:
   author: prashanth subrahmanyam
 ---

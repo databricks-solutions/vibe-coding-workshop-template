@@ -4,7 +4,7 @@
 
 This is a **monorepo** with four components: a Databricks AppKit workshop with Lakebase and agent-chat extensions, a standalone GenAI agent course, a Data Product Accelerator with 45 agent skills, and an Agentic Framework for building multi-agent systems.
 
-Cross-client behavior is steered by four root [`skills/`](skills/): `vibecoding-state` detects the active client (`client_context`) and gates each prompt, `genie-code-environment` is the in-workspace (Genie Code) behavioral manifest, and `databricks-asset-bundles` + `databricks-expert-agent` are shared deep-reference skills. Routing is identical for every client; the per-client difference is carried by a RULE_0 preamble at the top of each routed prompt.
+Cross-client behavior is steered by five root [`skills/`](skills/): `vibecoding-state` detects the active client (`client_context`) and gates each prompt, `genie-code-environment` is the in-workspace (Genie Code) behavioral manifest, `databricks-asset-bundles` + `databricks-expert-agent` are shared deep-reference skills, and `lakebase-cdf` is the Lakebase CDF reference for the `sync_from_lakebase` step when `enable_lakebase_cdf=true`. Routing is identical for every client; the per-client difference is carried by a RULE_0 preamble at the top of each routed prompt.
 
 ---
 

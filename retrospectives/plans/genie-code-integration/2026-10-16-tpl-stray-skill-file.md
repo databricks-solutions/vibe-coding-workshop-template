@@ -81,3 +81,15 @@ needed if `enable_lakebase_cdf=true`. Removal would drop `skills::INSESSION_CREA
   (The M2 draft already does; keep that clause explicit and first-sentence-adjacent.)
 - AGENTS.md:234 row as in r0.1; tampers X1–X6 as written.
 - Release: review + gate, merge only into TPL integration; then the next small template RC for the human's merge.
+
+## Fix-up r1 (human, 2026-10-16, D-211) — one commit on PR #26
+- Frontmatter description: drop "and the clone fallback" (the body never covers it; lead's plan wording). The list
+  ends "…consuming _pg_* columns, and disabling." Description still states WHEN to load it.
+- AGENTS.md:7: "four root [`skills/`](skills/)" → "five root …", and the sentence names `lakebase-cdf` (the Lakebase
+  CDF reference for the sync_from_lakebase step when enable_lakebase_cdf=true) alongside the other four.
+- presentations/workshop-explorer.html:1558: the same "Four root skills/" sentence → "Five", naming lakebase-cdf.
+  Change only that sentence; the rest of the file byte-identical.
+- SKILL.md body stays byte-identical (A3); X1–X6 still hold; A1 scope now adds presentations/workshop-explorer.html.
+- New acceptance A8: every topic the description names is covered by the body (grep the body for wal2delta, lb_,
+  REPLICA IDENTITY, _pg_, Disabling; and the description must not contain "clone" or "fallback").
+- New tamper X7: re-add "and the clone fallback" to the description → A8 red.
