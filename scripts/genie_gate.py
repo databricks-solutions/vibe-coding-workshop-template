@@ -14,6 +14,12 @@ retrospectives/plans/genie-code-integration/00-overview.md and reports PASS/FAIL
      Auto-skips if the (git-ignored, separate-repo) prompts tree is absent.
   3. Optional `databricks bundle validate` when --bundle is passed and databricks.yml exists.
 
+The prompt checks (round trip + the fork gates) read apps_lakebase/prompts/sections/.
+Without it, --app-repo PATH (or APP_REPO) runs them against the app repo instead: its
+seed and scripts/prompt_tooling are copied into a temp dir, the sections are extracted
+there, and the temp dir is removed at exit. Nothing is written into PATH or this tree.
+In that mode the round trip is a report only (D-197): its differences, split by cause.
+
 Baseline lives at scripts/genie_gate_baseline.json (beside this script). Workflow:
   python scripts/genie_gate.py --update-baseline      # lock current state as the reference
   python scripts/genie_gate.py                         # check (no regression?) -> exit 0/1
@@ -25,13 +31,22 @@ passes and is reviewed, so each milestone ratchets coupling down and locks it in
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from collections import Counter
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASELINE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "genie_gate_baseline.json")
 ROOT_LABEL = "(root)"
+# The prompt checks read this tree; main() points it at a temp copy in --app-repo mode.
+PROMPTS_DIR = os.path.join(REPO_ROOT, "apps_lakebase", "prompts")
+SEED_NAME = "02_seed_section_input_prompts.sql"
+APP_REPO_COMMAND = "python3 scripts/genie_gate.py --app-repo /path/to/vibe-coding-workshop-app"
+# Rows written by the app's scripts/insights_prompts/build_rows.py, whose column and
+# line layout differs from what sync_markdown_to_seed.py rebuilds (round-trip cause 2).
+INSIGHTS_BUILDER_ROWS = {301, 302, 303, 304, 320, 321, 1301, 1302, 1303, 1304, 1320, 1321}
 
 # Semantic-layer HYBRID forks: native-author + extract-back + bundle-persist. These
 # intentionally SANCTION native executeCode/createAsset for the dev loop, so the bundle-only
@@ -131,11 +146,11 @@ def check_audit(touched: set[str]) -> bool:
 
 
 def check_roundtrip(allow_diff: bool) -> bool:
-    prompts = os.path.join(REPO_ROOT, "apps_lakebase", "prompts")
+    prompts = PROMPTS_DIR
     sync = os.path.join(prompts, "sync_markdown_to_seed.py")
     print("\n=== prompt round-trip gate ===")
     if not os.path.exists(sync):
-        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        _skip_absent()
         return True
     res = subprocess.run(
         [sys.executable, "sync_markdown_to_seed.py", "--dry-run"],
@@ -153,6 +168,154 @@ def check_roundtrip(allow_diff: bool) -> bool:
         return True
     print("round-trip gate: FAIL — seed not in sync. Re-extract/sync or pass --allow-seed-diff.")
     return False
+
+
+def _skip_absent() -> None:
+    print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+    print(f"  run it against the app repo: {APP_REPO_COMMAND}")
+
+
+def _hunks(diff: str) -> list[tuple[int, list[str]]]:
+    """Unified-diff hunks as (first old line, 1-based; body lines)."""
+    import re
+    hunks = []
+    for line in diff.splitlines():
+        m = re.match(r"^@@ -(\d+)(?:,\d+)? \+\d+(?:,\d+)? @@", line)
+        if m:
+            hunks.append((int(m.group(1)), []))
+        elif hunks and line[:1] in ("+", "-", " "):
+            hunks[-1][1].append(line)
+    return hunks
+
+
+def _hunk_cause(start: int, body: list[str], row_at, superseded: set[int]) -> str:
+    """Which known cause explains a round-trip hunk: insights, trigger, versions or other."""
+    import re
+    rows, minus, plus = set(), [], []
+    old = start - 1  # 0-based index of the next old line
+    for line in body:
+        if line[0] == "-":
+            rows.add(row_at(old))
+            minus.append(line[1:])
+            old += 1
+        elif line[0] == "+":
+            rows.add(row_at(old))
+            plus.append(line[1:])
+        else:
+            old += 1
+    if rows & INSIGHTS_BUILDER_ROWS:
+        return "insights"
+    # The rebuilt block always has a user_trigger_prompt column, and the value is ''.
+    for p in list(plus):
+        q = p.replace("user_trigger_prompt, ", "", 1)
+        if q != p and q in minus:
+            plus.remove(p)
+            minus.remove(q)
+    if (all(p == "''," for p in plus) and len(minus) <= len(plus)
+            and all(re.match(r"^'.*',$", m) for m in minus)):
+        return "trigger"
+    if rows & superseded:
+        return "versions"
+    return "other"
+
+
+def roundtrip_report(prompts: str) -> bool:
+    """--app-repo round trip, report only (D-197): `sync_markdown_to_seed.py --dry-run`
+    against the seed copy in `prompts`, its hunks split by the three known causes plus
+    "other". Known causes never fail; "other" > 0 prints a WARN with the first hunks."""
+    import re
+    from bisect import bisect_right
+    print("\n=== prompt round-trip report (--app-repo) ===")
+    res = subprocess.run(
+        [sys.executable, "sync_markdown_to_seed.py", "--dry-run"],
+        cwd=prompts, capture_output=True, text=True,
+    )
+    if res.returncode != 0:
+        print(f"sync --dry-run exited {res.returncode}:")
+        print((res.stdout + res.stderr).strip()[-1500:])
+        print("round-trip report: FAIL — the dry run did not complete.")
+        return False
+    if "No differences detected" in res.stdout:
+        print("sync --dry-run: No differences detected")
+        print("round-trip report: PASS (byte-clean)")
+        return True
+
+    sys.path.insert(0, prompts)
+    from _seed_parser import read_seed
+    from pathlib import Path
+    _, blocks = read_seed(Path(prompts))
+    starts = [b["start"] for b in blocks]
+
+    def row_at(i: int) -> int | None:
+        k = bisect_right(starts, i) - 1
+        return blocks[k]["input_id"] if k >= 0 and i <= blocks[k]["end"] else None
+
+    superseded = {int(m) for m in re.findall(
+        r"Seed block input_id=(\d+) .* has no markdown file", res.stderr)}
+    hunks = _hunks(res.stdout)
+    by_cause = Counter()
+    others = []
+    for start, body in hunks:
+        cause = _hunk_cause(start, body, row_at, superseded)
+        by_cause[cause] += 1
+        if cause == "other":
+            others.append((start, body))
+
+    print(f"sync --dry-run: {len(hunks)} differing hunk(s) — report only (D-197)")
+    print(f"  (1) user_trigger_prompt not extracted: {by_cause['trigger']}")
+    print(f"  (2) Insights column layout (rows {', '.join(map(str, sorted(INSIGHTS_BUILDER_ROWS)))}): "
+          f"{by_cause['insights']}")
+    print(f"  (3) versions sharing one section file: {by_cause['versions']} "
+          f"({len(superseded)} older row(s) have no section file and are not compared)")
+    print(f"  other: {len(others)}")
+    if others:
+        print(f"WARN — {len(others)} hunk(s) with no known cause; the first ones:")
+        for start, body in others[:3]:
+            print(f"  @@ -{start} @@")
+            for line in body[:12]:
+                print(f"    {line[:200]}")
+        print("round-trip report: PASS-WITH-WARN (report only; review the hunks above)")
+    else:
+        print("round-trip report: PASS (report only; every hunk has a known cause)")
+    return True
+
+
+def prepare_app_prompts(app_repo: str) -> str | None:
+    """Copy the app repo's seed and scripts/prompt_tooling into a new temp dir, extract
+    the sections there (raw seed), and return the temp dir. On error print why, remove
+    anything created, and return None. Reads app_repo only; never writes there or here."""
+    app = os.path.abspath(app_repo)
+    seed = os.path.join(app, "db", "lakebase", "dml_seed", SEED_NAME)
+    tooling = os.path.join(app, "scripts", "prompt_tooling")
+    if not os.path.isfile(seed):
+        print(f"ERROR: --app-repo {app_repo}: app seed not found: {seed}")
+        return None
+    if not os.path.isfile(os.path.join(tooling, "extract_to_markdown.py")):
+        print(f"ERROR: --app-repo {app_repo}: prompt tooling not found: {tooling}")
+        return None
+    tmp = tempfile.mkdtemp(prefix="genie_gate_")
+    real = os.path.realpath(tmp)
+    for root in (REPO_ROOT, app):
+        root = os.path.realpath(root)
+        if os.path.commonpath([real, root]) == root:
+            shutil.rmtree(tmp)
+            print(f"ERROR: temp dir {tmp} is inside {root}; set TMPDIR outside it.")
+            return None
+    prompts = os.path.join(tmp, "prompts")
+    shutil.copytree(tooling, prompts, ignore=shutil.ignore_patterns(
+        "sections", "__pycache__", "*.sql", "[0-9][0-9]-*.md"))
+    shutil.copyfile(seed, os.path.join(prompts, SEED_NAME))
+    res = subprocess.run([sys.executable, "extract_to_markdown.py"],
+                         cwd=prompts, capture_output=True, text=True)
+    if res.returncode != 0:
+        shutil.rmtree(tmp)
+        print(f"ERROR: extract_to_markdown.py exited {res.returncode}:")
+        print((res.stdout + res.stderr).strip()[-1500:])
+        return None
+    done = [ln for ln in res.stdout.splitlines() if ln.startswith("Extracted ")]
+    count = done[-1].split()[1] if done else "?"
+    print(f"--app-repo {app}: {count} prompt(s) extracted from the app seed into a temp dir.")
+    return tmp
 
 
 def _tokens(text: str) -> set[str]:
@@ -175,12 +338,12 @@ def check_fork_parity() -> bool:
     clone-rooted paths). Mechanics may differ; intent may not. Auto-skips if the prompts tree
     is absent (git-ignored / separate repo)."""
     import re
-    sections = os.path.join(REPO_ROOT, "apps_lakebase", "prompts", "sections")
+    sections = os.path.join(PROMPTS_DIR, "sections")
     print("\n=== fork intent-parity gate ===")
     if not os.path.isdir(sections):
-        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        _skip_absent()
         return True
-    sys.path.insert(0, os.path.join(REPO_ROOT, "apps_lakebase", "prompts"))
+    sys.path.insert(0, PROMPTS_DIR)
     try:
         from sync_markdown_to_seed import parse_markdown
     except Exception as e:  # pragma: no cover
@@ -250,12 +413,12 @@ def check_deploy_fork_discipline() -> bool:
          authorization — the silent pivot to `jobs/create` was the observed regression).
     Static content check only; auto-skips if the prompts tree is absent."""
     import re
-    sections = os.path.join(REPO_ROOT, "apps_lakebase", "prompts", "sections")
+    sections = os.path.join(PROMPTS_DIR, "sections")
     print("\n=== deploy-fork discipline gate ===")
     if not os.path.isdir(sections):
-        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        _skip_absent()
         return True
-    sys.path.insert(0, os.path.join(REPO_ROOT, "apps_lakebase", "prompts"))
+    sys.path.insert(0, PROMPTS_DIR)
     try:
         from sync_markdown_to_seed import parse_markdown
     except Exception as e:  # pragma: no cover
@@ -330,12 +493,12 @@ def check_hybrid_fork_discipline() -> bool:
         benchmark/instruction assertion (no shell payloads),
       - Dashboard-bearing forks: the mandatory canvas-navigation terms (openAsset / readAssetById).
     Static content check; auto-skips if the prompts tree is absent."""
-    sections = os.path.join(REPO_ROOT, "apps_lakebase", "prompts", "sections")
+    sections = os.path.join(PROMPTS_DIR, "sections")
     print("\n=== hybrid-fork discipline gate ===")
     if not os.path.isdir(sections):
-        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        _skip_absent()
         return True
-    sys.path.insert(0, os.path.join(REPO_ROOT, "apps_lakebase", "prompts"))
+    sys.path.insert(0, PROMPTS_DIR)
     try:
         from sync_markdown_to_seed import parse_markdown
     except Exception as e:  # pragma: no cover
@@ -409,12 +572,12 @@ def check_lakehouse_fork_discipline() -> bool:
       (d) the Gold-pipeline fork forbids `saveAsTable` for gold loads and keeps the
           post-merge `validate_gold` task.
     Static content check only; auto-skips if the prompts tree is absent."""
-    sections = os.path.join(REPO_ROOT, "apps_lakebase", "prompts", "sections")
+    sections = os.path.join(PROMPTS_DIR, "sections")
     print("\n=== lakehouse-fork discipline gate ===")
     if not os.path.isdir(sections):
-        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        _skip_absent()
         return True
-    sys.path.insert(0, os.path.join(REPO_ROOT, "apps_lakebase", "prompts"))
+    sys.path.insert(0, PROMPTS_DIR)
     try:
         from sync_markdown_to_seed import parse_markdown
     except Exception as e:  # pragma: no cover
@@ -523,12 +686,12 @@ def check_state_persistence_discipline() -> bool:
       - the hard completion rule ("NOT complete until ...").
     Spans lakehouse + apps + agents forks. Static content check; auto-skips if absent."""
     import re
-    sections = os.path.join(REPO_ROOT, "apps_lakebase", "prompts", "sections")
+    sections = os.path.join(PROMPTS_DIR, "sections")
     print("\n=== state-persistence discipline gate ===")
     if not os.path.isdir(sections):
-        print("SKIP — prompts tree not present (separate-repo / git-ignored).")
+        _skip_absent()
         return True
-    sys.path.insert(0, os.path.join(REPO_ROOT, "apps_lakebase", "prompts"))
+    sys.path.insert(0, PROMPTS_DIR)
     try:
         from sync_markdown_to_seed import parse_markdown
     except Exception as e:  # pragma: no cover
@@ -623,27 +786,49 @@ def main() -> int:
                     help="Also run `databricks bundle validate --target dev`.")
     ap.add_argument("--profile", default=None,
                     help="Databricks CLI profile for --bundle (e.g. fevm-jane-doe).")
+    ap.add_argument("--app-repo", default=None, metavar="PATH",
+                    help="vibe-coding-workshop-app checkout to run the prompt checks against "
+                         "when apps_lakebase/prompts/sections is absent (default: $APP_REPO).")
     args = ap.parse_args()
 
     if args.update_baseline:
         write_baseline(current_counts())
         return 0
 
-    ok = check_audit(set(args.touched))
-    if not args.skip_roundtrip:
-        ok = check_roundtrip(args.allow_seed_diff) and ok
-    if not args.skip_fork_parity:
-        ok = check_fork_parity() and ok
-    if not args.skip_deploy_discipline:
-        ok = check_deploy_fork_discipline() and ok
-    if not args.skip_hybrid_discipline:
-        ok = check_hybrid_fork_discipline() and ok
-    if not args.skip_lakehouse_discipline:
-        ok = check_lakehouse_fork_discipline() and ok
-    if not args.skip_state_discipline:
-        ok = check_state_persistence_discipline() and ok
-    if args.bundle:
-        ok = check_bundle(args.profile) and ok
+    global PROMPTS_DIR
+    app_repo = args.app_repo or os.environ.get("APP_REPO")
+    tmp = None
+    if app_repo:
+        if os.path.isdir(os.path.join(PROMPTS_DIR, "sections")):
+            print(f"note: apps_lakebase/prompts/sections is present; --app-repo {app_repo} ignored.")
+        else:
+            tmp = prepare_app_prompts(app_repo)
+            if tmp is None:
+                return 2
+            PROMPTS_DIR = os.path.join(tmp, "prompts")
+
+    try:
+        ok = check_audit(set(args.touched))
+        if not args.skip_roundtrip:
+            if tmp:
+                ok = roundtrip_report(PROMPTS_DIR) and ok
+            else:
+                ok = check_roundtrip(args.allow_seed_diff) and ok
+        if not args.skip_fork_parity:
+            ok = check_fork_parity() and ok
+        if not args.skip_deploy_discipline:
+            ok = check_deploy_fork_discipline() and ok
+        if not args.skip_hybrid_discipline:
+            ok = check_hybrid_fork_discipline() and ok
+        if not args.skip_lakehouse_discipline:
+            ok = check_lakehouse_fork_discipline() and ok
+        if not args.skip_state_discipline:
+            ok = check_state_persistence_discipline() and ok
+        if args.bundle:
+            ok = check_bundle(args.profile) and ok
+    finally:
+        if tmp:
+            shutil.rmtree(tmp)
 
     print("\n" + ("=" * 48))
     print("GATE RESULT:", "PASS ✅" if ok else "FAIL ❌")

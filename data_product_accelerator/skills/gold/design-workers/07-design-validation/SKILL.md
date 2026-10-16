@@ -469,7 +469,7 @@ Benchmark the Gold design against a **Databricks Industry Vibe Data Model** (or 
 
 ### Single Source of Matching
 
-Matching is owned by `design-workers/08-industry-alignment` (Phase 0/2), which writes `gold_layer_design/INDUSTRY_CROSSWALK.csv`. Validation 6 **loads** that crosswalk — it does NOT re-match — then verifies it against the current YAML and scores it. This avoids two divergent matchers.
+Matching is owned by `design-workers/08-industry-alignment` (Phase 0/2), which writes `<ARTIFACT_ROOT>/<use_case_slug>_dab/gold_layer_design/INDUSTRY_CROSSWALK.csv`. Validation 6 **loads** that crosswalk — it does NOT re-match — then verifies it against the current YAML and scores it. This avoids two divergent matchers.
 
 ### Preconditions
 

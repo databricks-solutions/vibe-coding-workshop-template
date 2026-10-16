@@ -36,21 +36,21 @@
     "genai-agents::SCRIPT_DEPLOY": 1,
     "genai-agents::SETUP_SCRIPT": 1,
     "genai-agents::SHELL_DATABRICKS": 84,
-    "skills::APP_DEPLOY": 108,
+    "skills::APP_DEPLOY": 114,
     "skills::BARE_ARTIFACT_PATH": 1,
     "skills::GENIE_RESOURCE": 18,
-    "skills::INSESSION_CREATE": 14,
+    "skills::INSESSION_CREATE": 17,
     "skills::LOCAL_PATH": 24,
     "skills::PY_BUNDLE_CONFIG": 1,
     "skills::SETUP_SCRIPT": 1,
     "skills::SHELL_DATABRICKS": 59
   },
   "by_class": {
-    "APP_DEPLOY": 2081,
+    "APP_DEPLOY": 2087,
     "BARE_ARTIFACT_PATH": 48,
     "CLIENT_NAV": 8,
     "GENIE_RESOURCE": 46,
-    "INSESSION_CREATE": 317,
+    "INSESSION_CREATE": 320,
     "LOCAL_AUTH": 90,
     "LOCAL_PATH": 347,
     "LOCAL_SPARK": 9,
@@ -59,5 +59,5 @@
     "SETUP_SCRIPT": 23,
     "SHELL_DATABRICKS": 591
   },
-  "total": 3575
+  "total": 3584
 }

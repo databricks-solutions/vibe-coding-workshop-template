@@ -100,8 +100,13 @@ The single creation event is **deploy**. SDK `w.*.create()`, hand-run SQL DDL, a
 **read-only authoring support** only (inspect schemas, confirm column names/types, check lineage, sample
 rows) — never the channel that brings a deliverable into existence. A `CREATE …` that is the *body of a
 bundle-authored DLT/SQL resource* runs **during** `bundle deploy` and **stays** — that is not in-session
-creation. There are **two carve-outs**: (1) a Genie Space via `createAsset` (RULE_8 **Tier 3**),
+creation. There are **three carve-outs**: (1) a Genie Space via `createAsset` (RULE_8 **Tier 3**),
 Genie-Code-only and last-resort (see [Genie Spaces — three deploy tiers](#genie-spaces--three-deploy-tiers-rule_8));
+(3) the Genie Code light path (genie-accelerator and Insights): the AI/BI dashboard via `createAsset` with
+`assetType` dashboard, and its operational add-ons (SQL alerts via `w.alerts.create`, the dashboard schedule and
+subscription via `w.lakeview.create_schedule` / `create_subscription`), Genie-Code-only. Each object's id is
+recorded in `<STATE_FILE>` and a clickable link is printed; making them reproducible belongs to a bundle step,
+never to an ad-hoc import (D-156);
 (2) idempotent foundation provisioning of the participant's own prefixed schema/volume, on both clients:
 `CREATE SCHEMA IF NOT EXISTS {catalog}.{user_schema_prefix}_agent` / `CREATE VOLUME IF NOT EXISTS {catalog}.{user_schema_prefix}_agent.{volume}`
 (and the `_ops` equivalents), nothing else (no tables,
@@ -423,7 +428,7 @@ createAsset({ assetType: "genie",
               tableIdentifiers: ["<prefixed.schema.table>", ...] })
 ```
 
-This is one of the **two sanctioned exceptions** to the authoring discipline (user-approved; the other is RULE_10's idempotent foundation provisioning, D-56). It is permitted
+This is one of the **three sanctioned exceptions** to the authoring discipline (user-approved; the others are RULE_10's idempotent foundation provisioning, D-56, and the Genie Code light path, D-156). It is permitted
 **only** inside a Genie Code session **and only** when neither bundle tier is viable (e.g. no bundle
 context). It creates workspace state the bundle does not own, so it is **non-version-controlled and never
 the default**; the IDE client has no Tier-3 equivalent. Keep **Tier 2 as the canonical, cross-client
