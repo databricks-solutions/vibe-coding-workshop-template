@@ -269,7 +269,7 @@ The report summarizes: table inventory, entity classification, inferred relation
 3. Define measures and metrics with calculation logic
 4. Define relationships (FK constraints)
 5. Assign tables to domains (Location, Product, Time, Sales, etc.)
-6. **(Optional) Apply industry alignment** — if `industry_reference_source` ≠ `none`, read `design-workers/08-industry-alignment` and apply its guidance rules 1–6 (canonical domain names, conformed-dimension identification, grain/measure completeness, terminology steering, gap disposition, sensitivity). Record every decision in `DESIGN_DECISIONS.md` Section 8 and write `gold_layer_design/INDUSTRY_CROSSWALK.csv`. Never invent tables for uncovered entities — disposition them as `Waived`/`Planned` in `SOURCE_TABLE_MAPPING.csv`.
+6. **(Optional) Apply industry alignment** — if `industry_reference_source` ≠ `none`, read `design-workers/08-industry-alignment` and apply its guidance rules 1–6 (canonical domain names, conformed-dimension identification, grain/measure completeness, terminology steering, gap disposition, sensitivity). Record every decision in `DESIGN_DECISIONS.md` Section 8 and write `<ARTIFACT_ROOT>/<use_case_slug>_dab/gold_layer_design/INDUSTRY_CROSSWALK.csv`. Never invent tables for uncovered entities — disposition them as `Waived`/`Planned` in `SOURCE_TABLE_MAPPING.csv`.
 
 **MANDATORY: Read these skills using the Read tool in order during Phase 2:**
 
