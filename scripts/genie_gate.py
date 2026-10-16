@@ -162,27 +162,28 @@ def app_seed_rows(prompts: str) -> tuple[list[dict], dict]:
         shutil.rmtree(tmp)
 
 
-def measure_audit() -> tuple[dict, dict]:
-    """The audit counts by area and class, and how the app seed was measured.
+def audit_rows() -> tuple[list[tuple[str, dict]], dict]:
+    """Every counted audit row as (area, row), and how the app seed was measured.
 
     The tree scan skips everything under apps_lakebase/prompts/ (raw seed, generated
     files, local sections), so no seed line is counted twice; the app seed in
     PROMPTS_DIR is then added once per served row (app_seed_rows)."""
-    rows = [r for r in _scan_in(REPO_ROOT)
-            if not os.path.normpath(r["file"]).startswith(PROMPTS_REL + os.sep)]
+    rows = [(_area(r["file"]), r) for r in _scan_in(REPO_ROOT)
+            if r["class"] != "READ_ERROR"
+            and not os.path.normpath(r["file"]).startswith(PROMPTS_REL + os.sep)]
     seed_rows, info = app_seed_rows(PROMPTS_DIR)
+    rows += [(APP_SEED_AREA, r) for r in seed_rows if r["class"] != "READ_ERROR"]
+    return rows, info
 
-    by_area_class = Counter()
-    by_class = Counter()
-    for area, r in [(_area(r["file"]), r) for r in rows] + [(APP_SEED_AREA, r) for r in seed_rows]:
-        if r["class"] == "READ_ERROR":
-            continue
-        by_area_class[f"{area}::{r['class']}"] += 1
-        by_class[r["class"]] += 1
+
+def measure_audit() -> tuple[dict, dict]:
+    """The audit counts by area and class, and how the app seed was measured."""
+    rows, info = audit_rows()
+    by_class = Counter(r["class"] for _, r in rows)
     counts = {
         "total": sum(by_class.values()),
         "by_class": dict(by_class),
-        "by_area_class": dict(by_area_class),
+        "by_area_class": dict(Counter(f"{area}::{r['class']}" for area, r in rows)),
     }
     return counts, info
 
