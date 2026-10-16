@@ -15,8 +15,8 @@
     "apps_lakebase::INSESSION_CREATE": 136,
     "apps_lakebase::LOCAL_AUTH": 76,
     "apps_lakebase::LOCAL_PATH": 55,
-    "apps_lakebase::SCRIPT_DEPLOY": 5,
-    "apps_lakebase::SETUP_SCRIPT": 10,
+    "apps_lakebase::SCRIPT_DEPLOY": 13,
+    "apps_lakebase::SETUP_SCRIPT": 18,
     "apps_lakebase::SHELL_DATABRICKS": 291,
     "data_product_accelerator::APP_DEPLOY": 24,
     "data_product_accelerator::BARE_ARTIFACT_PATH": 8,
@@ -33,6 +33,8 @@
     "genai-agents::LOCAL_AUTH": 1,
     "genai-agents::LOCAL_PATH": 174,
     "genai-agents::LOCAL_SPARK": 2,
+    "genai-agents::SCRIPT_DEPLOY": 1,
+    "genai-agents::SETUP_SCRIPT": 1,
     "genai-agents::SHELL_DATABRICKS": 84,
     "skills::APP_DEPLOY": 108,
     "skills::BARE_ARTIFACT_PATH": 1,
@@ -53,9 +55,9 @@
     "LOCAL_PATH": 347,
     "LOCAL_SPARK": 9,
     "PY_BUNDLE_CONFIG": 1,
-    "SCRIPT_DEPLOY": 5,
-    "SETUP_SCRIPT": 14,
+    "SCRIPT_DEPLOY": 14,
+    "SETUP_SCRIPT": 23,
     "SHELL_DATABRICKS": 591
   },
-  "total": 3557
+  "total": 3575
 }

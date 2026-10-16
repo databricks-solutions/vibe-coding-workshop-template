@@ -365,10 +365,10 @@ This is *how* a session runs — distilled from the field forks (someone ran thi
 > (`create_job`, `create_pipeline_idempotent`, `make_job_notebook`). Those created un-versioned workspace
 > state that diverged from the IDE's bundle output — **that divergence was itself the regression.** They
 > are **superseded by the bundle-deploy spine** (`databricks-asset-bundles`): every artifact is a bundle
-> resource brought to life by `bundle deploy`, identically on both clients. The only sanctioned in-session
-> creation is RULE_8 **Tier 3** Genie-Space `createAsset` (last-resort). [decision #6/#8; M3 §2a Bucket C]
+> resource brought to life by `bundle deploy`, identically on both clients. In-session creation has exactly two
+> sanctioned carve-outs: (1) RULE_8 **Tier 3** Genie-Space `createAsset` (Genie Code only, last-resort); (2) the RULE_10 idempotent foundation provisioning — `IF NOT EXISTS` creation of the participant's own prefixed foundation schema/volume, both clients, nothing else (D-56). [decision #6/#8; M3 §2a Bucket C]
 >
-> **This explicitly includes data-product table DDL.** Creating Bronze/Silver/Gold schemas and tables —
+> **This explicitly includes data-product table DDL** (the Bronze/Silver/Gold deliverable; the RULE_10 foundation carve-out above — `IF NOT EXISTS` of the participant's own prefixed foundation schema/volume, D-56 — is separate and is not this regression). Creating Bronze/Silver/Gold schemas and tables —
 > `CREATE SCHEMA`, `CREATE TABLE`, `DEEP CLONE`, `ALTER TABLE … SET TBLPROPERTIES`, `CLUSTER BY`, and the
 > data load — directly via `executeCode`/`spark.sql` is the SAME regression: it produces live tables with
 > no versioned bundle behind them. Those statements are the **body of a bundle job notebook**, executed by
