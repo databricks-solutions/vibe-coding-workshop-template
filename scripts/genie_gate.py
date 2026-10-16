@@ -9,6 +9,9 @@ retrospectives/plans/genie-code-integration/00-overview.md and reports PASS/FAIL
      - untouched areas must NOT increase vs the locked baseline (hard fail),
      - touched areas (--touched) are reported but allowed to change (they should drop),
      - total is reported with a delta (warn-only if it rose).
+     The tree scan skips apps_lakebase/prompts/. The app seed (local, or --app-repo) is
+     counted once instead: each row the app serves, as its section file plus its
+     user_trigger_prompt, under area apps_lakebase. With no seed that part prints SKIP.
   2. Prompt chain round-trip: apps_lakebase/prompts/sync_markdown_to_seed.py --dry-run
      must report "No differences detected" (unless --allow-seed-diff, then report only).
      Auto-skips if the (git-ignored, separate-repo) prompts tree is absent.
@@ -42,6 +45,9 @@ BASELINE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "genie_
 ROOT_LABEL = "(root)"
 # The prompt checks read this tree; main() points it at a temp copy in --app-repo mode.
 PROMPTS_DIR = os.path.join(REPO_ROOT, "apps_lakebase", "prompts")
+# The audit skips this tree and counts the served app seed once instead (measure_audit).
+PROMPTS_REL = os.path.join("apps_lakebase", "prompts")
+APP_SEED_AREA = "apps_lakebase"
 SEED_NAME = "02_seed_section_input_prompts.sql"
 APP_REPO_COMMAND = "python3 scripts/genie_gate.py --app-repo /path/to/vibe-coding-workshop-app"
 # Rows written by the app's scripts/insights_prompts/build_rows.py, whose column and
@@ -63,29 +69,143 @@ def _area(file_path: str) -> str:
     return parts[0] if len(parts) > 1 else ROOT_LABEL
 
 
-def current_counts() -> dict:
-    """Run the audit from the repo root and bucket flags by area and class."""
+def _scan_in(path: str) -> list[dict]:
+    """audit_genie_compat.scan() run with `path` as the working directory."""
     from audit_genie_compat import scan  # imported here so --help works without it
 
     cwd = os.getcwd()
-    os.chdir(REPO_ROOT)
+    os.chdir(path)
     try:
-        rows = scan()
+        return scan()
     finally:
         os.chdir(cwd)
 
-    by_area_class = Counter()
-    by_class = Counter()
-    for r in rows:
-        if r["class"] == "READ_ERROR":
-            continue
-        by_area_class[f"{_area(r['file'])}::{r['class']}"] += 1
-        by_class[r["class"]] += 1
-    return {
+
+def served_rows(prompts: str) -> tuple[list[str], list[tuple[dict, dict]], list[int]]:
+    """The seed in `prompts`, reduced to the rows the app serves: (seed lines, served
+    (block, fields) pairs, dropped input_ids). The app serves one row per
+    (section_tag, coding_assistant), the active row with the highest version (routes.py);
+    rows tied on that version are all kept. Same reduction as the forge diff gate's
+    served_seed, parsed with the copied tooling's _seed_parser."""
+    sys.path.insert(0, prompts)
+    from _seed_parser import extract_sql_strings, find_blocks
+    with open(os.path.join(prompts, SEED_NAME), encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    rows = []
+    for block in find_blocks(lines):
+        fields = extract_sql_strings("\n".join(lines[block["start"]:block["end"] + 1]), block["columns"])
+        if not fields:
+            raise ValueError(f"cannot parse seed row input_id={block['input_id']}")
+        key = (fields.get("section_tag", block["section_tag"]), fields.get("coding_assistant") or "__default__")
+        rows.append((block, fields, key))
+    newest = {}
+    for _, fields, key in rows:
+        if fields.get("is_active", True):
+            newest[key] = max(fields.get("version", 1), newest.get(key, fields.get("version", 1)))
+    served, dropped = [], []
+    for block, fields, key in rows:
+        if not fields.get("is_active", True) or fields.get("version", 1) < newest[key]:
+            dropped.append(block["input_id"])
+        else:
+            served.append((block, fields))
+    return lines, served, sorted(dropped)
+
+
+def app_seed_rows(prompts: str) -> tuple[list[dict], dict]:
+    """Audit rows for the app seed in `prompts`, each served row counted once: its section
+    file (extracted from the served rows only) plus its user_trigger_prompt, which the
+    extractor does not write. Rows are labelled `source` "section" or "trigger" and get
+    area apps_lakebase. Returns (rows, info); info["status"] is "measured", "skip" (no
+    seed or tooling) or "error" (the served rows and the section files do not match)."""
+    import re
+    seed = os.path.join(prompts, SEED_NAME)
+    if not os.path.isfile(seed):
+        return [], {"status": "skip", "why": "no app seed"}
+    for name in ("_seed_parser.py", "extract_to_markdown.py"):
+        if not os.path.isfile(os.path.join(prompts, name)):
+            return [], {"status": "skip", "why": f"{name} not found next to the seed {seed}"}
+    lines, served, dropped = served_rows(prompts)
+    keep = {i for block, _ in served for i in range(block["start"], block["end"] + 1)}
+    tmp = tempfile.mkdtemp(prefix="genie_gate_seed_")
+    try:
+        work = os.path.join(tmp, "prompts")
+        shutil.copytree(prompts, work, ignore=shutil.ignore_patterns(
+            "sections", "__pycache__", "*.sql", "[0-9][0-9]-*.md"))
+        with open(os.path.join(work, SEED_NAME), "w", encoding="utf-8") as f:
+            f.write("\n".join(line for i, line in enumerate(lines) if i in keep) + "\n")
+        sections, triggers = os.path.join(work, "sections"), os.path.join(tmp, "triggers")
+        res = subprocess.run([sys.executable, "extract_to_markdown.py"],
+                             cwd=work, capture_output=True, text=True)
+        if res.returncode != 0:
+            return [], {"status": "error", "why": "extract_to_markdown.py exited "
+                        f"{res.returncode}: {(res.stdout + res.stderr).strip()[-500:]}"}
+        files = sorted(n for n in os.listdir(sections) if n.endswith(".md") and n != "README.md")
+        info = {"status": "measured", "served": len(served), "dropped": dropped,
+                "section_files": len(files), "triggers": 0}
+        served_ids = {fields["input_id"]: fields.get("section_tag", block["section_tag"])
+                      for block, fields in served}
+        file_ids = {}
+        for n in files:
+            with open(os.path.join(sections, n), encoding="utf-8") as f:
+                head = f.read(4000)
+            m, t = re.search(r"^input_id: (\d+)$", head, re.M), re.search(r"^section_tag: (\S+)$", head, re.M)
+            file_ids[int(m.group(1)) if m else n] = t.group(1) if t else "?"
+        if len(files) != len(served) or set(file_ids) != set(served_ids):
+            def ids(rows):
+                return ", ".join(f"{i} ({tag})" for i, tag in sorted(rows, key=str)) or "none"
+            missing = [(i, served_ids[i]) for i in set(served_ids) - set(file_ids)]
+            extra = [(i, file_ids[i]) for i in set(file_ids) - set(served_ids)]
+            info.update(status="error", why=f"{len(served)} served rows but {len(files)} section files; "
+                        f"served rows with no section file: {ids(missing)}; "
+                        f"section files with no served row: {ids(extra)}")
+            return [], info
+        os.mkdir(triggers)
+        for _, fields in served:
+            if fields.get("user_trigger_prompt"):
+                info["triggers"] += 1
+                with open(os.path.join(triggers, f"{fields['input_id']}.txt"), "w", encoding="utf-8") as f:
+                    f.write(fields["user_trigger_prompt"])
+        rows = []
+        for source, path in (("section", sections), ("trigger", triggers)):
+            for r in _scan_in(path):
+                if os.path.basename(r["file"]) == "README.md":
+                    continue
+                r.update(file=os.path.join(source + "s", os.path.relpath(r["file"])), source=source)
+                rows.append(r)
+        return rows, info
+    finally:
+        shutil.rmtree(tmp)
+
+
+def audit_rows() -> tuple[list[tuple[str, dict]], dict]:
+    """Every counted audit row as (area, row), and how the app seed was measured.
+
+    The tree scan skips everything under apps_lakebase/prompts/ (raw seed, generated
+    files, local sections), so no seed line is counted twice; the app seed in
+    PROMPTS_DIR is then added once per served row (app_seed_rows)."""
+    rows = [(_area(r["file"]), r) for r in _scan_in(REPO_ROOT)
+            if r["class"] != "READ_ERROR"
+            and not os.path.normpath(r["file"]).startswith(PROMPTS_REL + os.sep)]
+    seed_rows, info = app_seed_rows(PROMPTS_DIR)
+    rows += [(APP_SEED_AREA, r) for r in seed_rows if r["class"] != "READ_ERROR"]
+    return rows, info
+
+
+def measure_audit() -> tuple[dict, dict]:
+    """The audit counts by area and class, and how the app seed was measured."""
+    rows, info = audit_rows()
+    by_class = Counter(r["class"] for _, r in rows)
+    counts = {
         "total": sum(by_class.values()),
         "by_class": dict(by_class),
-        "by_area_class": dict(by_area_class),
+        "by_area_class": dict(Counter(f"{area}::{r['class']}" for area, r in rows)),
     }
+    return counts, info
+
+
+def current_counts() -> dict:
+    """Run the audit from the repo root and bucket flags by area and class."""
+    return measure_audit()[0]
 
 
 def load_baseline() -> dict | None:
@@ -111,7 +231,7 @@ def check_audit(touched: set[str]) -> bool:
     if baseline is None:
         print("NO BASELINE yet. Run: python scripts/genie_gate.py --update-baseline")
         return False
-    cur = current_counts()
+    cur, app = measure_audit()
     base_ac = baseline.get("by_area_class", {})
 
     regressions = []
@@ -126,14 +246,22 @@ def check_audit(touched: set[str]) -> bool:
 
     total_delta = cur["total"] - baseline["total"]
     print("=== audit gate ===")
+    if app["status"] == "measured":
+        print(f"app seed: {app['served']} served row(s) counted once each: {app['section_files']} "
+              f"section file(s) + {app['triggers']} user_trigger_prompt(s); "
+              f"{len(app['dropped'])} superseded/inactive row(s) not counted")
     print(f"total: baseline {baseline['total']} -> current {cur['total']} "
           f"(delta {total_delta:+d})")
     if touched:
         print(f"touched (changes allowed): {', '.join(sorted(touched))}")
-    moved = {a: d for a, d in sorted(per_area_delta.items()) if d != 0}
+    moved = {a: d for a, d in sorted(per_area_delta.items())
+             if d != 0 and (app["status"] == "measured" or a != APP_SEED_AREA)}
     if moved:
         print("per-area delta: " + ", ".join(f"{a} {d:+d}" for a, d in moved.items()))
 
+    if app["status"] == "error":
+        print(f"\nFAIL — app seed could not be counted: {app['why']}")
+        return False
     if regressions:
         print("\nFAIL — untouched areas increased (regression):")
         for k, b, c in sorted(regressions):
@@ -141,6 +269,13 @@ def check_audit(touched: set[str]) -> bool:
         return False
     if total_delta > 0:
         print("WARN — total rose, but only within touched areas. Confirm it's intended.")
+    if app["status"] == "skip":
+        # Without the seed, apps_lakebase is far below its lock; that is not a pass.
+        print(f"{APP_SEED_AREA}:: SKIP — app seed text not measured ({app['why']}); "
+              f"its counts hold only the template's own files.")
+        print(f"  run it against the app repo: {APP_REPO_COMMAND}")
+        print(f"audit gate: PASS for the other areas; {APP_SEED_AREA}:: SKIP")
+        return True
     print("audit gate: PASS")
     return True
 
