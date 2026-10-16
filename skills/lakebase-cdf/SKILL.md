@@ -1,3 +1,15 @@
+---
+name: lakebase-cdf
+description: >
+  Lakebase Change Data Feed (CDF) — stream INSERT/UPDATE/DELETE from Lakebase
+  Postgres via the WAL (wal2delta) into Unity Catalog lb_<table>_history Delta
+  tables. Use for the sync_from_lakebase step when enable_lakebase_cdf is true:
+  prerequisites (Postgres 17 autoscaling, non-default-storage catalog, REPLICA
+  IDENTITY FULL), schema-level enablement, verifying STREAMING in
+  wal2delta.tables, consuming _pg_* columns, and disabling.
+metadata:
+  author: prashanth subrahmanyam
+---
 # Lakebase Change Data Feed (CDF) — Sync Postgres to Unity Catalog
 
 ## Overview
