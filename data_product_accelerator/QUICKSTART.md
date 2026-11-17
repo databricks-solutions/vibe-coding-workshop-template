@@ -28,6 +28,8 @@ This guide walks you through building a complete Databricks data platform — fr
 >   /Workspace/Users/<your-username>/.assistant/skills/vibe-coding-workshop
 > ```
 > 
+> Genie Code's default **Auto-approve** mode always blocks the agent's copy into `.assistant/`. Set Genie Code approvals to **Ask first** (the ⋮ menu, Settings, Actions) and click Allow on the copy, or open `setup/publish_skills.ipynb` in your clone and click Run all.
+> 
 > After the copy lands, **start a NEW Agent-mode chat thread** (hard-refresh the page if skills don't appear), then load `skills/genie-code-environment`; `skills/vibecoding-state` detects `client_context` and gates each prompt. Genie Code is pre-authenticated — skip the CLI auth prerequisite above. Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 ---

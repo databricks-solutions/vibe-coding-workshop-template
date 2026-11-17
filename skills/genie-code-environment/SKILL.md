@@ -335,6 +335,15 @@ This is *how* a session runs — distilled from the field forks (someone ran thi
   before the first write (`vibecoding-state`'s `resolve_root` / `bootstrap` step 0 do this; `git clone` if
   absent, then confirm with `os.path.exists` to clear the FUSE create-then-validate gap; a Repos-managed Git
   folder is the documented fallback). [TESTED P2]
+- **Writes to `.assistant/` need the learner's approval — never retry or route around a denial.** In
+  Genie Code's default **Auto-approve** mode, every agent write to or delete under `.assistant/` (the skills
+  copy, a newly published skill) is denied as protected assistant configuration, even after the learner
+  confirms. Before such a write, tell the learner to set Genie Code approvals to **Ask first** (the ⋮ menu,
+  Settings, Actions) and click Allow. If it is denied anyway, do NOT retry it, and do NOT write a notebook,
+  script or job that does the copy for you. Instead ask the learner to run it themselves: for the full skills copy,
+  open `<artifact_root>/setup/publish_skills.ipynb` and click Run all; for anything else, paste the exact code
+  into a serverless notebook cell and run it. Then re-check the target with `os.path.exists`. With Ask first
+  set, the same copy runs once the learner clicks Allow. [TESTED — user-observed]
 - **The data-product bundle anchors to `dp_bundle_root`, a dedicated subdir — not the bare `artifact_root` root.**
   `skills/vibecoding-state` captures `dp_bundle_root = <artifact_root>/<use_case_slug>_dab` (e.g.
   `…/vibe-coding-workshop/booking_app_dab`). The whole DP pipeline (bronze→silver→gold→semantic) writes its
