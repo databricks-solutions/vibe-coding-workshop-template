@@ -225,6 +225,8 @@ cp -r /Workspace/Users/<your-username>/vibe-coding-workshop \
 # (a second `git clone` to the skills path instead of `cp -r` is the optional `git pull`-refresh alternative)
 ```
 
+**Approvals for the copy.** In its default **Auto-approve** mode, Genie Code always blocks the agent's own writes to `.assistant/`, even after you confirm. Before step 2, set Genie Code approvals to **Ask first** (the ⋮ menu, Settings, Actions) and click Allow on the copy; you can switch back to Auto-approve afterwards. Or skip the agent entirely: open `setup/publish_skills.ipynb` in your clone, attach serverless, and click Run all (it runs the copy and prints the two setup checks).
+
 After the copy lands, **start a NEW Agent-mode chat thread** (hard-refresh the page if the skills don't appear) so Genie Code recurses into the `.assistant/skills` copy and auto-loads every `SKILL.md` beneath it. Then **load `skills/genie-code-environment`** so the agent knows how it behaves on Genie Code (pre-auth, serverless, page-context CLI via `runDatabricksCli`, artifact placement under your git-cloned user project root — skills load from the `.assistant/skills` copy — never `/tmp`). Session state and client detection are owned by `skills/vibecoding-state` (it sets `client_context` and gates each prompt). Full setup: [PRE-REQUISITES.md](PRE-REQUISITES.md) (Genie Code path). Grounded in the [Genie Code skills docs](https://learn.microsoft.com/en-us/azure/databricks/genie-code/skills).
 
 **Skill roots** (Genie Code recurses all of these; any IDE can also reference them directly):
